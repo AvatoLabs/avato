@@ -132,6 +132,7 @@ describe('DocumentService', () => {
       delete: vi.fn(),
       deleteManyAny: vi.fn(),
       findById: vi.fn(),
+      hasFilesForBlob: vi.fn(),
       softDeleteManyAny: vi.fn(),
       update: vi.fn(),
       updateAny: vi.fn(),
@@ -538,6 +539,7 @@ describe('DocumentService', () => {
 
       (mockDb.query as any).files.findMany.mockResolvedValueOnce([
         {
+          blobId: null,
           contentUid: 'res_file_1',
           fileHash: null,
           spaceId: 'spc_test',
@@ -567,6 +569,7 @@ describe('DocumentService', () => {
 
       (mockDb.query as any).files.findMany.mockResolvedValueOnce([
         {
+          blobId: null,
           contentUid: 'res_file_1',
           fileHash: 'hash-1',
           spaceId: 'spc_test',
@@ -579,6 +582,31 @@ describe('DocumentService', () => {
       await service.deleteDocuments(['doc-1'], false);
 
       expect(mockFileService.deleteFiles).not.toHaveBeenCalled();
+      expect(mockFileModel.checkHash).not.toHaveBeenCalled();
+    });
+
+    it('should preserve shared space blobs while another file still references them', async () => {
+      (mockDb.query as any).documents.findMany
+        .mockResolvedValueOnce([{ fileId: 'file-1', fileType: 'custom/document', id: 'doc-1' }])
+        .mockResolvedValueOnce([{ contentUid: 'res_doc_1', spaceId: 'spc_test' }]);
+
+      (mockDb.query as any).files.findMany.mockResolvedValueOnce([
+        {
+          blobId: 'blob-1',
+          contentUid: 'res_file_1',
+          fileHash: null,
+          spaceId: 'spc_test',
+          url: 'v2/spaces/spc_test/blobs/blob-1',
+        },
+      ]);
+
+      mockFileModel.hasFilesForBlob.mockResolvedValue(true);
+      mockFileModel.deleteManyAny.mockResolvedValue([]);
+
+      await service.deleteDocuments(['doc-1'], false);
+
+      expect(mockFileService.deleteFiles).not.toHaveBeenCalled();
+      expect(mockFileModel.hasFilesForBlob).toHaveBeenCalledWith('blob-1');
       expect(mockFileModel.checkHash).not.toHaveBeenCalled();
     });
   });
@@ -887,6 +915,33 @@ describe('DocumentService', () => {
   });
 
   describe('ensureFileDocument', () => {
+    it('should accept canonical document ids without resolving the backing file', async () => {
+      const existingDocument = {
+        content: '# Hello',
+        createdAt: new Date('2026-04-07T00:00:00.000Z'),
+        editorData: null,
+        fileType: 'custom/document',
+        filename: 'Readme',
+        id: 'docs_1',
+        metadata: {},
+        parentId: null,
+        source: '/f/file-1',
+        sourceType: 'file',
+        title: 'Readme',
+        totalCharCount: 7,
+        totalLineCount: 1,
+        updatedAt: new Date('2026-04-07T00:00:00.000Z'),
+      };
+      mockRequireDocument.mockResolvedValue(existingDocument);
+
+      const result = await service.ensureFileDocument('docs_1');
+
+      expect(mockRequireDocument).toHaveBeenCalledWith('docs_1', 'preview_content');
+      expect(mockRequireFile).not.toHaveBeenCalled();
+      expect(mockDocumentModel.findByFileId).not.toHaveBeenCalled();
+      expect(result).toBe(existingDocument);
+    });
+
     it('should reuse an existing parsed document for the file', async () => {
       const existingDocument = { fileId: 'file-1', id: 'docs_1', sourceType: 'file' };
       mockDocumentModel.findByFileId.mockResolvedValue(existingDocument);
@@ -927,6 +982,38 @@ describe('DocumentService', () => {
         }),
       );
       expect(result).toEqual({ id: 'docs_2', title: 'Readme' });
+    });
+  });
+
+  describe('previewFileContent', () => {
+    it('should return canonical document content directly for docs_* ids', async () => {
+      const document = {
+        content: '# Hello',
+        createdAt: new Date('2026-04-07T00:00:00.000Z'),
+        editorData: { blocks: [] },
+        fileType: 'custom/document',
+        filename: 'Readme',
+        id: 'docs_1',
+        metadata: { title: 'Readme' },
+        pages: [{ metadata: { page: 1 }, pageContent: 'Hello', charCount: 5, lineCount: 1 }],
+        parentId: null,
+        source: '/f/file-1',
+        sourceSetId: 'ss_1',
+        sourceType: 'file',
+        spaceId: 'spc_1',
+        title: 'Readme',
+        totalCharCount: 7,
+        totalLineCount: 1,
+        updatedAt: new Date('2026-04-07T00:00:00.000Z'),
+      };
+      mockRequireDocument.mockResolvedValue(document);
+
+      const result = await service.previewFileContent('docs_1');
+
+      expect(mockRequireDocument).toHaveBeenCalledWith('docs_1', 'preview_content');
+      expect(mockRequireFile).not.toHaveBeenCalled();
+      expect(mockFileService.downloadFileToLocal).not.toHaveBeenCalled();
+      expect(result).toEqual(document);
     });
   });
 

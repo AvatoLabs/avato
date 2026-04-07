@@ -26,12 +26,25 @@ import {
   messageApi,
   topicApi,
 } from '../lib/api';
+import {
+  buildDocContextDisplayText,
+  buildDocContextPromptText,
+  toDocSelections,
+} from '../lib/chatContext';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
 import { navigateToLogin } from '../lib/navigation';
+import { isRawFileResourceId } from '../lib/resourceList';
 import { isGroupSessionLike, resolveSessionTypeWithFallback } from '../lib/session';
 import { generateBestTitle } from '../lib/titleGeneration';
-import type { ChatMessage, ChatToolPayload, MobileMemoryEffort, Topic } from '../types';
+import type {
+  ChatContextSelection,
+  ChatMessage,
+  ChatToolPayload,
+  DocSelection,
+  MobileMemoryEffort,
+  Topic,
+} from '../types';
 import {
   getSessionChatOptions,
   mergeResolvedToolPayloads,
@@ -142,6 +155,56 @@ const FILE_CONTENT_EXTRACTION_RETRY_DELAYS = [0, 600, 1500];
 const buildAttachmentDisplayContent = (attachments: UploadedAttachment[]) =>
   attachments.map((f) => `[${f.name}]`).join('\n');
 
+const getMessageDocSelections = (
+  message?: Pick<ChatMessage, 'metadata'> | null,
+): DocSelection[] => {
+  const rawSelections = message?.metadata?.docSelections;
+  if (!Array.isArray(rawSelections)) return [];
+
+  return rawSelections.filter(
+    (selection): selection is DocSelection =>
+      !!selection &&
+      typeof selection === 'object' &&
+      typeof (selection as DocSelection).content === 'string' &&
+      typeof (selection as DocSelection).docId === 'string' &&
+      typeof (selection as DocSelection).id === 'string',
+  );
+};
+
+const hasMessageDocSelections = (message?: Pick<ChatMessage, 'metadata'> | null) =>
+  getMessageDocSelections(message).length > 0;
+
+const buildDocContextSummarySection = (contexts: Array<ChatContextSelection | DocSelection>) => {
+  if (contexts.length === 0) return '';
+
+  return `Document context:\n${buildDocContextDisplayText(contexts)}`;
+};
+
+const buildDocContextPromptSection = (contexts: Array<ChatContextSelection | DocSelection>) => {
+  if (contexts.length === 0) return '';
+
+  return `Document context:\n${buildDocContextPromptText(contexts)}`;
+};
+
+const buildUserDisplayContent = (
+  text: string,
+  attachments: UploadedAttachment[],
+  docContexts: ChatContextSelection[],
+) => {
+  const blocks: string[] = [];
+
+  if (text) blocks.push(text);
+  if (!text && docContexts.length > 0) {
+    blocks.push(buildDocContextSummarySection(docContexts));
+  }
+
+  if (blocks.length === 0 && attachments.length > 0) {
+    blocks.push(buildAttachmentDisplayContent(attachments));
+  }
+
+  return blocks.join('\n\n').trim();
+};
+
 const buildAttachmentContextLine = (attachment: UploadedAttachment) => {
   const extractedContent = attachment.content?.trim();
 
@@ -162,10 +225,16 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const GROUP_LOADING_CONTENT = '...';
 const GROUP_POLL_INTERVAL_MS = 1200;
 const GROUP_POLL_MAX_ATTEMPTS = 45;
+const isAttachableFileId = (fileId?: string | null) => isRawFileResourceId(fileId);
 
 const hydrateAttachmentContents = async (attachments: UploadedAttachment[]) => {
   const pendingFileIds = attachments
-    .filter((attachment) => !isImageAttachment(attachment.type) && !attachment.content?.trim())
+    .filter(
+      (attachment) =>
+        !isImageAttachment(attachment.type) &&
+        !attachment.content?.trim() &&
+        isAttachableFileId(attachment.fileId),
+    )
     .map((attachment) => attachment.fileId);
 
   if (pendingFileIds.length === 0) return;
@@ -218,8 +287,25 @@ const buildAttachmentPromptText = (text: string, attachments: UploadedAttachment
   return textBlocks.join('\n\n');
 };
 
-const isAttachableFileId = (fileId?: string | null) =>
-  typeof fileId === 'string' && fileId.trim().length > 0 && !fileId.startsWith('docs_');
+const buildUserPromptText = (
+  text: string,
+  attachments: UploadedAttachment[],
+  docContexts: Array<ChatContextSelection | DocSelection>,
+) => {
+  const textBlocks: string[] = [];
+  const attachmentText = buildAttachmentPromptText(text, attachments).trim();
+  const docContextText = buildDocContextPromptSection(docContexts);
+
+  if (attachmentText) {
+    textBlocks.push(attachmentText);
+  }
+
+  if (docContextText) {
+    textBlocks.push(docContextText);
+  }
+
+  return textBlocks.join('\n\n').trim();
+};
 
 const normalizeTopicItem = (topic: any, sessionId: string): Topic => ({
   createdAt:
@@ -695,12 +781,12 @@ const toToolCalls = (message: ChatMessage): MobileMessageToolCall[] | undefined 
 const buildContextMessage = (message: ChatMessage): MobileChatMessage | null => {
   if (message.role === 'user') {
     const attachments = toUploadedAttachment(message);
+    const docSelections = getMessageDocSelections(message);
+    const promptText = buildUserPromptText(message.content, attachments, docSelections);
 
     return {
       content:
-        attachments.length > 0
-          ? buildUserStreamContent(message.content, attachments)
-          : message.content,
+        attachments.length > 0 ? buildUserStreamContent(promptText, attachments) : promptText,
       role: 'user',
     };
   }
@@ -737,7 +823,7 @@ const mergePersistedMessageWithLocal = (
   const shouldPreferLocalUserCaption =
     persisted.role === 'user' &&
     local.role === 'user' &&
-    hasMessageAttachments(local) &&
+    (hasMessageAttachments(local) || hasMessageDocSelections(local)) &&
     !!local.content?.trim();
   const shouldPreferLocalAssistantContent =
     persisted.role === 'assistant' &&
@@ -1084,11 +1170,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const textContent = content.trim();
     const fileState = useFileStore.getState();
     const attachments = fileState.pendingFiles.filter((f) => f.status !== 'error');
+    const chatContextSelections = fileState.chatContextSelections;
+    const docSelections = toDocSelections(chatContextSelections);
     if (attachments.some((f) => f.status === 'uploading')) {
       return false;
     }
 
-    if (!textContent && attachments.length === 0) return false;
+    if (!textContent && attachments.length === 0 && chatContextSelections.length === 0)
+      return false;
 
     const uploadedAttachments: UploadedAttachment[] = [];
     if (attachments.length > 0) {
@@ -1129,7 +1218,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return false;
     }
 
-    const displayContent = textContent || buildAttachmentDisplayContent(uploadedAttachments);
+    const displayContent = buildUserDisplayContent(
+      textContent,
+      uploadedAttachments,
+      chatContextSelections,
+    );
+    const promptContent = buildUserPromptText(
+      textContent,
+      uploadedAttachments,
+      chatContextSelections,
+    );
     const attachedFileIds = uploadedAttachments
       .map((f) => f.fileId)
       .filter((fileId): fileId is string => isAttachableFileId(fileId));
@@ -1157,6 +1255,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           url: f.url,
         })),
       createdAt: new Date().toISOString(),
+      ...(docSelections.length > 0 ? { metadata: { docSelections } } : {}),
       updatedAt: new Date().toISOString(),
     };
 
@@ -1221,13 +1320,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
           agentId: supervisorAgentId,
           ...(attachedFileIds.length > 0 ? { files: attachedFileIds } : {}),
           groupId: sessionId,
-          message: buildAttachmentPromptText(textContent, uploadedAttachments),
+          message: promptContent,
           targetId,
           topicId,
         });
 
-        if (uploadedAttachments.length > 0) {
+        if (result.userMessageId) {
+          if (promptContent !== displayContent) {
+            void messageApi.update(result.userMessageId, displayContent).catch((error) => {
+              console.warn('[ChatStore] Failed to normalize group user message content:', error);
+            });
+          }
+
+          if (docSelections.length > 0) {
+            void messageApi
+              .updateMetadata(result.userMessageId, { docSelections })
+              .catch((error) => {
+                console.warn('[ChatStore] Failed to persist group doc selections:', error);
+              });
+          }
+        }
+
+        if (uploadedAttachments.length > 0 || chatContextSelections.length > 0) {
           useFileStore.getState().clearPending();
+          useFileStore.getState().clearChatContextSelections();
         }
 
         const resolvedTopicId = result.topicId ?? topicId ?? null;
@@ -1627,6 +1743,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ...messageContainerParams,
         content: displayContent,
         ...(attachedFileIds.length > 0 ? { files: attachedFileIds } : {}),
+        ...(docSelections.length > 0 ? { metadata: { docSelections } } : {}),
         role: 'user',
         topicId: resolvedTopicId,
       } as any);
@@ -1666,9 +1783,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const lastCtx = contextMessages.at(-1);
       if (!lastCtx) return false;
       if (lastCtx.role === 'user') {
-        const lastTextContent =
-          typeof lastCtx.content === 'string' ? lastCtx.content : textContent || displayContent;
-        const multimodalContent = buildUserStreamContent(lastTextContent, uploadedAttachments);
+        const multimodalContent = buildUserStreamContent(promptContent, uploadedAttachments);
         contextMessages[lastIndex] = {
           ...lastCtx,
           content: multimodalContent,
@@ -1705,8 +1820,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ],
       },
     }));
-    if (uploadedAttachments.length > 0) {
+    if (uploadedAttachments.length > 0 || chatContextSelections.length > 0) {
       useFileStore.getState().clearPending();
+      useFileStore.getState().clearChatContextSelections();
     }
 
     // Stream AI response via XHR (RN fetch lacks ReadableStream support)

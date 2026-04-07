@@ -27,6 +27,45 @@ export interface SpaceItem {
   updatedAt: Date;
 }
 
+export interface CanonicalContentResource {
+  id: string;
+  kind?: 'document' | 'file' | null;
+  sourceType?: 'document' | 'file' | null;
+}
+
+export interface CanonicalSharedContentResource {
+  kind: ContentKind;
+  localId: string;
+}
+
+export const isCanonicalDocumentResource = (item?: CanonicalContentResource | null): boolean => {
+  if (!item) return false;
+
+  return item.kind === 'document' || item.sourceType === 'document' || item.id.startsWith('docs_');
+};
+
+export const getCanonicalContentKind = (
+  item?: CanonicalContentResource | null,
+): 'document' | 'file' => {
+  return isCanonicalDocumentResource(item) ? 'document' : 'file';
+};
+
+export const isRawFileContentResource = (item?: CanonicalContentResource | null): boolean => {
+  return getCanonicalContentKind(item) === 'file';
+};
+
+export const isRawFileContentId = (id: string): boolean => {
+  return isRawFileContentResource({ id, sourceType: 'file' });
+};
+
+export const getCanonicalSharedContentKind = (
+  item: CanonicalSharedContentResource,
+): ContentKind => {
+  if (item.kind === 'source_set') return item.kind;
+
+  return getCanonicalContentKind({ id: item.localId, kind: item.kind });
+};
+
 export interface SpaceMemberItem {
   avatar?: string | null;
   createdBy: string;

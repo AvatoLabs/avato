@@ -1,3 +1,4 @@
+import { getCanonicalContentKind } from '@lobechat/types';
 import { z } from 'zod';
 
 import { SearchRepo } from '@/database/repositories/search';
@@ -194,7 +195,7 @@ export const searchRouter = router({
               return ctx.contentAuthorizer.getAccessMatch({
                 capability: 'read_metadata',
                 id: result.id,
-                kind: 'file',
+                kind: getCanonicalContentKind({ id: result.id, sourceType: 'file' }),
               });
             }
             case 'folder':

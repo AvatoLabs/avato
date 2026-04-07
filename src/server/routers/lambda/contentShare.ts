@@ -1,4 +1,5 @@
 import { documents } from '@lobechat/database/schemas';
+import { getCanonicalContentKind } from '@lobechat/types';
 import { nanoid } from '@lobechat/utils';
 import { TRPCError } from '@trpc/server';
 import bcrypt from 'bcryptjs';
@@ -32,9 +33,19 @@ const resolveTargetContent = async (
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'RESOURCE_TARGET_REQUIRED' });
   }
 
-  const registry = await model.findContentRegistryByLocalId(input.kind, input.id);
-  if (!registry) throw new TRPCError({ code: 'NOT_FOUND', message: 'RESOURCE_NOT_FOUND' });
-  return registry;
+  const canonicalKind =
+    input.kind === 'source_set'
+      ? input.kind
+      : getCanonicalContentKind({ id: input.id, kind: input.kind });
+  const candidateKinds =
+    input.kind !== canonicalKind ? (['document', 'file'] as const) : ([input.kind] as const);
+
+  for (const kind of candidateKinds) {
+    const registry = await model.findContentRegistryByLocalId(kind, input.id);
+    if (registry) return registry;
+  }
+
+  throw new TRPCError({ code: 'NOT_FOUND', message: 'RESOURCE_NOT_FOUND' });
 };
 
 const shareProcedure = authedProcedure.use(serverDatabase).use(async ({ ctx, next }) => {

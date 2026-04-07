@@ -6,7 +6,8 @@ import { create } from 'zustand';
 import { useToast } from '../components/ui/Toast';
 import { fileApi } from '../lib/api';
 import { useI18n } from '../lib/i18n';
-import type { FileAttachment } from '../types';
+import { isCanonicalDocumentItem } from '../lib/resourceList';
+import type { ChatContextSelection, FileAttachment } from '../types';
 
 export interface UploadedFileResult {
   fileId: string;
@@ -14,20 +15,35 @@ export interface UploadedFileResult {
 }
 
 interface FileState {
+  addChatContextSelection: (context: ChatContextSelection) => void;
   addFile: (file: Omit<FileAttachment, 'status' | 'progress'>) => void;
 
+  chatContextSelections: ChatContextSelection[];
+  clearChatContextSelections: () => void;
   clearPending: () => void;
   pendingFiles: FileAttachment[];
+  removeChatContextSelection: (id: string) => void;
   removeFile: (id: string) => void;
   uploadAll: () => Promise<void>;
   uploadFile: (id: string, options?: { sessionId?: string }) => Promise<UploadedFileResult | null>;
 }
 
 export const useFileStore = create<FileState>((set, get) => ({
+  chatContextSelections: [],
   pendingFiles: [],
 
   addFile: (file) => {
     const alreadyUploaded = 'fileId' in file && 'url' in file && !!file.fileId && !!file.url;
+    if (
+      alreadyUploaded &&
+      file.fileId &&
+      isCanonicalDocumentItem({ id: file.fileId, kind: 'file' })
+    ) {
+      const t = useI18n.getState().t;
+      useToast.getState().show('error', t.fileUploadFailed);
+      return;
+    }
+
     const attachment: FileAttachment = {
       ...file,
       progress: alreadyUploaded ? 100 : 0,
@@ -36,8 +52,23 @@ export const useFileStore = create<FileState>((set, get) => ({
     set((s) => ({ pendingFiles: [...s.pendingFiles, attachment] }));
   },
 
+  addChatContextSelection: (context) => {
+    set((s) => ({
+      chatContextSelections: [
+        ...s.chatContextSelections.filter((item) => item.id !== context.id),
+        context,
+      ],
+    }));
+  },
+
   removeFile: (id) => {
     set((s) => ({ pendingFiles: s.pendingFiles.filter((f) => f.id !== id) }));
+  },
+
+  removeChatContextSelection: (id) => {
+    set((s) => ({
+      chatContextSelections: s.chatContextSelections.filter((context) => context.id !== id),
+    }));
   },
 
   uploadFile: async (id: string, options?: { sessionId?: string }) => {
@@ -45,14 +76,10 @@ export const useFileStore = create<FileState>((set, get) => ({
     if (!file) return null;
 
     if (file.fileId && file.url) {
-      if (file.fileId.startsWith('docs_')) {
+      if (isCanonicalDocumentItem({ id: file.fileId, kind: 'file' })) {
         const t = useI18n.getState().t;
         useToast.getState().show('error', t.fileUploadFailed);
-        set((s) => ({
-          pendingFiles: s.pendingFiles.map((f) =>
-            f.id === id ? { ...f, status: 'error' as const } : f,
-          ),
-        }));
+        set((s) => ({ pendingFiles: s.pendingFiles.filter((f) => f.id !== id) }));
         return null;
       }
       return { fileId: file.fileId, url: file.url };
@@ -118,5 +145,9 @@ export const useFileStore = create<FileState>((set, get) => ({
 
   clearPending: () => {
     set({ pendingFiles: [] });
+  },
+
+  clearChatContextSelections: () => {
+    set({ chatContextSelections: [] });
   },
 }));

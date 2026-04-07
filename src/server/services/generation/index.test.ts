@@ -1,15 +1,17 @@
 import { sha256 } from 'js-sha256';
 import mime from 'mime';
-import { nanoid } from 'nanoid';
 import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FileService } from '@/server/services/file';
 import { calculateThumbnailDimensions } from '@/utils/number';
-import { getYYYYmmddHHMMss } from '@/utils/time';
 import { inferFileExtensionFromImageUrl } from '@/utils/url';
 
 import { fetchImageFromUrl, GenerationService } from './index';
+
+const { mockResolveProviderReadableFileReference } = vi.hoisted(() => ({
+  mockResolveProviderReadableFileReference: vi.fn(),
+}));
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -20,11 +22,12 @@ vi.mock('debug', () => ({
 }));
 vi.mock('js-sha256');
 vi.mock('mime');
-vi.mock('nanoid');
 vi.mock('sharp');
 vi.mock('@/server/services/file');
+vi.mock('@/server/services/file/resolveProviderReadableFileReference', () => ({
+  resolveProviderReadableFileReference: mockResolveProviderReadableFileReference,
+}));
 vi.mock('@/utils/number');
-vi.mock('@/utils/time');
 vi.mock('@/utils/url');
 
 describe('GenerationService', () => {
@@ -38,11 +41,16 @@ describe('GenerationService', () => {
 
     // Setup common mocks used across all tests
     mockFileService = {
+      createOpaqueUserBlobPath: vi.fn(),
+      getFullFileUrl: vi.fn(),
+      getKeyFromFullUrl: vi.fn(),
       uploadMedia: vi.fn(),
     };
     vi.mocked(FileService).mockImplementation(() => mockFileService);
-    vi.mocked(nanoid).mockReturnValue('test-uuid');
-    vi.mocked(getYYYYmmddHHMMss).mockReturnValue('20240101123000');
+    mockFileService.getKeyFromFullUrl.mockResolvedValue(null);
+    mockFileService.getFullFileUrl.mockImplementation(async (url: string) => url);
+    mockResolveProviderReadableFileReference.mockReset();
+    mockResolveProviderReadableFileReference.mockResolvedValue(null);
 
     // Setup mime.getExtension with consistent behavior
     vi.mocked(mime.getExtension).mockImplementation((mimeType) => {
@@ -320,12 +328,12 @@ describe('GenerationService', () => {
       expect(result.image.width).toBe(800);
       expect(result.image.height).toBe(600);
       expect(result.image.extension).toBe('png');
-      expect(result.image.hash).toMatch(/^hash-\d+-/); // Matches our stable hash format
+      expect(result.image.sha256).toMatch(/^hash-\d+-/); // Matches our stable hash format
 
       // Verify thumbnail properties
       expect(result.thumbnailImage.width).toBe(512);
       expect(result.thumbnailImage.height).toBe(384);
-      expect(result.thumbnailImage.hash).toMatch(/^hash-\d+-/);
+      expect(result.thumbnailImage.sha256).toMatch(/^hash-\d+-/);
 
       // Verify resize was called with correct dimensions
       expect(mockSharp.resize).toHaveBeenCalledWith(512, 384);
@@ -370,6 +378,46 @@ describe('GenerationService', () => {
       expect(result.image.width).toBe(1024);
       expect(result.image.height).toBe(768);
       expect(result.image.extension).toBe('jpg'); // URL is image.jpg, so extension should be jpg
+      expect(result.thumbnailImage.width).toBe(512);
+      expect(result.thumbnailImage.height).toBe(384);
+    });
+
+    it('should resolve relative stable file proxy URLs before transforming images', async () => {
+      const url = '/f/file-1';
+      const readableUrl = 'https://blob.example.com/v2/spaces/spc_personal/blobs/source.png';
+
+      const mockArrayBuffer = mockOriginalBuffer.buffer.slice(
+        mockOriginalBuffer.byteOffset,
+        mockOriginalBuffer.byteOffset + mockOriginalBuffer.byteLength,
+      );
+      mockFileService.getFullFileUrl.mockResolvedValueOnce(readableUrl);
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: {
+          get: vi.fn().mockReturnValue('image/png'),
+        },
+        arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer),
+      });
+
+      const mockSharp = {
+        metadata: vi.fn().mockResolvedValue({ format: 'png', width: 1024, height: 768 }),
+        resize: vi.fn().mockReturnThis(),
+        webp: vi.fn().mockReturnThis(),
+        toBuffer: vi.fn().mockResolvedValue(mockThumbnailBuffer),
+      };
+      vi.mocked(sharp).mockReturnValue(mockSharp as any);
+      vi.mocked(calculateThumbnailDimensions).mockReturnValue({
+        shouldResize: true,
+        thumbnailWidth: 512,
+        thumbnailHeight: 384,
+      });
+
+      const result = await service.transformImageForGeneration(url);
+
+      expect(mockFileService.getFullFileUrl).toHaveBeenCalledWith(url);
+      expect(mockFetch).toHaveBeenCalledWith(readableUrl, { headers: undefined });
+      expect(result.image.extension).toBe('png');
       expect(result.thumbnailImage.width).toBe(512);
       expect(result.thumbnailImage.height).toBe(384);
     });
@@ -623,33 +671,47 @@ describe('GenerationService', () => {
     };
 
     it('should upload both images when buffers are different', async () => {
+      mockFileService.createOpaqueUserBlobPath
+        .mockResolvedValueOnce({ key: 'v2/spaces/spc_personal/blobs/generations/images/raw.png' })
+        .mockResolvedValueOnce({
+          key: 'v2/spaces/spc_personal/blobs/generations/images/thumb.png',
+        });
       mockFileService.uploadMedia
         .mockResolvedValueOnce({
-          key: 'generations/images/test-uuid_600x800_20240101123000_raw.png',
+          key: 'v2/spaces/spc_personal/blobs/generations/images/raw.png',
         })
         .mockResolvedValueOnce({
-          key: 'generations/images/test-uuid_300x400_20240101123000_thumb.png',
+          key: 'v2/spaces/spc_personal/blobs/generations/images/thumb.png',
         });
 
       const result = await service.uploadImageForGeneration(mockImage, mockThumbnail);
 
       expect(mockFileService.uploadMedia).toHaveBeenCalledTimes(2);
 
-      // Verify correct file naming pattern with dimensions
+      expect(mockFileService.createOpaqueUserBlobPath).toHaveBeenNthCalledWith(
+        1,
+        'generations/images',
+        'png',
+      );
+      expect(mockFileService.createOpaqueUserBlobPath).toHaveBeenNthCalledWith(
+        2,
+        'generations/images',
+        'png',
+      );
       expect(mockFileService.uploadMedia).toHaveBeenNthCalledWith(
         1,
-        expect.stringMatching(/^generations\/images\/test-uuid_600x800_20240101123000_raw\.png$/),
+        'v2/spaces/spc_personal/blobs/generations/images/raw.png',
         mockImage.buffer,
       );
       expect(mockFileService.uploadMedia).toHaveBeenNthCalledWith(
         2,
-        expect.stringMatching(/^generations\/images\/test-uuid_300x400_20240101123000_thumb\.png$/),
+        'v2/spaces/spc_personal/blobs/generations/images/thumb.png',
         mockThumbnail.buffer,
       );
 
       expect(result).toEqual({
-        imageUrl: 'generations/images/test-uuid_600x800_20240101123000_raw.png',
-        thumbnailImageUrl: 'generations/images/test-uuid_300x400_20240101123000_thumb.png',
+        imageUrl: 'v2/spaces/spc_personal/blobs/generations/images/raw.png',
+        thumbnailImageUrl: 'v2/spaces/spc_personal/blobs/generations/images/thumb.png',
       });
     });
 
@@ -658,8 +720,11 @@ describe('GenerationService', () => {
       const imageWithSameBuffer = { ...mockImage, buffer: identicalBuffer };
       const thumbnailWithSameBuffer = { ...mockThumbnail, buffer: identicalBuffer };
 
+      mockFileService.createOpaqueUserBlobPath.mockResolvedValueOnce({
+        key: 'v2/spaces/spc_personal/blobs/generations/images/raw.png',
+      });
       mockFileService.uploadMedia.mockResolvedValueOnce({
-        key: 'generations/images/test-uuid_600x800_20240101123000_raw.png',
+        key: 'v2/spaces/spc_personal/blobs/generations/images/raw.png',
       });
 
       const result = await service.uploadImageForGeneration(
@@ -668,20 +733,29 @@ describe('GenerationService', () => {
       );
 
       expect(mockFileService.uploadMedia).toHaveBeenCalledTimes(1);
+      expect(mockFileService.createOpaqueUserBlobPath).toHaveBeenCalledWith(
+        'generations/images',
+        'png',
+      );
       expect(mockFileService.uploadMedia).toHaveBeenCalledWith(
-        'generations/images/test-uuid_600x800_20240101123000_raw.png',
+        'v2/spaces/spc_personal/blobs/generations/images/raw.png',
         identicalBuffer,
       );
       expect(result).toEqual({
-        imageUrl: 'generations/images/test-uuid_600x800_20240101123000_raw.png',
-        thumbnailImageUrl: 'generations/images/test-uuid_600x800_20240101123000_raw.png',
+        imageUrl: 'v2/spaces/spc_personal/blobs/generations/images/raw.png',
+        thumbnailImageUrl: 'v2/spaces/spc_personal/blobs/generations/images/raw.png',
       });
     });
 
     it('should handle partial upload failure in concurrent uploads', async () => {
+      mockFileService.createOpaqueUserBlobPath
+        .mockResolvedValueOnce({ key: 'v2/spaces/spc_personal/blobs/generations/images/raw.png' })
+        .mockResolvedValueOnce({
+          key: 'v2/spaces/spc_personal/blobs/generations/images/thumb.png',
+        });
       mockFileService.uploadMedia
         .mockResolvedValueOnce({
-          key: 'generations/images/test-uuid_600x800_20240101123000_raw.png',
+          key: 'v2/spaces/spc_personal/blobs/generations/images/raw.png',
         })
         .mockRejectedValueOnce(new Error('Thumbnail upload failed'));
 
@@ -694,6 +768,11 @@ describe('GenerationService', () => {
     });
 
     it('should handle complete upload failure', async () => {
+      mockFileService.createOpaqueUserBlobPath
+        .mockResolvedValueOnce({ key: 'v2/spaces/spc_personal/blobs/generations/images/raw.png' })
+        .mockResolvedValueOnce({
+          key: 'v2/spaces/spc_personal/blobs/generations/images/thumb.png',
+        });
       mockFileService.uploadMedia
         .mockRejectedValueOnce(new Error('Image upload failed'))
         .mockRejectedValueOnce(new Error('Thumbnail upload failed'));
@@ -711,6 +790,9 @@ describe('GenerationService', () => {
       const imageWithSameBuffer = { ...mockImage, buffer: identicalBuffer };
       const thumbnailWithSameBuffer = { ...mockThumbnail, buffer: identicalBuffer };
 
+      mockFileService.createOpaqueUserBlobPath.mockResolvedValueOnce({
+        key: 'v2/spaces/spc_personal/blobs/generations/images/raw.png',
+      });
       mockFileService.uploadMedia.mockRejectedValueOnce(new Error('Upload service unavailable'));
 
       await expect(
@@ -720,35 +802,26 @@ describe('GenerationService', () => {
       expect(mockFileService.uploadMedia).toHaveBeenCalledTimes(1);
     });
 
-    it('should validate file naming format with correct patterns', async () => {
+    it('should allocate opaque generation image paths in the caller space', async () => {
+      mockFileService.createOpaqueUserBlobPath
+        .mockResolvedValueOnce({ key: 'v2/spaces/spc_personal/blobs/generations/images/raw.png' })
+        .mockResolvedValueOnce({
+          key: 'v2/spaces/spc_personal/blobs/generations/images/thumb.png',
+        });
       mockFileService.uploadMedia
         .mockResolvedValueOnce({
-          key: 'generations/images/test-uuid_600x800_20240101123000_raw.png',
+          key: 'v2/spaces/spc_personal/blobs/generations/images/raw.png',
         })
         .mockResolvedValueOnce({
-          key: 'generations/images/test-uuid_300x400_20240101123000_thumb.png',
+          key: 'v2/spaces/spc_personal/blobs/generations/images/thumb.png',
         });
 
       await service.uploadImageForGeneration(mockImage, mockThumbnail);
 
-      // Verify file name patterns match exact format: {uuid}_{width}x{height}_{timestamp}_{type}.{ext}
-      const imageCall = mockFileService.uploadMedia.mock.calls[0];
-      const thumbnailCall = mockFileService.uploadMedia.mock.calls[1];
-
-      expect(imageCall[0]).toMatch(
-        /^generations\/images\/test-uuid_600x800_20240101123000_raw\.png$/,
-      );
-      expect(thumbnailCall[0]).toMatch(
-        /^generations\/images\/test-uuid_300x400_20240101123000_thumb\.png$/,
-      );
-
-      // Verify dimensions are correctly embedded in filename
-      expect(imageCall[0]).toContain('600x800'); // Original dimensions
-      expect(thumbnailCall[0]).toContain('300x400'); // Thumbnail dimensions
-
-      // Verify file type suffixes
-      expect(imageCall[0]).toContain('_raw.');
-      expect(thumbnailCall[0]).toContain('_thumb.');
+      expect(mockFileService.createOpaqueUserBlobPath.mock.calls).toEqual([
+        ['generations/images', 'png'],
+        ['generations/images', 'png'],
+      ]);
     });
   });
 
@@ -775,22 +848,31 @@ describe('GenerationService', () => {
         thumbnailHeight: 192,
       });
 
+      mockFileService.createOpaqueUserBlobPath.mockResolvedValueOnce({
+        key: 'v2/spaces/spc_personal/blobs/generations/covers/cover.webp',
+      });
       mockFileService.uploadMedia.mockResolvedValueOnce({
-        key: 'generations/covers/test-uuid_256x192_20240101123000_cover.webp',
+        key: 'v2/spaces/spc_personal/blobs/generations/covers/cover.webp',
       });
 
       const result = await service.createCoverFromUrl(dataUri);
 
+      expect(mockFileService.createOpaqueUserBlobPath).toHaveBeenCalledWith(
+        'generations/covers',
+        'webp',
+      );
       expect(mockSharp.resize).toHaveBeenCalledWith(256, 192);
       expect(mockFileService.uploadMedia).toHaveBeenCalledWith(
-        'generations/covers/test-uuid_256x192_20240101123000_cover.webp',
+        'v2/spaces/spc_personal/blobs/generations/covers/cover.webp',
         mockCoverBuffer,
       );
-      expect(result).toBe('generations/covers/test-uuid_256x192_20240101123000_cover.webp');
+      expect(result).toBe('v2/spaces/spc_personal/blobs/generations/covers/cover.webp');
     });
 
     it('should create cover from HTTP URL', async () => {
       const url = 'https://example.com/image.jpg';
+      const internalKey = 'v2/spaces/spc_personal/blobs/source.jpg';
+      const readableUrl = 'https://blob.example.com/v2/spaces/spc_personal/blobs/source.jpg';
 
       // Mock fetch for HTTP URL
       const mockBuffer = Buffer.from('original image data');
@@ -798,6 +880,8 @@ describe('GenerationService', () => {
         mockBuffer.byteOffset,
         mockBuffer.byteOffset + mockBuffer.byteLength,
       );
+      mockFileService.getKeyFromFullUrl.mockResolvedValueOnce(internalKey);
+      mockFileService.getFullFileUrl.mockResolvedValueOnce(readableUrl);
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -820,13 +904,171 @@ describe('GenerationService', () => {
         thumbnailHeight: 192,
       });
 
+      mockFileService.createOpaqueUserBlobPath.mockResolvedValueOnce({
+        key: 'v2/spaces/spc_personal/blobs/generations/covers/cover.webp',
+      });
       mockFileService.uploadMedia.mockResolvedValueOnce({
-        key: 'generations/covers/test-uuid_256x192_20240101123000_cover.webp',
+        key: 'v2/spaces/spc_personal/blobs/generations/covers/cover.webp',
       });
 
       const result = await service.createCoverFromUrl(url);
 
-      expect(result).toBe('generations/covers/test-uuid_256x192_20240101123000_cover.webp');
+      expect(mockFileService.getKeyFromFullUrl).toHaveBeenCalledWith(url);
+      expect(mockFileService.getFullFileUrl).toHaveBeenCalledWith(internalKey);
+      expect(mockFetch).toHaveBeenCalledWith(readableUrl, { headers: undefined });
+      expect(result).toBe('v2/spaces/spc_personal/blobs/generations/covers/cover.webp');
+    });
+
+    it('should create cover from relative stable file proxy URL', async () => {
+      const coverUrl = '/f/file-1';
+      const readableUrl = 'https://blob.example.com/v2/spaces/spc_personal/blobs/source.png';
+
+      const mockBuffer = Buffer.from('original image data');
+      const mockArrayBuffer = mockBuffer.buffer.slice(
+        mockBuffer.byteOffset,
+        mockBuffer.byteOffset + mockBuffer.byteLength,
+      );
+      mockFileService.getFullFileUrl.mockResolvedValueOnce(readableUrl);
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: {
+          get: vi.fn().mockReturnValue('image/png'),
+        },
+        arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer),
+      });
+
+      const mockSharp = {
+        metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
+        resize: vi.fn().mockReturnThis(),
+        webp: vi.fn().mockReturnThis(),
+        toBuffer: vi.fn().mockResolvedValue(mockCoverBuffer),
+      };
+      vi.mocked(sharp).mockReturnValue(mockSharp as any);
+      vi.mocked(calculateThumbnailDimensions).mockReturnValue({
+        shouldResize: true,
+        thumbnailWidth: 256,
+        thumbnailHeight: 192,
+      });
+
+      mockFileService.createOpaqueUserBlobPath.mockResolvedValueOnce({
+        key: 'v2/spaces/spc_personal/blobs/generations/covers/cover.webp',
+      });
+      mockFileService.uploadMedia.mockResolvedValueOnce({
+        key: 'v2/spaces/spc_personal/blobs/generations/covers/cover.webp',
+      });
+
+      const result = await service.createCoverFromUrl(coverUrl);
+
+      expect(mockFileService.getFullFileUrl).toHaveBeenCalledWith(coverUrl);
+      expect(mockFetch).toHaveBeenCalledWith(readableUrl, { headers: undefined });
+      expect(result).toBe('v2/spaces/spc_personal/blobs/generations/covers/cover.webp');
+    });
+
+    it('should create cover from shared file proxy URL via provider-readable helper', async () => {
+      const coverUrl = '/share/f/share-token-1?password=secret';
+      const readableUrl = 'https://blob.example.com/v2/spaces/spc_personal/blobs/source.png';
+
+      const mockBuffer = Buffer.from('original image data');
+      const mockArrayBuffer = mockBuffer.buffer.slice(
+        mockBuffer.byteOffset,
+        mockBuffer.byteOffset + mockBuffer.byteLength,
+      );
+      mockResolveProviderReadableFileReference.mockResolvedValueOnce({
+        fileId: 'file-share-1',
+        key: 'v2/spaces/spc_personal/blobs/source.png',
+        url: readableUrl,
+      });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: {
+          get: vi.fn().mockReturnValue('image/png'),
+        },
+        arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer),
+      });
+
+      const mockSharp = {
+        metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
+        resize: vi.fn().mockReturnThis(),
+        webp: vi.fn().mockReturnThis(),
+        toBuffer: vi.fn().mockResolvedValue(mockCoverBuffer),
+      };
+      vi.mocked(sharp).mockReturnValue(mockSharp as any);
+      vi.mocked(calculateThumbnailDimensions).mockReturnValue({
+        shouldResize: true,
+        thumbnailWidth: 256,
+        thumbnailHeight: 192,
+      });
+
+      mockFileService.createOpaqueUserBlobPath.mockResolvedValueOnce({
+        key: 'v2/spaces/spc_personal/blobs/generations/covers/cover.webp',
+      });
+      mockFileService.uploadMedia.mockResolvedValueOnce({
+        key: 'v2/spaces/spc_personal/blobs/generations/covers/cover.webp',
+      });
+
+      const result = await service.createCoverFromUrl(coverUrl);
+
+      expect(mockResolveProviderReadableFileReference).toHaveBeenCalledWith({
+        db: mockDb,
+        fileService: mockFileService,
+        sourceIp: null,
+        url: coverUrl,
+        userAgent: null,
+        userId: mockUserId,
+        via: 'generation_cover_input',
+      });
+      expect(mockFileService.getFullFileUrl).not.toHaveBeenCalledWith(coverUrl);
+      expect(mockFetch).toHaveBeenCalledWith(readableUrl, { headers: undefined });
+      expect(result).toBe('v2/spaces/spc_personal/blobs/generations/covers/cover.webp');
+    });
+
+    it('should create cover from canonical blob key', async () => {
+      const coverKey = 'v2/spaces/spc_personal/blobs/generations/images/input.png';
+      const readableUrl =
+        'https://blob.example.com/v2/spaces/spc_personal/blobs/generations/images/input.png';
+
+      const mockBuffer = Buffer.from('original image data');
+      const mockArrayBuffer = mockBuffer.buffer.slice(
+        mockBuffer.byteOffset,
+        mockBuffer.byteOffset + mockBuffer.byteLength,
+      );
+      mockFileService.getFullFileUrl.mockResolvedValueOnce(readableUrl);
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: {
+          get: vi.fn().mockReturnValue('image/png'),
+        },
+        arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer),
+      });
+
+      const mockSharp = {
+        metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
+        resize: vi.fn().mockReturnThis(),
+        webp: vi.fn().mockReturnThis(),
+        toBuffer: vi.fn().mockResolvedValue(mockCoverBuffer),
+      };
+      vi.mocked(sharp).mockReturnValue(mockSharp as any);
+      vi.mocked(calculateThumbnailDimensions).mockReturnValue({
+        shouldResize: true,
+        thumbnailWidth: 256,
+        thumbnailHeight: 192,
+      });
+
+      mockFileService.createOpaqueUserBlobPath.mockResolvedValueOnce({
+        key: 'v2/spaces/spc_personal/blobs/generations/covers/cover.webp',
+      });
+      mockFileService.uploadMedia.mockResolvedValueOnce({
+        key: 'v2/spaces/spc_personal/blobs/generations/covers/cover.webp',
+      });
+
+      const result = await service.createCoverFromUrl(coverKey);
+
+      expect(mockFileService.getFullFileUrl).toHaveBeenCalledWith(coverKey);
+      expect(mockFetch).toHaveBeenCalledWith(readableUrl, { headers: undefined });
+      expect(result).toBe('v2/spaces/spc_personal/blobs/generations/covers/cover.webp');
     });
 
     it('should throw error for invalid image format', async () => {
@@ -858,27 +1100,24 @@ describe('GenerationService', () => {
         thumbnailHeight: 192,
       });
 
+      mockFileService.createOpaqueUserBlobPath.mockResolvedValueOnce({
+        key: 'v2/spaces/spc_personal/blobs/generations/covers/cover.webp',
+      });
       mockFileService.uploadMedia.mockResolvedValueOnce({
-        key: 'generations/covers/test-uuid_256x192_20240101123000_cover.webp',
+        key: 'v2/spaces/spc_personal/blobs/generations/covers/cover.webp',
       });
 
       const result = await service.createCoverFromUrl(dataUri);
 
-      // Verify cover filename contains calculated dimensions
+      expect(mockFileService.createOpaqueUserBlobPath).toHaveBeenCalledWith(
+        'generations/covers',
+        'webp',
+      );
       expect(mockFileService.uploadMedia).toHaveBeenCalledWith(
-        'generations/covers/test-uuid_256x192_20240101123000_cover.webp',
+        'v2/spaces/spc_personal/blobs/generations/covers/cover.webp',
         mockCoverBuffer,
       );
-
-      // Verify filename pattern: {uuid}_{width}x{height}_{timestamp}_cover.{ext}
-      const filename = mockFileService.uploadMedia.mock.calls[0][0];
-      expect(filename).toMatch(
-        /^generations\/covers\/test-uuid_256x192_20240101123000_cover\.webp$/,
-      );
-      expect(filename).toContain('256x192'); // Cover dimensions
-      expect(filename).toContain('_cover.'); // Cover suffix
-
-      expect(result).toBe('generations/covers/test-uuid_256x192_20240101123000_cover.webp');
+      expect(result).toBe('v2/spaces/spc_personal/blobs/generations/covers/cover.webp');
     });
   });
 });

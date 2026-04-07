@@ -149,6 +149,24 @@ describe('GET /share/f/[token]', () => {
     expect(mockServeAuthorizedFileDownload).not.toHaveBeenCalled();
   });
 
+  it('returns 404 when file share registry resolves to a document-shaped local id', async () => {
+    mockDb.select.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ kind: 'file', localId: 'docs_1', contentUid: 'ru1' }]),
+        }),
+      }),
+    });
+    const req = new Request('https://app.example.com/share/f/tok');
+    const res = await GET(req, { params: Promise.resolve({ token: 'tok' }) });
+
+    expect(res.status).toBe(404);
+    expect(mockGetFileById).not.toHaveBeenCalled();
+    expect(mockServeAuthorizedFileDownload).not.toHaveBeenCalled();
+  });
+
   it('returns 404 when file row is missing', async () => {
     mockGetFileById.mockResolvedValue(null);
     const req = new Request('https://app.example.com/share/f/tok');

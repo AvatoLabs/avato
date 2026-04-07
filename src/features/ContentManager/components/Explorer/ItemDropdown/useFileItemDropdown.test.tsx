@@ -6,9 +6,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useFileItemDropdown } from './useFileItemDropdown';
 
+const mockCopyToClipboard = vi.hoisted(() => vi.fn());
+const mockAddChatContextSelection = vi.hoisted(() => vi.fn());
 const mockEnsureFileDocument = vi.hoisted(() => vi.fn());
 const mockNavigate = vi.hoisted(() => vi.fn());
 const mockOpenCreateSpaceMemoryCandidateModal = vi.hoisted(() => vi.fn());
+const mockOpenShareModal = vi.hoisted(() => vi.fn());
+const mockPreviewFileContent = vi.hoisted(() => vi.fn());
+const mockRevealChatContextPanel = vi.hoisted(() => vi.fn());
+const mockGetDocumentById = vi.hoisted(() => vi.fn());
 let mockSpace = {
   id: 'spc_1',
   kind: 'team',
@@ -36,7 +42,7 @@ const mockMessage = {
 
 vi.mock('@lobehub/ui', () => ({
   Icon: vi.fn(() => null),
-  copyToClipboard: vi.fn(),
+  copyToClipboard: mockCopyToClipboard,
   createRawModal: vi.fn(),
 }));
 
@@ -84,8 +90,12 @@ vi.mock('@/features/ContentManager/components/SourceSetTree/treeState', () => ({
 
 vi.mock('@/features/ResourceSharing', () => ({
   useResourceShareModal: () => ({
-    open: vi.fn(),
+    open: mockOpenShareModal,
   }),
+}));
+
+vi.mock('@/features/ChatInput/utils/revealChatContextPanel', () => ({
+  revealChatContextPanel: mockRevealChatContextPanel,
 }));
 
 vi.mock('@/features/ResourceSpaces', () => ({
@@ -116,13 +126,15 @@ vi.mock('@/routes/(main)/content/features/store', () => ({
 vi.mock('@/services/document', () => ({
   documentService: {
     ensureFileDocument: mockEnsureFileDocument,
-    getDocumentById: vi.fn(),
+    getDocumentById: mockGetDocumentById,
+    previewFileContent: mockPreviewFileContent,
   },
 }));
 
 vi.mock('@/store/file', () => ({
   useFileStore: vi.fn((selector: any) =>
     selector({
+      addChatContextSelection: mockAddChatContextSelection,
       deleteContentItem: vi.fn(),
       moveContentItem: vi.fn(),
       refreshFileList: vi.fn(),
@@ -146,9 +158,15 @@ vi.mock('@/utils/client/downloadFile', () => ({
 
 describe('useFileItemDropdown', () => {
   beforeEach(() => {
+    mockCopyToClipboard.mockReset();
+    mockAddChatContextSelection.mockReset();
     mockEnsureFileDocument.mockReset();
+    mockGetDocumentById.mockReset();
     mockNavigate.mockReset();
     mockOpenCreateSpaceMemoryCandidateModal.mockReset();
+    mockOpenShareModal.mockReset();
+    mockPreviewFileContent.mockReset();
+    mockRevealChatContextPanel.mockReset();
     mockMessage.error.mockReset();
     mockMessage.success.mockReset();
     mockMessage.warning.mockReset();
@@ -163,6 +181,8 @@ describe('useFileItemDropdown', () => {
       membershipRole: 'editor',
       name: 'Team Space',
     };
+    mockGetDocumentById.mockResolvedValue(undefined);
+    mockPreviewFileContent.mockResolvedValue(undefined);
   });
 
   it('exposes an explicit markdown-to-document action and opens the derived doc', async () => {
@@ -226,6 +246,79 @@ describe('useFileItemDropdown', () => {
     });
   });
 
+  it('shares file-backed document entries with the canonical document id', async () => {
+    const { result } = renderHook(() =>
+      useFileItemDropdown({
+        fileId: 'file_backing_1',
+        fileType: 'text/markdown',
+        filename: 'Spec.md',
+        id: 'docs_existing_1',
+        sourceType: 'file',
+        url: '/spec.md',
+      }),
+    );
+
+    const action = result.current.menuItems().find((item: any) => item?.key === 'share');
+
+    await act(async () => {
+      await action.onClick({ domEvent: { stopPropagation: vi.fn() } });
+    });
+
+    expect(mockOpenShareModal).toHaveBeenCalledWith({
+      id: 'docs_existing_1',
+      kind: 'document',
+      name: 'Spec.md',
+    });
+  });
+
+  it('keeps raw files on file share targets until they have a backing document', async () => {
+    const { result } = renderHook(() =>
+      useFileItemDropdown({
+        fileId: 'file_raw_1',
+        fileType: 'text/markdown',
+        filename: 'Draft.md',
+        id: 'file_raw_1',
+        sourceType: 'file',
+        url: '/draft.md',
+      }),
+    );
+
+    const action = result.current.menuItems().find((item: any) => item?.key === 'share');
+
+    await act(async () => {
+      await action.onClick({ domEvent: { stopPropagation: vi.fn() } });
+    });
+
+    expect(mockOpenShareModal).toHaveBeenCalledWith({
+      id: 'file_raw_1',
+      kind: 'file',
+      name: 'Draft.md',
+    });
+  });
+
+  it('copies canonical document routes for file-backed document entries', async () => {
+    const { result } = renderHook(() =>
+      useFileItemDropdown({
+        fileId: 'file_backing_1',
+        fileType: 'text/markdown',
+        filename: 'Spec.md',
+        id: 'docs_existing_1',
+        sourceSetId: 'sst_1',
+        sourceType: 'file',
+        url: '/spec.md',
+      }),
+    );
+
+    const action = result.current.menuItems().find((item: any) => item?.key === 'copyUrl');
+
+    await act(async () => {
+      await action.onClick({ domEvent: { stopPropagation: vi.fn() } });
+    });
+
+    expect(mockCopyToClipboard).toHaveBeenCalledWith('https://app.local/spaces/preview');
+    expect(mockMessage.success).toHaveBeenCalledWith('FileManager.actions.copyUrlSuccess');
+  });
+
   it('offers an add-to-space-memory action with source refs', async () => {
     const { result } = renderHook(() =>
       useFileItemDropdown({
@@ -278,5 +371,44 @@ describe('useFileItemDropdown', () => {
     const action = result.current.menuItems().find((item: any) => item?.key === 'addToSpaceMemory');
 
     expect(action).toBeUndefined();
+  });
+
+  it('adds canonical document entries to chat context', async () => {
+    mockGetDocumentById.mockResolvedValue({
+      content: '# Spec',
+      id: 'docs_existing_1',
+      title: 'Spec',
+    });
+
+    const { result } = renderHook(() =>
+      useFileItemDropdown({
+        fileId: 'file_backing_1',
+        fileType: 'text/markdown',
+        filename: 'Spec.md',
+        id: 'docs_existing_1',
+        sourceType: 'file',
+        url: '/spec.md',
+      }),
+    );
+
+    const action = result.current.menuItems().find((item: any) => item?.key === 'addToChatContext');
+
+    expect(action?.label).toBe('actions.addToChatContext');
+
+    await act(async () => {
+      await action.onClick({ domEvent: { stopPropagation: vi.fn() } });
+    });
+
+    expect(mockAddChatContextSelection).toHaveBeenCalledWith({
+      content: '# Spec',
+      docId: 'docs_existing_1',
+      format: 'markdown',
+      id: 'document-context-docs_existing_1',
+      preview: 'Spec',
+      title: 'Spec',
+      type: 'text',
+    });
+    expect(mockRevealChatContextPanel).toHaveBeenCalledTimes(1);
+    expect(mockMessage.success).toHaveBeenCalledWith('actions.addToChatContextSuccess');
   });
 });

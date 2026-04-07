@@ -1,20 +1,31 @@
+import { getCanonicalContentKind } from '@lobechat/types';
+
 import {
   type ContentItem,
   type ContentQueryParams,
   type CreateContentParams,
   type UpdateContentParams,
 } from '@/types/content';
-import { type FileListItem } from '@/types/files';
+import { type FileAssetCapabilities, type FileListItem } from '@/types/files';
 
 import { type CreateDocumentParams } from '../document';
 import { documentService } from '../document';
 import { fileService } from '../file';
 
+const getCanonicalContentSourceType = (
+  id: string,
+  sourceType: 'file' | 'document',
+): 'file' | 'document' => {
+  return getCanonicalContentKind({ id, sourceType });
+};
+
 /**
  * Map FileListItem to ContentItem
  */
 const mapToContentItem = (item: FileListItem & { sourceSetId?: string | null }): ContentItem => {
+  const sourceType = getCanonicalContentSourceType(item.id, item.sourceType as 'file' | 'document');
   return {
+    ...item,
     chunkCount: item.chunkCount,
     chunkTaskId: item.chunkingStatus ? 'placeholder' : null,
     chunkingError: item.chunkingError,
@@ -35,7 +46,7 @@ const mapToContentItem = (item: FileListItem & { sourceSetId?: string | null }):
     parentId: item.parentId,
     size: item.size,
     slug: item.slug,
-    sourceType: item.sourceType as 'file' | 'document',
+    sourceType,
     updatedAt: item.updatedAt,
     url: item.url,
   };
@@ -49,6 +60,7 @@ export class ContentService {
    * Query content items (unified files + documents).
    */
   async queryContentItems(params: ContentQueryParams): Promise<{
+    governanceCapabilities?: FileAssetCapabilities;
     hasMore: boolean;
     items: ContentItem[];
     total?: number;
@@ -56,6 +68,7 @@ export class ContentService {
     const response = await fileService.getKnowledgeItems(params);
 
     return {
+      governanceCapabilities: response.governanceCapabilities,
       hasMore: response.hasMore,
       items: response.items.map(mapToContentItem),
       total: 'total' in response ? (response.total as number) : undefined,
@@ -77,9 +90,10 @@ export class ContentService {
           fileType: params.fileType,
           name: params.name,
           parentId: params.parentId,
+          sha256: params.sha256,
           size: params.size,
           spaceId: params.spaceId,
-          url: params.url,
+          storageKey: params.storageKey,
         },
         params.sourceSetId,
       );
@@ -168,7 +182,7 @@ export class ContentService {
   /** Delete a content item. */
   async deleteContentItem(id: string, trash: boolean = true): Promise<void> {
     if (!trash) {
-      if (id.startsWith('docs_')) {
+      if (getCanonicalContentKind({ id, sourceType: 'file' }) === 'document') {
         await documentService.deleteDocument(id, false);
       } else {
         await fileService.removeFile(id, false);
@@ -195,7 +209,7 @@ export class ContentService {
     const documentIds: string[] = [];
 
     for (const id of ids) {
-      if (id.startsWith('docs_')) {
+      if (getCanonicalContentKind({ id, sourceType: 'file' }) === 'document') {
         documentIds.push(id);
       } else {
         fileIds.push(id);
@@ -223,7 +237,7 @@ export class ContentService {
   }
 
   async restoreContentItem(item: Pick<ContentItem, 'id' | 'sourceType'>) {
-    if (item.sourceType === 'file') {
+    if (getCanonicalContentSourceType(item.id, item.sourceType) === 'file') {
       await fileService.restoreFile(item.id);
       return;
     }
@@ -232,9 +246,11 @@ export class ContentService {
   }
 
   async restoreContentItems(items: Array<Pick<ContentItem, 'id' | 'sourceType'>>) {
-    const fileIds = items.filter((item) => item.sourceType === 'file').map((item) => item.id);
+    const fileIds = items
+      .filter((item) => getCanonicalContentSourceType(item.id, item.sourceType) === 'file')
+      .map((item) => item.id);
     const documentIds = items
-      .filter((item) => item.sourceType === 'document')
+      .filter((item) => getCanonicalContentSourceType(item.id, item.sourceType) === 'document')
       .map((item) => item.id);
 
     await Promise.all([

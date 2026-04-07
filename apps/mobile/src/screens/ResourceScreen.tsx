@@ -38,6 +38,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Settings2,
   Share2,
   Trash2,
   Users,
@@ -66,7 +67,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
 import AttachmentSheet from '../components/ui/AttachmentSheet';
-import { FilterChip, SelectionBadge } from '../components/ui/ChoiceControls';
+import { BottomSheetScaffold } from '../components/ui/BottomSheetScaffold';
+import { FilterChip, MetaTag, SelectionBadge } from '../components/ui/ChoiceControls';
 import EmptyState from '../components/ui/EmptyState';
 import FileGridSkeleton from '../components/ui/FileGridSkeleton';
 import PromptModal from '../components/ui/PromptModal';
@@ -89,23 +91,38 @@ import {
 import { getAuthHeaders } from '../lib/auth';
 import { useMainTabScrollableContentPaddingBottom } from '../lib/bottomChrome';
 import {
+  createChatContextSelectionFromResource,
+  isChatContextEligibleResource,
+} from '../lib/chatContext';
+import { formatMobileDate } from '../lib/dateTime';
+import {
+  buildFileGovernanceBadges,
+  buildGovernanceCapabilityHint,
+  buildGovernanceFilterSummaryLabels,
+  countActiveGovernanceFilters,
+  type MobileGovernanceFilterState,
+  normalizeGovernanceRightsOwner,
+} from '../lib/fileGovernance';
+import { haptics } from '../lib/haptics';
+import { useI18n } from '../lib/i18n';
+import {
   clearResourceCacheEntry,
   getResourceCacheEntry,
   listResourceCacheEntries,
   type ResourceCacheEntry,
   saveResourceCacheEntry,
-} from '../lib/contentCache';
+} from '../lib/resourceCache';
+import { areSameFileItems, getCanonicalResourceKind } from '../lib/resourceList';
 import {
   clearResourceListCache,
   getResourceListCacheEntry,
   saveResourceListCacheEntry,
-} from '../lib/contentListCache';
-import { haptics } from '../lib/haptics';
-import { useI18n } from '../lib/i18n';
+} from '../lib/resourceListCache';
 import { useConnectionStore } from '../store/connection';
+import { useFileStore } from '../store/file';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
-import type { FileListItem, SourceSetItem } from '../types';
+import type { FileAssetCapabilities, FileListItem, SourceSetItem } from '../types';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -166,34 +183,6 @@ function sortFileList(
   return sorted;
 }
 
-function areSameFileItems(left: FileListItem[] | undefined, right: FileListItem[]): boolean {
-  if (!left) return false;
-  if (left.length !== right.length) return false;
-
-  let index = 0;
-
-  for (const item of left) {
-    const target = right[index];
-    if (!target) return false;
-
-    if (
-      item.id !== target.id ||
-      item.name !== target.name ||
-      item.fileType !== target.fileType ||
-      item.parentId !== target.parentId ||
-      item.size !== target.size ||
-      item.createdAt !== target.createdAt ||
-      item.slug !== target.slug ||
-      item.sourceType !== target.sourceType
-    ) {
-      return false;
-    }
-
-    index += 1;
-  }
-
-  return true;
-}
 const IMAGE_EXTENSIONS = new Set([
   'avif',
   'bmp',
@@ -623,12 +612,7 @@ function FileTypeIcon({
 }
 
 function formatDate(isoString: string): string {
-  try {
-    const d = new Date(isoString);
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch {
-    return '';
-  }
+  return formatMobileDate(isoString);
 }
 
 function resolveRemoteFileUrl(apiBaseUrl: string, item: Pick<FileListItem, 'id' | 'url'>): string {
@@ -693,6 +677,7 @@ const FilePreviewModal = memo(
     const { t } = useI18n();
     const toast = useToast();
     const colors = useThemeColors();
+    const itemKind = getCanonicalResourceKind(item);
     const [imgLoading, setImgLoading] = useState(true);
     const [downloading, setDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState(0);
@@ -711,7 +696,7 @@ const FilePreviewModal = memo(
     const previewCandidates = item ? buildRemoteFileCandidates(apiBaseUrl, item) : [];
     const fileUrl = previewCandidates[previewIndex] || '';
     const imageFile = item ? isImage(item.fileType, item.name) : false;
-    const textFile = item ? isTextLikeFile(item.fileType, item.name, item.sourceType) : false;
+    const textFile = item ? isTextLikeFile(item.fileType, item.name, itemKind) : false;
     const pdfFile = item ? item.fileType === 'application/pdf' : false;
     // Office docs: use Microsoft Office Viewer (same as Web), not Google Docs
     const officeFile = item
@@ -871,7 +856,7 @@ const FilePreviewModal = memo(
       let cancelled = false;
       const loadText = async () => {
         try {
-          if (item.sourceType === 'document' && typeof item.content === 'string') {
+          if (itemKind === 'document' && typeof item.content === 'string') {
             if (!cancelled) {
               setPreviewLoadFailed(false);
               setTextContent(item.content);
@@ -879,7 +864,7 @@ const FilePreviewModal = memo(
             return;
           }
 
-          if (item.sourceType === 'document') {
+          if (itemKind === 'document') {
             const document = await resourceApi.getDocument(item.id).catch(() => null);
             if (cancelled) return;
             if (typeof document?.content === 'string') {
@@ -933,7 +918,7 @@ const FilePreviewModal = memo(
       item,
       item?.content,
       item?.id,
-      item?.sourceType,
+      itemKind,
       textFile,
       remoteHeaders,
       visible,
@@ -943,7 +928,7 @@ const FilePreviewModal = memo(
       ? ((item as FileListItem & { updatedAt?: string | null }).updatedAt ?? undefined)
       : undefined;
     const markdownFile = item ? textFile && isMarkdownFile(item.fileType, item.name) : false;
-    const canEditText = !!item && textFile && item.sourceType === 'document';
+    const canEditText = !!item && textFile && itemKind === 'document';
     const markdownHtml = useMemo(
       () =>
         markdownFile && textContent ? buildMarkdownPreviewHtml(textContent, colors) : undefined,
@@ -1417,7 +1402,7 @@ const FilePreviewModal = memo(
             item
               ? {
                   id: item.id,
-                  kind: item.sourceType === 'file' ? 'file' : 'document',
+                  kind: itemKind,
                   name: item.name || item.id,
                 }
               : null
@@ -1588,6 +1573,46 @@ function ResourceThumbnail({
   );
 }
 
+function ResourceGovernanceBadges({
+  item,
+  maxVisible = 3,
+}: {
+  item: FileListItem;
+  maxVisible?: number;
+}) {
+  const colors = useThemeColors();
+  const { t } = useI18n();
+  const badges = useMemo(
+    () => buildFileGovernanceBadges(item, t, maxVisible),
+    [item, maxVisible, t],
+  );
+
+  if (isFolder(item) || badges.length === 0) return null;
+
+  return (
+    <View className="mt-1 flex-row flex-wrap">
+      {badges.map((badge) => (
+        <View className="mr-1.5 mt-1" key={badge.key}>
+          <MetaTag
+            backgroundColor={badge.emphasis === 'warning' ? colors.warningSubtle : undefined}
+            label={badge.label}
+            textColor={badge.emphasis === 'warning' ? colors.fileArchive : undefined}
+            tone={
+              badge.emphasis === 'warning'
+                ? 'neutral'
+                : badge.emphasis === 'accent'
+                  ? 'accent'
+                  : badge.emphasis === 'success'
+                    ? 'success'
+                    : 'neutral'
+            }
+          />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 interface FileRowProps {
   apiBaseUrl: string;
   cachedLocalUri?: string | null;
@@ -1704,6 +1729,7 @@ function FileRow({
             ? formatDate(item.createdAt)
             : `${formatBytes(item.size)}  ·  ${formatDate(item.createdAt)}`}
         </Text>
+        <ResourceGovernanceBadges item={item} />
       </View>
 
       {onOpenActions && !selectMode ? (
@@ -1733,7 +1759,8 @@ function fileListItemFromShared(params: {
   localId: string;
   name: string;
 }): FileListItem {
-  const isFile = params.kind === 'file';
+  const canonicalKind = getCanonicalResourceKind({ id: params.localId, kind: params.kind });
+  const isFile = canonicalKind === 'file';
   return {
     id: params.localId,
     name: params.name,
@@ -1758,6 +1785,7 @@ export default function ResourceScreen() {
   const scrollListPaddingBottom = useMainTabScrollableContentPaddingBottom();
   const toast = useToast();
   const colors = useThemeColors();
+  const addChatContextSelection = useFileStore((s) => s.addChatContextSelection);
 
   const [files, setFiles] = useState<FileListItem[]>([]);
   const [hasResolvedFiles, setHasResolvedFiles] = useState(false);
@@ -1790,7 +1818,11 @@ export default function ResourceScreen() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
+  const [governanceSheetVisible, setGovernanceSheetVisible] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [governanceFilters, setGovernanceFilters] = useState<MobileGovernanceFilterState>({});
+  const [governanceDraft, setGovernanceDraft] = useState<MobileGovernanceFilterState>({});
+  const [governanceCapabilities, setGovernanceCapabilities] = useState<FileAssetCapabilities>();
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [actionItem, setActionItem] = useState<FileListItem | null>(null);
@@ -1842,15 +1874,31 @@ export default function ResourceScreen() {
     return sourceSets.find((l) => l.id === sourceSetId)?.spaceId ?? undefined;
   }, [sourceSetId, sourceSets]);
 
+  const normalizedGovernanceFilters = useMemo(
+    () => ({
+      ...governanceFilters,
+      assetRightsOwner: normalizeGovernanceRightsOwner(governanceFilters.assetRightsOwner),
+    }),
+    [governanceFilters],
+  );
+
   const resourceListQueryParams = useMemo(
     () => ({
+      ...normalizedGovernanceFilters,
       sourceSetId: sourceSetId ?? undefined,
       limit: RESOURCE_LIST_PAGE_SIZE,
       parentId: sourceSetId ? (currentFolderId ?? currentFolderSlug ?? null) : null,
       q: searchText.trim() || undefined,
       ...(sourceSetSpaceId ? { spaceId: sourceSetSpaceId } : {}),
     }),
-    [sourceSetId, currentFolderId, currentFolderSlug, sourceSetSpaceId, searchText],
+    [
+      normalizedGovernanceFilters,
+      sourceSetId,
+      currentFolderId,
+      currentFolderSlug,
+      sourceSetSpaceId,
+      searchText,
+    ],
   );
 
   /** Stable identity for list reload — avoids re-running when only the loadFiles callback reference changes */
@@ -1861,9 +1909,64 @@ export default function ResourceScreen() {
         parent: sourceSetId ? (currentFolderId ?? currentFolderSlug ?? null) : null,
         q: searchText.trim() || null,
         space: sourceSetSpaceId ?? null,
+        governance: normalizedGovernanceFilters,
       }),
-    [sourceSetId, currentFolderId, currentFolderSlug, sourceSetSpaceId, searchText],
+    [
+      normalizedGovernanceFilters,
+      sourceSetId,
+      currentFolderId,
+      currentFolderSlug,
+      sourceSetSpaceId,
+      searchText,
+    ],
   );
+
+  const activeGovernanceFilterCount = useMemo(
+    () => countActiveGovernanceFilters(governanceFilters),
+    [governanceFilters],
+  );
+
+  const governanceFilterSummaryLabels = useMemo(
+    () => buildGovernanceFilterSummaryLabels(governanceFilters, t),
+    [governanceFilters, t],
+  );
+  const governanceCapabilityHint = useMemo(
+    () => buildGovernanceCapabilityHint(governanceCapabilities, t),
+    [governanceCapabilities, t],
+  );
+  const governanceWorkbenchSummary = useMemo(() => {
+    if (governanceFilterSummaryLabels.length > 0) return governanceFilterSummaryLabels.join(' · ');
+    return governanceCapabilityHint || t.resourceGovernanceFiltersSubtitle;
+  }, [
+    governanceCapabilityHint,
+    governanceFilterSummaryLabels,
+    t.resourceGovernanceFiltersSubtitle,
+  ]);
+  const hasGovernanceWorkbench = Boolean(
+    governanceCapabilityHint || governanceFilterSummaryLabels.length > 0,
+  );
+  const selectionSummaryLabel = useMemo(
+    () => t.resourceSelectCount.replace('{count}', String(selectedIds.size)),
+    [selectedIds.size, t.resourceSelectCount],
+  );
+
+  const openGovernanceSheet = useCallback(() => {
+    setGovernanceDraft(governanceFilters);
+    setGovernanceSheetVisible(true);
+  }, [governanceFilters]);
+
+  const clearGovernanceDraft = useCallback(() => {
+    setGovernanceDraft({});
+  }, []);
+
+  const applyGovernanceFilters = useCallback(() => {
+    haptics.selection();
+    setGovernanceFilters({
+      ...governanceDraft,
+      assetRightsOwner: normalizeGovernanceRightsOwner(governanceDraft.assetRightsOwner),
+    });
+    setGovernanceSheetVisible(false);
+  }, [governanceDraft]);
 
   useEffect(() => {
     if (!searchVisible) return;
@@ -2088,6 +2191,7 @@ export default function ResourceScreen() {
         if (ticket !== loadRequestRef.current) return;
         const items = result?.items ?? [];
         const nextHasMore = result?.hasMore ?? false;
+        setGovernanceCapabilities(result?.governanceCapabilities);
 
         setHasMore(nextHasMore);
         nextOffsetRef.current = loadOffset + items.length;
@@ -2107,6 +2211,7 @@ export default function ResourceScreen() {
         }
       } catch {
         if (ticket !== loadRequestRef.current) return;
+        setGovernanceCapabilities(undefined);
         if (!append && !hasCachedEntry && !silent) {
           nextOffsetRef.current = 0;
           setFiles([]);
@@ -2130,6 +2235,7 @@ export default function ResourceScreen() {
 
       const treeKey = parentId ?? ROOT_TREE_KEY;
       const cacheParams = {
+        ...normalizedGovernanceFilters,
         sourceSetId,
         limit: RESOURCE_TREE_PAGE_SIZE,
         parentId,
@@ -2161,6 +2267,7 @@ export default function ResourceScreen() {
 
       try {
         const result = await resourceApi.getKnowledgeItems({
+          ...normalizedGovernanceFilters,
           sourceSetId,
           limit: RESOURCE_TREE_PAGE_SIZE,
           offset: 0,
@@ -2192,7 +2299,7 @@ export default function ResourceScreen() {
         });
       }
     },
-    [sourceSetId, sourceSetSpaceId],
+    [normalizedGovernanceFilters, sourceSetId, sourceSetSpaceId],
   );
 
   const refreshTreeData = useCallback(async () => {
@@ -2266,7 +2373,10 @@ export default function ResourceScreen() {
 
       for (const id of ids) {
         const item = files.find((f) => f.id === id);
-        if (item?.sourceType === 'document' || item?.fileType === 'custom/folder') {
+        if (
+          item &&
+          (getCanonicalResourceKind(item) === 'document' || item.fileType === 'custom/folder')
+        ) {
           documentIds.push(id);
         } else {
           fileIds.push(id);
@@ -2499,7 +2609,7 @@ export default function ResourceScreen() {
         for (const id of idsToMove) {
           const item = files.find((f) => f.id === id);
           if (item && id !== '__batch__') {
-            await resourceApi.moveResource(id, targetFolderId, item.sourceType);
+            await resourceApi.moveResource(id, targetFolderId, getCanonicalResourceKind(item));
           }
         }
         haptics.success();
@@ -2663,7 +2773,7 @@ export default function ResourceScreen() {
       setRenameModalVisible(false);
       try {
         const itemIsFolder = isFolder(actionItem);
-        if (itemIsFolder) {
+        if (itemIsFolder || getCanonicalResourceKind(actionItem) === 'document') {
           await resourceApi.updateDocument(actionItem.id, { title: newName.trim() });
         } else {
           await fileApi.update(actionItem.id, { name: newName.trim() });
@@ -2685,7 +2795,7 @@ export default function ResourceScreen() {
   const openItemShareSheet = useCallback((item: FileListItem) => {
     setShareTarget({
       id: item.id,
-      kind: item.sourceType === 'file' ? 'file' : 'document',
+      kind: getCanonicalResourceKind(item),
       name: item.name || item.id,
     });
   }, []);
@@ -2716,12 +2826,42 @@ export default function ResourceScreen() {
     });
   }, [sourceSetId, sourceSets, t.resourceTitle]);
 
+  const handleAddToChatContext = useCallback(
+    async (item: FileListItem) => {
+      closeActionSheet();
+
+      if (!isChatContextEligibleResource(item)) return;
+
+      try {
+        const context = await createChatContextSelectionFromResource(item);
+
+        if (!context) {
+          toast.show('error', t.fileUploadFailed);
+          return;
+        }
+
+        addChatContextSelection(context);
+        haptics.success();
+        toast.show('success', t.fileAddToChatContextSuccess);
+      } catch {
+        toast.show('error', t.fileUploadFailed);
+      }
+    },
+    [
+      addChatContextSelection,
+      closeActionSheet,
+      t.fileAddToChatContextSuccess,
+      t.fileUploadFailed,
+      toast,
+    ],
+  );
+
   const openManageShareFromItem = useCallback(
     (item: FileListItem) => {
       closeActionSheet();
       setManageShareTarget({
         id: item.id,
-        kind: item.sourceType === 'file' ? 'file' : 'document',
+        kind: getCanonicalResourceKind(item),
         name: item.name || item.id,
       });
     },
@@ -2742,7 +2882,12 @@ export default function ResourceScreen() {
   const handleSharedWithMePick = useCallback(
     async (row: SharedWithMeRow) => {
       setSharedWithMeVisible(false);
-      if (row.kind === 'source_set') {
+      const rowKind =
+        row.kind === 'source_set'
+          ? row.kind
+          : getCanonicalResourceKind({ id: row.localId, kind: row.kind });
+
+      if (rowKind === 'source_set') {
         setSourceSetId(row.localId);
         setCurrentFolderId(null);
         setCurrentFolderSlug(null);
@@ -2753,7 +2898,7 @@ export default function ResourceScreen() {
         haptics.success();
         return;
       }
-      if (row.kind === 'file') {
+      if (rowKind === 'file') {
         setPreviewItem(
           fileListItemFromShared({ kind: 'file', localId: row.localId, name: row.name }),
         );
@@ -2911,6 +3056,7 @@ export default function ResourceScreen() {
       let children = treeChildrenByParent[treeKey];
       if (!children) {
         const result = await resourceApi.getKnowledgeItems({
+          ...normalizedGovernanceFilters,
           sourceSetId,
           limit: 200,
           offset: 0,
@@ -2931,7 +3077,15 @@ export default function ResourceScreen() {
 
     setTreeChildrenByParent((prev) => ({ ...prev, ...nextChildren }));
     setTreeExpandedIds(expandedIds);
-  }, [sourceSetId, sourceSetSpaceId, locale, sortOrder, sorter, treeChildrenByParent]);
+  }, [
+    normalizedGovernanceFilters,
+    sourceSetId,
+    sourceSetSpaceId,
+    locale,
+    sortOrder,
+    sorter,
+    treeChildrenByParent,
+  ]);
 
   const handleCollapseAllTree = useCallback(() => {
     setTreeExpandedIds(new Set());
@@ -3227,6 +3381,19 @@ export default function ResourceScreen() {
               );
             })}
             <FilterChip
+              active={activeGovernanceFilterCount > 0}
+              count={activeGovernanceFilterCount > 0 ? activeGovernanceFilterCount : undefined}
+              label={t.resourceGovernanceFilters}
+              icon={
+                <Settings2
+                  color={activeGovernanceFilterCount > 0 ? colors.primary : colors.muted}
+                  size={tokens.icon.size.sm}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              }
+              onPress={openGovernanceSheet}
+            />
+            <FilterChip
               label={getSortLabel()}
               icon={
                 <ArrowDownUp
@@ -3238,28 +3405,156 @@ export default function ResourceScreen() {
               onPress={() => setSortMenuVisible(true)}
             />
           </ScrollView>
+          {hasGovernanceWorkbench ? (
+            <TouchableOpacity
+              activeOpacity={0.82}
+              className="mt-3 rounded-2xl border px-4 py-3"
+              style={{
+                backgroundColor: colors.fillQuaternary,
+                borderColor: colors.borderSubtle,
+              }}
+              onPress={openGovernanceSheet}
+            >
+              <View className="flex-row items-start justify-between gap-3">
+                <View className="flex-1 min-w-0">
+                  <Text
+                    className="text-[11px] font-semibold uppercase tracking-[1.2px]"
+                    style={{ color: colors.secondaryText }}
+                  >
+                    {t.resourceGovernanceFilters}
+                  </Text>
+                  <Text
+                    className="mt-1 text-[14px] font-semibold"
+                    style={{ color: colors.foreground }}
+                  >
+                    {activeGovernanceFilterCount > 0
+                      ? governanceWorkbenchSummary
+                      : t.resourceGovernanceFiltersSubtitle}
+                  </Text>
+                  {governanceCapabilityHint && activeGovernanceFilterCount === 0 ? (
+                    <Text
+                      className="mt-1 text-[12px] leading-5"
+                      style={{ color: colors.secondaryText }}
+                    >
+                      {governanceCapabilityHint}
+                    </Text>
+                  ) : null}
+                </View>
+                <View className="items-end">
+                  <View
+                    className="rounded-full px-2.5 py-1"
+                    style={{
+                      backgroundColor:
+                        activeGovernanceFilterCount > 0 ? colors.primaryMuted : colors.fillTertiary,
+                    }}
+                  >
+                    <Text
+                      className="text-[11px] font-semibold"
+                      style={{
+                        color:
+                          activeGovernanceFilterCount > 0 ? colors.primary : colors.secondaryText,
+                      }}
+                    >
+                      {activeGovernanceFilterCount > 0
+                        ? String(activeGovernanceFilterCount)
+                        : t.resourceGovernanceApply}
+                    </Text>
+                  </View>
+                  <ChevronRight
+                    color={colors.muted}
+                    size={16}
+                    strokeWidth={tokens.icon.strokeWidth}
+                    style={{ marginTop: 10 }}
+                  />
+                </View>
+              </View>
+              {governanceFilterSummaryLabels.length > 0 ? (
+                <View className="mt-3 flex-row flex-wrap" style={{ gap: 6 }}>
+                  {governanceFilterSummaryLabels.map((label) => (
+                    <MetaTag key={label} label={label} tone="accent" />
+                  ))}
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          ) : null}
         </View>
       </ScreenHeader>
 
       {/* Batch action bar */}
       {selectMode && selectedIds.size > 0 && (
         <View
-          className="flex-row items-center justify-around border-t border-border bg-card px-4 py-3"
-          style={{ paddingBottom: insets.bottom + 12 }}
+          className="mx-4 mb-3 rounded-[24px] border px-4 py-3"
+          style={{
+            backgroundColor: colors.card,
+            borderColor: colors.borderSubtle,
+            marginTop: 4,
+            paddingBottom: insets.bottom + 8,
+          }}
         >
-          <TouchableOpacity className="flex-1 items-center" onPress={handleBatchDelete}>
-            <Text style={{ color: colors.danger }}>{t.resourceBatchDelete}</Text>
-          </TouchableOpacity>
-          {sourceSetId && (
-            <TouchableOpacity className="flex-1 items-center" onPress={handleBatchMove}>
-              <Text style={{ color: colors.primary }}>{t.resourceBatchMove}</Text>
+          <View className="flex-row items-start justify-between gap-3">
+            <View className="flex-1">
+              <Text
+                className="text-[11px] font-semibold uppercase tracking-[1.2px]"
+                style={{ color: colors.secondaryText }}
+              >
+                {t.resourceTitle}
+              </Text>
+              <Text className="mt-1 text-[16px] font-semibold" style={{ color: colors.foreground }}>
+                {selectionSummaryLabel}
+              </Text>
+            </View>
+            <TouchableOpacity
+              accessibilityRole="button"
+              className="h-9 w-9 items-center justify-center rounded-full"
+              style={{ backgroundColor: colors.fillTertiary }}
+              onPress={() => {
+                setSelectMode(false);
+                setSelectedIds(new Set());
+              }}
+            >
+              <X color={colors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
             </TouchableOpacity>
-          )}
-          {selectedIds.size === 1 && (
-            <TouchableOpacity className="flex-1 items-center" onPress={handleBatchShareLink}>
-              <Text style={{ color: colors.primary }}>{t.resourceBatchShareLink}</Text>
+          </View>
+
+          <View className="mt-3 flex-row flex-wrap" style={{ gap: 8 }}>
+            <TouchableOpacity
+              activeOpacity={0.78}
+              className="flex-row items-center rounded-full px-3 py-2"
+              style={{ backgroundColor: `${colors.danger}12` }}
+              onPress={handleBatchDelete}
+            >
+              <Trash2 color={colors.danger} size={15} strokeWidth={tokens.icon.strokeWidth} />
+              <Text className="ml-2 text-[13px] font-semibold" style={{ color: colors.danger }}>
+                {t.resourceBatchDelete}
+              </Text>
             </TouchableOpacity>
-          )}
+            {sourceSetId ? (
+              <TouchableOpacity
+                activeOpacity={0.78}
+                className="flex-row items-center rounded-full px-3 py-2"
+                style={{ backgroundColor: colors.primaryMuted }}
+                onPress={handleBatchMove}
+              >
+                <Folder color={colors.primary} size={15} strokeWidth={tokens.icon.strokeWidth} />
+                <Text className="ml-2 text-[13px] font-semibold" style={{ color: colors.primary }}>
+                  {t.resourceBatchMove}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            {selectedIds.size === 1 ? (
+              <TouchableOpacity
+                activeOpacity={0.78}
+                className="flex-row items-center rounded-full px-3 py-2"
+                style={{ backgroundColor: colors.primaryMuted }}
+                onPress={handleBatchShareLink}
+              >
+                <Link2 color={colors.primary} size={15} strokeWidth={tokens.icon.strokeWidth} />
+                <Text className="ml-2 text-[13px] font-semibold" style={{ color: colors.primary }}>
+                  {t.resourceBatchShareLink}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
       )}
 
@@ -3471,6 +3766,7 @@ export default function ResourceScreen() {
                             ? formatDate(entry.createdAt)
                             : `${formatBytes(entry.size)}  ·  ${formatDate(entry.createdAt)}`}
                         </Text>
+                        <ResourceGovernanceBadges item={entry} maxVisible={2} />
                       </View>
                       {!selectMode ? (
                         <TouchableOpacity
@@ -3565,6 +3861,9 @@ export default function ResourceScreen() {
                 >
                   {isFolder(item) ? formatDate(item.createdAt) : formatBytes(item.size)}
                 </Text>
+                <View className="items-center">
+                  <ResourceGovernanceBadges item={item} maxVisible={2} />
+                </View>
               </TouchableOpacity>
             ) : (
               <FileRow
@@ -3647,6 +3946,139 @@ export default function ResourceScreen() {
             : undefined
         }
       />
+
+      <BottomSheetScaffold
+        description={t.resourceGovernanceFiltersSubtitle}
+        title={t.resourceGovernanceFilters}
+        visible={governanceSheetVisible}
+        headerRight={
+          activeGovernanceFilterCount > 0 || countActiveGovernanceFilters(governanceDraft) > 0 ? (
+            <TouchableOpacity activeOpacity={0.72} onPress={clearGovernanceDraft}>
+              <Text className="text-[14px] font-semibold" style={{ color: colors.primary }}>
+                {t.resourceGovernanceClear}
+              </Text>
+            </TouchableOpacity>
+          ) : undefined
+        }
+        onClose={() => setGovernanceSheetVisible(false)}
+      >
+        <View className="px-5 pb-2">
+          {governanceCapabilityHint ? (
+            <View
+              className="mb-4 rounded-2xl border px-3.5 py-3"
+              style={{ backgroundColor: colors.fillQuaternary, borderColor: colors.borderSubtle }}
+            >
+              <Text className="text-[12px]" style={{ color: colors.secondaryText }}>
+                {governanceCapabilityHint}
+              </Text>
+            </View>
+          ) : null}
+          {[
+            {
+              key: 'assetReviewStatus',
+              label: t.resourceGovernanceSectionReview,
+              options: [
+                { label: t.resourceGovernanceAny, value: undefined },
+                { label: t.resourceGovernanceReviewDraft, value: 'draft' },
+                { label: t.resourceGovernanceReviewApproved, value: 'approved' },
+                { label: t.resourceGovernanceReviewArchived, value: 'archived' },
+              ],
+            },
+            {
+              key: 'assetUsagePolicy',
+              label: t.resourceGovernanceSectionUsage,
+              options: [
+                { label: t.resourceGovernanceAny, value: undefined },
+                { label: t.resourceGovernanceUsageInternal, value: 'internal' },
+                { label: t.resourceGovernanceUsagePublic, value: 'public' },
+                { label: t.resourceGovernanceUsageRestricted, value: 'restricted' },
+              ],
+            },
+            {
+              key: 'assetClassification',
+              label: t.resourceGovernanceSectionClassification,
+              options: [
+                { label: t.resourceGovernanceAny, value: undefined },
+                { label: t.resourceGovernanceClassificationGeneral, value: 'general' },
+                { label: t.resourceGovernanceClassificationBrand, value: 'brand' },
+                { label: t.resourceGovernanceClassificationFinance, value: 'finance' },
+                { label: t.resourceGovernanceClassificationHr, value: 'hr' },
+                { label: t.resourceGovernanceClassificationLegal, value: 'legal' },
+                { label: t.resourceGovernanceClassificationProduct, value: 'product' },
+              ],
+            },
+          ].map((section) => (
+            <View className="mb-4" key={section.key}>
+              <Text
+                className="mb-2 text-[13px] font-semibold"
+                style={{ color: colors.secondaryText }}
+              >
+                {section.label}
+              </Text>
+              <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+                {section.options.map((option) => {
+                  const selected =
+                    governanceDraft[section.key as keyof MobileGovernanceFilterState] ===
+                    option.value;
+
+                  return (
+                    <FilterChip
+                      active={selected}
+                      key={`${section.key}:${option.value ?? 'all'}`}
+                      label={option.label}
+                      onPress={() => {
+                        haptics.selection();
+                        setGovernanceDraft((prev) => ({
+                          ...prev,
+                          [section.key]: option.value,
+                        }));
+                      }}
+                    />
+                  );
+                })}
+              </View>
+            </View>
+          ))}
+          <View className="mb-4">
+            <Text
+              className="mb-2 text-[13px] font-semibold"
+              style={{ color: colors.secondaryText }}
+            >
+              {t.resourceGovernanceSectionRightsOwner}
+            </Text>
+            <View
+              className="rounded-2xl border px-3.5 py-2.5"
+              style={{ backgroundColor: colors.fillQuaternary, borderColor: colors.borderSubtle }}
+            >
+              <TextInput
+                autoCapitalize="words"
+                className="text-[15px] text-foreground"
+                placeholder={t.resourceGovernanceRightsOwnerPlaceholder}
+                placeholderTextColor={colors.muted}
+                returnKeyType="done"
+                value={governanceDraft.assetRightsOwner ?? ''}
+                onChangeText={(text) =>
+                  setGovernanceDraft((prev) => ({
+                    ...prev,
+                    assetRightsOwner: text,
+                  }))
+                }
+              />
+            </View>
+          </View>
+          <TouchableOpacity
+            accessibilityRole="button"
+            activeOpacity={0.8}
+            className="mt-1 items-center rounded-2xl px-5 py-3.5"
+            style={{ backgroundColor: colors.primary }}
+            onPress={applyGovernanceFilters}
+          >
+            <Text className="text-[15px] font-semibold" style={{ color: colors.iconOnPrimary }}>
+              {t.resourceGovernanceApply}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheetScaffold>
 
       <FilePreviewModal
         apiBaseUrl={apiBase}
@@ -3903,6 +4335,24 @@ export default function ResourceScreen() {
                   <Pencil color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
                   <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
                 </Pressable>
+                {isChatContextEligibleResource(actionItem) ? (
+                  <Pressable
+                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                    onPress={() => void handleAddToChatContext(actionItem)}
+                  >
+                    <FileText
+                      color={colors.muted}
+                      size={18}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                    <View className="ml-3 flex-1">
+                      <Text className="text-base text-foreground">{t.fileAddToChatContext}</Text>
+                      <Text className="mt-0.5 text-[12px]" style={{ color: colors.secondaryText }}>
+                        {t.fileAddToChatContextDesc}
+                      </Text>
+                    </View>
+                  </Pressable>
+                ) : null}
                 <Pressable
                   className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                   onPress={() => handleShareFromActionSheet(actionItem)}

@@ -10,7 +10,10 @@ import useSWR from 'swr';
 import Loading from '@/components/Loading/BrandTextLoading';
 import { lambdaClient } from '@/libs/trpc/client';
 
-import { resolveSharedResourcePath } from './resolveSharedResourcePath';
+import {
+  getCanonicalSharedResourceKind,
+  resolveSharedResourcePath,
+} from './resolveSharedResourcePath';
 
 const SharedWithMePage = memo(() => {
   const { t } = useTranslation('file');
@@ -33,7 +36,7 @@ const SharedWithMePage = memo(() => {
   return (
     <Flexbox gap={16} padding={24} width={'100%'}>
       <Flexbox gap={4}>
-        <Text as={'h2'}>{t('shared.title')}</Text>
+        <Text as={'h2'}>{`${t('space.quickAccessTitle')} / ${t('shared.title')}`}</Text>
         <Text type={'secondary'}>{t('shared.subtitle')}</Text>
       </Flexbox>
 
@@ -44,10 +47,11 @@ const SharedWithMePage = memo(() => {
       ) : (
         <Flexbox gap={12}>
           {items.map((item) => {
+            const kind = getCanonicalSharedResourceKind(item);
             const icon =
-              item.kind === 'source_set'
+              kind === 'source_set'
                 ? LibraryIcon
-                : item.kind === 'document'
+                : kind === 'document'
                   ? FolderOpenIcon
                   : FilesIcon;
             const targetPath = resolveSharedResourcePath(item);
@@ -69,7 +73,7 @@ const SharedWithMePage = memo(() => {
                     {item.name}
                   </Text>
                   <Text ellipsis fontSize={12} type={'secondary'}>
-                    {t(`shared.kind.${item.kind}`)}
+                    {t(`shared.kind.${kind}`)}
                   </Text>
                 </Flexbox>
               </Block>

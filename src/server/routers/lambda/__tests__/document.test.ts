@@ -9,6 +9,8 @@ const mockDocumentModelFindBySlugInSpace = vi.fn();
 const mockDocumentModelFindByIdAny = vi.fn();
 const mockDocumentServiceCreateDocument = vi.fn();
 const mockDocumentServiceCreateDocuments = vi.fn();
+const mockDocumentServiceEnsureFileDocument = vi.fn();
+const mockDocumentServicePreviewFileContent = vi.fn();
 const mockDocumentServiceQueryDocuments = vi.fn();
 const mockResourceAuthorizerGetAccessMatch = vi.fn();
 const mockResolverRequireKnowledgeBase = vi.fn();
@@ -45,6 +47,8 @@ vi.mock('@/server/services/document', () => ({
   DocumentService: vi.fn(() => ({
     createDocument: mockDocumentServiceCreateDocument,
     createDocuments: mockDocumentServiceCreateDocuments,
+    ensureFileDocument: mockDocumentServiceEnsureFileDocument,
+    previewFileContent: mockDocumentServicePreviewFileContent,
     queryDocuments: mockDocumentServiceQueryDocuments,
   })),
 }));
@@ -53,8 +57,10 @@ vi.mock('@/server/services/content', () => ({
   AuthorizedResourceResolver: vi.fn(() => ({
     requireSourceSet: mockResolverRequireKnowledgeBase,
   })),
-  ResourceAuthorizer: vi.fn(() => ({
+  ContentAuthorizer: vi.fn(() => ({
     getAccessMatch: mockResourceAuthorizerGetAccessMatch,
+    assertCapability: vi.fn().mockResolvedValue(undefined),
+    filterVisibleDocumentIdsForList: vi.fn().mockResolvedValue([]),
   })),
 }));
 
@@ -169,5 +175,33 @@ describe('documentRouter', () => {
         slug: 'shared-folder',
       },
     ]);
+  });
+
+  it('should allow canonical document ids through ensureFileDocument', async () => {
+    mockDocumentServiceEnsureFileDocument.mockResolvedValue({ id: 'docs_1' });
+
+    const caller = documentRouter.createCaller({
+      serverDB: {} as any,
+      userId: 'test-user',
+    } as any);
+
+    const result = await caller.ensureFileDocument({ id: 'docs_1' });
+
+    expect(mockDocumentServiceEnsureFileDocument).toHaveBeenCalledWith('docs_1');
+    expect(result).toEqual({ id: 'docs_1' });
+  });
+
+  it('should allow canonical document ids through previewFileContent', async () => {
+    mockDocumentServicePreviewFileContent.mockResolvedValue({ id: 'docs_1', content: '# Hello' });
+
+    const caller = documentRouter.createCaller({
+      serverDB: {} as any,
+      userId: 'test-user',
+    } as any);
+
+    const result = await caller.previewFileContent({ id: 'docs_1' });
+
+    expect(mockDocumentServicePreviewFileContent).toHaveBeenCalledWith('docs_1');
+    expect(result).toEqual({ content: '# Hello', id: 'docs_1' });
   });
 });

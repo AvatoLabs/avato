@@ -1,5 +1,6 @@
 import type { LobeChatDatabase } from '@lobechat/database';
 import { contentRegistry, files, messages, messagesFiles } from '@lobechat/database/schemas';
+import { isRawFileContentId } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
 
@@ -17,6 +18,17 @@ type TrustedFileReference =
   | { key: string; type: 'canonicalKey' }
   | { fileId: string; type: 'file' }
   | { fileId: string; shareId: string; type: 'topicShare' };
+
+const DOCUMENT_REFERENCE_NOT_FETCHABLE_MESSAGE = 'DOCUMENT_REFERENCE_NOT_FETCHABLE';
+
+const assertRawFileReferenceId = (fileId: string) => {
+  if (isRawFileContentId(fileId)) return;
+
+  throw new TRPCError({
+    code: 'BAD_REQUEST',
+    message: DOCUMENT_REFERENCE_NOT_FETCHABLE_MESSAGE,
+  });
+};
 
 const resolveTrustedFileReferenceFromPathname = (
   pathname: string,
@@ -132,6 +144,8 @@ export const resolveProviderReadableFileReference = async (params: {
         })()
       : reference.type === 'file'
         ? await (async () => {
+            assertRawFileReferenceId(reference.fileId);
+
             const authorizer = new ContentAuthorizer(params.db, params.userId);
             const access = await authorizer.assertCapability({
               capability: params.capability ?? 'preview_content',
@@ -175,8 +189,15 @@ export const resolveProviderReadableFileReference = async (params: {
               const registry = await contentModel.findContentRegistryByUid(
                 shareAccess.link.contentUid,
               );
-              if (!registry || registry.kind !== 'file') {
+              if (!registry) {
                 throw new TRPCError({ code: 'NOT_FOUND', message: 'FILE_NOT_FOUND' });
+              }
+
+              if (registry.kind !== 'file' || !isRawFileContentId(registry.localId)) {
+                throw new TRPCError({
+                  code: 'BAD_REQUEST',
+                  message: DOCUMENT_REFERENCE_NOT_FETCHABLE_MESSAGE,
+                });
               }
 
               const file = await FileModel.getFileById(params.db, registry.localId);
@@ -198,6 +219,8 @@ export const resolveProviderReadableFileReference = async (params: {
               };
             })()
           : await (async () => {
+              assertRawFileReferenceId(reference.fileId);
+
               const share = await TopicShareModel.findByShareIdWithAccessCheck(
                 params.db,
                 reference.shareId,

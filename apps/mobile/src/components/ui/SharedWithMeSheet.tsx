@@ -19,8 +19,10 @@ import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { contentShareApi } from '../../lib/api';
+import { formatMobileDateTime } from '../../lib/dateTime';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
+import { getCanonicalSharedResourceKind } from '../../lib/resourceShare';
 import { useThemeColors } from '../../theme/colors';
 import { enteringModalContent } from '../../theme/motion';
 
@@ -37,10 +39,11 @@ export interface SharedWithMeRow {
 function normalizeRow(raw: unknown, untitled: string): SharedWithMeRow | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as Record<string, unknown>;
-  const kind = o.kind;
+  const rawKind = o.kind;
   const localId = o.localId;
-  if (kind !== 'file' && kind !== 'document' && kind !== 'source_set') return null;
+  if (rawKind !== 'file' && rawKind !== 'document' && rawKind !== 'source_set') return null;
   if (typeof localId !== 'string') return null;
+  const kind = getCanonicalSharedResourceKind({ kind: rawKind, localId });
   const sr = o.sharedRole;
   const sharedRole = sr === 'editor' || sr === 'owner' || sr === 'viewer' ? sr : undefined;
   const se = o.sharedExpiresAt;
@@ -58,14 +61,7 @@ function normalizeRow(raw: unknown, untitled: string): SharedWithMeRow | null {
 }
 
 function formatSharedWhen(value: string | Date | null | undefined): string {
-  if (value == null) return '—';
-  try {
-    const d = typeof value === 'string' ? new Date(value) : value;
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString();
-  } catch {
-    return '—';
-  }
+  return formatMobileDateTime(value);
 }
 
 function kindLabel(
@@ -142,7 +138,8 @@ export default function SharedWithMeSheet({ visible, onClose, onPick }: SharedWi
       <TouchableOpacity
         accessibilityRole="button"
         activeOpacity={0.7}
-        className="flex-row items-center py-3.5 border-b border-foreground/8 gap-2"
+        className="mb-3 flex-row items-center gap-2 rounded-2xl border px-4 py-3.5"
+        style={{ backgroundColor: colors.card, borderColor: colors.borderSubtle }}
         onPress={() => {
           haptics.selection();
           onPick(item);
@@ -166,7 +163,7 @@ export default function SharedWithMeSheet({ visible, onClose, onPick }: SharedWi
         <ChevronRight color={colors.muted} size={18} strokeWidth={2} />
       </TouchableOpacity>
     ),
-    [colors.muted, colors.secondaryText, onPick, t],
+    [colors.borderSubtle, colors.card, colors.muted, colors.secondaryText, onPick, t],
   );
 
   return (
@@ -230,6 +227,34 @@ export default function SharedWithMeSheet({ visible, onClose, onPick }: SharedWi
                 renderItem={renderSharedRow}
                 showsVerticalScrollIndicator={false}
                 style={{ maxHeight: SHARED_LIST_MAX_H }}
+                ListHeaderComponent={
+                  <View
+                    className="mb-4 rounded-2xl border px-4 py-4"
+                    style={{
+                      backgroundColor: colors.fillQuaternary,
+                      borderColor: colors.borderSubtle,
+                    }}
+                  >
+                    <Text
+                      className="text-[11px] font-semibold uppercase tracking-[1.2px]"
+                      style={{ color: colors.secondaryText }}
+                    >
+                      {t.resourceSharedWithMe}
+                    </Text>
+                    <Text
+                      className="mt-2 text-[15px] font-semibold"
+                      style={{ color: colors.foreground }}
+                    >
+                      {rows.length}
+                    </Text>
+                    <Text
+                      className="mt-1 text-[13px] leading-5"
+                      style={{ color: colors.secondaryText }}
+                    >
+                      {t.resourceShareLinkSheetSubtitle}
+                    </Text>
+                  </View>
+                }
                 refreshControl={
                   <RefreshControl
                     refreshing={refreshing}

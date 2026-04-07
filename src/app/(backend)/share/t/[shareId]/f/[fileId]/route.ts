@@ -1,4 +1,5 @@
 import { contentRegistry, files, messages, messagesFiles } from '@lobechat/database/schemas';
+import { isRawFileContentId } from '@lobechat/types';
 import debug from 'debug';
 import { and, eq } from 'drizzle-orm';
 
@@ -16,6 +17,10 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
     const { fileId, shareId } = await segmentData.params;
 
     if (!fileId?.trim() || !shareId?.trim()) {
+      return new Response('Not found', { status: 404 });
+    }
+
+    if (!isRawFileContentId(fileId)) {
       return new Response('Not found', { status: 404 });
     }
 

@@ -1,3 +1,4 @@
+import { getCanonicalContentKind } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
@@ -29,7 +30,7 @@ const assertSourceItemsReadable = async (authorizer: ContentAuthorizer, ids: str
     authorizer.assertCapability({
       capability: 'preview_content',
       id,
-      kind: id.startsWith('docs_') ? 'document' : 'file',
+      kind: getCanonicalContentKind({ id, sourceType: 'file' }),
     }),
   );
 

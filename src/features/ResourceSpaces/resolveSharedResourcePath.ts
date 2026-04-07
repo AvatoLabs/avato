@@ -1,3 +1,5 @@
+import { getCanonicalSharedContentKind } from '@lobechat/types';
+
 import { getPageDetailPath, getPageKind } from '@/utils/docs';
 
 import { buildFilesPreviewPath, buildSourceSetPath } from './paths';
@@ -9,12 +11,18 @@ interface SharedResourcePathTarget {
   spaceId: string;
 }
 
+export const getCanonicalSharedResourceKind = (item: SharedResourcePathTarget) => {
+  return getCanonicalSharedContentKind(item);
+};
+
 export const resolveSharedResourcePath = (item: SharedResourcePathTarget) => {
-  if (item.kind === 'source_set') {
+  const kind = getCanonicalSharedResourceKind(item);
+
+  if (kind === 'source_set') {
     return buildSourceSetPath(item.spaceId, item.localId);
   }
 
-  if (item.kind === 'document') {
+  if (kind === 'document') {
     return getPageDetailPath(item.localId, getPageKind(item.metadata?.pageKind), item.spaceId);
   }
 

@@ -6,7 +6,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useFileItemClick } from './useFileItemClick';
 
-const mockGetDocumentById = vi.hoisted(() => vi.fn());
 const mockNavigate = vi.hoisted(() => vi.fn());
 
 interface MockContentManagerState {
@@ -40,15 +39,8 @@ vi.mock('@/routes/(main)/content/features/store', () => ({
   ),
 }));
 
-vi.mock('@/services/document', () => ({
-  documentService: {
-    getDocumentById: mockGetDocumentById,
-  },
-}));
-
 describe('useFileItemClick', () => {
   beforeEach(() => {
-    mockGetDocumentById.mockReset();
     mockNavigate.mockReset();
     mockContentManagerState = {
       setCurrentViewItemId: vi.fn(),
@@ -66,6 +58,7 @@ describe('useFileItemClick', () => {
         isFolder: false,
         isPage: false,
         onOpen,
+        sourceType: 'file',
         sourceSetId: 'ss_1',
       }),
     );
@@ -74,11 +67,11 @@ describe('useFileItemClick', () => {
       await result.current();
     });
 
-    expect(mockContentManagerState.setCurrentViewItemId).toHaveBeenCalledWith('file_1');
-    expect(mockContentManagerState.setMode).toHaveBeenCalledWith('editor');
-    expect(onOpen).toHaveBeenCalledWith('file_1');
+    expect(mockContentManagerState.setCurrentViewItemId).toHaveBeenCalledWith('docs_1');
+    expect(mockContentManagerState.setMode).toHaveBeenCalledWith('doc');
+    expect(onOpen).not.toHaveBeenCalled();
     expect(mockNavigate).toHaveBeenCalledWith(
-      '/spaces/spc_1/files/item/file_1?scope=source-set%3Ass_1&view=list',
+      '/spaces/spc_1/files/item/docs_1?scope=source-set%3Ass_1&view=list',
       {
         replace: true,
       },
@@ -91,6 +84,7 @@ describe('useFileItemClick', () => {
         id: 'docs_1',
         isFolder: false,
         isPage: true,
+        sourceType: 'document',
         sourceSetId: 'ss_1',
       }),
     );
@@ -109,13 +103,14 @@ describe('useFileItemClick', () => {
     );
   });
 
-  it('prefers preview mode for file-backed entries even when the caller marks them as pages', async () => {
+  it('treats file-backed entries with document ids as canonical docs', async () => {
     const { result } = renderHook(() =>
       useFileItemClick({
         fileId: 'file_1',
         id: 'docs_1',
         isFolder: false,
         isPage: true,
+        sourceType: 'file',
         sourceSetId: 'ss_1',
       }),
     );
@@ -124,28 +119,23 @@ describe('useFileItemClick', () => {
       await result.current();
     });
 
-    expect(mockContentManagerState.setCurrentViewItemId).toHaveBeenCalledWith('file_1');
-    expect(mockContentManagerState.setMode).toHaveBeenCalledWith('editor');
+    expect(mockContentManagerState.setCurrentViewItemId).toHaveBeenCalledWith('docs_1');
+    expect(mockContentManagerState.setMode).toHaveBeenCalledWith('doc');
     expect(mockNavigate).toHaveBeenCalledWith(
-      '/spaces/spc_1/files/item/file_1?scope=source-set%3Ass_1&view=list',
+      '/spaces/spc_1/files/item/docs_1?scope=source-set%3Ass_1&view=list',
       {
         replace: true,
       },
     );
   });
 
-  it('resolves file-backed documents lazily when fileId is missing', async () => {
-    mockGetDocumentById.mockResolvedValue({
-      fileId: 'file_9',
-      id: 'docs_9',
-      sourceType: 'file',
-    });
-
+  it('keeps document ids in doc mode when the backing file id is missing', async () => {
     const { result } = renderHook(() =>
       useFileItemClick({
         id: 'docs_9',
         isFolder: false,
         isPage: true,
+        sourceType: 'file',
         sourceSetId: 'ss_1',
       }),
     );
@@ -154,11 +144,39 @@ describe('useFileItemClick', () => {
       await result.current();
     });
 
-    expect(mockGetDocumentById).toHaveBeenCalledWith('docs_9');
-    expect(mockContentManagerState.setCurrentViewItemId).toHaveBeenCalledWith('file_9');
-    expect(mockContentManagerState.setMode).toHaveBeenCalledWith('editor');
+    expect(mockContentManagerState.setCurrentViewItemId).toHaveBeenCalledWith('docs_9');
+    expect(mockContentManagerState.setMode).toHaveBeenCalledWith('doc');
     expect(mockNavigate).toHaveBeenCalledWith(
-      '/spaces/spc_1/files/item/file_9?scope=source-set%3Ass_1&view=list',
+      '/spaces/spc_1/files/item/docs_9?scope=source-set%3Ass_1&view=list',
+      {
+        replace: true,
+      },
+    );
+  });
+
+  it('keeps raw files on editor preview routes', async () => {
+    const onOpen = vi.fn();
+    const { result } = renderHook(() =>
+      useFileItemClick({
+        fileId: 'file_5',
+        id: 'file_5',
+        isFolder: false,
+        isPage: false,
+        onOpen,
+        sourceType: 'file',
+        sourceSetId: 'ss_1',
+      }),
+    );
+
+    await act(async () => {
+      await result.current();
+    });
+
+    expect(mockContentManagerState.setCurrentViewItemId).toHaveBeenCalledWith('file_5');
+    expect(mockContentManagerState.setMode).toHaveBeenCalledWith('editor');
+    expect(onOpen).toHaveBeenCalledWith('file_5');
+    expect(mockNavigate).toHaveBeenCalledWith(
+      '/spaces/spc_1/files/item/file_5?scope=source-set%3Ass_1&view=list',
       {
         replace: true,
       },

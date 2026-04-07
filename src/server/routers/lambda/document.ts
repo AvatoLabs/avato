@@ -136,15 +136,7 @@ export const documentRouter = router({
 
   ensureFileDocument: documentProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      await ctx.contentAuthorizer.assertCapability({
-        capability: 'preview_content',
-        id: input.id,
-        kind: 'file',
-      });
-
-      return ctx.documentService.ensureFileDocument(input.id);
-    }),
+    .mutation(async ({ ctx, input }) => ctx.documentService.ensureFileDocument(input.id)),
 
   restoreDocument: documentProcedure
     .input(z.object({ id: z.string() }))
@@ -270,15 +262,7 @@ export const documentRouter = router({
         id: z.string(),
       }),
     )
-    .query(async ({ ctx, input }) => {
-      await ctx.contentAuthorizer.assertCapability({
-        capability: 'preview_content',
-        id: input.id,
-        kind: 'file',
-      });
-
-      return ctx.documentService.previewFile(input.id);
-    }),
+    .query(async ({ ctx, input }) => ctx.documentService.previewFileContent(input.id)),
 
   queryDocuments: documentProcedure
     .input(

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
+import { isCanonicalDocumentEntry } from '@/features/ContentManager/utils/isCanonicalDocumentEntry';
 import { buildFilesItemPath } from '@/features/ResourceSpaces';
 import { documentSelectors, useFileStore } from '@/store/file';
 
@@ -11,8 +12,9 @@ import { useContentManagerStore } from '../store';
 /**
  * Used for initial loading only, handle URL like:
  *
- * /content/item/:fileId
- * /content?file=xxxxxx (legacy, auto-migrated)
+ * /spaces/:spaceId/files/item/:fileId
+ * /spaces/:spaceId/files?file=xxxxxx
+ * /spaces/:spaceId/files?files=xxxxxx (legacy, auto-migrated)
  */
 export const useInitFileCheck = () => {
   const location = useLocation();
@@ -24,25 +26,25 @@ export const useInitFileCheck = () => {
     s.setCurrentViewItemId,
   ]);
 
-  const legacyFileId = searchParams.get('file') ?? searchParams.get('files');
-  const fileId = routeFileId ?? legacyFileId;
+  const queryFileId = searchParams.get('file') ?? searchParams.get('files') ?? undefined;
+  const fileId = routeFileId ?? queryFileId;
 
   const useFetchKnowledgeItem = useFileStore((s) => s.useFetchKnowledgeItem);
   const { data: fileData } = useFetchKnowledgeItem(fileId || undefined);
   const documentData = useFileStore(documentSelectors.getDocumentById(fileId || undefined));
 
   useEffect(() => {
-    if (routeFileId || !legacyFileId) return;
+    if (routeFileId || !queryFileId) return;
 
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('file');
     nextParams.delete('files');
 
-    const nextPath = buildFilesItemPath(location.pathname, legacyFileId);
+    const nextPath = buildFilesItemPath(location.pathname, queryFileId);
     const nextSearch = nextParams.toString();
 
     navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
-  }, [legacyFileId, location.pathname, navigate, routeFileId, searchParams]);
+  }, [location.pathname, navigate, queryFileId, routeFileId, searchParams]);
 
   useEffect(() => {
     if (!fileId) {
@@ -58,6 +60,11 @@ export const useInitFileCheck = () => {
 
       if (!fileData && !documentData) return;
 
+      const hasCanonicalDocumentIdentity = isCanonicalDocumentEntry({
+        id: fileId,
+        sourceType: fileData?.sourceType,
+      });
+
       const isPDF =
         fileData?.fileType?.toLowerCase() === 'pdf' ||
         fileData?.fileType?.toLowerCase() === 'application/pdf' ||
@@ -68,18 +75,16 @@ export const useInitFileCheck = () => {
         documentData?.source?.toLowerCase().endsWith('.pdf');
 
       const isDoc =
-        !isPDF &&
-        (fileData?.sourceType === 'document' ||
-          fileData?.fileType === 'custom/document' ||
-          !!documentData);
-
-      if (isPDF) {
-        if (!cancelled) setMode('editor');
-        return;
-      }
+        hasCanonicalDocumentIdentity ||
+        (!isPDF && (fileData?.fileType === 'custom/document' || !!documentData));
 
       if (isDoc) {
         if (!cancelled) setMode('doc');
+        return;
+      }
+
+      if (isPDF) {
+        if (!cancelled) setMode('editor');
         return;
       }
 

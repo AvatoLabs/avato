@@ -23,23 +23,15 @@ import {
   isSharePasswordRequiredError,
   type PublicSharedContentPayload,
 } from '../lib/api';
+import { formatMobileDateTime } from '../lib/dateTime';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { codeInlineRules } from '../lib/markdownRules';
 import { getThemedMarkdownStyles } from '../lib/markdownStyles';
+import { getCanonicalSharedResourceKind } from '../lib/resourceShare';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
-
-function formatExpiresAt(value: string | Date): string {
-  try {
-    const d = typeof value === 'string' ? new Date(value) : value;
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString();
-  } catch {
-    return '—';
-  }
-}
 
 export default function PublicResourceShareScreen({
   navigation,
@@ -94,6 +86,9 @@ export default function PublicResourceShareScreen({
   }, [load]);
 
   const title = data?.title?.trim() ? data.title : data?.name;
+  const canonicalKind = data
+    ? getCanonicalSharedResourceKind({ kind: data.kind, localId: data.localId })
+    : undefined;
 
   const description =
     data && 'description' in data
@@ -101,7 +96,7 @@ export default function PublicResourceShareScreen({
       : null;
 
   const handleDownload = async () => {
-    if (!data || data.kind !== 'file') return;
+    if (!data || canonicalKind !== 'file') return;
     haptics.selection();
     const base = await getApiUrl();
     const url = `${base}/share/f/${encodeURIComponent(token)}${
@@ -115,9 +110,9 @@ export default function PublicResourceShareScreen({
   };
 
   const kindLabel =
-    data?.kind === 'file'
+    canonicalKind === 'file'
       ? t.resourceSharedKindFile
-      : data?.kind === 'source_set'
+      : canonicalKind === 'source_set'
         ? t.resourceSharedKindSourceSet
         : t.resourceSharedKindDocument;
 
@@ -141,134 +136,205 @@ export default function PublicResourceShareScreen({
           contentContainerStyle={{ paddingBottom: 24 }}
           keyboardShouldPersistTaps="handled"
         >
-          <Text className="text-[20px] font-bold text-foreground text-center">
-            {t.resourcePublicSharePasswordTitle}
-          </Text>
-          <Text className="text-[14px] mt-2 text-center" style={{ color: colors.secondaryText }}>
-            {t.resourcePublicSharePasswordSubtitle}
-          </Text>
-          <TextInput
-            autoFocus
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            className="rounded-xl px-3 py-2.5 text-[15px] text-foreground mt-5"
-            placeholder={t.resourcePublicSharePasswordPlaceholder}
-            placeholderTextColor={colors.muted}
-            value={passwordDraft}
-            style={{
-              backgroundColor: colors.fillTertiary,
-              borderColor: colors.border,
-              borderWidth: 1,
-            }}
-            onChangeText={setPasswordDraft}
-          />
-          <TouchableOpacity
-            accessibilityLabel={t.resourcePublicShareUnlock}
-            accessibilityRole="button"
-            className="rounded-xl py-3.5 items-center mt-4"
-            style={{ backgroundColor: colors.primary }}
-            onPress={() => {
-              haptics.selection();
-              setSubmittedPassword(passwordDraft || undefined);
-            }}
+          <View
+            className="rounded-[24px] border px-5 py-5"
+            style={{ backgroundColor: colors.fillQuaternary, borderColor: colors.borderSubtle }}
           >
-            <Text className="text-[16px] font-semibold" style={{ color: colors.iconOnPrimary }}>
-              {t.resourcePublicShareUnlock}
+            <Text
+              className="text-[11px] font-semibold uppercase tracking-[1.2px]"
+              style={{ color: colors.secondaryText }}
+            >
+              {t.resourcePublicShareTitle}
             </Text>
-          </TouchableOpacity>
+            <Text className="mt-2 text-[20px] font-bold text-foreground">
+              {t.resourcePublicSharePasswordTitle}
+            </Text>
+            <Text className="text-[14px] mt-2 leading-6" style={{ color: colors.secondaryText }}>
+              {t.resourcePublicSharePasswordSubtitle}
+            </Text>
+            <TextInput
+              autoFocus
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              className="rounded-xl px-3 py-2.5 text-[15px] text-foreground mt-5"
+              placeholder={t.resourcePublicSharePasswordPlaceholder}
+              placeholderTextColor={colors.muted}
+              value={passwordDraft}
+              style={{
+                backgroundColor: colors.fillTertiary,
+                borderColor: colors.border,
+                borderWidth: 1,
+              }}
+              onChangeText={setPasswordDraft}
+            />
+            <TouchableOpacity
+              accessibilityLabel={t.resourcePublicShareUnlock}
+              accessibilityRole="button"
+              className="rounded-xl py-3.5 items-center mt-4"
+              style={{ backgroundColor: colors.primary }}
+              onPress={() => {
+                haptics.selection();
+                setSubmittedPassword(passwordDraft || undefined);
+              }}
+            >
+              <Text className="text-[16px] font-semibold" style={{ color: colors.iconOnPrimary }}>
+                {t.resourcePublicShareUnlock}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       ) : notFound || !data ? (
         <View className="flex-1 px-6 justify-center">
-          <Text className="text-[15px] text-center font-medium text-foreground">
-            {t.resourcePublicShareNotFound}
-          </Text>
-          <Text
-            className="text-[13px] mt-3 text-center leading-5"
-            style={{ color: colors.secondaryText }}
+          <View
+            className="rounded-[24px] border px-5 py-5"
+            style={{ backgroundColor: colors.fillQuaternary, borderColor: colors.borderSubtle }}
           >
-            {t.resourcePublicShareNotFoundHint}
-          </Text>
-          <TouchableOpacity
-            accessibilityLabel={t.errorRetry}
-            accessibilityRole="button"
-            activeOpacity={0.85}
-            className="mt-6 self-center rounded-xl px-6 py-3"
-            style={{ backgroundColor: colors.primary }}
-            onPress={() => {
-              haptics.light();
-              void load();
-            }}
-          >
-            <Text className="text-[15px] font-semibold" style={{ color: colors.iconOnPrimary }}>
-              {t.errorRetry}
+            <Text
+              className="text-[11px] font-semibold uppercase tracking-[1.2px]"
+              style={{ color: colors.secondaryText }}
+            >
+              {t.resourcePublicShareTitle}
             </Text>
-          </TouchableOpacity>
+            <Text className="mt-2 text-[16px] text-center font-semibold text-foreground">
+              {t.resourcePublicShareNotFound}
+            </Text>
+            <Text
+              className="text-[13px] mt-3 text-center leading-5"
+              style={{ color: colors.secondaryText }}
+            >
+              {t.resourcePublicShareNotFoundHint}
+            </Text>
+            <TouchableOpacity
+              accessibilityLabel={t.errorRetry}
+              accessibilityRole="button"
+              activeOpacity={0.85}
+              className="mt-6 self-center rounded-xl px-6 py-3"
+              style={{ backgroundColor: colors.primary }}
+              onPress={() => {
+                haptics.light();
+                void load();
+              }}
+            >
+              <Text className="text-[15px] font-semibold" style={{ color: colors.iconOnPrimary }}>
+                {t.errorRetry}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ) : (
         <ScrollView className="flex-1 px-5 pt-4" contentContainerStyle={{ paddingBottom: 32 }}>
-          <Text className="text-[22px] font-bold text-foreground">{title}</Text>
-          <Text className="text-[13px] mt-1" style={{ color: colors.secondaryText }}>
-            {kindLabel}
-          </Text>
-          {description ? (
-            <Text className="text-[14px] mt-3 leading-5" style={{ color: colors.secondaryText }}>
-              {description}
-            </Text>
-          ) : null}
-          {data.kind === 'source_set' ? (
-            <Text className="text-[13px] mt-3 leading-5" style={{ color: colors.secondaryText }}>
-              {t.resourcePublicShareSourceSetHint}
-            </Text>
-          ) : null}
-
-          <View className="flex-row flex-wrap gap-2 mt-4">
-            <View
-              className="rounded-lg px-3 py-2"
-              style={{
-                backgroundColor: colors.fillTertiary,
-                borderColor: colors.border,
-                borderWidth: 1,
-              }}
+          <View
+            className="rounded-[24px] border px-5 py-5"
+            style={{ backgroundColor: colors.fillQuaternary, borderColor: colors.borderSubtle }}
+          >
+            <Text
+              className="text-[11px] font-semibold uppercase tracking-[1.2px]"
+              style={{ color: colors.secondaryText }}
             >
-              <Text className="text-[12px]" style={{ color: colors.secondaryText }}>
-                {t.resourcePublicShareExpires}: {formatExpiresAt(data.expiresAt)}
-              </Text>
-            </View>
-            {data.kind === 'file' ? (
-              <TouchableOpacity
-                accessibilityLabel={t.resourcePublicShareDownload}
-                accessibilityRole="button"
-                className="flex-row items-center gap-1.5 rounded-lg px-3 py-2"
-                style={{ backgroundColor: colors.primary }}
-                onPress={() => void handleDownload()}
+              {t.resourcePublicShareTitle}
+            </Text>
+            <Text className="mt-2 text-[22px] font-bold text-foreground">{title}</Text>
+            <View className="mt-3 flex-row flex-wrap gap-2">
+              <View
+                className="rounded-full px-2.5 py-1"
+                style={{ backgroundColor: colors.primaryMuted }}
               >
-                <Download color={colors.iconOnPrimary} size={16} strokeWidth={2.2} />
-                <Text className="text-[13px] font-semibold" style={{ color: colors.iconOnPrimary }}>
-                  {t.resourcePublicShareDownload}
+                <Text className="text-[12px] font-semibold" style={{ color: colors.primary }}>
+                  {kindLabel}
                 </Text>
-              </TouchableOpacity>
+              </View>
+              <View
+                className="rounded-full px-2.5 py-1"
+                style={{ backgroundColor: colors.fillTertiary }}
+              >
+                <Text className="text-[12px] font-medium" style={{ color: colors.secondaryText }}>
+                  {t.resourcePublicShareExpires}: {formatMobileDateTime(data.expiresAt)}
+                </Text>
+              </View>
+            </View>
+            {description ? (
+              <Text className="text-[14px] mt-4 leading-6" style={{ color: colors.secondaryText }}>
+                {description}
+              </Text>
+            ) : null}
+
+            {canonicalKind === 'file' ? (
+              <View
+                className="mt-4 rounded-2xl border px-4 py-3"
+                style={{ backgroundColor: colors.card, borderColor: colors.borderSubtle }}
+              >
+                <Text
+                  className="text-[11px] font-semibold uppercase tracking-[1.2px]"
+                  style={{ color: colors.secondaryText }}
+                >
+                  {t.notebookPreview}
+                </Text>
+                <Text className="mt-1 text-[14px]" style={{ color: colors.secondaryText }}>
+                  {kindLabel}
+                </Text>
+                <TouchableOpacity
+                  accessibilityLabel={t.resourcePublicShareDownload}
+                  accessibilityRole="button"
+                  className="mt-4 flex-row items-center justify-center gap-1.5 rounded-xl px-3 py-3"
+                  style={{ backgroundColor: colors.primary }}
+                  onPress={() => void handleDownload()}
+                >
+                  <Download color={colors.iconOnPrimary} size={16} strokeWidth={2.2} />
+                  <Text
+                    className="text-[14px] font-semibold"
+                    style={{ color: colors.iconOnPrimary }}
+                  >
+                    {t.resourcePublicShareDownload}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             ) : null}
           </View>
 
-          {data.kind === 'document' && data.content ? (
+          <View
+            className="mt-4 overflow-hidden rounded-[24px] border"
+            style={{ backgroundColor: colors.card, borderColor: colors.borderSubtle }}
+          >
             <View
-              className="rounded-xl p-4 mt-5"
+              className="border-b px-4 py-3"
               style={{
-                backgroundColor: colors.fillTertiary,
-                borderColor: colors.border,
-                borderWidth: 1,
+                backgroundColor: colors.fillQuaternary,
+                borderBottomColor: colors.borderSubtle,
               }}
             >
-              <Markdown rules={codeInlineRules as any} style={markdownStyles}>
-                {data.content}
-              </Markdown>
+              <Text
+                className="text-[11px] font-semibold uppercase tracking-[1.2px]"
+                style={{ color: colors.secondaryText }}
+              >
+                {t.notebookPreview}
+              </Text>
+              <Text className="mt-1 text-[14px] font-semibold" style={{ color: colors.foreground }}>
+                {kindLabel}
+              </Text>
             </View>
-          ) : data.kind === 'document' ? (
-            <Text className="text-[14px] mt-5" style={{ color: colors.secondaryText }}>
-              {t.resourcePublicShareDocEmpty}
-            </Text>
-          ) : null}
+
+            {canonicalKind === 'document' && data.content ? (
+              <View className="p-4">
+                <Markdown rules={codeInlineRules as any} style={markdownStyles}>
+                  {data.content}
+                </Markdown>
+              </View>
+            ) : canonicalKind === 'document' ? (
+              <Text className="px-4 py-4 text-[14px]" style={{ color: colors.secondaryText }}>
+                {t.resourcePublicShareDocEmpty}
+              </Text>
+            ) : (
+              <Text
+                className="px-4 py-4 text-[14px] leading-6"
+                style={{ color: colors.secondaryText }}
+              >
+                {canonicalKind === 'source_set'
+                  ? t.resourcePublicShareSourceSetHint
+                  : t.resourcePreviewUnavailable}
+              </Text>
+            )}
+          </View>
         </ScrollView>
       )}
     </View>

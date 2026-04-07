@@ -66,6 +66,11 @@ vi.mock('@/features/ResourceSpaces', () => ({
     `/spaces/${spaceId}/files?scope=source-set:${sourceSetId}`,
 }));
 
+vi.mock('@/utils/docs', () => ({
+  getPageDetailPath: (id: string, kind: string, spaceId?: string | null) =>
+    `/spaces/${spaceId}/docs/${id}?kind=${kind}`,
+}));
+
 vi.mock('@/store/agent/store', () => ({
   useAgentStore: (selector: any) =>
     selector({
@@ -128,5 +133,21 @@ describe('AttachSourceSet Item Actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Details' }));
 
     expect(openMock).toHaveBeenCalledWith('/spaces/space-explicit/files?scope=source-set:ss-2');
+  });
+
+  it('opens canonical document entries as docs instead of file previews', () => {
+    render(
+      <Actions
+        enabled
+        id="docs_existing_1"
+        scope={'agent' as any}
+        spaceId="space-explicit"
+        type={AgentSourceKind.File}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }));
+
+    expect(openMock).toHaveBeenCalledWith('/spaces/space-explicit/docs/docs_existing_1?kind=doc');
   });
 });

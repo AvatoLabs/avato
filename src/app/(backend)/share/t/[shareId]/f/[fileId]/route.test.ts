@@ -85,6 +85,17 @@ describe('GET /share/t/[shareId]/f/[fileId]', () => {
     expect(TopicShareModel.findByShareIdWithAccessCheck).not.toHaveBeenCalled();
   });
 
+  it('returns 404 for document-shaped topic attachment ids before share lookup', async () => {
+    const req = new Request('https://app.example.com/share/t/share-1/f/docs_1');
+    const res = await GET(req, {
+      params: Promise.resolve({ fileId: 'docs_1', shareId: 'share-1' }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(TopicShareModel.findByShareIdWithAccessCheck).not.toHaveBeenCalled();
+    expect(mockServeAuthorizedFileDownload).not.toHaveBeenCalled();
+  });
+
   it('returns 404 when the shared file does not belong to the topic', async () => {
     mockDb.select.mockReturnValue({
       from: vi.fn().mockReturnValue({

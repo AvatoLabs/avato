@@ -1,3 +1,4 @@
+import { isRawFileContentId } from '@lobechat/types';
 import debug from 'debug';
 
 import { auth } from '@/auth';
@@ -34,6 +35,10 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
     const sharePassword = searchParams.get('password');
 
     log('File proxy request: %s', id);
+
+    if (!isRawFileContentId(id)) {
+      return new Response('File not found', { status: 404 });
+    }
 
     const session =
       process.env.NOAUTH_MODE === '1'

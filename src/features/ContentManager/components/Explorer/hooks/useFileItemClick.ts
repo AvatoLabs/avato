@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
+import { isCanonicalDocumentEntry } from '@/features/ContentManager/utils/isCanonicalDocumentEntry';
 import { buildFilesFolderPath, buildFilesItemPath } from '@/features/ResourceSpaces';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
-import { documentService } from '@/services/document';
 
 export interface UseFileItemClickOptions {
   fileId?: string | null;
@@ -13,6 +13,7 @@ export interface UseFileItemClickOptions {
   onOpen?: (id: string) => void;
   slug?: string | null;
   sourceSetId?: string | null;
+  sourceType?: string | null;
 }
 
 /**
@@ -25,6 +26,7 @@ export const useFileItemClick = ({
   isFolder,
   isPage,
   onOpen,
+  sourceType,
 }: UseFileItemClickOptions) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -42,7 +44,6 @@ export const useFileItemClick = ({
       // Preserve existing query parameters (view and sort preferences)
       const newParams = new URLSearchParams(location.search);
       newParams.delete('file');
-      newParams.delete('files');
 
       const queryString = newParams.toString();
       const basePath = buildFilesFolderPath(spaceId, folderSlug);
@@ -50,50 +51,25 @@ export const useFileItemClick = ({
       return;
     }
 
-    let previewTargetId = fileId || id;
+    const hasCanonicalDocumentIdentity = isCanonicalDocumentEntry({ id, sourceType });
 
-    if (!fileId && id.startsWith('docs_')) {
-      try {
-        const document = await documentService.getDocumentById(id);
-        if (document?.sourceType === 'file' && document.fileId) {
-          previewTargetId = document.fileId;
-        }
-      } catch {
-        // Fall back to the original id when the derived document lookup fails.
-      }
-    }
-
-    const isFileBackedEntry = previewTargetId !== id;
-
-    if (isFileBackedEntry) {
-      setCurrentViewItemId(previewTargetId);
-      setMode('editor');
-      const nextParams = new URLSearchParams(location.search);
-      nextParams.delete('file');
-      nextParams.delete('files');
-
-      const nextPath = buildFilesItemPath(location.pathname, previewTargetId);
-      const nextSearch = nextParams.toString();
-      navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
-      onOpen?.(previewTargetId);
-    } else if (isPage) {
+    if (hasCanonicalDocumentIdentity || isPage) {
       // Switch to doc mode for existing documents
       setCurrentViewItemId(id);
       setMode('doc');
       const nextParams = new URLSearchParams(location.search);
       nextParams.delete('file');
-      nextParams.delete('files');
 
       const nextPath = buildFilesItemPath(location.pathname, id);
       const nextSearch = nextParams.toString();
       navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
     } else {
       // Set mode to editor for regular files
+      const previewTargetId = fileId || id;
       setCurrentViewItemId(previewTargetId);
       setMode('editor');
       const nextParams = new URLSearchParams(location.search);
       nextParams.delete('file');
-      nextParams.delete('files');
 
       const nextPath = buildFilesItemPath(location.pathname, previewTargetId);
       const nextSearch = nextParams.toString();
@@ -113,6 +89,7 @@ export const useFileItemClick = ({
     setCurrentViewItemId,
     setMode,
     slug,
+    sourceType,
     spaceId,
   ]);
 

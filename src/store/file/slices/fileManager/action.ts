@@ -1,9 +1,11 @@
 import {
   type FileAssetClassification,
   type FileAssetMetadata,
+  type FileAssetReviewStatus,
   type FileAssetState,
   type FileAssetUsagePolicy,
   type FileGovernanceSummary,
+  isRawFileContentId,
 } from '@lobechat/types';
 import {
   buildFolderTree,
@@ -36,6 +38,7 @@ const serverFileService = new FileService();
 const FETCH_ALL_KNOWLEDGE_KEY = 'useFetchKnowledgeItems';
 const FETCH_ALL_KNOWLEDGE_GOVERNANCE_SUMMARY_KEY = 'useFetchKnowledgeGovernanceSummary';
 const createUploadId = createNanoId(12);
+const isRawFileResourceId = (id: string) => isRawFileContentId(id);
 
 const createPendingUploadItem = (
   file: File,
@@ -95,11 +98,14 @@ export class FileManageActionImpl {
   };
 
   embeddingChunks = async (fileIds: string[]): Promise<void> => {
+    const rawFileIds = fileIds.filter(isRawFileResourceId);
+    if (rawFileIds.length === 0) return;
+
     // toggle file ids
-    this.#get().toggleEmbeddingIds(fileIds);
+    this.#get().toggleEmbeddingIds(rawFileIds);
 
     // parse files
-    const pools = fileIds.map(async (id) => {
+    const pools = rawFileIds.map(async (id) => {
       try {
         await ragService.createEmbeddingChunksTask(id);
       } catch (e) {
@@ -109,7 +115,7 @@ export class FileManageActionImpl {
 
     await Promise.all(pools);
     await this.#get().refreshFileList();
-    this.#get().toggleEmbeddingIds(fileIds, false);
+    this.#get().toggleEmbeddingIds(rawFileIds, false);
   };
 
   loadMoreKnowledgeItems = async (): Promise<void> => {
@@ -147,6 +153,8 @@ export class FileManageActionImpl {
   };
 
   moveFileToFolder = async (fileId: string, parentId: string | null): Promise<void> => {
+    if (!isRawFileResourceId(fileId)) return;
+
     // Optimistically update all file list caches
     await mutate(
       (key) => Array.isArray(key) && key[0] === FETCH_ALL_KNOWLEDGE_KEY,
@@ -168,11 +176,14 @@ export class FileManageActionImpl {
   };
 
   parseFilesToChunks = async (ids: string[], params?: { skipExist?: boolean }): Promise<void> => {
+    const rawFileIds = ids.filter(isRawFileResourceId);
+    if (rawFileIds.length === 0) return;
+
     // toggle file ids
-    this.#get().toggleParsingIds(ids);
+    this.#get().toggleParsingIds(rawFileIds);
 
     // parse files
-    const pools = ids.map(async (id) => {
+    const pools = rawFileIds.map(async (id) => {
       try {
         await ragService.createParseFileTask(id, params?.skipExist);
       } catch (e) {
@@ -182,7 +193,7 @@ export class FileManageActionImpl {
 
     await Promise.all(pools);
     await this.#get().refreshFileList();
-    this.#get().toggleParsingIds(ids, false);
+    this.#get().toggleParsingIds(rawFileIds, false);
   };
 
   pushDockFileList = async (
@@ -281,6 +292,7 @@ export class FileManageActionImpl {
   };
 
   reEmbeddingChunks = async (id: string): Promise<void> => {
+    if (!isRawFileResourceId(id)) return;
     if (fileManagerSelectors.isCreatingChunkEmbeddingTask(id)(this.#get())) return;
 
     // toggle file ids
@@ -298,6 +310,7 @@ export class FileManageActionImpl {
   };
 
   reParseFile = async (id: string): Promise<void> => {
+    if (!isRawFileResourceId(id)) return;
     // toggle file ids
     this.#get().toggleParsingIds([id]);
 
@@ -332,12 +345,17 @@ export class FileManageActionImpl {
   };
 
   removeFileItem = async (id: string): Promise<void> => {
+    if (!isRawFileResourceId(id)) return;
+
     await fileService.removeFile(id);
     await this.#get().refreshFileList();
   };
 
   removeFiles = async (ids: string[]): Promise<void> => {
-    await fileService.removeFiles(ids);
+    const rawFileIds = ids.filter(isRawFileResourceId);
+    if (rawFileIds.length === 0) return;
+
+    await fileService.removeFiles(rawFileIds);
     await this.#get().refreshFileList();
   };
 
@@ -609,6 +627,7 @@ export class FileManageActionImpl {
     data: {
       classification?: FileAssetClassification;
       metadata?: FileAssetMetadata | null;
+      reviewStatus?: FileAssetReviewStatus;
       rightsOwner?: string | null;
       usagePolicy?: FileAssetUsagePolicy;
     },
@@ -627,6 +646,7 @@ export class FileManageActionImpl {
     data: {
       classification?: FileAssetClassification;
       metadata?: FileAssetMetadata | null;
+      reviewStatus?: FileAssetReviewStatus;
       rightsOwner?: string | null;
       usagePolicy?: FileAssetUsagePolicy;
     },

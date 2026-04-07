@@ -1,13 +1,16 @@
 'use client';
 
+import { getCanonicalContentKind } from '@lobechat/types';
 import { Block, Button, Flexbox, Text } from '@lobehub/ui';
 import { App } from 'antd';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import FileIcon from '@/components/FileIcon';
+import { useSpaceName } from '@/features/ResourceSpaces';
 import { contentService } from '@/services/content';
 import { revalidateResources } from '@/store/file/slices/content/hooks';
+import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { type ContentItem } from '@/types/content';
 
 interface TrashContentProps {
@@ -17,15 +20,22 @@ interface TrashContentProps {
   variant?: 'modal' | 'page';
 }
 
+const getCanonicalContentSourceType = (item: Pick<ContentItem, 'id' | 'sourceType'>) =>
+  getCanonicalContentKind(item);
+
 const toResourceRef = (item: Pick<ContentItem, 'id' | 'sourceType'>) => ({
   id: item.id,
-  sourceType: item.sourceType,
+  sourceType: getCanonicalContentSourceType(item),
 });
 
 export const TrashContent = memo<TrashContentProps>(
   ({ enabled = true, sourceSetId, spaceId, variant = 'page' }) => {
     const { t } = useTranslation(['common', 'file']);
     const { message, modal } = App.useApp();
+    const spaceName = useSpaceName(spaceId);
+    const sourceSetName = useSourceSetStore(
+      sourceSetSelectors.getSourceSetNameById(sourceSetId || ''),
+    );
     const [items, setItems] = useState<ContentItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [deletingAll, setDeletingAll] = useState(false);
@@ -156,11 +166,17 @@ export const TrashContent = memo<TrashContentProps>(
       });
     };
 
+    const surfaceTitle = sourceSetName
+      ? `${sourceSetName} / ${t('trash.title', { ns: 'file' })}`
+      : spaceName
+        ? `${spaceName} / ${t('trash.title', { ns: 'file' })}`
+        : `${t('space.quickAccessTitle', { ns: 'file' })} / ${t('trash.title', { ns: 'file' })}`;
+
     return (
       <Flexbox gap={16} width={'100%'}>
         {variant === 'page' && (
           <Flexbox gap={4}>
-            <Text as={'h2'}>{t('trash.title', { ns: 'file' })}</Text>
+            <Text as={'h2'}>{surfaceTitle}</Text>
             <Text type={'secondary'}>
               {t(sourceSetId ? 'trash.hint' : 'trash.hintAll', { ns: 'file' })}
             </Text>
@@ -224,7 +240,7 @@ export const TrashContent = memo<TrashContentProps>(
                           {t(
                             isFolder
                               ? 'trash.kind.folder'
-                              : item.sourceType === 'document'
+                              : getCanonicalContentSourceType(item) === 'document'
                                 ? 'trash.kind.page'
                                 : 'trash.kind.file',
                             { ns: 'file' },

@@ -33,14 +33,15 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) =>
       (
-        {
+        ({
           'shared.empty': 'No shared resources',
           'shared.kind.document': 'Document',
           'shared.kind.file': 'File',
           'shared.kind.source_set': 'Source Set',
+          'space.quickAccessTitle': 'Quick Access',
           'shared.subtitle': 'Shared with you',
           'shared.title': 'Shared',
-        } as Record<string, string>
+        }) as Record<string, string>
       )[key] || key,
   }),
 }));
@@ -80,7 +81,7 @@ describe('SharedWithMePage', () => {
 
     render(<SharedWithMePage />);
 
-    expect(screen.getByText('Shared')).toBeInTheDocument();
+    expect(screen.getByText('Quick Access / Shared')).toBeInTheDocument();
     expect(screen.getByText('No shared resources')).toBeInTheDocument();
   });
 
@@ -127,9 +128,26 @@ describe('SharedWithMePage', () => {
     fireEvent.click(screen.getByText('Research Set').closest('button')!);
 
     expect(navigateMock).toHaveBeenNthCalledWith(1, '/spaces/spc_1/files/item/file_1');
-    expect(navigateMock).toHaveBeenNthCalledWith(
-      2,
-      '/spaces/spc_1/files?scope=source-set%3Ass_1',
-    );
+    expect(navigateMock).toHaveBeenNthCalledWith(2, '/spaces/spc_1/files?scope=source-set%3Ass_1');
+  });
+
+  it('treats docs_* file entries as shared documents in the UI', () => {
+    swrState.data = [
+      {
+        contentUid: 'cnt_doc_from_file_1',
+        kind: 'file',
+        localId: 'docs_9',
+        metadata: { pageKind: 'table' },
+        name: 'Derived Doc',
+        spaceId: 'spc_1',
+      },
+    ];
+
+    render(<SharedWithMePage />);
+
+    expect(screen.getByText('Document')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Derived Doc').closest('button')!);
+
+    expect(navigateMock).toHaveBeenCalledWith('/spaces/spc_1/docs/table/9');
   });
 });

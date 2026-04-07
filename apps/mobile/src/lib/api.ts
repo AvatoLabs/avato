@@ -29,6 +29,7 @@ import type {
   ChatToolPayload,
   CreateSessionConfig,
   DiscoverModel,
+  FileAssetCapabilities,
   FileListItem,
   GenerationBatch,
   GenerationTopic,
@@ -47,6 +48,15 @@ import type {
   MemoryPreferenceItem,
   MessageContentPart,
   MobileMemoryEffort,
+  MobileSpaceItem,
+  MobileSpaceMemoryAuditBatchBundle,
+  MobileSpaceMemoryAuditBundle,
+  MobileSpaceMemoryEntryPreview,
+  MobileSpaceMemoryEntryResult,
+  MobileSpaceMemoryRecallFilter,
+  MobileSpaceMemorySection,
+  MobileSpaceMemorySectionResult,
+  MobileSpaceMemorySummary,
   MobileSSOProvider,
   MobileUserState,
   ModelRankItem,
@@ -61,6 +71,12 @@ import type {
 } from '../types';
 import { clearStoredAuthSession, getAuthHeaders } from './auth';
 import { useI18n } from './i18n';
+import { getCanonicalResourceKind, isRawFileResourceId } from './resourceList';
+import {
+  normalizeContentShareTarget,
+  normalizePublicSharedContent,
+  normalizeSharedWithMeItem,
+} from './resourceShare';
 import {
   getApiUrl,
   hasConfiguredUrl,
@@ -916,8 +932,7 @@ export const agentGroupApi = {
 };
 
 // ── AI Agent API (group chat execution) ───────────────────────────────
-const isValidChatFileId = (fileId?: string | null): fileId is string =>
-  typeof fileId === 'string' && fileId.trim().length > 0 && !fileId.startsWith('docs_');
+const isValidChatFileId = (fileId?: string | null): fileId is string => isRawFileResourceId(fileId);
 
 const hasInvalidChatFileIds = (fileIds?: string[]) =>
   !!fileIds?.some((fileId) => !isValidChatFileId(fileId));
@@ -1122,6 +1137,8 @@ export const messageApi = {
   /** Server procedure is `message.update`, NOT `message.updateMessage` */
   update: (id: string, content: string) =>
     trpcMutate('message.update', { id, value: { content } }),
+  updateMetadata: (id: string, value: Record<string, unknown>) =>
+    trpcMutate('message.updateMetadata', { id, value }),
   /** Server expects `{ ids: string[] }`, NOT `{ sessionId, topicId }` */
   removeAll: (ids: string[]) =>
     trpcMutate('message.removeMessages', { ids }),
@@ -2143,9 +2160,18 @@ export const sourceSetApi = {
     trpcMutate('sourceSet.deleteSourceSet', { id, removeFiles }),
 };
 
+export const spaceApi = {
+  getById: (id: string) => trpcQuery<MobileSpaceItem>('space.getSpace', { id }),
+  list: () => trpcQuery<MobileSpaceItem[]>('space.listSpaces'),
+};
+
 // ── Resource API (unified files + documents with folder support) ─────
 
 export interface ResourceQueryParams {
+  assetClassification?: FileListItem['assetClassification'];
+  assetReviewStatus?: FileListItem['assetReviewStatus'];
+  assetRightsOwner?: string;
+  assetUsagePolicy?: FileListItem['assetUsagePolicy'];
   category?: string;
   limit?: number;
   offset?: number;
@@ -2160,6 +2186,7 @@ export interface ResourceQueryParams {
 }
 
 export interface ResourceListResponse {
+  governanceCapabilities?: FileAssetCapabilities;
   hasMore: boolean;
   items: FileListItem[];
   total?: number;
@@ -2177,6 +2204,17 @@ export interface TrashedDocumentItem {
   fileType: string | null;
   id: string;
   title: string | null;
+}
+
+interface PreviewFileDocumentPage {
+  pageContent?: string | null;
+}
+
+interface PreviewFileDocument {
+  content?: string | null;
+  id: string;
+  pages?: PreviewFileDocumentPage[] | null;
+  title?: string | null;
 }
 
 export const resourceApi = {
@@ -2203,6 +2241,12 @@ export const resourceApi = {
       title?: string | null;
     }>('document.getDocumentById', { id }),
 
+  ensureFileDocument: (id: string) =>
+    trpcMutate<{ id: string }>('document.ensureFileDocument', { id }),
+
+  previewFileContent: (id: string) =>
+    trpcQuery<PreviewFileDocument>('document.previewFileContent', { id }),
+
   createFolder: (params: {
     sourceSetId: string;
     parentId?: string;
@@ -2221,7 +2265,7 @@ export const resourceApi = {
     parentId: string | null,
     sourceType: 'file' | 'document',
   ) => {
-    if (sourceType === 'file') {
+    if (getCanonicalResourceKind({ id, sourceType }) === 'file') {
       return trpcMutate('file.updateFile', { id, parentId });
     }
     return trpcMutate('document.updateDocument', { id, parentId });
@@ -2338,16 +2382,21 @@ export const contentShareApi = {
       fileShareDownloadUrl?: string;
       id: string;
       shareUrl: string;
-    }>('contentShare.createContentShareLink', params),
+    }>('contentShare.createContentShareLink', normalizeContentShareTarget(params)),
 
   disableContentShareLink: (shareLinkId: string) =>
     trpcMutate<{ success: boolean }>('contentShare.disableContentShareLink', { shareLinkId }),
 
   explainContentAccess: (params: { id?: string; kind?: ContentShareKind; contentUid?: string }) =>
-    trpcQuery<ExplainAccessResult>('contentShare.explainContentAccess', params),
+    trpcQuery<ExplainAccessResult>(
+      'contentShare.explainContentAccess',
+      normalizeContentShareTarget(params),
+    ),
 
   getSharedContentByToken: (params: { password?: string; token: string }) =>
-    trpcQuery<PublicSharedContentPayload>('contentShare.getSharedContentByToken', params),
+    trpcQuery<PublicSharedContentPayload>('contentShare.getSharedContentByToken', params).then(
+      normalizePublicSharedContent,
+    ),
 
   grantContentPermission: (params: {
     canReshare?: boolean;
@@ -2358,15 +2407,28 @@ export const contentShareApi = {
     kind?: ContentShareKind;
     role: 'owner' | 'editor' | 'viewer';
     username: string;
-  }) => trpcMutate<ContentPermissionListItem>('contentShare.grantContentPermission', params),
+  }) =>
+    trpcMutate<ContentPermissionListItem>(
+      'contentShare.grantContentPermission',
+      normalizeContentShareTarget(params),
+    ),
 
   listContentPermissions: (params: { id?: string; kind?: ContentShareKind; contentUid?: string }) =>
-    trpcQuery<ContentPermissionListItem[]>('contentShare.listContentPermissions', params),
+    trpcQuery<ContentPermissionListItem[]>(
+      'contentShare.listContentPermissions',
+      normalizeContentShareTarget(params),
+    ),
 
   listContentShareLinks: (params: { id?: string; kind?: ContentShareKind; contentUid?: string }) =>
-    trpcQuery<ContentShareLinkListItem[]>('contentShare.listContentShareLinks', params),
+    trpcQuery<ContentShareLinkListItem[]>(
+      'contentShare.listContentShareLinks',
+      normalizeContentShareTarget(params),
+    ),
 
-  listSharedWithMe: () => trpcQuery<SharedWithMeListItem[]>('contentShare.listSharedWithMe'),
+  listSharedWithMe: () =>
+    trpcQuery<SharedWithMeListItem[]>('contentShare.listSharedWithMe').then((items) =>
+      items.map(normalizeSharedWithMeItem),
+    ),
 
   revokeContentPermission: (permissionId: string) =>
     trpcMutate<{ success: boolean }>('contentShare.revokeContentPermission', { permissionId }),
@@ -2421,11 +2483,11 @@ export const fileApi = {
       const hashCheck = await trpcMutate<{
         isExist: boolean;
         metadata?: { path?: string };
-        url?: string;
-      }>('file.checkFileHash', { hash: sha256Hex, spaceId: options?.spaceId });
+        storageKey?: string;
+      }>('file.checkSpaceBlob', { sha256: sha256Hex, spaceId: options?.spaceId });
 
       if (hashCheck.isExist) {
-        storagePath = hashCheck.metadata?.path || hashCheck.url;
+        storagePath = hashCheck.metadata?.path || hashCheck.storageKey;
         if (storagePath) {
           metadata = fileMetadataFromStorageKey(storagePath, name);
         }
@@ -2481,14 +2543,14 @@ export const fileApi = {
 
     const created = await trpcMutate<{ id: string; url: string }>('file.createFile', {
       fileType,
-      hash: sha256Hex,
+      sha256: sha256Hex,
       sourceSetId: options?.sourceSetId,
       metadata: fileMetadata,
       name,
       parentId: options?.parentId,
       size,
       spaceId: options?.spaceId,
-      url: storagePath,
+      storageKey: storagePath,
     });
 
     const resolvedUrl = resolveRemoteFileUrl(baseUrl, created.id, created.url);
@@ -3272,6 +3334,86 @@ export const memoryApi = {
   // ── Chat Memory Injection ──
   queryIdentitiesForInjection: () =>
     trpcQuery<Array<{ content: string; id: string; role: string; title: string }>>('userMemories.queryIdentitiesForInjection'),
+};
+
+export const spaceMemoryApi = {
+  createCandidate: (
+    spaceId: string,
+    draft: {
+      category?: 'general' | 'playbook' | 'policy';
+      content?: string | null;
+      summary?: string | null;
+      title: string;
+    },
+  ) =>
+    trpcMutate<MobileSpaceMemoryEntryPreview>('spaceMemory.createCandidate', {
+      category: draft.category,
+      content: draft.content,
+      spaceId,
+      summary: draft.summary,
+      title: draft.title,
+    }),
+  exportAuditBundle: (
+    spaceId: string,
+    id: string,
+    recallFilter: MobileSpaceMemoryRecallFilter = 'all',
+  ) =>
+    trpcQuery<MobileSpaceMemoryAuditBundle>('spaceMemory.exportAuditBundle', {
+      id,
+      recallFilter,
+      spaceId,
+    }),
+  exportAuditBundles: (
+    spaceId: string,
+    ids: string[],
+    recallFilter: MobileSpaceMemoryRecallFilter = 'all',
+  ) =>
+    trpcQuery<MobileSpaceMemoryAuditBatchBundle>('spaceMemory.exportAuditBundles', {
+      ids,
+      recallFilter,
+      spaceId,
+    }),
+  getEntry: (spaceId: string, id: string) =>
+    trpcQuery<MobileSpaceMemoryEntryResult>('spaceMemory.getEntry', { id, spaceId }),
+  getSummary: (spaceId: string) =>
+    trpcQuery<MobileSpaceMemorySummary>('spaceMemory.getSummary', { spaceId }),
+  listEntries: (
+    spaceId: string,
+    section: MobileSpaceMemorySection,
+    recallFilter: MobileSpaceMemoryRecallFilter = 'all',
+  ) =>
+    trpcQuery<MobileSpaceMemorySectionResult>('spaceMemory.listEntries', {
+      recallFilter,
+      section,
+      spaceId,
+    }),
+  publishEntry: (spaceId: string, id: string) =>
+    trpcMutate('spaceMemory.publishEntry', { id, spaceId }),
+  rejectEntry: (spaceId: string, id: string) =>
+    trpcMutate('spaceMemory.rejectEntry', { id, spaceId }),
+  markEntryStale: (spaceId: string, id: string) =>
+    trpcMutate('spaceMemory.markEntriesStale', { ids: [id], spaceId }),
+  revalidateEntry: (spaceId: string, id: string) =>
+    trpcMutate('spaceMemory.revalidateEntries', { ids: [id], spaceId }),
+  mergeEntry: (
+    spaceId: string,
+    params: {
+      candidateId: string;
+      merge?: {
+        appendSources?: boolean;
+        applyContent?: boolean;
+        applySummary?: boolean;
+        applyTitle?: boolean;
+      };
+      targetEntryId: string;
+    },
+  ) =>
+    trpcMutate('spaceMemory.mergeEntry', {
+      candidateId: params.candidateId,
+      merge: params.merge,
+      spaceId,
+      targetEntryId: params.targetEntryId,
+    }),
 };
 
 // ── Artwork / Image Generation API ─────────────────────────────────

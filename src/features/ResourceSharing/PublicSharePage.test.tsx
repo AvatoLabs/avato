@@ -5,6 +5,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { TRPCClientError } from '@trpc/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { formatDateTime } from '@/utils/format';
+
 import PublicSharePage from './PublicSharePage';
 
 const swrState = vi.hoisted(() => ({
@@ -36,7 +38,19 @@ vi.mock('@lobehub/ui', () => ({
     </button>
   ),
   Center: ({ children }: any) => <div>{children}</div>,
-  Flexbox: ({ as, children, onSubmit, ...props }: any) => {
+  DropdownMenu: ({ children, items }: any) => (
+    <div>
+      {children}
+      <div>
+        {items.map((item: any) => (
+          <button key={item.key} type="button" onClick={() => item.onClick?.()}>
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  ),
+  Flexbox: ({ as, children, horizontal: _horizontal, onSubmit, ...props }: any) => {
     const Component = as || 'div';
     return (
       <Component onSubmit={onSubmit} {...props}>
@@ -74,6 +88,8 @@ vi.mock('react-i18next', () => ({
           'publicShare.download': 'Download',
           'publicShare.downloadCsv': 'Download CSV',
           'publicShare.downloadXlsx': 'Download Excel (.xlsx)',
+          'publicShare.exportActions': 'Export',
+          'publicShare.moreActions': 'More actions',
           'publicShare.expiresAt': `Expires ${options?.date}`,
           'publicShare.noPreview': 'No preview',
           'publicShare.notFoundDesc': 'Not found',
@@ -194,16 +210,17 @@ describe('PublicSharePage', () => {
     render(<PublicSharePage />);
 
     expect(screen.getByText('Preview')).toBeInTheDocument();
-    expect(screen.getByText('1 rows · 2 columns · Read-only snapshot')).toBeInTheDocument();
+    expect(screen.getAllByText('1 rows · 2 columns · Read-only snapshot')).not.toHaveLength(0);
+    expect(
+      screen.getByText(`Expires ${formatDateTime(new Date('2026-04-04T12:00:00.000Z'))}`),
+    ).toBeInTheDocument();
     expect(screen.getByRole('table')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Status' })).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: 'Launch' })).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: 'Done' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Open in Docs' })).toHaveAttribute(
-      'data-href',
-      '/spaces/spc_1/docs/table/2',
-    );
+    expect(screen.getByRole('button', { name: 'Open in Docs' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download CSV' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download Excel (.xlsx)' })).toBeInTheDocument();
     expect(screen.queryByTestId('markdown-preview')).not.toBeInTheDocument();
@@ -335,7 +352,7 @@ describe('PublicSharePage', () => {
     render(<PublicSharePage />);
 
     expect(screen.getByText('Preview')).toBeInTheDocument();
-    expect(screen.getByText('Read-only preview')).toBeInTheDocument();
+    expect(screen.getAllByText('Read-only preview')).not.toHaveLength(0);
     expect(screen.getByTestId('markdown-preview')).toHaveTextContent('# Shared Doc');
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open in Docs' })).toHaveAttribute(
@@ -361,7 +378,7 @@ describe('PublicSharePage', () => {
     render(<PublicSharePage />);
 
     expect(screen.getByText('Preview')).toBeInTheDocument();
-    expect(screen.getByText('Preview is unavailable for this shared item.')).toBeInTheDocument();
+    expect(screen.getAllByText('Preview is unavailable for this shared item.')).not.toHaveLength(0);
     expect(screen.getByRole('button', { name: 'Open in Files' })).toHaveAttribute(
       'data-href',
       '/spaces/spc_1/files?scope=source-set%3Ass_1',
@@ -392,5 +409,29 @@ describe('PublicSharePage', () => {
     );
     expect(screen.queryByRole('button', { name: 'Open in Docs' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Download CSV' })).not.toBeInTheDocument();
+  });
+
+  it('canonicalizes docs_* file payloads to the docs preview flow', () => {
+    swrState.data = {
+      content: '# Shared Doc\n\nHello team',
+      expiresAt: new Date('2026-04-04T12:00:00.000Z'),
+      kind: 'file',
+      localId: 'docs_7',
+      metadata: { pageKind: 'doc' },
+      name: 'Legacy Shared Doc',
+      spaceId: 'spc_1',
+      title: 'Legacy Shared Doc',
+    };
+
+    render(<PublicSharePage />);
+
+    expect(screen.getAllByText('Document')).not.toHaveLength(0);
+    expect(screen.getByTestId('markdown-preview')).toHaveTextContent('# Shared Doc');
+    expect(screen.getByRole('button', { name: 'Open in Docs' })).toHaveAttribute(
+      'data-href',
+      '/spaces/spc_1/docs/7',
+    );
+    expect(screen.queryByRole('button', { name: 'Download' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open in Files' })).not.toBeInTheDocument();
   });
 });

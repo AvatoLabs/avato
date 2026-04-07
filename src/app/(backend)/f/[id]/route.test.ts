@@ -93,6 +93,16 @@ describe('GET /f/[id]', () => {
   });
 
   describe('session download', () => {
+    it('should 404 for document-shaped file ids before lookup', async () => {
+      const req = new Request('https://app.example.com/f/docs_1');
+      const res = await GET(req, { params: Promise.resolve({ id: 'docs_1' }) });
+
+      expect(res.status).toBe(404);
+      expect(mockGetServerDB).not.toHaveBeenCalled();
+      expect(mockGetFileById).not.toHaveBeenCalled();
+      expect(mockServeAuthorizedFileDownload).not.toHaveBeenCalled();
+    });
+
     it('should 401 when no session and no token', async () => {
       const req = new Request('https://app.example.com/f/file-1');
       const res = await GET(req, { params: Promise.resolve({ id: 'file-1' }) });

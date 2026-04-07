@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import { sha256 } from 'js-sha256';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DocumentModel } from '@/database/models/document';
@@ -8,10 +9,18 @@ import { TempFileManager } from '@/server/utils/tempFileManager';
 import { FileService } from '../index';
 import { STORAGE_OBJECT_MISSING_MESSAGE } from '../storageErrors';
 
-const { mockGetOrCreatePersonalSpace, mockRequireFile, mockUpsertSpaceBlob } = vi.hoisted(() => ({
+const {
+  mockEnsureContentRegistry,
+  mockEnsureOwnerPermission,
+  mockGetOrCreatePersonalSpace,
+  mockRequireFile,
+  mockUpsertSpaceBlob,
+} = vi.hoisted(() => ({
+  mockEnsureContentRegistry: vi.fn().mockResolvedValue({ contentUid: 'res_file_1' }),
+  mockEnsureOwnerPermission: vi.fn().mockResolvedValue(undefined),
   mockGetOrCreatePersonalSpace: vi.fn().mockResolvedValue({ id: 'spc_personal_default' }),
   mockRequireFile: vi.fn(),
-  mockUpsertSpaceBlob: vi.fn().mockResolvedValue(undefined),
+  mockUpsertSpaceBlob: vi.fn().mockResolvedValue({ id: 'blob_1' }),
 }));
 
 vi.mock('@/config/db', () => ({
@@ -52,6 +61,8 @@ vi.mock('@/database/models/space', () => ({
 
 vi.mock('@/database/models/content', () => ({
   ContentModel: vi.fn(() => ({
+    ensureContentRegistry: mockEnsureContentRegistry,
+    ensureOwnerPermission: mockEnsureOwnerPermission,
     invalidateAuthzEpochsAfterRemoval: vi.fn().mockResolvedValue(undefined),
     upsertSpaceBlob: mockUpsertSpaceBlob,
   })),
@@ -67,6 +78,7 @@ vi.mock('@/server/utils/tempFileManager');
 
 vi.mock('@/utils/uuid', () => ({
   nanoid: () => 'test-id',
+  uuid: () => 'uuid-test-id',
 }));
 
 describe('FileService', () => {
@@ -99,6 +111,8 @@ describe('FileService', () => {
 
     mockRequireFile.mockReset();
     mockGetOrCreatePersonalSpace.mockClear();
+    mockEnsureContentRegistry.mockClear();
+    mockEnsureOwnerPermission.mockClear();
     mockUpsertSpaceBlob.mockClear();
     service = new FileService(mockDb, mockUserId);
   });
@@ -285,6 +299,14 @@ describe('FileService', () => {
     expect(result).toBe(expectedUrl);
   });
 
+  it('should reject internal document urls when requesting a fetchable file url', async () => {
+    await expect(service.getFullFileUrl('internal://document/doc-1')).rejects.toThrow(
+      new TRPCError({ code: 'BAD_REQUEST', message: 'INTERNAL_DOCUMENT_URL_NOT_FETCHABLE' }),
+    );
+
+    expect(service['impl'].getFullFileUrl).not.toHaveBeenCalled();
+  });
+
   it('should delegate getKeyFromFullUrl to implementation', async () => {
     const testUrl = 'https://example.com/path/to/file.jpg';
     const expectedKey = 'path/to/file.jpg';
@@ -308,26 +330,55 @@ describe('FileService', () => {
     expect(result).toBe(expectedResult);
   });
 
+  it('should create opaque user blob paths under the personal space', async () => {
+    const result = await service.createOpaqueUserBlobPath('mcp-content/images', 'png');
+
+    expect(mockGetOrCreatePersonalSpace).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      key: 'v2/spaces/spc_personal_default/blobs/mcp-content/images/test-id.png',
+      spaceId: 'spc_personal_default',
+    });
+  });
+
+  it('should create opaque user blob paths under an explicit space', async () => {
+    const result = await service.createOpaqueUserBlobPath(
+      'rag-eval-records',
+      'jsonl',
+      'spc_team_ops',
+    );
+
+    expect(mockGetOrCreatePersonalSpace).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      key: 'v2/spaces/spc_team_ops/blobs/rag-eval-records/test-id.jsonl',
+      spaceId: 'spc_team_ops',
+    });
+  });
+
   describe('createFileRecord', () => {
     beforeEach(() => {
       mockFileModel.create = vi.fn();
+      mockFileModel.update = vi.fn().mockResolvedValue(undefined);
     });
 
     it('should return same-origin proxy path /f/:id', async () => {
       mockFileModel.create.mockResolvedValue({ id: 'new-file-id' });
 
       const result = await service.createFileRecord({
-        fileHash: 'test-hash',
         fileType: 'image/png',
         name: 'test.png',
+        sha256: 'test-hash',
         size: 1024,
-        url: 'files/test.png',
+        storageKey: 'files/test.png',
       });
 
       expect(mockGetOrCreatePersonalSpace).toHaveBeenCalled();
       expect(mockFileModel.create).toHaveBeenCalledWith(
-        expect.objectContaining({ spaceId: 'spc_personal_default' }),
-        true,
+        expect.objectContaining({
+          blobId: 'blob_1',
+          fileHash: null,
+          spaceId: 'spc_personal_default',
+        }),
+        false,
       );
       expect(mockUpsertSpaceBlob).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -337,6 +388,24 @@ describe('FileService', () => {
           storageKey: 'files/test.png',
         }),
       );
+      expect(mockEnsureContentRegistry).toHaveBeenCalledWith({
+        createdBy: mockUserId,
+        kind: 'file',
+        localId: 'new-file-id',
+        spaceId: 'spc_personal_default',
+      });
+      expect(mockFileModel.update).toHaveBeenCalledWith(
+        'new-file-id',
+        expect.objectContaining({
+          blobId: 'blob_1',
+          contentUid: 'res_file_1',
+          spaceId: 'spc_personal_default',
+        }),
+      );
+      expect(mockEnsureOwnerPermission).toHaveBeenCalledWith({
+        contentUid: 'res_file_1',
+        spaceId: 'spc_personal_default',
+      });
       expect(result).toEqual({
         fileId: 'new-file-id',
         url: '/f/new-file-id',
@@ -347,17 +416,22 @@ describe('FileService', () => {
       mockFileModel.create.mockResolvedValue({ id: 'custom-id' });
 
       const result = await service.createFileRecord({
-        fileHash: 'test-hash',
         fileType: 'image/png',
         id: 'custom-id',
         name: 'test.png',
+        sha256: 'test-hash',
         size: 1024,
-        url: 'files/test.png',
+        storageKey: 'files/test.png',
       });
 
       expect(mockFileModel.create).toHaveBeenCalledWith(
-        expect.objectContaining({ spaceId: 'spc_personal_default' }),
-        true,
+        expect.objectContaining({
+          blobId: 'blob_1',
+          fileHash: null,
+          id: 'custom-id',
+          spaceId: 'spc_personal_default',
+        }),
+        false,
       );
       expect(result).toEqual({
         fileId: 'custom-id',
@@ -365,23 +439,30 @@ describe('FileService', () => {
       });
     });
 
-    it('should always attempt global_files insert (onConflictDoNothing)', async () => {
+    it('should create space-scoped file rows without global_files when a space is resolved', async () => {
       mockFileModel.create.mockResolvedValue({ id: 'file-id' });
 
       await service.createFileRecord({
-        fileHash: 'any-hash',
         fileType: 'text/plain',
         name: 'test.txt',
+        sha256: 'any-hash',
         size: 100,
-        url: 'files/test.txt',
+        storageKey: 'files/test.txt',
       });
 
       expect(mockFileModel.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          fileHash: 'any-hash',
+          blobId: 'blob_1',
+          fileHash: null,
           spaceId: 'spc_personal_default',
         }),
-        true,
+        false,
+      );
+      expect(mockUpsertSpaceBlob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sha256: 'any-hash',
+          spaceId: 'spc_personal_default',
+        }),
       );
     });
 
@@ -389,14 +470,22 @@ describe('FileService', () => {
       mockFileModel.create.mockResolvedValue({ id: 'file-id' });
 
       await service.createFileRecord({
-        fileHash: 'h1',
         fileType: 'text/plain',
         name: 'test.txt',
+        sha256: 'h1',
         size: 100,
         spaceId: 'spc_1',
-        url: 'files/test.txt',
+        storageKey: 'files/test.txt',
       });
 
+      expect(mockFileModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          blobId: 'blob_1',
+          fileHash: null,
+          spaceId: 'spc_1',
+        }),
+        false,
+      );
       expect(mockUpsertSpaceBlob).toHaveBeenCalledWith(
         expect.objectContaining({
           sha256: 'h1',
@@ -407,24 +496,102 @@ describe('FileService', () => {
       );
     });
 
-    it('should skip personal space and space_blobs when spaceId is null', async () => {
+    it('should preserve file context fields when creating a space-scoped file row', async () => {
       mockFileModel.create.mockResolvedValue({ id: 'file-id' });
 
       await service.createFileRecord({
-        fileHash: 'h2',
+        blobId: 'blob_existing',
+        blobMetadata: { source: 'lambda_upload' },
         fileType: 'text/plain',
+        metadata: { path: 'files/test.txt' } as any,
         name: 'test.txt',
-        size: 10,
-        spaceId: null,
-        url: 'files/x.txt',
+        parentId: 'folder-1',
+        sha256: 'ctx-hash',
+        source: 'user_file_upload',
+        sourceSetId: 'kb_1',
+        size: 100,
+        spaceId: 'spc_1',
+        storageKey: 'files/test.txt',
       });
 
-      expect(mockGetOrCreatePersonalSpace).not.toHaveBeenCalled();
-      expect(mockFileModel.create).toHaveBeenCalledWith(
-        expect.objectContaining({ spaceId: undefined }),
-        true,
-      );
       expect(mockUpsertSpaceBlob).not.toHaveBeenCalled();
+      expect(mockFileModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          blobId: 'blob_existing',
+          metadata: { path: 'files/test.txt' },
+          parentId: 'folder-1',
+          source: 'user_file_upload',
+          sourceSetId: 'kb_1',
+          spaceId: 'spc_1',
+        }),
+        false,
+      );
+      expect(mockEnsureContentRegistry).toHaveBeenCalledWith({
+        createdBy: mockUserId,
+        kind: 'file',
+        localId: 'file-id',
+        spaceId: 'spc_1',
+      });
+      expect(mockEnsureOwnerPermission).toHaveBeenCalledWith({
+        contentUid: 'res_file_1',
+        spaceId: 'spc_1',
+      });
+    });
+
+    it('should reject null spaceId and require a space-scoped destination', async () => {
+      await expect(
+        service.createFileRecord({
+          fileType: 'text/plain',
+          name: 'test.txt',
+          sha256: 'h2',
+          size: 10,
+          spaceId: null,
+          storageKey: 'files/x.txt',
+        }),
+      ).rejects.toThrow(
+        'createFileRecord requires a space-scoped destination; use createGlobalFile instead',
+      );
+
+      expect(mockGetOrCreatePersonalSpace).not.toHaveBeenCalled();
+      expect(mockFileModel.create).not.toHaveBeenCalled();
+      expect(mockUpsertSpaceBlob).not.toHaveBeenCalled();
+      expect(mockEnsureContentRegistry).not.toHaveBeenCalled();
+      expect(mockEnsureOwnerPermission).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createFileRecordFromStorageObject', () => {
+    it('should compute the real sha256 from stored bytes before creating the record', async () => {
+      const storedBytes = new Uint8Array([1, 2, 3, 4]);
+      const createFileRecordSpy = vi.spyOn(service, 'createFileRecord').mockResolvedValue({
+        fileId: 'file-1',
+        url: '/f/file-1',
+      });
+      vi.mocked(service['impl'].getFileByteArray).mockResolvedValue(storedBytes);
+
+      const result = await service.createFileRecordFromStorageObject({
+        fileType: 'application/pdf',
+        name: 'report.pdf',
+        spaceId: 'spc_team',
+        storageKey: 'v2/spaces/spc_team/blobs/exports/report.pdf',
+      });
+
+      expect(createFileRecordSpy).toHaveBeenCalledWith({
+        fileType: 'application/pdf',
+        name: 'report.pdf',
+        sha256: sha256(storedBytes),
+        size: storedBytes.byteLength,
+        spaceId: 'spc_team',
+        storageKey: 'v2/spaces/spc_team/blobs/exports/report.pdf',
+      });
+      expect(result).toEqual({
+        fileId: 'file-1',
+        sha256: sha256(storedBytes),
+        size: storedBytes.byteLength,
+        url: '/f/file-1',
+      });
+
+      createFileRecordSpy.mockRestore();
     });
   });
 
@@ -438,18 +605,18 @@ describe('FileService', () => {
       mockFileModel.createGlobalFile.mockResolvedValue([{ hashId: 'test-hash' }]);
 
       const result = await service.createGlobalFile({
-        fileHash: 'test-hash',
         fileType: 'text/markdown',
         metadata: {
           dirname: 'skills/source_files/abc123',
           filename: 'README.md',
           path: 'skills/source_files/abc123/README.md',
         },
+        sha256: 'test-hash',
         size: 1024,
-        url: 'skills/source_files/abc123/README.md',
+        storageKey: 'skills/source_files/abc123/README.md',
       });
 
-      expect(result).toEqual({ fileHash: 'test-hash' });
+      expect(result).toEqual({ sha256: 'test-hash' });
       expect(mockFileModel.checkHash).not.toHaveBeenCalled();
       expect(mockFileModel.createGlobalFile).toHaveBeenCalledWith({
         creator: mockUserId,
@@ -469,13 +636,13 @@ describe('FileService', () => {
       mockFileModel.createGlobalFile.mockResolvedValue([]);
 
       const result = await service.createGlobalFile({
-        fileHash: 'existing-hash',
         fileType: 'text/plain',
+        sha256: 'existing-hash',
         size: 100,
-        url: 'some/path.txt',
+        storageKey: 'some/path.txt',
       });
 
-      expect(result).toEqual({ fileHash: 'existing-hash' });
+      expect(result).toEqual({ sha256: 'existing-hash' });
       expect(mockFileModel.checkHash).not.toHaveBeenCalled();
       expect(mockFileModel.createGlobalFile).toHaveBeenCalledWith({
         creator: mockUserId,
@@ -491,10 +658,10 @@ describe('FileService', () => {
       mockFileModel.createGlobalFile.mockResolvedValue([{ hashId: 'test-hash' }]);
 
       await service.createGlobalFile({
-        fileHash: 'test-hash',
         fileType: 'text/plain',
+        sha256: 'test-hash',
         size: 100,
-        url: 'some/path.txt',
+        storageKey: 'some/path.txt',
       });
 
       expect(mockFileModel.checkHash).not.toHaveBeenCalled();
@@ -506,6 +673,64 @@ describe('FileService', () => {
         size: 100,
         url: 'some/path.txt',
       });
+    });
+  });
+
+  describe('uploadFromUrl', () => {
+    it('should preserve explicit name and spaceId when creating a file record', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response('hello world', {
+          headers: { 'content-type': 'image/png' },
+          status: 200,
+        }),
+      );
+      vi.mocked(service['impl'].uploadMedia).mockResolvedValue({
+        key: 'v2/spaces/spc_team/blobs/ai-agent-inputs/opq_1.png',
+      });
+      const createFileRecordSpy = vi.spyOn(service, 'createFileRecord').mockResolvedValue({
+        fileId: 'file-1',
+        url: '/f/file-1',
+      });
+
+      const result = await service.uploadFromUrl(
+        'https://cdn.example.com/photo.png',
+        'v2/spaces/spc_team/blobs/ai-agent-inputs/opq_1.png',
+        {
+          name: 'photo.png',
+          spaceId: 'spc_team',
+        },
+      );
+
+      expect(createFileRecordSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileType: 'image/png',
+          name: 'photo.png',
+          spaceId: 'spc_team',
+          storageKey: 'v2/spaces/spc_team/blobs/ai-agent-inputs/opq_1.png',
+        }),
+      );
+      expect(result).toEqual({
+        fileId: 'file-1',
+        key: 'v2/spaces/spc_team/blobs/ai-agent-inputs/opq_1.png',
+        url: '/f/file-1',
+      });
+
+      createFileRecordSpy.mockRestore();
+      fetchSpy.mockRestore();
+    });
+
+    it('should reject non-canonical storage keys', async () => {
+      await expect(
+        service.uploadFromUrl('https://cdn.example.com/photo.png', 'files/test-user/legacy.png'),
+      ).rejects.toThrow('uploadFromUrl only accepts canonical v2/spaces/{spaceId}/blobs keys');
+    });
+  });
+
+  describe('uploadBase64', () => {
+    it('should reject non-canonical storage keys', async () => {
+      await expect(service.uploadBase64('aGVsbG8=', 'files/test-user/legacy.png')).rejects.toThrow(
+        'uploadBase64 only accepts canonical v2/spaces/{spaceId}/blobs keys',
+      );
     });
   });
 });

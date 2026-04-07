@@ -1,8 +1,12 @@
+import { getCanonicalContentKind } from '@lobechat/types';
+
 import { lambdaClient } from '@/libs/trpc/client';
 import {
-  type CheckFileHashResult,
+  type CheckSpaceBlobResult,
   type FileAssetClassification,
+  type FileAssetGovernanceAuditTrailResult,
   type FileAssetMetadata,
+  type FileAssetReviewStatus,
   type FileAssetState,
   type FileAssetUsagePolicy,
   type FileGovernanceSummary,
@@ -13,11 +17,10 @@ import {
   type UploadFileParams,
 } from '@/types/files';
 
-interface CreateFileParams extends Omit<UploadFileParams, 'url'> {
+interface CreateFileParams extends UploadFileParams {
   parentId?: string;
   sourceSetId?: string;
   spaceId?: string;
-  url: string;
 }
 
 export class FileService {
@@ -82,7 +85,7 @@ export class FileService {
   // This method handles both files (file_ prefix) and documents (docs_ prefix)
   getKnowledgeItem = async (id: string) => {
     // Detect type based on ID prefix
-    if (id.startsWith('docs_')) {
+    if (getCanonicalContentKind({ id, sourceType: 'file' }) === 'document') {
       // Document (including folders) - use document endpoint
       const doc = await lambdaClient.document.getDocumentById.query({ id });
       if (!doc) return null;
@@ -121,12 +124,19 @@ export class FileService {
     return lambdaClient.file.getFileAssetById.query({ id });
   };
 
+  getFileAssetAuditTrail = async (
+    id: string,
+    limit?: number,
+  ): Promise<FileAssetGovernanceAuditTrailResult> => {
+    return lambdaClient.file.getFileAssetAuditTrail.query(limit ? { id, limit } : { id });
+  };
+
   getFolderBreadcrumb = async (slug: string, spaceId?: string) => {
     return lambdaClient.document.getFolderBreadcrumb.query(spaceId ? { slug, spaceId } : { slug });
   };
 
-  checkFileHash = async (hash: string, spaceId?: string): Promise<CheckFileHashResult> => {
-    return lambdaClient.file.checkFileHash.mutate(spaceId ? { hash, spaceId } : { hash });
+  checkSpaceBlob = async (sha256: string, spaceId?: string): Promise<CheckSpaceBlobResult> => {
+    return lambdaClient.file.checkSpaceBlob.mutate(spaceId ? { sha256, spaceId } : { sha256 });
   };
 
   removeFileAsyncTask = async (id: string, type: 'embedding' | 'chunk') => {
@@ -142,6 +152,7 @@ export class FileService {
     data: {
       classification?: FileAssetClassification;
       metadata?: FileAssetMetadata | null;
+      reviewStatus?: FileAssetReviewStatus;
       rightsOwner?: string | null;
       usagePolicy?: FileAssetUsagePolicy;
     },

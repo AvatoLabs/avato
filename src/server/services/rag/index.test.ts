@@ -78,7 +78,58 @@ describe('ServerRagService', () => {
     mockSemanticSearchForChat.mockResolvedValue([]);
   });
 
+  describe('getFileContents', () => {
+    it('should ignore docs_* canonical document ids', async () => {
+      const serverDB = {
+        query: {
+          sourceSetFiles: {
+            findMany: vi.fn().mockResolvedValue([]),
+          },
+        },
+      } as any;
+      mockFilterReadableFileIds.mockResolvedValue(['file-1']);
+      mockFindByFileId.mockResolvedValue({ content: 'alpha', metadata: { pageKind: 'doc' } });
+      const service = new ServerRagService(serverDB, userId);
+
+      const result = await service.getFileContents(['docs_derived_1', 'file-1']);
+
+      expect(mockFilterReadableFileIds).toHaveBeenCalledWith(['file-1']);
+      expect(mockRequireFile).toHaveBeenCalledWith('file-1', 'preview_content');
+      expect(mockRequireFile).not.toHaveBeenCalledWith('docs_derived_1', 'preview_content');
+      expect(result).toEqual([
+        expect.objectContaining({
+          content: 'alpha',
+          fileId: 'file-1',
+          filename: 'doc.md',
+        }),
+      ]);
+    });
+  });
+
   describe('semanticSearchForChat', () => {
+    it('should strip docs_* ids before readable-file filtering', async () => {
+      const serverDB = {
+        query: {
+          sourceSetFiles: {
+            findMany: vi.fn().mockResolvedValue([]),
+          },
+        },
+      } as any;
+      mockFilterReadableFileIds.mockResolvedValue(['file-1']);
+      mockSemanticSearchForChat.mockResolvedValue([
+        { fileId: 'file-1', fileName: 'A', id: 'chunk-1', similarity: 0.95, text: 'alpha' },
+      ]);
+
+      const service = new ServerRagService(serverDB, userId);
+
+      await service.semanticSearchForChat({
+        fileIds: ['docs_derived_1', 'file-1'],
+        query: 'rag audit',
+      });
+
+      expect(mockFilterReadableFileIds).toHaveBeenCalledWith(['file-1']);
+    });
+
     it('should short-circuit before embedding when no readable files remain', async () => {
       const serverDB = {
         query: {

@@ -1,3 +1,4 @@
+import { getCanonicalContentKind } from '@lobechat/types';
 import { useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -19,13 +20,13 @@ export const useOpenFileDocument = ({ fileId, id }: UseOpenFileDocumentOptions) 
   ]);
 
   return useCallback(async () => {
-    const documentId = id.startsWith('docs_')
-      ? id
-      : (await documentService.ensureFileDocument(fileId || id)).id;
+    const documentId =
+      getCanonicalContentKind({ id, sourceType: 'file' }) === 'document'
+        ? id
+        : (await documentService.ensureFileDocument(fileId || id)).id;
 
     const nextParams = new URLSearchParams(location.search);
     nextParams.delete('file');
-    nextParams.delete('files');
 
     const nextPath = buildFilesItemPath(location.pathname, documentId);
     const nextSearch = nextParams.toString();

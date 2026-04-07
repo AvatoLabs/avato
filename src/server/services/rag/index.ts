@@ -2,6 +2,7 @@ import { DEFAULT_FILE_EMBEDDING_MODEL_ITEM } from '@lobechat/const';
 import {
   type ChatSemanticSearchChunk,
   type FileSearchResult,
+  isRawFileContentId,
   resolveSemanticSearchLimits,
   type SemanticSearchSchemaType,
 } from '@lobechat/types';
@@ -29,6 +30,8 @@ interface FileContentResult {
   totalCharCount?: number;
   totalLineCount?: number;
 }
+
+const filterRawFileIds = (fileIds: string[]) => fileIds.filter(isRawFileContentId);
 
 const groupAndRankFiles = (
   chunks: ChatSemanticSearchChunk[],
@@ -138,7 +141,10 @@ export class ServerRagService {
     fileIds: string[],
     _signal?: AbortSignal,
   ): Promise<FileContentResult[]> => {
-    const readableFileIds = await this.contentAuthorizer.filterReadableFileIds(fileIds);
+    const rawFileIds = filterRawFileIds(fileIds);
+    if (rawFileIds.length === 0) return [];
+
+    const readableFileIds = await this.contentAuthorizer.filterReadableFileIds(rawFileIds);
 
     return pMap(
       readableFileIds,
@@ -186,8 +192,9 @@ export class ServerRagService {
     fileIds,
     query,
   }: Pick<SemanticSearchSchemaType, 'fileIds' | 'query'>) => {
-    const readableFileIds = fileIds
-      ? await this.contentAuthorizer.filterReadableFileIds(fileIds)
+    const rawFileIds = fileIds ? filterRawFileIds(fileIds) : undefined;
+    const readableFileIds = rawFileIds
+      ? await this.contentAuthorizer.filterReadableFileIds(rawFileIds)
       : undefined;
 
     if (fileIds && readableFileIds.length === 0) return [];
@@ -249,8 +256,9 @@ export class ServerRagService {
     fileIds,
     sourceSetIds,
   }: Pick<SemanticSearchSchemaType, 'fileIds' | 'sourceSetIds'>) => {
-    const readableFileIds = fileIds
-      ? await this.contentAuthorizer.filterReadableFileIds(fileIds)
+    const rawFileIds = fileIds ? filterRawFileIds(fileIds) : undefined;
+    const readableFileIds = rawFileIds
+      ? await this.contentAuthorizer.filterReadableFileIds(rawFileIds)
       : [];
 
     if (!sourceSetIds || sourceSetIds.length === 0) {

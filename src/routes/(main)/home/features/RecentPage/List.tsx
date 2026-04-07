@@ -3,6 +3,7 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
 
+import { buildPageScopeSearch, createSourceSetPageScope } from '@/features/Pages/usePageScope';
 import GroupSkeleton from '@/routes/(main)/home/features/components/GroupSkeleton';
 import { RECENT_BLOCK_SIZE } from '@/routes/(main)/home/features/const';
 import { homeRecentSelectors } from '@/store/home/selectors';
@@ -27,11 +28,15 @@ const RecentPageList = memo(() => {
   }
 
   return documents.map((document) => {
-    const pageUrl = getPageDetailPath(
+    const pagePath = getPageDetailPath(
       document.id,
       getPageKindFromDocument(document),
       document.spaceId,
     );
+    const pageSearch = document.sourceSetId
+      ? buildPageScopeSearch(createSourceSetPageScope(document.sourceSetId))
+      : '';
+    const pageUrl = `${pagePath}${pageSearch}`;
 
     return (
       <Link

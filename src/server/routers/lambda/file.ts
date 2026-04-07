@@ -3,6 +3,7 @@ import {
   FileAssetRenditionKind,
   FileAssetReviewStatus,
   FileAssetUsagePolicy,
+  getCanonicalContentKind,
 } from '@lobechat/types';
 import { getMimeType } from '@lobechat/utils';
 import { TRPCError } from '@trpc/server';
@@ -40,6 +41,17 @@ import { QueryFileListSchema, UploadFileSchema } from '@/types/files';
  * Mobile prepends API base when `url` starts with `/` (see `resolveRemoteFileUrl`).
  */
 const getFileProxyUrl = (fileId: string): string => `/f/${fileId}`;
+const governanceAuditActions = [
+  'file_asset_governance_updated',
+  'file_asset_approved',
+  'file_asset_archived',
+] as const;
+const governanceAuditActionValues = [...governanceAuditActions];
+const getCanonicalKnowledgeItemSourceType = (
+  item: Pick<FileListItem, 'id' | 'sourceType'>,
+): 'file' | 'document' => {
+  return getCanonicalContentKind(item);
+};
 
 const normalizeFileType = (fileType?: string | null, name?: string | null): string => {
   if (!fileType || fileType.toLowerCase().includes('octet-stream')) {
@@ -220,6 +232,74 @@ const restoreDeletedFiles = async (
   return restored.filter(Boolean);
 };
 
+const buildFileAssetAuditState = (
+  item?: {
+    classification?: FileAssetClassification;
+    metadata?: Record<string, unknown> | null;
+    reviewStatus?: FileAssetReviewStatus;
+    rightsOwner?: string | null;
+    usagePolicy?: FileAssetUsagePolicy;
+  } | null,
+) => ({
+  classification: item?.classification ?? FileAssetClassification.General,
+  metadata: item?.metadata ?? null,
+  reviewStatus: item?.reviewStatus ?? FileAssetReviewStatus.Draft,
+  rightsOwner: item?.rightsOwner ?? null,
+  usagePolicy: item?.usagePolicy ?? FileAssetUsagePolicy.Internal,
+});
+
+const getFileAssetAuditChangedFields = (
+  before: ReturnType<typeof buildFileAssetAuditState>,
+  after: ReturnType<typeof buildFileAssetAuditState>,
+) =>
+  (['classification', 'metadata', 'reviewStatus', 'rightsOwner', 'usagePolicy'] as const).filter(
+    (field) => JSON.stringify(before[field] ?? null) !== JSON.stringify(after[field] ?? null),
+  );
+
+const recordFileAssetAuditLog = async (
+  ctx: {
+    contentModel: ContentModel;
+  },
+  params: {
+    action: string;
+    after?: {
+      classification?: FileAssetClassification;
+      metadata?: Record<string, unknown> | null;
+      reviewStatus?: FileAssetReviewStatus;
+      rightsOwner?: string | null;
+      usagePolicy?: FileAssetUsagePolicy;
+    } | null;
+    before?: {
+      classification?: FileAssetClassification;
+      metadata?: Record<string, unknown> | null;
+      reviewStatus?: FileAssetReviewStatus;
+      rightsOwner?: string | null;
+      usagePolicy?: FileAssetUsagePolicy;
+    } | null;
+    contentUid?: string | null;
+    fileId: string;
+    spaceId?: string | null;
+  },
+) => {
+  const before = buildFileAssetAuditState(params.before);
+  const after = buildFileAssetAuditState(params.after);
+  const changedFields = getFileAssetAuditChangedFields(before, after);
+
+  if (changedFields.length === 0) return;
+
+  await ctx.contentModel.createAuditLog({
+    action: params.action,
+    after,
+    before,
+    contentUid: params.contentUid ?? null,
+    metadata: {
+      changedFields,
+      fileId: params.fileId,
+    },
+    spaceId: params.spaceId ?? null,
+  });
+};
+
 const buildFileAssetMap = async (ctx: { fileAssetModel: FileAssetModel }, fileIds: string[]) => {
   const assetRows = await ctx.fileAssetModel.findByFileIds(fileIds);
 
@@ -242,6 +322,121 @@ const buildFileAssetMap = async (ctx: { fileAssetModel: FileAssetModel }, fileId
       ];
     }),
   );
+};
+
+const buildLatestGovernanceAuditMap = async (
+  ctx: { contentModel: ContentModel },
+  items: Array<{ contentUid?: string | null; fileId: string }>,
+) => {
+  type LatestGovernanceAuditSummary = Pick<
+    FileListItem,
+    | 'assetLatestGovernanceAuditAction'
+    | 'assetLatestGovernanceAuditActorDisplayName'
+    | 'assetLatestGovernanceAuditAt'
+    | 'assetLatestGovernanceAuditAfter'
+    | 'assetLatestGovernanceAuditBefore'
+    | 'assetLatestGovernanceAuditChangedFields'
+  >;
+
+  const contentUids = [
+    ...new Set(items.map((item) => item.contentUid).filter(Boolean)),
+  ] as string[];
+  if (contentUids.length === 0) return new Map<string, LatestGovernanceAuditSummary>();
+
+  const auditRows = await ctx.contentModel.findLatestAuditLogsByContentUids({
+    actions: governanceAuditActionValues,
+    contentUids,
+  });
+  const auditByContentUid = new Map(
+    auditRows.map((item) => {
+      const normalized = normalizeGovernanceAuditItem(item);
+
+      return [
+        item.contentUid,
+        {
+          assetLatestGovernanceAuditAction: normalized.action,
+          assetLatestGovernanceAuditActorDisplayName: normalized.actorDisplayName,
+          assetLatestGovernanceAuditAt: normalized.createdAt,
+          assetLatestGovernanceAuditAfter: normalized.after ?? null,
+          assetLatestGovernanceAuditBefore: normalized.before ?? null,
+          assetLatestGovernanceAuditChangedFields: normalized.changedFields ?? [],
+        } satisfies LatestGovernanceAuditSummary,
+      ];
+    }),
+  );
+
+  return new Map(
+    items.flatMap((item) => {
+      if (!item.contentUid) return [];
+      const audit = auditByContentUid.get(item.contentUid);
+      return audit ? [[item.fileId, audit] as const] : [];
+    }),
+  );
+};
+
+const normalizeGovernanceAuditItem = (auditItem: {
+  action: string;
+  after?: Record<string, unknown> | null;
+  actorDisplayName?: string | null;
+  actorId?: string | null;
+  before?: Record<string, unknown> | null;
+  createdAt: Date;
+  metadata?: Record<string, unknown> | null;
+}) => ({
+  action: auditItem.action,
+  ...(auditItem.after ? { after: auditItem.after } : {}),
+  actorDisplayName: auditItem.actorDisplayName,
+  actorId: auditItem.actorId,
+  ...(auditItem.before ? { before: auditItem.before } : {}),
+  changedFields: Array.isArray(auditItem.metadata?.changedFields)
+    ? auditItem.metadata.changedFields.filter((field): field is string => typeof field === 'string')
+    : [],
+  createdAt: auditItem.createdAt,
+});
+
+const buildGovernanceAuditTrailResult = (
+  auditRows: Array<Parameters<typeof normalizeGovernanceAuditItem>[0]>,
+  limit: number,
+) => ({
+  hasMore: auditRows.length > limit,
+  items: auditRows.slice(0, limit).map(normalizeGovernanceAuditItem),
+});
+
+const buildFileAssetStateResponse = async (
+  ctx: {
+    contentModel: ContentModel;
+    fileAssetModel: FileAssetModel;
+  },
+  params: {
+    capabilities: ReturnType<typeof resolveFileAssetCapabilities>;
+    file: { contentUid?: string | null; id: string };
+    item?: Awaited<ReturnType<FileAssetModel['findByFileId']>> | null;
+  },
+) => {
+  const latestGovernanceAudit = params.file.contentUid
+    ? await ctx.contentModel.findLatestAuditLog({
+        actions: governanceAuditActionValues,
+        contentUid: params.file.contentUid,
+      })
+    : null;
+  const governanceAuditTrailRows = params.file.contentUid
+    ? await ctx.contentModel.listAuditLogs({
+        actions: governanceAuditActionValues,
+        contentUid: params.file.contentUid,
+        limit: 6,
+      })
+    : [];
+  const governanceAuditTrail = buildGovernanceAuditTrailResult(governanceAuditTrailRows, 5);
+
+  return {
+    capabilities: params.capabilities,
+    governanceAuditTrail: governanceAuditTrail.items,
+    governanceAuditTrailHasMore: governanceAuditTrail.hasMore,
+    item: params.item ?? (await ctx.fileAssetModel.findByFileId(params.file.id)) ?? null,
+    latestGovernanceAudit: latestGovernanceAudit
+      ? normalizeGovernanceAuditItem(latestGovernanceAudit)
+      : null,
+  };
 };
 
 const buildFileGovernanceSummaryGroup = <T extends string>(
@@ -304,18 +499,53 @@ const assertAccessibleKnowledgeSpace = async (
   }
 };
 
+const resolveKnowledgeGovernanceCapabilities = async (
+  ctx: {
+    documentModel: DocumentModel;
+    resolver: AuthorizedResourceResolver;
+    spaceModel: SpaceModel;
+  },
+  input: {
+    parentId?: string | null;
+    sourceSetId?: string;
+    spaceId?: string;
+  },
+) => {
+  let targetSpaceId = input.spaceId;
+
+  if (!targetSpaceId && input.sourceSetId) {
+    const sourceSet = await ctx.resolver.requireSourceSet(input.sourceSetId, 'read_content');
+    targetSpaceId = sourceSet.spaceId || (await ctx.spaceModel.getOrCreatePersonalSpace()).id;
+  } else if (!targetSpaceId && input.parentId) {
+    const resolvedParentId = await resolveParentDocumentId(ctx, {
+      parentId: input.parentId,
+      spaceId: input.spaceId,
+    });
+    const folder = await ctx.resolver.requireDocument(resolvedParentId!, 'read_content');
+    targetSpaceId = folder.spaceId || (await ctx.spaceModel.getOrCreatePersonalSpace()).id;
+  }
+
+  if (!targetSpaceId) {
+    targetSpaceId = (await ctx.spaceModel.getOrCreatePersonalSpace()).id;
+  }
+
+  const space = await ctx.spaceModel.findAccessibleSpaceById(targetSpaceId);
+
+  return resolveFileAssetCapabilities(space?.membershipRole);
+};
+
 export const fileRouter = router({
-  checkFileHash: fileProcedure
+  checkSpaceBlob: fileProcedure
     .use(checkFileStorageUsage)
     .input(
       z.object({
-        hash: z.string(),
+        sha256: z.string(),
         spaceId: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const spaceId = await resolveWriteSpaceId(ctx, { spaceId: input.spaceId });
-      const blob = await ctx.contentModel.findSpaceBlobByHash(spaceId, input.hash);
+      const blob = await ctx.contentModel.findReadySpaceBlobBySha256(spaceId, input.sha256);
 
       if (!blob) return { isExist: false };
 
@@ -331,17 +561,17 @@ export const fileRouter = router({
         isExist: true,
         metadata: blob.metadata,
         size: blob.size,
-        url: blob.storageKey,
+        storageKey: blob.storageKey,
       };
     }),
 
   createFile: fileProcedure
     .use(checkFileStorageUsage)
     .input(
-      UploadFileSchema.omit({ url: true }).extend({
+      UploadFileSchema.omit({ storageKey: true }).extend({
         parentId: z.string().optional(),
         spaceId: z.string().optional(),
-        url: z.string(),
+        storageKey: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -361,7 +591,9 @@ export const fileRouter = router({
       let actualSize = input.size;
       let actualFileType = input.fileType;
       try {
-        const { contentLength, contentType } = await ctx.fileService.getFileMetadata(input.url);
+        const { contentLength, contentType } = await ctx.fileService.getFileMetadata(
+          input.storageKey,
+        );
         if (contentLength >= 1) {
           actualSize = contentLength;
         }
@@ -383,7 +615,7 @@ export const fileRouter = router({
         actualSize,
         clientIp: ctx.clientIp ?? undefined,
         inputSize: input.size,
-        url: input.url,
+        url: input.storageKey,
         userId: ctx.userId,
       });
 
@@ -391,20 +623,16 @@ export const fileRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'File size cannot be negative' });
       }
 
-      if (!input.hash) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'FILE_HASH_REQUIRED' });
-      }
-
       const blob = await ctx.contentModel.upsertSpaceBlob({
         createdBy: ctx.userId,
         etag: undefined,
         fileType: actualFileType,
         metadata: input.metadata,
-        sha256: input.hash,
+        sha256: input.sha256,
         size: actualSize,
         spaceId,
         status: 'ready',
-        storageKey: input.url,
+        storageKey: input.storageKey,
         verifiedAt: new Date(),
       });
 
@@ -425,43 +653,22 @@ export const fileRouter = router({
         return { id: existingFile.id, url: getFileProxyUrl(existingFile.id) };
       }
 
-      // User uploads are space-scoped via space_blobs; do not insert into global_files or set
-      // files.file_hash (FK to global_files) to avoid cross-user existence leaks.
-      const { id } = await ctx.fileModel.create(
-        {
-          blobId: blob.id,
-          fileHash: null,
-          fileType: actualFileType,
-          sourceSetId: input.sourceSetId,
-          metadata: input.metadata,
-          name: input.name,
-          parentId: resolvedParentId,
-          size: actualSize,
-          spaceId,
-          url: input.url,
-        },
-        false,
-      );
-
-      const registry = await ctx.contentModel.ensureContentRegistry({
-        createdBy: ctx.userId,
-        kind: 'file',
-        localId: id,
-        spaceId,
-      });
-
-      await ctx.fileModel.update(id, {
+      const { fileId, url } = await ctx.fileService.createFileRecord({
         blobId: blob.id,
-        contentUid: registry.contentUid,
+        blobMetadata: input.metadata as Record<string, unknown> | undefined,
+        fileType: actualFileType,
+        metadata: input.metadata,
+        name: input.name,
+        parentId: resolvedParentId,
+        sha256: input.sha256,
+        source: input.source,
+        sourceSetId: input.sourceSetId,
+        size: actualSize,
         spaceId,
-      } as any);
-
-      await ctx.contentModel.ensureOwnerPermission({
-        contentUid: registry.contentUid,
-        spaceId,
+        storageKey: input.storageKey,
       });
 
-      return { id, url: getFileProxyUrl(id) };
+      return { id: fileId, url };
     }),
   findById: fileProcedure
     .input(
@@ -484,7 +691,6 @@ export const fileRouter = router({
         clientId: item.clientId,
         createdAt: item.createdAt,
         embeddingTaskId: item.embeddingTaskId,
-        fileHash: item.fileHash,
         fileType: normalizeFileType(item.fileType, item.name),
         id: item.id,
         metadata: item.metadata,
@@ -561,10 +767,43 @@ export const fileRouter = router({
 
       if (!space?.id) throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_ACCESS_DENIED' });
 
-      return {
+      return buildFileAssetStateResponse(ctx, {
         capabilities: resolveFileAssetCapabilities(space.membershipRole),
-        item: (await ctx.fileAssetModel.findByFileId(input.id)) ?? null,
-      };
+        file,
+      });
+    }),
+
+  getFileAssetAuditTrail: fileProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        limit: z.number().int().min(1).max(50).optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await ctx.contentAuthorizer.assertCapability({
+        capability: 'read_metadata',
+        id: input.id,
+        kind: 'file',
+      });
+
+      const file = await ctx.resolver.requireFile(input.id, 'read_metadata');
+      const limit = input.limit ?? 10;
+
+      if (!file.contentUid) {
+        return {
+          hasMore: false,
+          items: [],
+        };
+      }
+
+      const auditRows = await ctx.contentModel.listAuditLogs({
+        actions: governanceAuditActionValues,
+        contentUid: file.contentUid,
+        limit: limit + 1,
+      });
+
+      return buildGovernanceAuditTrailResult(auditRows, limit);
     }),
 
   getFiles: fileProcedure.input(QueryFileListSchema).query(async ({ ctx, input }) => {
@@ -577,6 +816,13 @@ export const fileRouter = router({
     const fileAssetMap = await buildFileAssetMap(
       ctx,
       visibleList.map((item) => item.id),
+    );
+    const latestGovernanceAuditMap = await buildLatestGovernanceAuditMap(
+      ctx,
+      visibleList.map((item) => ({
+        contentUid: item.contentUid,
+        fileId: item.id,
+      })),
     );
 
     const fileIds = visibleList.map((item) => item.id);
@@ -605,6 +851,7 @@ export const fileRouter = router({
 
       const fileItem = {
         ...fileAssetMap.get(item.id),
+        ...latestGovernanceAuditMap.get(item.id),
         ...item,
         chunkCount: chunks.find((chunk) => chunk.id === item.id)?.count ?? null,
         chunkingError: chunkTask?.error ?? null,
@@ -624,6 +871,7 @@ export const fileRouter = router({
 
   getKnowledgeItems: fileProcedure.input(QueryFileListSchema).query(async ({ ctx, input }) => {
     await assertAccessibleKnowledgeSpace(ctx, input);
+    const governanceCapabilities = await resolveKnowledgeGovernanceCapabilities(ctx, input);
 
     // Request one more item than limit to check if there are more items
     const limit = input.limit ?? 50;
@@ -671,6 +919,15 @@ export const fileRouter = router({
       .filter((item) => item.sourceType === 'file')
       .map((item: any) => item.fileId || item.id);
     const fileAssetMap = await buildFileAssetMap(ctx, fileIds);
+    const latestGovernanceAuditMap = await buildLatestGovernanceAuditMap(
+      ctx,
+      aclFiltered
+        .filter((item) => item.sourceType === 'file')
+        .map((item: any) => ({
+          contentUid: item.contentUid,
+          fileId: item.fileId || item.id,
+        })),
+    );
 
     const attachableFileIds = input.attachableOnly
       ? new Set(
@@ -720,6 +977,7 @@ export const fileRouter = router({
 
         resultItems.push({
           ...fileAssetMap.get((item as any).fileId || item.id),
+          ...latestGovernanceAuditMap.get((item as any).fileId || item.id),
           ...item,
           attachable: input.attachableOnly
             ? Boolean(attachableFileIds?.has((item as any).fileId || item.id))
@@ -754,8 +1012,12 @@ export const fileRouter = router({
     }
 
     return {
+      governanceCapabilities,
       hasMore,
-      items: resultItems,
+      items: resultItems.map((item) => ({
+        ...item,
+        sourceType: getCanonicalKnowledgeItemSourceType(item),
+      })),
     };
   }),
 
@@ -832,6 +1094,13 @@ export const fileRouter = router({
       // Get file IDs for batch processing
       const fileIds = fileItems.map((item) => item.fileId || item.id);
       const fileAssetMap = await buildFileAssetMap(ctx, fileIds);
+      const latestGovernanceAuditMap = await buildLatestGovernanceAuditMap(
+        ctx,
+        fileItems.map((item) => ({
+          contentUid: item.contentUid,
+          fileId: item.fileId || item.id,
+        })),
+      );
       const chunksArray = await ctx.chunkModel.countByFileIds(fileIds);
       const chunks: Record<string, number> = {};
       for (const item of chunksArray) {
@@ -865,6 +1134,7 @@ export const fileRouter = router({
 
         resultFiles.push({
           ...fileAssetMap.get(actualFileId),
+          ...latestGovernanceAuditMap.get(actualFileId),
           ...item,
           chunkCount: chunks[actualFileId] ?? 0,
           chunkingError: chunkTask?.error ?? null,
@@ -889,7 +1159,9 @@ export const fileRouter = router({
       const limit = input?.limit ?? 12;
       const allItems = await ctx.knowledgeRepo.queryRecent(limit * 5);
       const pageCandidates = allItems.filter(
-        (item) => item.sourceType === 'document' && item.fileType !== 'custom/folder',
+        (item) =>
+          getCanonicalKnowledgeItemSourceType(item as FileListItem) === 'document' &&
+          item.fileType !== 'custom/folder',
       );
       const visibleDocIds = new Set(
         await ctx.contentAuthorizer.filterVisibleDocumentIdsForList(
@@ -897,7 +1169,13 @@ export const fileRouter = router({
         ),
       );
 
-      return pageCandidates.filter((item) => visibleDocIds.has(item.id)).slice(0, limit);
+      return pageCandidates
+        .filter((item) => visibleDocIds.has(item.id))
+        .slice(0, limit)
+        .map((item) => ({
+          ...item,
+          sourceType: getCanonicalKnowledgeItemSourceType(item as FileListItem),
+        }));
     }),
 
   removeAllFiles: fileProcedure.mutation(async ({ ctx }) => {
@@ -1124,26 +1402,52 @@ export const fileRouter = router({
         metadata: fileAssetMetadataSchema,
         rightsOwner: z.string().nullable().optional(),
         classification: z.nativeEnum(FileAssetClassification).optional(),
+        reviewStatus: z.nativeEnum(FileAssetReviewStatus).optional(),
         usagePolicy: z.nativeEnum(FileAssetUsagePolicy).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { capabilities, spaceId } = await assertCanWriteFileAsset(ctx, input.id);
+      const { capabilities, file, spaceId } = await assertCanWriteFileAsset(ctx, input.id);
       if (!capabilities.canEditGovernance) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'FILE_ASSET_GOVERNANCE_DENIED' });
       }
+      if (input.reviewStatus === FileAssetReviewStatus.Approved && !capabilities.canApprove) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'FILE_ASSET_APPROVE_DENIED' });
+      }
+      if (input.reviewStatus === FileAssetReviewStatus.Archived && !capabilities.canArchive) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'FILE_ASSET_ARCHIVE_DENIED' });
+      }
 
+      const reviewStatus =
+        input.reviewStatus === undefined
+          ? undefined
+          : {
+              reviewStatus: input.reviewStatus,
+              reviewedAt: input.reviewStatus === FileAssetReviewStatus.Draft ? null : new Date(),
+              reviewedBy: input.reviewStatus === FileAssetReviewStatus.Draft ? null : ctx.userId,
+            };
+
+      const before = await ctx.fileAssetModel.findByFileId(input.id);
       const item = await ctx.fileAssetModel.upsert({
         createdBy: ctx.userId,
         fileId: input.id,
         classification: input.classification,
         metadata: input.metadata ?? undefined,
-        rightsOwner: input.rightsOwner ?? null,
+        ...reviewStatus,
+        rightsOwner: input.rightsOwner,
         spaceId,
         usagePolicy: input.usagePolicy,
       });
+      await recordFileAssetAuditLog(ctx, {
+        action: 'file_asset_governance_updated',
+        after: item,
+        before,
+        contentUid: file.contentUid ?? null,
+        fileId: input.id,
+        spaceId,
+      });
 
-      return { capabilities, item };
+      return buildFileAssetStateResponse(ctx, { capabilities, file, item });
     }),
 
   approveFileAsset: fileProcedure
@@ -1153,11 +1457,12 @@ export const fileRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { capabilities, spaceId } = await assertCanWriteFileAsset(ctx, input.id);
+      const { capabilities, file, spaceId } = await assertCanWriteFileAsset(ctx, input.id);
       if (!capabilities.canApprove) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'FILE_ASSET_APPROVE_DENIED' });
       }
 
+      const before = await ctx.fileAssetModel.findByFileId(input.id);
       const item = await ctx.fileAssetModel.upsert({
         createdBy: ctx.userId,
         fileId: input.id,
@@ -1166,8 +1471,16 @@ export const fileRouter = router({
         reviewStatus: FileAssetReviewStatus.Approved,
         spaceId,
       });
+      await recordFileAssetAuditLog(ctx, {
+        action: 'file_asset_approved',
+        after: item,
+        before,
+        contentUid: file.contentUid ?? null,
+        fileId: input.id,
+        spaceId,
+      });
 
-      return { capabilities, item };
+      return buildFileAssetStateResponse(ctx, { capabilities, file, item });
     }),
 
   archiveFileAsset: fileProcedure
@@ -1177,11 +1490,12 @@ export const fileRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { capabilities, spaceId } = await assertCanWriteFileAsset(ctx, input.id);
+      const { capabilities, file, spaceId } = await assertCanWriteFileAsset(ctx, input.id);
       if (!capabilities.canArchive) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'FILE_ASSET_ARCHIVE_DENIED' });
       }
 
+      const before = await ctx.fileAssetModel.findByFileId(input.id);
       const item = await ctx.fileAssetModel.upsert({
         createdBy: ctx.userId,
         fileId: input.id,
@@ -1190,8 +1504,16 @@ export const fileRouter = router({
         reviewStatus: FileAssetReviewStatus.Archived,
         spaceId,
       });
+      await recordFileAssetAuditLog(ctx, {
+        action: 'file_asset_archived',
+        after: item,
+        before,
+        contentUid: file.contentUid ?? null,
+        fileId: input.id,
+        spaceId,
+      });
 
-      return { capabilities, item };
+      return buildFileAssetStateResponse(ctx, { capabilities, file, item });
     }),
 });
 

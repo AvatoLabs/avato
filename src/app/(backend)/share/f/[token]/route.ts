@@ -1,4 +1,5 @@
 import { contentRegistry } from '@lobechat/database/schemas';
+import { isRawFileContentId } from '@lobechat/types';
 import debug from 'debug';
 import { eq } from 'drizzle-orm';
 
@@ -53,7 +54,7 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
       .where(eq(contentRegistry.contentUid, link.contentUid))
       .limit(1);
 
-    if (!reg || reg.kind !== 'file') {
+    if (!reg || reg.kind !== 'file' || !isRawFileContentId(reg.localId)) {
       return new Response('Not found', { status: 404 });
     }
 

@@ -1,4 +1,8 @@
-import { FileAssetClassification, FileAssetUsagePolicy } from '@lobechat/types';
+import {
+  FileAssetClassification,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+} from '@lobechat/types';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -202,6 +206,22 @@ describe('FileManagerActions', () => {
       expect(refreshSpy).toHaveBeenCalled();
       expect(toggleSpy).toHaveBeenCalledWith(['file-1'], false);
     });
+
+    it('should ignore docs_* canonical document ids', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const createTaskSpy = vi.spyOn(ragService, 'createEmbeddingChunksTask');
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+      const toggleSpy = vi.spyOn(result.current, 'toggleEmbeddingIds');
+
+      await act(async () => {
+        await result.current.embeddingChunks(['docs_derived_1']);
+      });
+
+      expect(createTaskSpy).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
+      expect(toggleSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('parseFilesToChunks', () => {
@@ -256,6 +276,22 @@ describe('FileManagerActions', () => {
       expect(consoleErrorSpy).toHaveBeenCalled();
       expect(refreshSpy).toHaveBeenCalled();
       expect(toggleSpy).toHaveBeenCalledWith(['file-1'], false);
+    });
+
+    it('should ignore docs_* canonical document ids', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const createTaskSpy = vi.spyOn(ragService, 'createParseFileTask');
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+      const toggleSpy = vi.spyOn(result.current, 'toggleParsingIds');
+
+      await act(async () => {
+        await result.current.parseFilesToChunks(['docs_derived_1']);
+      });
+
+      expect(createTaskSpy).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
+      expect(toggleSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -659,6 +695,23 @@ describe('FileManagerActions', () => {
       expect(refreshSpy).toHaveBeenCalledTimes(2);
       expect(toggleSpy).toHaveBeenCalledWith(['file-1'], false);
     });
+
+    it('should ignore docs_* canonical document ids', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const toggleSpy = vi.spyOn(result.current, 'toggleEmbeddingIds');
+      const createTaskSpy = vi.spyOn(ragService, 'createEmbeddingChunksTask');
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.reEmbeddingChunks('docs_derived_1');
+      });
+
+      expect(toggleSpy).not.toHaveBeenCalled();
+      expect(lambdaClient.file.removeFileAsyncTask.mutate).not.toHaveBeenCalled();
+      expect(createTaskSpy).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('reParseFile', () => {
@@ -677,6 +730,22 @@ describe('FileManagerActions', () => {
       expect(retrySpy).toHaveBeenCalledWith('file-1');
       expect(refreshSpy).toHaveBeenCalled();
       expect(toggleSpy).toHaveBeenCalledWith(['file-1'], false);
+    });
+
+    it('should ignore docs_* canonical document ids', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const toggleSpy = vi.spyOn(result.current, 'toggleParsingIds');
+      const retrySpy = vi.spyOn(ragService, 'retryParseFile');
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.reParseFile('docs_derived_1');
+      });
+
+      expect(toggleSpy).not.toHaveBeenCalled();
+      expect(retrySpy).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -723,6 +792,20 @@ describe('FileManagerActions', () => {
       expect(removeSpy).toHaveBeenCalledWith('file-1');
       expect(refreshSpy).toHaveBeenCalled();
     });
+
+    it('should ignore docs_* canonical document ids', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const removeSpy = vi.spyOn(fileService, 'removeFile').mockResolvedValue(undefined);
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.removeFileItem('docs_derived_1');
+      });
+
+      expect(removeSpy).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('removeFiles', () => {
@@ -738,6 +821,34 @@ describe('FileManagerActions', () => {
 
       expect(removeSpy).toHaveBeenCalledWith(['file-1', 'file-2']);
       expect(refreshSpy).toHaveBeenCalled();
+    });
+
+    it('should filter out docs_* canonical document ids', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const removeSpy = vi.spyOn(fileService, 'removeFiles').mockResolvedValue(undefined);
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.removeFiles(['docs_derived_1', 'file-2']);
+      });
+
+      expect(removeSpy).toHaveBeenCalledWith(['file-2']);
+      expect(refreshSpy).toHaveBeenCalled();
+    });
+
+    it('should no-op when all ids are docs_* canonical documents', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const removeSpy = vi.spyOn(fileService, 'removeFiles').mockResolvedValue(undefined);
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.removeFiles(['docs_derived_1']);
+      });
+
+      expect(removeSpy).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -985,6 +1096,8 @@ describe('FileManagerActions', () => {
       await act(async () => {
         await result.current.updateFileAssetsGovernance(['file-1', 'file-2'], {
           classification: FileAssetClassification.Legal,
+          reviewStatus: FileAssetReviewStatus.Draft,
+          rightsOwner: 'Brand Team',
           usagePolicy: FileAssetUsagePolicy.Restricted,
         });
       });
@@ -993,11 +1106,15 @@ describe('FileManagerActions', () => {
       expect(lambdaClient.file.updateFileAssetGovernance.mutate).toHaveBeenNthCalledWith(1, {
         classification: FileAssetClassification.Legal,
         id: 'file-1',
+        reviewStatus: FileAssetReviewStatus.Draft,
+        rightsOwner: 'Brand Team',
         usagePolicy: FileAssetUsagePolicy.Restricted,
       });
       expect(lambdaClient.file.updateFileAssetGovernance.mutate).toHaveBeenNthCalledWith(2, {
         classification: FileAssetClassification.Legal,
         id: 'file-2',
+        reviewStatus: FileAssetReviewStatus.Draft,
+        rightsOwner: 'Brand Team',
         usagePolicy: FileAssetUsagePolicy.Restricted,
       });
       expect(refreshSpy).toHaveBeenCalledTimes(1);

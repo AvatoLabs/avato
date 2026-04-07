@@ -3,6 +3,7 @@ import { CheckIcon, InfoIcon, MoreVerticalIcon, Trash2 } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { isCanonicalDocumentEntry } from '@/features/ContentManager/utils/isCanonicalDocumentEntry';
 import { buildFilesPreviewPath, buildSourceSetPath } from '@/features/ResourceSpaces';
 import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useAgentStore } from '@/store/agent/store';
@@ -10,6 +11,7 @@ import { useChatStore } from '@/store/chat';
 import { useServerConfigStore } from '@/store/serverConfig';
 import { useSessionStore } from '@/store/session/store';
 import { AgentSourceKind } from '@/types/sourceSet';
+import { getPageDetailPath } from '@/utils/docs';
 
 import { type SourceSetModalScope } from '../types';
 
@@ -103,7 +105,11 @@ const Actions = memo<ActionsProps>(({ id, type, enabled, scope, spaceId }) => {
                   return;
                 }
 
-                window.open(buildFilesPreviewPath(targetSpaceId, id));
+                window.open(
+                  isCanonicalDocumentEntry({ id })
+                    ? getPageDetailPath(id, 'doc', targetSpaceId)
+                    : buildFilesPreviewPath(targetSpaceId, id),
+                );
               },
             },
             {

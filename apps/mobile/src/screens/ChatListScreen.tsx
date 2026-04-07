@@ -38,9 +38,11 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  FlatList,
   Image as RNImage,
   Keyboard,
   LayoutAnimation,
+  type ListRenderItemInfo,
   Modal,
   Platform,
   Pressable,
@@ -99,6 +101,10 @@ import {
   userApi,
 } from '../lib/api';
 import { useMainTabBottomInsets } from '../lib/bottomChrome';
+import {
+  createChatContextSelectionFromResource,
+  isChatContextEligibleResource,
+} from '../lib/chatContext';
 import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -109,6 +115,7 @@ import {
   shouldHidePersonalNotebookSession,
 } from '../lib/personalNotebookSession';
 import { useResolvedRemoteAsset } from '../lib/remoteAsset';
+import { getCanonicalResourceKind } from '../lib/resourceList';
 import { loadSkillPickerSelection, saveSkillPickerSelection } from '../lib/skillPicker';
 import { recordUsage } from '../lib/streak';
 import { generateBestTitle } from '../lib/titleGeneration';
@@ -410,7 +417,9 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   const updateTopicTag = useTopicStore((s) => s.updateTopicTag);
   const updateTopic = useTopicStore((s) => s.updateTopic);
   const pendingFiles = useFileStore((s) => s.pendingFiles);
+  const chatContextSelections = useFileStore((s) => s.chatContextSelections);
   const addFile = useFileStore((s) => s.addFile);
+  const addChatContextSelection = useFileStore((s) => s.addChatContextSelection);
 
   const selectedModel = useModelStore((s) => s.selectedModel);
   const selectedProvider = useModelStore((s) => s.selectedProvider);
@@ -1040,7 +1049,7 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
 
   const handleHeroSubmit = useCallback(async () => {
     const prompt = heroText.trim();
-    const hasAttachment = pendingFiles.length > 0;
+    const hasAttachment = pendingFiles.length + chatContextSelections.length > 0;
     if (!prompt && !hasAttachment) return;
 
     try {
@@ -1099,6 +1108,7 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     memoryEnabled,
     navigation,
     pendingFiles.length,
+    chatContextSelections.length,
     selectedModel,
     selectedProvider,
     sendMessage,
@@ -1196,9 +1206,26 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     async (items: FileListItem[]) => {
       const base = await getApiUrl();
       const baseUrl = base?.replace(/\/$/, '') ?? '';
+      let failedContextCount = 0;
 
       for (const item of items) {
-        if (item.sourceType !== 'file' || !item.id || item.id.startsWith('docs_')) continue;
+        if (!item.id) continue;
+        const itemKind = getCanonicalResourceKind(item);
+
+        if (isChatContextEligibleResource(item)) {
+          const context = await createChatContextSelectionFromResource(item).catch(() => null);
+          if (context) {
+            addChatContextSelection(context);
+            continue;
+          }
+
+          if (itemKind === 'document') {
+            failedContextCount += 1;
+            continue;
+          }
+        }
+
+        if (itemKind !== 'file') continue;
 
         const fileUrl = item.url?.startsWith('http')
           ? item.url
@@ -1216,8 +1243,12 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
           url: fileUrl,
         });
       }
+
+      if (failedContextCount > 0) {
+        toast.show('error', t.fileUploadFailed);
+      }
     },
-    [addFile],
+    [addChatContextSelection, addFile, t.fileUploadFailed, toast],
   );
 
   const handlePluginsPress = useCallback(() => {
@@ -2262,7 +2293,9 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
       transform: [{ translateY: -lift }],
     };
   }, [insets.bottom, keyboardOffset]);
-  const composerActive = keyboardOffset > 0 || Boolean(heroText.trim()) || pendingFiles.length > 0;
+  const composerAttachmentCount = pendingFiles.length + chatContextSelections.length;
+  const composerActive =
+    keyboardOffset > 0 || Boolean(heroText.trim()) || composerAttachmentCount > 0;
   const actionSessionIsGroup = actionSession?.type === 'group';
   const actionSessionIsInbox = isInboxSession(actionSession);
   const drawerBackdropStyle = useAnimatedStyle(() => ({
@@ -2458,10 +2491,10 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
             <ChatComposerBody
               textEditable
               active={composerActive}
-              canSend={Boolean(heroText.trim()) || pendingFiles.length > 0}
+              canSend={Boolean(heroText.trim()) || composerAttachmentCount > 0}
               memoryEnabled={memoryEnabled}
               modelDrawerVisible={modelDrawerVisible}
-              pendingFilesCount={pendingFiles.length}
+              pendingFilesCount={composerAttachmentCount}
               placeholder={hints[hintIndex]}
               pluginsEnabled={enabledSkills.size > 0}
               providerLogoError={providerLogoError}
@@ -2470,7 +2503,7 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
               value={heroText}
               variant="home"
               topSlot={
-                pendingFiles.length > 0 ? (
+                composerAttachmentCount > 0 ? (
                   <View className="px-3 pt-2">
                     <FilePreview />
                   </View>

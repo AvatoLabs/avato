@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import SourceIcon from '@/components/SourceIcon';
+import { isCanonicalDocumentEntry } from '@/features/ContentManager/utils/isCanonicalDocumentEntry';
 import {
   buildFilesPreviewPath,
   buildFilesRootPath,
@@ -21,6 +22,7 @@ import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { agentSelectors } from '@/store/agent/selectors';
 import { useAgentStore } from '@/store/agent/store';
 import { AgentSourceKind } from '@/types/sourceSet';
+import { getPageDetailPath } from '@/utils/docs';
 
 interface AgentSourceListItem {
   description?: string | null;
@@ -241,10 +243,13 @@ const AgentSources = memo(() => {
 
   const handleOpenItem = useCallback(
     (item: AgentSourceListItem) => {
+      const targetSpaceId = resolveWorkspaceSpaceId({ spaceId: item.spaceId });
       const path =
         item.type === AgentSourceKind.SourceSet
-          ? buildSourceSetPath(item.spaceId, item.id)
-          : buildFilesPreviewPath(item.spaceId, item.id);
+          ? buildSourceSetPath(targetSpaceId, item.id)
+          : isCanonicalDocumentEntry({ id: item.id })
+            ? getPageDetailPath(item.id, 'doc', targetSpaceId)
+            : buildFilesPreviewPath(targetSpaceId, item.id);
 
       closeAndNavigate(path);
     },

@@ -62,9 +62,14 @@ import {
   userApi,
 } from '../lib/api';
 import { stackScreenComposerPaddingBottom } from '../lib/bottomChrome';
+import {
+  createChatContextSelectionFromResource,
+  isChatContextEligibleResource,
+} from '../lib/chatContext';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
+import { getCanonicalResourceKind } from '../lib/resourceList';
 import { isGroupSessionLike } from '../lib/session';
 import { loadSkillPickerSelection, saveSkillPickerSelection } from '../lib/skillPicker';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -187,6 +192,8 @@ export default function ChatDetailScreen({
 
   const pendingFiles = useFileStore((s) => s.pendingFiles);
   const addFile = useFileStore((s) => s.addFile);
+  const chatContextSelections = useFileStore((s) => s.chatContextSelections);
+  const addChatContextSelection = useFileStore((s) => s.addChatContextSelection);
 
   const [inputText, setInputText] = useState('');
   const [searchEnabled, setSearchEnabled] = useState(false);
@@ -727,8 +734,9 @@ export default function ChatDetailScreen({
   const sendAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: sendScale.value }],
   }));
+  const composerAttachmentCount = pendingFiles.length + chatContextSelections.length;
   const composerActive =
-    keyboardOffset > 0 || Boolean(inputText.trim()) || pendingFiles.length > 0 || generating;
+    keyboardOffset > 0 || Boolean(inputText.trim()) || composerAttachmentCount > 0 || generating;
 
   const autoScrollToEnd = useCallback(() => {
     if (!listRef.current || messages.length === 0) return;
@@ -757,7 +765,7 @@ export default function ChatDetailScreen({
   }, [stopGenerating, toast, t.toastGenerationStopped]);
 
   const handleSend = useCallback(async () => {
-    if (!sessionId || (!inputText.trim() && pendingFiles.length === 0) || generating) return;
+    if (!sessionId || (!inputText.trim() && composerAttachmentCount === 0) || generating) return;
     haptics.light();
     autoScrollLocked.current = false;
     isScrolledToBottom.current = true;
@@ -782,7 +790,7 @@ export default function ChatDetailScreen({
     sessionId,
     enabledPlugins,
     activeTopic,
-    pendingFiles.length,
+    composerAttachmentCount,
     memoryEffort,
     memoryEnabled,
     searchEnabled,
@@ -864,8 +872,25 @@ export default function ChatDetailScreen({
     async (items: FileListItem[]) => {
       const base = await getApiUrl();
       const baseUrl = base?.replace(/\/$/, '') ?? '';
+      let failedContextCount = 0;
       for (const item of items) {
-        if (item.sourceType !== 'file' || !item.id || item.id.startsWith('docs_')) continue;
+        if (!item.id) continue;
+        const itemKind = getCanonicalResourceKind(item);
+
+        if (isChatContextEligibleResource(item)) {
+          const context = await createChatContextSelectionFromResource(item).catch(() => null);
+          if (context) {
+            addChatContextSelection(context);
+            continue;
+          }
+
+          if (itemKind === 'document') {
+            failedContextCount += 1;
+            continue;
+          }
+        }
+
+        if (itemKind !== 'file') continue;
 
         const fileUrl = item.url?.startsWith('http')
           ? item.url
@@ -882,8 +907,12 @@ export default function ChatDetailScreen({
           url: fileUrl,
         });
       }
+
+      if (failedContextCount > 0) {
+        toast.show('error', t.fileUploadFailed);
+      }
     },
-    [addFile],
+    [addChatContextSelection, addFile, t.fileUploadFailed, toast],
   );
 
   // ── Toolbar: Model ────────────────────────────────────────────────
@@ -1217,11 +1246,11 @@ export default function ChatDetailScreen({
           <ChatComposerBody
             textEditable
             active={composerActive}
-            canSend={Boolean(inputText.trim()) || pendingFiles.length > 0}
+            canSend={Boolean(inputText.trim()) || composerAttachmentCount > 0}
             generating={generating}
             memoryEnabled={memoryEnabled}
             modelDrawerVisible={modelDrawerVisible}
-            pendingFilesCount={pendingFiles.length}
+            pendingFilesCount={composerAttachmentCount}
             placeholder={generating ? t.chatGenerating : hints[hintIndex]}
             pluginsEnabled={enabledPlugins.size > 0}
             providerLogoError={providerLogoError}
@@ -1240,7 +1269,7 @@ export default function ChatDetailScreen({
                 : undefined
             }
             topSlot={
-              pendingFiles.length > 0 ? (
+              composerAttachmentCount > 0 ? (
                 <View className="px-3 pt-2">
                   <FilePreview sessionId={sessionId} />
                 </View>

@@ -3,7 +3,9 @@ import { z } from 'zod';
 import type { AsyncTaskStatus } from '../asyncTask';
 import type { ContentRole, InheritMode } from '../content';
 import type {
+  FileAssetCapabilities,
   FileAssetClassification,
+  FileAssetGovernanceAuditSnapshot,
   FileAssetRenditionKind,
   FileAssetReviewStatus,
   FileAssetUsagePolicy,
@@ -24,6 +26,12 @@ const fileAssetUsagePolicyValues = ['internal', 'public', 'restricted'] as const
 
 export interface FileListItem {
   assetClassification?: FileAssetClassification | null;
+  assetLatestGovernanceAuditAction?: string | null;
+  assetLatestGovernanceAuditActorDisplayName?: string | null;
+  assetLatestGovernanceAuditAfter?: Partial<FileAssetGovernanceAuditSnapshot> | null;
+  assetLatestGovernanceAuditAt?: Date | null;
+  assetLatestGovernanceAuditBefore?: Partial<FileAssetGovernanceAuditSnapshot> | null;
+  assetLatestGovernanceAuditChangedFields?: string[] | null;
   assetPrimaryRenditionKind?: FileAssetRenditionKind | null;
   assetPrimaryRenditionLabel?: string | null;
   assetRenditionCount?: number | null;
@@ -60,6 +68,7 @@ export interface FileListItem {
   parentId?: string | null;
   size: number;
   slug?: string | null;
+  sourceSetId?: string | null;
   sourceType: string;
   spaceId?: string | null;
   updatedAt: Date;
@@ -85,6 +94,10 @@ export enum SortType {
 export const QueryFileListSchema = z.object({
   attachableOnly: z.boolean().default(false),
   assetClassification: z.enum(fileAssetClassificationValues).optional(),
+  assetRightsOwner: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().trim().max(120).optional(),
+  ),
   assetReviewStatus: z.enum(fileAssetReviewStatusValues).optional(),
   assetUsagePolicy: z.enum(fileAssetUsagePolicyValues).optional(),
   category: z.string().optional(),
@@ -105,6 +118,7 @@ export type QueryFileListSchemaType = z.infer<typeof QueryFileListSchema>;
 export interface QueryFileListParams {
   assetClassification?: FileAssetClassification;
   assetReviewStatus?: FileAssetReviewStatus;
+  assetRightsOwner?: string;
   assetUsagePolicy?: FileAssetUsagePolicy;
   attachableOnly?: boolean;
   category?: string;
@@ -121,6 +135,7 @@ export interface QueryFileListParams {
 }
 
 export interface PaginatedFileList {
+  governanceCapabilities?: FileAssetCapabilities;
   hasMore: boolean;
   items: FileListItem[];
   total?: number;

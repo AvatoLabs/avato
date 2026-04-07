@@ -18,6 +18,8 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { type SearchResult } from '@/database/repositories/search';
+import { isCanonicalDocumentEntry } from '@/features/ContentManager/utils/isCanonicalDocumentEntry';
+import { buildPageScopeSearch, createSourceSetPageScope } from '@/features/Pages/usePageScope';
 import {
   buildFilesFolderPath,
   buildFilesPreviewPath,
@@ -79,8 +81,13 @@ const SearchResults = memo<SearchResultsProps>(
           break;
         }
         case 'file': {
-          // Navigate to resource library with file parameter
-          const fileUrl = buildFilesPreviewPath(result.spaceId, result.id, result.sourceSetId);
+          const canonicalDocPath = getPageDetailPath(result.id, 'doc', result.spaceId);
+          const canonicalDocSearch = result.sourceSetId
+            ? buildPageScopeSearch(createSourceSetPageScope(result.sourceSetId))
+            : '';
+          const fileUrl = isCanonicalDocumentEntry({ id: result.id })
+            ? `${canonicalDocPath}${canonicalDocSearch}`
+            : buildFilesPreviewPath(result.spaceId, result.id, result.sourceSetId);
           console.info('[SearchResults] File navigation:', {
             fileDetails: result,
             url: fileUrl,
@@ -104,13 +111,15 @@ const SearchResults = memo<SearchResultsProps>(
         }
         case 'page': {
           const document = listSelectors.getDocumentById(result.id)(usePageStore.getState());
-          navigate(
-            getPageDetailPath(
-              result.id,
-              getPageKindFromDocument(document),
-              result.spaceId ?? document?.spaceId,
-            ),
+          const pagePath = getPageDetailPath(
+            result.id,
+            getPageKindFromDocument(document),
+            result.spaceId ?? document?.spaceId,
           );
+          const pageSearch = document?.sourceSetId
+            ? buildPageScopeSearch(createSourceSetPageScope(document.sourceSetId))
+            : '';
+          navigate(`${pagePath}${pageSearch}`);
           break;
         }
         case 'mcp': {

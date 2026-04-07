@@ -1,3 +1,4 @@
+import { getCanonicalContentKind } from '@lobechat/types';
 import debug from 'debug';
 import i18n from 'i18next';
 import { createElement } from 'react';
@@ -22,6 +23,15 @@ const log = debug('resource-manager:action');
 let syncEngineInstance: ResourceSyncEngine | null = null;
 
 type Setter = StoreSetter<FileStore>;
+
+const getCanonicalContentSourceType = (
+  item: Pick<ContentItem, 'id' | 'sourceType'> | undefined,
+): 'file' | 'document' => {
+  if (!item) return 'file';
+
+  return getCanonicalContentKind(item);
+};
+
 export const createResourceSlice = (set: Setter, get: () => FileStore, _api?: unknown) => ({
   ...initialResourceState,
   ...new ResourceActionImpl(set, get, _api),
@@ -118,7 +128,7 @@ export class ResourceActionImpl {
       updatedAt: new Date(),
       ...(params.sourceType === 'file'
         ? {
-            url: 'url' in params ? params.url : '',
+            url: 'storageKey' in params ? params.storageKey : '',
           }
         : {
             content: 'content' in params ? params.content : '',
@@ -178,7 +188,7 @@ export class ResourceActionImpl {
       updatedAt: new Date(),
       ...(params.sourceType === 'file'
         ? {
-            url: 'url' in params ? params.url : '',
+            url: 'storageKey' in params ? params.storageKey : '',
           }
         : {
             content: 'content' in params ? params.content : '',
@@ -238,7 +248,7 @@ export class ResourceActionImpl {
       resourceMap,
     };
 
-    const isDocument = existing.sourceType === 'document';
+    const isDocument = getCanonicalContentSourceType(existing) === 'document';
     const trash = options?.trash ?? true; // Default to soft delete
 
     // Optimistic update
@@ -285,7 +295,10 @@ export class ResourceActionImpl {
               onClick: async () => {
                 notification.destroy(notificationKey);
                 try {
-                  await contentService.restoreContentItem({ id, sourceType: existing.sourceType });
+                  await contentService.restoreContentItem({
+                    id,
+                    sourceType: getCanonicalContentSourceType(existing),
+                  });
                   await this.#get().refreshFileList();
                   notification.success({
                     description: t('actions.delete.undoSuccess', { ns: 'file' }),
@@ -360,7 +373,7 @@ export class ResourceActionImpl {
 
     for (const id of ids) {
       const resource = resourceMap.get(id);
-      if (resource?.sourceType === 'document') {
+      if (getCanonicalContentSourceType(resource) === 'document') {
         documentIds.push(id);
       } else {
         fileIds.push(id);
@@ -415,7 +428,9 @@ export class ResourceActionImpl {
           const resource = rollbackState.resourceMap.get(id);
           return {
             id,
-            sourceType: resource?.sourceType ?? (id.startsWith('docs_') ? 'document' : 'file'),
+            sourceType: getCanonicalContentSourceType(
+              resource ?? { id, sourceType: 'file' as const },
+            ),
           };
         }) as Array<{ id: string; sourceType: 'file' | 'document' }>;
 

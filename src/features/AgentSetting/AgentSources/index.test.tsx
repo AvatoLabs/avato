@@ -25,7 +25,16 @@ vi.mock('@lobehub/ui', () => ({
       {children}
     </button>
   ),
-  DropdownMenu: ({ children }: any) => <div>{children}</div>,
+  DropdownMenu: ({ children, items }: any) => (
+    <div>
+      {children}
+      {items?.map((item: any) => (
+        <button key={item.key} type="button" onClick={item.onClick}>
+          {item.label}
+        </button>
+      ))}
+    </div>
+  ),
   Empty: ({ children, description }: any) => (
     <div>
       <div>{description}</div>
@@ -127,6 +136,11 @@ vi.mock('@/features/ResourceSpaces', () => ({
     spaceId ? `/spaces/${spaceId}/files/item/${fileId}` : `/spaces/item/${fileId}`,
 }));
 
+vi.mock('@/utils/docs', () => ({
+  getPageDetailPath: (id: string, kind: string, spaceId?: string | null) =>
+    spaceId ? `/spaces/${spaceId}/docs/${id}?kind=${kind}` : '/spaces',
+}));
+
 describe('AgentSources', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -191,6 +205,40 @@ describe('AgentSources', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Content' }));
 
     expect(mockNavigate).toHaveBeenCalledWith('/spaces/space-route/files');
+    expect(useAgentStore.getState().showAgentSetting).toBe(false);
+    expect(useAgentStore.getState().activeAgentSettingTab).toBeUndefined();
+  });
+
+  it('opens file-backed docs in canonical doc mode from agent sources', () => {
+    act(() => {
+      useAgentStore.setState({
+        activeAgentId: 'agent-1',
+        activeAgentSettingTab: ChatSettingsTabs.Sources,
+        agentMap: {
+          'agent-1': {
+            files: [
+              {
+                enabled: true,
+                id: 'docs_existing_1',
+                name: 'Spec',
+                spaceId: null,
+                type: 'text/markdown',
+              },
+            ],
+            sourceSets: [],
+          } as any,
+        },
+        showAgentSetting: true,
+      });
+    });
+
+    window.history.replaceState({}, '', '/spaces/space-route/files');
+
+    render(<AgentSources />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/spaces/space-route/docs/docs_existing_1?kind=doc');
     expect(useAgentStore.getState().showAgentSetting).toBe(false);
     expect(useAgentStore.getState().activeAgentSettingTab).toBeUndefined();
   });

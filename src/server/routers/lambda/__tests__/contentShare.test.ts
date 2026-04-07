@@ -157,6 +157,48 @@ describe('contentShareRouter', () => {
     );
   });
 
+  it('canonicalizes docs_* file targets to document shares', async () => {
+    const caller = contentShareRouter.createCaller({
+      serverDB: {} as any,
+      userId: 'user-1',
+    } as any);
+
+    mockFindContentRegistryByLocalId.mockImplementation(
+      async (kind: 'document' | 'file' | 'source_set', localId: string) => {
+        if (kind === 'document' && localId === 'docs_1') {
+          return {
+            contentUid: 'cnt_doc_1',
+            kind: 'document',
+            localId: 'docs_1',
+            spaceId: 'spc_1',
+          };
+        }
+
+        return null;
+      },
+    );
+
+    const result = await caller.createContentShareLink({
+      expiresInDays: 7,
+      id: 'docs_1',
+      kind: 'file',
+    });
+
+    expect(mockFindContentRegistryByLocalId).toHaveBeenCalledWith('document', 'docs_1');
+    expect(mockCreateShareLink).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contentUid: 'cnt_doc_1',
+        spaceId: 'spc_1',
+      }),
+    );
+    expect(result).toEqual({
+      expiresAt: expect.any(Date),
+      fileShareDownloadUrl: undefined,
+      id: 'shl_1',
+      shareUrl: 'http://localhost:3010/share/r/share_tok_1',
+    });
+  });
+
   it('returns a file payload for a valid shared file token', async () => {
     const caller = contentShareRouter.createCaller({
       serverDB: {} as any,

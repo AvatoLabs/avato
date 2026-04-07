@@ -132,6 +132,25 @@ describe('resolveProviderReadableFileReference', () => {
     });
   });
 
+  it('rejects document-shaped file proxy urls before file authorization', async () => {
+    await expect(
+      resolveProviderReadableFileReference({
+        db: {} as any,
+        fileService: { getFullFileUrl: mockGetFullFileUrl } as any,
+        url: '/f/docs_1',
+        userId: 'user-1',
+        via: 'image_generation_input',
+      }),
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'DOCUMENT_REFERENCE_NOT_FETCHABLE',
+    });
+
+    expect(mockAssertCapability).not.toHaveBeenCalled();
+    expect(mockGetFileById).not.toHaveBeenCalled();
+    expect(mockCreateAccessEvent).not.toHaveBeenCalled();
+  });
+
   it('resolves same-origin absolute proxy urls', async () => {
     const result = await resolveProviderReadableFileReference({
       db: {} as any,
@@ -318,6 +337,24 @@ describe('resolveProviderReadableFileReference', () => {
     });
   });
 
+  it('rejects document-shaped topic share attachment refs', async () => {
+    await expect(
+      resolveProviderReadableFileReference({
+        db: {} as any,
+        fileService: { getFullFileUrl: mockGetFullFileUrl } as any,
+        url: '/share/t/share-1/f/docs_2',
+        userId: 'user-1',
+        via: 'image_generation_input',
+      }),
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'DOCUMENT_REFERENCE_NOT_FETCHABLE',
+    });
+
+    expect(mockFindByShareIdWithAccessCheck).not.toHaveBeenCalled();
+    expect(mockCreateAccessEvent).not.toHaveBeenCalled();
+  });
+
   it('resolves shared file proxy urls through share access and audit', async () => {
     mockGetFileById.mockResolvedValue({
       id: 'file-share-2',
@@ -354,5 +391,30 @@ describe('resolveProviderReadableFileReference', () => {
       key: 'v2/spaces/space-share-2/blobs/blob-share-2',
       url: 'https://blob.example.com/download/blob-1',
     });
+  });
+
+  it('rejects shared file tokens that resolve to canonical documents', async () => {
+    mockFindContentRegistryByUid.mockResolvedValue({
+      contentUid: 'content-doc-share-1',
+      kind: 'document',
+      localId: 'docs_3',
+      spaceId: 'space-share-3',
+    });
+
+    await expect(
+      resolveProviderReadableFileReference({
+        db: {} as any,
+        fileService: { getFullFileUrl: mockGetFullFileUrl } as any,
+        url: '/share/f/share-token-1',
+        userId: 'user-1',
+        via: 'image_generation_input',
+      }),
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'DOCUMENT_REFERENCE_NOT_FETCHABLE',
+    });
+
+    expect(mockGetFileById).not.toHaveBeenCalled();
+    expect(mockCreateAccessEvent).not.toHaveBeenCalled();
   });
 });

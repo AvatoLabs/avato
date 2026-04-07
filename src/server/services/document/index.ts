@@ -1,6 +1,7 @@
 import { type LobeChatDatabase } from '@lobechat/database';
 import { type DocumentItem } from '@lobechat/database/schemas';
 import { loadFile } from '@lobechat/file-loaders';
+import { getCanonicalContentKind } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import debug from 'debug';
 
@@ -24,6 +25,26 @@ const getDocumentTitle = (filename: string, metadataTitle?: string | null) => {
   const stripped = filename.replace(/\.[^.]+$/, '').trim();
   return stripped || 'Untitled';
 };
+
+const documentItemToLobeDocument = (document: DocumentItem): LobeDocument => ({
+  content: document.content,
+  createdAt: document.createdAt,
+  editorData: document.editorData ?? null,
+  fileType: document.fileType,
+  filename: document.filename || document.title || 'Untitled',
+  id: document.id,
+  metadata: document.metadata ?? {},
+  pages: document.pages ?? undefined,
+  parentId: document.parentId,
+  source: document.source,
+  sourceSetId: document.sourceSetId,
+  sourceType: document.sourceType as DocumentSourceType,
+  spaceId: document.spaceId,
+  title: document.title || undefined,
+  totalCharCount: document.totalCharCount,
+  totalLineCount: document.totalLineCount,
+  updatedAt: document.updatedAt,
+});
 
 export class DocumentService {
   userId: string;
@@ -447,7 +468,7 @@ export class DocumentService {
 
     if (fileIds.length > 0) {
       const fileRows = await this.db.query.files.findMany({
-        columns: { contentUid: true, fileHash: true, spaceId: true, url: true },
+        columns: { blobId: true, contentUid: true, fileHash: true, spaceId: true, url: true },
         where: (fields, { inArray }) => inArray(fields.id, fileIds),
       });
       fileRowsForCleanup.push(...fileRows);
@@ -674,6 +695,10 @@ export class DocumentService {
   }
 
   async ensureFileDocument(fileId: string): Promise<DocumentItem> {
+    if (getCanonicalContentKind({ id: fileId, sourceType: 'file' }) === 'document') {
+      return this.resolver.requireDocument(fileId, 'preview_content');
+    }
+
     await this.resolver.requireFile(fileId, 'preview_content');
 
     const existingDocument = await this.documentModel.findByFileId(fileId);
@@ -860,5 +885,15 @@ export class DocumentService {
     } finally {
       cleanup();
     }
+  }
+
+  async previewFileContent(id: string): Promise<LobeDocument> {
+    if (getCanonicalContentKind({ id, sourceType: 'file' }) === 'document') {
+      const document = await this.resolver.requireDocument(id, 'preview_content');
+      return documentItemToLobeDocument(document as DocumentItem);
+    }
+
+    await this.resolver.requireFile(id, 'preview_content');
+    return this.previewFile(id);
   }
 }

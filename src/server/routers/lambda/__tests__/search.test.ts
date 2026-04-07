@@ -63,6 +63,19 @@ describe('searchRouter', () => {
         url: null,
       },
       {
+        createdAt: new Date('2026-01-01'),
+        id: 'docs_file_visible',
+        name: 'Visible Derived Doc',
+        fileType: 'application/pdf',
+        relevance: 3,
+        size: 12,
+        sourceSetId: null,
+        title: 'Visible Derived Doc',
+        type: 'file',
+        updatedAt: new Date('2026-01-02'),
+        url: null,
+      },
+      {
         avatar: null,
         createdAt: new Date('2026-01-01'),
         id: 'ss_visible',
@@ -99,6 +112,7 @@ describe('searchRouter', () => {
 
     expect(result.map((item: any) => item.id)).toEqual([
       'docs_visible',
+      'docs_file_visible',
       'ss_visible',
       'agent_visible',
     ]);
@@ -111,6 +125,11 @@ describe('searchRouter', () => {
       capability: 'read_metadata',
       id: 'file_hidden',
       kind: 'file',
+    });
+    expect(mockGetAccessMatch).toHaveBeenCalledWith({
+      capability: 'read_metadata',
+      id: 'docs_file_visible',
+      kind: 'document',
     });
     expect(mockGetAccessMatch).toHaveBeenCalledWith({
       capability: 'read_metadata',
