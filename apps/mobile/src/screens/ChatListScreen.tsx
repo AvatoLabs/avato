@@ -95,6 +95,7 @@ import {
   messageApi,
   type MessageSearchResult,
   pluginApi,
+  resourceApi,
   sessionApi,
   tagApi,
   topicApi,
@@ -109,7 +110,7 @@ import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
-import { navigateToLogin } from '../lib/navigation';
+import { navigateToLogin, navigateToNotebook } from '../lib/navigation';
 import {
   PERSONAL_NOTEBOOK_SESSION_STORAGE_KEY,
   shouldHidePersonalNotebookSession,
@@ -488,6 +489,8 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   const [tagDraftColor, setTagDraftColor] = useState<string | null>(null);
   const [tagEditingTarget, setTagEditingTarget] = useState<TagItem | null>(null);
   const [expandedSessionIds, setExpandedSessionIds] = useState<Set<string>>(() => new Set());
+  const [recentFiles, setRecentFiles] = useState<FileListItem[]>([]);
+  const [recentPages, setRecentPages] = useState<FileListItem[]>([]);
   const [recentTopics, setRecentTopics] = useState<RecentTopic[]>([]);
   const [topicRenameTarget, setTopicRenameTarget] = useState<{
     sessionId: string;
@@ -510,6 +513,7 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   const hasBootstrappedRef = useRef(false);
   const inboxSessionPromiseRef = useRef<Promise<ChatSession | null> | null>(null);
   const lastHomeRefreshAtRef = useRef(0);
+  const lastRecentContentRefreshAtRef = useRef(0);
   const lastRecentTopicsRefreshAtRef = useRef(0);
   const hydratedTopicSessionIdsRef = useRef<Set<string>>(new Set());
   const [persistedSkillIdentifiers, setPersistedSkillIdentifiers] = useState<string[]>([]);
@@ -720,13 +724,40 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     }
   }, []);
 
+  const refreshRecentContent = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastRecentContentRefreshAtRef.current < 30_000) return;
+
+    lastRecentContentRefreshAtRef.current = now;
+
+    try {
+      const [files, pages] = await Promise.all([
+        resourceApi.getRecentFiles(6).catch(() => []),
+        resourceApi.getRecentPages(6).catch(() => []),
+      ]);
+      setRecentFiles(files ?? []);
+      setRecentPages(pages ?? []);
+    } catch {
+      setRecentFiles([]);
+      setRecentPages([]);
+    }
+  }, []);
+
   const refreshHomeData = useCallback(
-    async (options?: { force?: boolean; includeRecentTopics?: boolean }) => {
+    async (options?: {
+      force?: boolean;
+      includeRecentContent?: boolean;
+      includeRecentTopics?: boolean;
+    }) => {
       const force = options?.force ?? false;
+      const includeRecentContent = options?.includeRecentContent ?? false;
       const includeRecentTopics = options?.includeRecentTopics ?? false;
       const now = Date.now();
 
       if (!force && now - lastHomeRefreshAtRef.current < 45_000) {
+        if (includeRecentContent) {
+          void refreshRecentContent(false);
+        }
         if (includeRecentTopics) {
           void refreshRecentTopics(false);
         }
@@ -748,6 +779,10 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
       tasks.push(loadSkillPickerSelection().then(setPersistedSkillIdentifiers));
       tasks.push(loadGlobalMemorySettings());
 
+      if (includeRecentContent) {
+        tasks.push(refreshRecentContent(force));
+      }
+
       if (includeRecentTopics) {
         tasks.push(refreshRecentTopics(force));
       }
@@ -762,6 +797,7 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
       initialized,
       loadGlobalMemorySettings,
       loadSelection,
+      refreshRecentContent,
       refreshRecentTopics,
     ],
   );
@@ -770,14 +806,14 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     if (hasBootstrappedRef.current) return;
 
     hasBootstrappedRef.current = true;
-    void refreshHomeData({ force: true, includeRecentTopics: true });
+    void refreshHomeData({ force: true, includeRecentContent: true, includeRecentTopics: true });
     void recordUsage();
   }, [refreshHomeData]);
 
   // Re-read sessions (with AsyncStorage provider overlay) whenever the screen gains focus
   useFocusEffect(
     useCallback(() => {
-      void refreshHomeData({ includeRecentTopics: true });
+      void refreshHomeData({ includeRecentContent: true, includeRecentTopics: true });
     }, [refreshHomeData]),
   );
 
@@ -957,7 +993,7 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await refreshHomeData({ force: true, includeRecentTopics: true });
+      await refreshHomeData({ force: true, includeRecentContent: true, includeRecentTopics: true });
       haptics.success();
     } catch {
       toast.show('error', t.errorNetwork);
@@ -1249,6 +1285,53 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
       }
     },
     [addChatContextSelection, addFile, t.fileUploadFailed, toast],
+  );
+
+  const handleAddRecentResourceToChatContext = useCallback(
+    async (item: FileListItem) => {
+      if (!isChatContextEligibleResource(item)) return;
+
+      try {
+        const context = await createChatContextSelectionFromResource(item);
+        if (!context) {
+          toast.show('error', t.fileUploadFailed);
+          return;
+        }
+
+        addChatContextSelection(context);
+        haptics.success();
+        toast.show('success', t.fileAddToChatContextSuccess);
+      } catch {
+        toast.show('error', t.fileUploadFailed);
+      }
+    },
+    [addChatContextSelection, t.fileAddToChatContextSuccess, t.fileUploadFailed, toast],
+  );
+
+  const handleOpenRecentResource = useCallback(
+    (item: FileListItem) => {
+      const openKind = getCanonicalResourceKind(item);
+      haptics.light();
+
+      if (openKind === 'document') {
+        navigateToNotebook({ documentId: item.id });
+        return;
+      }
+
+      navigation.navigate('Resources', {
+        openItem: {
+          content: item.content ?? null,
+          fileType: item.fileType,
+          id: item.id,
+          name: item.name,
+          sourceType: openKind,
+          url: item.url,
+        },
+        openItemId: item.id,
+        openKind,
+      });
+    },
+    [navigation],
   );
 
   const handlePluginsPress = useCallback(() => {
@@ -2351,6 +2434,82 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     [directoryMounted],
   );
 
+  const renderRecentResourceSection = useCallback(
+    (items: FileListItem[], title: string) => {
+      if (items.length === 0) return null;
+
+      return (
+        <SectionBlock title={title}>
+          <View className="px-5" style={{ gap: 10 }}>
+            {items.map((item) => (
+              <View
+                className="flex-row items-center rounded-2xl px-3 py-3"
+                key={`${title}-${item.id}`}
+                style={{
+                  backgroundColor: colors.fillQuaternary,
+                  borderColor: colors.borderSubtle,
+                  borderWidth: 1,
+                }}
+              >
+                <TouchableOpacity
+                  activeOpacity={0.78}
+                  className="flex-1 flex-row items-center"
+                  onPress={() => handleOpenRecentResource(item)}
+                >
+                  <View
+                    className="h-10 w-10 items-center justify-center rounded-2xl"
+                    style={{ backgroundColor: colors.surfaceElevated }}
+                  >
+                    <FileText
+                      color={colors.primary}
+                      size={18}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                  </View>
+                  <View className="ml-3 min-w-0 flex-1">
+                    <Text className="text-[14px] font-semibold text-foreground" numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text
+                      className="mt-1 text-[12px] font-medium"
+                      numberOfLines={1}
+                      style={{ color: colors.secondaryText }}
+                    >
+                      {formatTimeAgo(item.updatedAt || item.createdAt, t)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+                {isChatContextEligibleResource(item) ? (
+                  <TouchableOpacity
+                    activeOpacity={0.78}
+                    className="ml-3 rounded-full px-3 py-2"
+                    style={{ backgroundColor: colors.primarySubtle }}
+                    onPress={() => void handleAddRecentResourceToChatContext(item)}
+                  >
+                    <Text className="text-[11px] font-semibold" style={{ color: colors.primary }}>
+                      {t.fileAddToChatContext}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        </SectionBlock>
+      );
+    },
+    [
+      colors.borderSubtle,
+      colors.fillQuaternary,
+      colors.primary,
+      colors.primarySubtle,
+      colors.secondaryText,
+      colors.surfaceElevated,
+      handleAddRecentResourceToChatContext,
+      handleOpenRecentResource,
+      t,
+    ],
+  );
+
   return (
     <GestureDetector gesture={openDrawerGesture}>
       <View className="flex-1 bg-background">
@@ -2476,6 +2635,8 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
                 </Animated.View>
               )}
             </View>
+            {renderRecentResourceSection(recentPages, t.homeRecentDocs)}
+            {renderRecentResourceSection(recentFiles, t.homeRecentFiles)}
           </ScrollView>
 
           <Animated.View

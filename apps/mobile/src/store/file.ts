@@ -17,13 +17,17 @@ export interface UploadedFileResult {
 interface FileState {
   addChatContextSelection: (context: ChatContextSelection) => void;
   addFile: (file: Omit<FileAttachment, 'status' | 'progress'>) => void;
+  addSessionChatContextSelection: (sessionId: string, context: ChatContextSelection) => void;
 
   chatContextSelections: ChatContextSelection[];
   clearChatContextSelections: () => void;
   clearPending: () => void;
+  clearSessionChatContextSelections: (sessionId: string) => void;
   pendingFiles: FileAttachment[];
   removeChatContextSelection: (id: string) => void;
   removeFile: (id: string) => void;
+  removeSessionChatContextSelection: (sessionId: string, id: string) => void;
+  sessionChatContextSelections: Record<string, ChatContextSelection[]>;
   uploadAll: () => Promise<void>;
   uploadFile: (id: string, options?: { sessionId?: string }) => Promise<UploadedFileResult | null>;
 }
@@ -31,6 +35,7 @@ interface FileState {
 export const useFileStore = create<FileState>((set, get) => ({
   chatContextSelections: [],
   pendingFiles: [],
+  sessionChatContextSelections: {},
 
   addFile: (file) => {
     const alreadyUploaded = 'fileId' in file && 'url' in file && !!file.fileId && !!file.url;
@@ -61,6 +66,21 @@ export const useFileStore = create<FileState>((set, get) => ({
     }));
   },
 
+  addSessionChatContextSelection: (sessionId, context) => {
+    if (!sessionId) return;
+
+    set((s) => {
+      const current = s.sessionChatContextSelections[sessionId] ?? [];
+
+      return {
+        sessionChatContextSelections: {
+          ...s.sessionChatContextSelections,
+          [sessionId]: [...current.filter((item) => item.id !== context.id), context],
+        },
+      };
+    });
+  },
+
   removeFile: (id) => {
     set((s) => ({ pendingFiles: s.pendingFiles.filter((f) => f.id !== id) }));
   },
@@ -69,6 +89,29 @@ export const useFileStore = create<FileState>((set, get) => ({
     set((s) => ({
       chatContextSelections: s.chatContextSelections.filter((context) => context.id !== id),
     }));
+  },
+
+  removeSessionChatContextSelection: (sessionId, id) => {
+    if (!sessionId) return;
+
+    set((s) => {
+      const current = s.sessionChatContextSelections[sessionId] ?? [];
+      const next = current.filter((context) => context.id !== id);
+
+      if (next.length === current.length) return s;
+
+      if (next.length === 0) {
+        const { [sessionId]: _, ...rest } = s.sessionChatContextSelections;
+        return { sessionChatContextSelections: rest };
+      }
+
+      return {
+        sessionChatContextSelections: {
+          ...s.sessionChatContextSelections,
+          [sessionId]: next,
+        },
+      };
+    });
   },
 
   uploadFile: async (id: string, options?: { sessionId?: string }) => {
@@ -149,5 +192,16 @@ export const useFileStore = create<FileState>((set, get) => ({
 
   clearChatContextSelections: () => {
     set({ chatContextSelections: [] });
+  },
+
+  clearSessionChatContextSelections: (sessionId) => {
+    if (!sessionId) return;
+
+    set((s) => {
+      if (!s.sessionChatContextSelections[sessionId]) return s;
+
+      const { [sessionId]: _, ...rest } = s.sessionChatContextSelections;
+      return { sessionChatContextSelections: rest };
+    });
   },
 }));

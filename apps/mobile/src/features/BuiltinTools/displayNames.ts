@@ -36,7 +36,7 @@ const DISPLAY_NAMES_ZH: Record<string, Record<string, string>> = {
     sort: '排序',
   },
   'lobe-web-browsing': { search: '网页搜索' },
-  'lobe-source-set': { searchSourceSet: '来源集检索' },
+  'lobe-source-set': { readSourceFiles: '读取来源文件', searchSourceSet: '来源集检索' },
   'lobe-agent-builder': {
     getAvailableModels: '获取可用模型',
     installPlugin: '安装插件',
@@ -133,7 +133,7 @@ const DISPLAY_NAMES_EN: Record<string, Record<string, string>> = {
     sort: 'Sort',
   },
   'lobe-web-browsing': { search: 'Web search' },
-  'lobe-source-set': { searchSourceSet: 'Source set search' },
+  'lobe-source-set': { readSourceFiles: 'Read source files', searchSourceSet: 'Source set search' },
   'lobe-agent-builder': {
     getAvailableModels: 'Get available models',
     installPlugin: 'Install plugin',

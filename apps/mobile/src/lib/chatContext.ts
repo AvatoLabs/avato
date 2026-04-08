@@ -1,5 +1,6 @@
 import type { ChatContextSelection, DocSelection, FileListItem } from '../types';
-import { fileApi, resourceApi } from './api';
+import { fileApi, notebookApi, resourceApi } from './api';
+import { getNotebookTableContextContent, isTableNotebookDocument } from './notebookDocument';
 import { getCanonicalResourceKind } from './resourceList';
 
 const MARKDOWN_EXTENSIONS = ['.md', '.markdown', '.mdown', '.mdx', '.mkd'];
@@ -75,8 +76,12 @@ export const createChatContextSelectionFromResource = async (
   if (!isChatContextEligibleResource(item)) return null;
 
   if (getCanonicalResourceKind(item) === 'document') {
-    const document = await resourceApi.getDocument(item.id).catch(() => null);
-    const content = document?.content?.trim();
+    const document = await notebookApi.get(item.id).catch(() => null);
+    if (!document) return null;
+
+    const content = isTableNotebookDocument(document)
+      ? getNotebookTableContextContent(document)
+      : document.content?.trim();
 
     if (!content) return null;
 

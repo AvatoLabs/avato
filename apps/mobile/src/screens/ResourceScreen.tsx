@@ -12,6 +12,7 @@
  *  • Pull-to-refresh, search filter
  *  • Image thumbnail preview inline
  */
+import { useRoute } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Image as ExpoImage } from 'expo-image';
@@ -31,9 +32,11 @@ import {
   FileVideo,
   Folder,
   FolderOpen,
+  GitBranch,
   Grid3X3,
   Link2,
   List,
+  MessageCircle,
   MoreVertical,
   Pencil,
   Plus,
@@ -71,12 +74,13 @@ import { BottomSheetScaffold } from '../components/ui/BottomSheetScaffold';
 import { FilterChip, MetaTag, SelectionBadge } from '../components/ui/ChoiceControls';
 import EmptyState from '../components/ui/EmptyState';
 import FileGridSkeleton from '../components/ui/FileGridSkeleton';
+import PortalScaffold from '../components/ui/PortalScaffold';
 import PromptModal from '../components/ui/PromptModal';
 import ResourceShareManageSheet from '../components/ui/ResourceShareManageSheet';
 import ResourceShareOptionsSheet, {
   type ResourceShareSheetTarget,
 } from '../components/ui/ResourceShareOptionsSheet';
-import { HeaderIconButton, ScreenHeader } from '../components/ui/ScreenHeader';
+import { HeaderIconButton } from '../components/ui/ScreenHeader';
 import { SearchField } from '../components/ui/SearchField';
 import SharedWithMeSheet, { type SharedWithMeRow } from '../components/ui/SharedWithMeSheet';
 import { useToast } from '../components/ui/Toast';
@@ -84,6 +88,7 @@ import {
   fileApi,
   type FolderCrumb,
   getApiUrl,
+  notebookApi,
   resourceApi,
   sourceSetApi,
   type TrashedDocumentItem,
@@ -106,6 +111,18 @@ import {
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import {
+  navigateBackFromPortal,
+  navigateToConversationOrigin,
+  navigateToNotebook,
+} from '../lib/navigation';
+import { getNotebookTablePreview, isTableNotebookDocument } from '../lib/notebookDocument';
+import {
+  appendCurrentPortalStack,
+  appendCurrentPortalStackWithOrigin,
+  createConversationOrigin,
+  getPreviousPortalTarget,
+} from '../lib/portalNavigation';
+import {
   clearResourceCacheEntry,
   getResourceCacheEntry,
   listResourceCacheEntries,
@@ -118,6 +135,14 @@ import {
   getResourceListCacheEntry,
   saveResourceListCacheEntry,
 } from '../lib/resourceListCache';
+import type {
+  ConversationOriginRouteParams,
+  MainTabScreenProps,
+  PortalRouteParams,
+  ResourceNavigationTarget,
+  ResourcesRouteParams,
+  RootStackScreenProps,
+} from '../navigation/types';
 import { useConnectionStore } from '../store/connection';
 import { useFileStore } from '../store/file';
 import { useThemeColors } from '../theme/colors';
@@ -661,6 +686,8 @@ const FilePreviewModal = memo(
   ({
     apiBaseUrl,
     item,
+    origin,
+    onReplaceItem,
     remoteHeaders,
     visible,
     onCacheReady,
@@ -669,10 +696,13 @@ const FilePreviewModal = memo(
     apiBaseUrl: string;
     item: FileListItem | null;
     onCacheReady?: (entry: ResourceCacheEntry) => void;
+    onReplaceItem?: (item: FileListItem, previousId?: string) => void;
+    origin?: ConversationOriginRouteParams | null;
     remoteHeaders?: Record<string, string>;
     visible: boolean;
     onClose: () => void;
   }) => {
+    const route = useRoute();
     const insets = useSafeAreaInsets();
     const { t } = useI18n();
     const toast = useToast();
@@ -690,6 +720,7 @@ const FilePreviewModal = memo(
     const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
     const [editingText, setEditingText] = useState(false);
     const [savingEdit, setSavingEdit] = useState(false);
+    const [convertingToDocument, setConvertingToDocument] = useState(false);
     const [textDraft, setTextDraft] = useState('');
     const [shareSheetOpen, setShareSheetOpen] = useState(false);
 
@@ -706,6 +737,13 @@ const FilePreviewModal = memo(
         item.fileType.includes('vnd.ms-powerpoint')
       : false;
     const previewableDoc = textFile || pdfFile || officeFile;
+    const knownTableDocument = item
+      ? itemKind === 'document' && isTableNotebookDocument(item)
+      : false;
+    const tablePreview = useMemo(
+      () => (itemKind === 'document' ? getNotebookTablePreview(item) : null),
+      [item, itemKind],
+    );
 
     useEffect(() => {
       setImgLoading(true);
@@ -719,6 +757,7 @@ const FilePreviewModal = memo(
       setPreviewLoadFailed(false);
       setDownloadProgress(0);
       setSavingEdit(false);
+      setConvertingToDocument(false);
       setTextDraft('');
       setShareSheetOpen(false);
     }, [apiBaseUrl, item?.id, visible]);
@@ -856,12 +895,13 @@ const FilePreviewModal = memo(
       let cancelled = false;
       const loadText = async () => {
         try {
-          if (itemKind === 'document' && typeof item.content === 'string') {
+          if (typeof item.content === 'string') {
             if (!cancelled) {
               setPreviewLoadFailed(false);
               setTextContent(item.content);
             }
-            return;
+
+            if (itemKind === 'document') return;
           }
 
           if (itemKind === 'document') {
@@ -927,13 +967,17 @@ const FilePreviewModal = memo(
     const itemUpdatedAt = item
       ? ((item as FileListItem & { updatedAt?: string | null }).updatedAt ?? undefined)
       : undefined;
-    const markdownFile = item ? textFile && isMarkdownFile(item.fileType, item.name) : false;
-    const canEditText = !!item && textFile && itemKind === 'document';
+    const markdownFile = item
+      ? textFile && isMarkdownFile(item.fileType, item.name) && !knownTableDocument
+      : false;
+    const canEditText = !!item && textFile && itemKind === 'document' && !knownTableDocument;
+    const canConvertToDocument = !!item && markdownFile && itemKind === 'file';
     const markdownHtml = useMemo(
       () =>
         markdownFile && textContent ? buildMarkdownPreviewHtml(textContent, colors) : undefined,
       [colors, markdownFile, textContent],
     );
+    const originActionLabel = origin?.threadId ? t.threadOpen : t.chatOpenConversation;
 
     if (!item) return null;
     const officeViewerUri =
@@ -1016,6 +1060,36 @@ const FilePreviewModal = memo(
       }
     };
 
+    const handleEditAsDocument = async () => {
+      if (!item || !canConvertToDocument || convertingToDocument) return;
+
+      setConvertingToDocument(true);
+
+      try {
+        const ensuredDocument = await ensureNotebookDocumentFromFile(item);
+        if (!ensuredDocument) {
+          toast.show('error', t.errorNetwork);
+          return;
+        }
+        const { documentId, nextItem } = ensuredDocument;
+        onReplaceItem?.(nextItem, item.id);
+        haptics.success();
+        toast.show('success', t.fileEditAsDocumentSuccess);
+        onClose();
+        navigateToNotebook({
+          documentId,
+          ...appendCurrentPortalStack(route.name, route.params, {}),
+          ...(origin?.sessionId ? { sessionId: origin.sessionId } : {}),
+          ...(origin?.threadId ? { threadId: origin.threadId } : {}),
+          ...(origin?.topicId ? { topicId: origin.topicId } : {}),
+        });
+      } catch {
+        toast.show('error', t.errorNetwork);
+      } finally {
+        setConvertingToDocument(false);
+      }
+    };
+
     return (
       <>
         <Modal
@@ -1095,6 +1169,27 @@ const FilePreviewModal = memo(
               </TouchableOpacity>
 
               <View className="flex-row items-center gap-3 flex-shrink-0">
+                {canConvertToDocument ? (
+                  <TouchableOpacity
+                    disabled={convertingToDocument}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    onPress={() => void handleEditAsDocument()}
+                  >
+                    {convertingToDocument ? (
+                      <ActivityIndicator
+                        color={imageFile ? colors.mediaOnBackdrop : colors.primary}
+                        size="small"
+                      />
+                    ) : (
+                      <Text
+                        className="text-[12px] font-semibold"
+                        style={{ color: imageFile ? colors.mediaOnBackdrop : colors.primary }}
+                      >
+                        {t.fileEditAsDocument}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                ) : null}
                 {canEditText ? (
                   editingText ? (
                     <TouchableOpacity
@@ -1128,6 +1223,31 @@ const FilePreviewModal = memo(
                       />
                     </TouchableOpacity>
                   )
+                ) : null}
+                {origin?.sessionId ? (
+                  <TouchableOpacity
+                    accessibilityHint={originActionLabel}
+                    accessibilityLabel={originActionLabel}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    onPress={() => {
+                      onClose();
+                      navigateToConversationOrigin(origin);
+                    }}
+                  >
+                    {origin.threadId ? (
+                      <GitBranch
+                        color={imageFile ? colors.mediaOnBackdrop : colors.primary}
+                        size={20}
+                        strokeWidth={1.8}
+                      />
+                    ) : (
+                      <MessageCircle
+                        color={imageFile ? colors.mediaOnBackdrop : colors.primary}
+                        size={20}
+                        strokeWidth={1.8}
+                      />
+                    )}
+                  </TouchableOpacity>
                 ) : null}
                 <TouchableOpacity
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -1217,7 +1337,127 @@ const FilePreviewModal = memo(
                   </View>
                 )
               ) : previewableDoc ? (
-                pdfFile && !fileUrl ? (
+                knownTableDocument && tablePreview ? (
+                  <View className="flex-1" style={{ backgroundColor: colors.background }}>
+                    <ScrollView
+                      className="flex-1"
+                      contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+                    >
+                      <View
+                        className="mb-4 rounded-2xl border px-4 py-4"
+                        style={{
+                          backgroundColor: colors.fillQuaternary,
+                          borderColor: colors.borderSubtle,
+                        }}
+                      >
+                        <Text
+                          className="text-[11px] font-semibold uppercase tracking-[1.1px]"
+                          style={{ color: colors.secondaryText }}
+                        >
+                          {t.resourceTablePreviewReadOnly}
+                        </Text>
+                        <Text
+                          className="mt-2 text-[15px] font-semibold"
+                          style={{ color: colors.foreground }}
+                        >
+                          {tablePreview.viewName || item.name}
+                        </Text>
+                        <Text className="mt-1 text-[13px]" style={{ color: colors.secondaryText }}>
+                          {t.resourceTablePreviewSummary
+                            .replace('{rows}', String(tablePreview.totalRows))
+                            .replace('{columns}', String(tablePreview.totalColumns))}
+                        </Text>
+                      </View>
+
+                      {tablePreview.rows.length === 0 ? (
+                        <View
+                          className="rounded-2xl border px-4 py-8"
+                          style={{
+                            backgroundColor: colors.card,
+                            borderColor: colors.borderSubtle,
+                          }}
+                        >
+                          <Text
+                            className="text-center text-[14px]"
+                            style={{ color: colors.secondaryText }}
+                          >
+                            {t.resourceTablePreviewUnavailable}
+                          </Text>
+                        </View>
+                      ) : (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                          <View
+                            style={{
+                              borderColor: colors.borderSubtle,
+                              borderRadius: 16,
+                              borderWidth: 1,
+                              minWidth: Math.max(SCREEN_W - 32, tablePreview.columns.length * 156),
+                              overflow: 'hidden',
+                            }}
+                          >
+                            <View
+                              className="flex-row"
+                              style={{ backgroundColor: colors.fillQuaternary }}
+                            >
+                              {tablePreview.columns.map((column) => (
+                                <View
+                                  className="border-r px-3 py-3"
+                                  key={column.id}
+                                  style={{
+                                    borderColor: colors.borderSubtle,
+                                    minWidth: 156,
+                                  }}
+                                >
+                                  <Text
+                                    className="text-[13px] font-semibold"
+                                    numberOfLines={1}
+                                    style={{ color: colors.foreground }}
+                                  >
+                                    {column.name}
+                                  </Text>
+                                </View>
+                              ))}
+                            </View>
+                            {tablePreview.rows.slice(0, 24).map((row, rowIndex) => (
+                              <View
+                                className="flex-row"
+                                key={row.id}
+                                style={{
+                                  backgroundColor:
+                                    rowIndex % 2 === 0 ? colors.card : colors.fillQuaternary,
+                                }}
+                              >
+                                {row.cells.map((cell, cellIndex) => (
+                                  <View
+                                    className="border-r border-t px-3 py-3"
+                                    key={`${row.id}-${tablePreview.columns[cellIndex]?.id ?? cellIndex}`}
+                                    style={{
+                                      borderColor: colors.borderSubtle,
+                                      minWidth: 156,
+                                    }}
+                                  >
+                                    <Text
+                                      className="text-[13px] leading-5"
+                                      style={{ color: colors.foreground }}
+                                    >
+                                      {cell || '—'}
+                                    </Text>
+                                  </View>
+                                ))}
+                              </View>
+                            ))}
+                          </View>
+                        </ScrollView>
+                      )}
+                    </ScrollView>
+                  </View>
+                ) : knownTableDocument ? (
+                  <View className="flex-1 items-center justify-center px-8">
+                    <Text className="text-center text-foreground/70 text-[14px]">
+                      {t.resourceTablePreviewUnavailable}
+                    </Text>
+                  </View>
+                ) : pdfFile && !fileUrl ? (
                   <View className="flex-1 items-center justify-center px-8">
                     <Text className="text-center text-foreground/70 text-[14px]">
                       {t.resourcePreviewUnavailable}
@@ -1777,9 +2017,85 @@ function fileListItemFromShared(params: {
   };
 }
 
+function fileListItemFromNavigationTarget(target: ResourceNavigationTarget): FileListItem {
+  return {
+    chunkCount: null,
+    chunkingError: null,
+    content: target.content ?? null,
+    createdAt: new Date().toISOString(),
+    embeddingError: null,
+    embeddingStatus: null,
+    fileType:
+      target.fileType ??
+      (target.sourceType === 'document' ? 'text/plain' : 'application/octet-stream'),
+    finishEmbedding: false,
+    id: target.id,
+    name: target.name,
+    size: 0,
+    sourceType: target.sourceType ?? 'file',
+    url: target.url ?? '',
+  };
+}
+
+async function ensureNotebookDocumentFromFile(item: FileListItem): Promise<{
+  documentId: string;
+  nextItem: FileListItem;
+} | null> {
+  const ensured = await resourceApi.ensureFileDocument(item.id);
+  const documentId = ensured?.id;
+
+  if (!documentId) return null;
+
+  const document = await resourceApi.getDocument(documentId).catch(() => null);
+
+  return {
+    documentId,
+    nextItem: {
+      ...item,
+      ...(typeof document?.content === 'string' ? { content: document.content } : {}),
+      fileType: document?.fileType ?? item.fileType,
+      id: documentId,
+      name: document?.title || item.name,
+      sourceType: 'document',
+    },
+  };
+}
+
+function isSourceSetConflictError(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+
+  const maybeError = error as {
+    data?: { code?: string };
+    message?: string;
+  };
+  const message = maybeError.message ?? '';
+
+  return (
+    maybeError.data?.code === 'CONFLICT' ||
+    message.includes('FILE_ALREADY_IN_SOURCE_SET') ||
+    message.includes('FILE_ALREADY_IN_KNOWLEDGE_BASE')
+  );
+}
+
 // ── Main Screen ───────────────────────────────────────────────────────
 
-export default function ResourceScreen() {
+type ResourceScreenRouteName = 'PortalResources' | 'Resources';
+type ResourceScreenRouteParams = (ResourcesRouteParams & PortalRouteParams) | undefined;
+
+interface ResourceScreenImplProps {
+  navigation: {
+    addListener: MainTabScreenProps<'Resources'>['navigation']['addListener'];
+    canGoBack: () => boolean;
+    goBack: () => void;
+    setParams: (params?: Partial<NonNullable<ResourceScreenRouteParams>>) => void;
+  };
+  route: {
+    name: ResourceScreenRouteName;
+    params: ResourceScreenRouteParams;
+  };
+}
+
+function ResourceScreenImpl({ navigation, route }: ResourceScreenImplProps) {
   const { locale, t } = useI18n();
   const insets = useSafeAreaInsets();
   const scrollListPaddingBottom = useMainTabScrollableContentPaddingBottom();
@@ -1799,6 +2115,8 @@ export default function ResourceScreen() {
   const [apiBase, setApiBase] = useState('');
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const [previewItem, setPreviewItem] = useState<FileListItem | null>(null);
+  const [resourceOrigin, setResourceOrigin] = useState<ConversationOriginRouteParams | null>(null);
+  const [previewOrigin, setPreviewOrigin] = useState<ConversationOriginRouteParams | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [sourceSetId, setSourceSetId] = useState<string | null>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
@@ -1806,6 +2124,13 @@ export default function ResourceScreen() {
   const [folderBreadcrumb, setFolderBreadcrumb] = useState<FolderCrumb[]>([]);
   const [sourceSets, setSourceSets] = useState<SourceSetItem[]>([]);
   const [sourceSetSelectVisible, setSourceSetSelectVisible] = useState(false);
+  const [sourceSetNameDraft, setSourceSetNameDraft] = useState('');
+  const [sourceSetNameMode, setSourceSetNameMode] = useState<'create' | 'rename'>('create');
+  const [sourceSetNameModalVisible, setSourceSetNameModalVisible] = useState(false);
+  const [sourceSetActionVisible, setSourceSetActionVisible] = useState(false);
+  const [sourceSetActionMode, setSourceSetActionMode] = useState<'add' | 'move'>('add');
+  const [sourceSetActionIds, setSourceSetActionIds] = useState<string[]>([]);
+  const [sourceSetActionSubmitting, setSourceSetActionSubmitting] = useState(false);
   const [createFolderVisible, setCreateFolderVisible] = useState(false);
   const [createFolderName, setCreateFolderName] = useState('');
   const [moveToFolderItem, setMoveToFolderItem] = useState<FileListItem | null>(null);
@@ -1873,6 +2198,10 @@ export default function ResourceScreen() {
     if (!sourceSetId) return undefined;
     return sourceSets.find((l) => l.id === sourceSetId)?.spaceId ?? undefined;
   }, [sourceSetId, sourceSets]);
+  const availableTargetSourceSets = useMemo(
+    () => sourceSets.filter((item) => item.id !== sourceSetId),
+    [sourceSetId, sourceSets],
+  );
 
   const normalizedGovernanceFilters = useMemo(
     () => ({
@@ -1948,6 +2277,41 @@ export default function ResourceScreen() {
   const selectionSummaryLabel = useMemo(
     () => t.resourceSelectCount.replace('{count}', String(selectedIds.size)),
     [selectedIds.size, t.resourceSelectCount],
+  );
+  const resourceItemsById = useMemo(() => {
+    const map = new Map<string, FileListItem>();
+
+    for (const item of files) {
+      map.set(item.id, item);
+    }
+
+    for (const children of Object.values(treeChildrenByParent)) {
+      for (const item of children) {
+        if (!map.has(item.id)) map.set(item.id, item);
+      }
+    }
+
+    if (previewItem) {
+      map.set(previewItem.id, previewItem);
+    }
+
+    return map;
+  }, [files, previewItem, treeChildrenByParent]);
+  const selectedSourceSetEligibleIds = useMemo(
+    () =>
+      Array.from(selectedIds).filter((id) => {
+        const item = resourceItemsById.get(id);
+        return Boolean(item && !isFolder(item));
+      }),
+    [resourceItemsById, selectedIds],
+  );
+  const selectedHasSourceSetUnsupportedItems = useMemo(
+    () =>
+      Array.from(selectedIds).some((id) => {
+        const item = resourceItemsById.get(id);
+        return Boolean(item && isFolder(item));
+      }),
+    [resourceItemsById, selectedIds],
   );
 
   const openGovernanceSheet = useCallback(() => {
@@ -2116,6 +2480,50 @@ export default function ResourceScreen() {
     },
     [cachedResourceMap, purgeResourceState],
   );
+
+  const replaceResourceItem = useCallback((nextItem: FileListItem, previousId?: string) => {
+    const targetId = previousId ?? nextItem.id;
+
+    setFiles((prev) =>
+      prev.some((item) => item.id === targetId)
+        ? prev.map((item) => (item.id === targetId ? nextItem : item))
+        : prev,
+    );
+    setSelectedIds((prev) => {
+      if (!prev.has(targetId) || targetId === nextItem.id) return prev;
+      const next = new Set(prev);
+      next.delete(targetId);
+      next.add(nextItem.id);
+      return next;
+    });
+    setVisibleIds((prev) => {
+      if (!prev.has(targetId) || targetId === nextItem.id) return prev;
+      const next = new Set(prev);
+      next.delete(targetId);
+      next.add(nextItem.id);
+      return next;
+    });
+    setTreeChildrenByParent((prev) => {
+      let changed = false;
+      const nextEntries = Object.entries(prev).map(([key, items]) => {
+        const nextItems = items.map((item) => {
+          if (item.id !== targetId) return item;
+          changed = true;
+          return nextItem;
+        });
+
+        return [key, nextItems] as const;
+      });
+
+      return changed ? Object.fromEntries(nextEntries) : prev;
+    });
+    setPreviewItem((current) =>
+      current && (current.id === targetId || current.id === nextItem.id) ? nextItem : current,
+    );
+    setActionItem((current) =>
+      current && (current.id === targetId || current.id === nextItem.id) ? nextItem : current,
+    );
+  }, []);
 
   // ── Data (defined early for handleBatchDelete etc.) ──────────────────
 
@@ -2372,7 +2780,7 @@ export default function ResourceScreen() {
       const documentIds: string[] = [];
 
       for (const id of ids) {
-        const item = files.find((f) => f.id === id);
+        const item = resourceItemsById.get(id);
         if (
           item &&
           (getCanonicalResourceKind(item) === 'document' || item.fileType === 'custom/folder')
@@ -2402,13 +2810,13 @@ export default function ResourceScreen() {
 
       await Promise.all(promises);
     },
-    [files],
+    [resourceItemsById],
   );
 
   const handleBatchDelete = useCallback(async () => {
     const ids = Array.from(selectedIds);
     const hasFolders = ids.some((id) => {
-      const item = files.find((f) => f.id === id);
+      const item = resourceItemsById.get(id);
       return item?.fileType === 'custom/folder';
     });
     const confirmTitle = hasFolders ? t.resourceFolderDeleteConfirm : t.resourceDeleteConfirm;
@@ -2435,7 +2843,7 @@ export default function ResourceScreen() {
     ]);
   }, [
     selectedIds,
-    files,
+    resourceItemsById,
     deleteResourcesUnified,
     purgeDeletedResources,
     clearSelection,
@@ -2483,11 +2891,151 @@ export default function ResourceScreen() {
     }
   }, [sourceSetSpaceId, moveFolderParentId, moveToFolderItem, sourceSetId]);
 
-  const handlePreview = useCallback((item: FileListItem) => {
-    haptics.light();
-    setPreviewItem(item);
-    setPreviewVisible(true);
-  }, []);
+  const handlePreview = useCallback(
+    (item: FileListItem) => {
+      const openPreview = (nextItem: FileListItem = item) => {
+        haptics.light();
+        setPreviewOrigin(resourceOrigin);
+        setPreviewItem(nextItem);
+        setPreviewVisible(true);
+      };
+
+      if (getCanonicalResourceKind(item) !== 'document') {
+        openPreview();
+        return;
+      }
+
+      void (async () => {
+        const document = await notebookApi.get(item.id).catch(() => null);
+        if (document) {
+          haptics.light();
+          navigateToNotebook(
+            appendCurrentPortalStackWithOrigin(
+              route.name,
+              route.params,
+              {
+                documentId: item.id,
+              },
+              resourceOrigin,
+            ),
+          );
+          return;
+        }
+
+        openPreview(item);
+      })();
+    },
+    [resourceOrigin, route.name, route.params],
+  );
+
+  const consumeNavigationTarget = useCallback(async () => {
+    const params = route.params;
+    if (!params) return;
+
+    const { openItem, openItemId, openKind, openSourceSetId, sessionId, threadId, topicId } =
+      params;
+    const hasNavigationTarget =
+      openItem !== undefined ||
+      openItemId !== undefined ||
+      openKind !== undefined ||
+      openSourceSetId !== undefined;
+
+    if (!hasNavigationTarget) return;
+
+    if (openSourceSetId !== undefined) {
+      setSourceSetId(openSourceSetId ?? null);
+      setCurrentFolderId(null);
+      setCurrentFolderSlug(null);
+      setTreeChildrenByParent({});
+      setTreeExpandedIds(new Set());
+      setFolderBreadcrumb([]);
+      clearResourceListCache();
+    }
+
+    const nextOrigin =
+      createConversationOrigin({
+        sessionId,
+        ...(threadId ? { threadId } : {}),
+        ...(topicId ? { topicId } : {}),
+      }) ?? null;
+
+    let previewTarget: FileListItem | null = openItem
+      ? fileListItemFromNavigationTarget(openItem)
+      : null;
+
+    if (!previewTarget && openItemId && openKind === 'document') {
+      const document = await notebookApi.get(openItemId).catch(() => null);
+
+      if (document) {
+        setResourceOrigin(nextOrigin);
+        navigateToNotebook(
+          appendCurrentPortalStackWithOrigin(
+            route.name,
+            route.params,
+            {
+              documentId: openItemId,
+            },
+            nextOrigin,
+          ),
+        );
+        navigation.setParams({
+          openItem: undefined,
+          openItemId: undefined,
+          openKind: undefined,
+          openSourceSetId: undefined,
+          sessionId: undefined,
+          threadId: undefined,
+          topicId: undefined,
+        });
+        return;
+      }
+
+      previewTarget = {
+        ...fileListItemFromShared({
+          fileType: 'text/plain',
+          kind: 'document',
+          localId: openItemId,
+          name: openItemId,
+        }),
+      };
+    }
+
+    if (!previewTarget && openItemId && openKind === 'file') {
+      previewTarget = fileListItemFromShared({
+        kind: 'file',
+        localId: openItemId,
+        name: openItemId,
+      });
+    }
+
+    setResourceOrigin(nextOrigin);
+
+    if (previewTarget && openKind !== 'source_set') {
+      setPreviewOrigin(nextOrigin);
+      setPreviewItem(previewTarget);
+      setPreviewVisible(true);
+      haptics.light();
+    }
+
+    navigation.setParams({
+      openItem: undefined,
+      openItemId: undefined,
+      openKind: undefined,
+      openSourceSetId: undefined,
+      sessionId: undefined,
+      threadId: undefined,
+      topicId: undefined,
+    });
+  }, [navigation, route.name, route.params]);
+
+  useEffect(
+    () =>
+      navigation.addListener('blur', () => {
+        setResourceOrigin(null);
+        setPreviewOrigin(null);
+      }),
+    [navigation],
+  );
 
   useEffect(() => {
     useConnectionStore.getState().checkConnection();
@@ -2497,6 +3045,10 @@ export default function ResourceScreen() {
     loadSourceSets();
     void refreshCachedResources();
   }, [loadSourceSets, refreshCachedResources]);
+
+  useEffect(() => {
+    void consumeNavigationTarget();
+  }, [consumeNavigationTarget]);
 
   useEffect(() => {
     if (currentFolderSlug) {
@@ -2607,7 +3159,7 @@ export default function ResourceScreen() {
       if (idsToMove.length === 0) return;
       try {
         for (const id of idsToMove) {
-          const item = files.find((f) => f.id === id);
+          const item = resourceItemsById.get(id);
           if (item && id !== '__batch__') {
             await resourceApi.moveResource(id, targetFolderId, getCanonicalResourceKind(item));
           }
@@ -2625,7 +3177,7 @@ export default function ResourceScreen() {
     [
       moveToFolderItem,
       batchMoveIds,
-      files,
+      resourceItemsById,
       clearSelection,
       loadFiles,
       refreshTreeData,
@@ -2728,6 +3280,98 @@ export default function ResourceScreen() {
     ? (sourceSets.find((l) => l.id === sourceSetId)?.name ?? '')
     : t.resourceSourceSetUnassigned;
 
+  const resetSourceSetNavigation = useCallback(() => {
+    setCurrentFolderId(null);
+    setCurrentFolderSlug(null);
+    setTreeChildrenByParent({});
+    setTreeExpandedIds(new Set());
+    setFolderBreadcrumb([]);
+    clearResourceListCache();
+  }, []);
+
+  const openCreateSourceSetModal = useCallback(() => {
+    setSourceSetNameMode('create');
+    setSourceSetNameDraft('');
+    setSourceSetSelectVisible(false);
+    setSourceSetNameModalVisible(true);
+  }, []);
+
+  const openRenameSourceSetModal = useCallback(() => {
+    if (!sourceSetId) return;
+
+    setSourceSetNameMode('rename');
+    setSourceSetNameDraft(currentSourceSetName);
+    setSourceSetSharingMenuVisible(false);
+    setSourceSetNameModalVisible(true);
+  }, [currentSourceSetName, sourceSetId]);
+
+  const handleSubmitSourceSetName = useCallback(
+    async (value: string) => {
+      const name = value.trim();
+      if (!name) return;
+
+      setSourceSetNameModalVisible(false);
+
+      try {
+        if (sourceSetNameMode === 'create') {
+          const createdId = await sourceSetApi.create({ name });
+          if (!createdId) {
+            toast.show('error', t.errorNetwork);
+            return;
+          }
+
+          await loadSourceSets();
+          setSourceSetId(createdId);
+          resetSourceSetNavigation();
+          await loadFiles(true);
+          haptics.success();
+          toast.show('success', t.resourceSourceSetCreated);
+          return;
+        }
+
+        if (!sourceSetId) return;
+
+        await sourceSetApi.update(sourceSetId, { name });
+        await loadSourceSets();
+        haptics.success();
+        toast.show('success', t.resourceRenamed);
+      } catch {
+        toast.show(
+          'error',
+          sourceSetNameMode === 'create' ? t.errorNetwork : t.resourceRenameFailed,
+        );
+      }
+    },
+    [loadFiles, loadSourceSets, resetSourceSetNavigation, sourceSetId, sourceSetNameMode, t, toast],
+  );
+
+  const handleDeleteSourceSet = useCallback(() => {
+    if (!sourceSetId) return;
+
+    Alert.alert(t.resourceDeleteSourceSetConfirm, t.resourceDeleteSourceSetDesc, [
+      { text: t.cancel, style: 'cancel' },
+      {
+        text: t.delete,
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              await sourceSetApi.remove(sourceSetId, false);
+              await loadSourceSets();
+              setSourceSetId(null);
+              resetSourceSetNavigation();
+              await loadFiles(true);
+              haptics.success();
+              toast.show('success', t.resourceSourceSetDeleted);
+            } catch {
+              toast.show('error', t.resourceDeleteFailed);
+            }
+          })();
+        },
+      },
+    ]);
+  }, [loadFiles, loadSourceSets, resetSourceSetNavigation, sourceSetId, t, toast]);
+
   // ── Delete ────────────────────────────────────────────────────────
 
   const handleDelete = useCallback(
@@ -2792,6 +3436,52 @@ export default function ResourceScreen() {
     [actionItem, refreshTreeData, t, toast],
   );
 
+  const handleConvertActionItemToDocument = useCallback(async () => {
+    if (
+      !actionItem ||
+      isFolder(actionItem) ||
+      getCanonicalResourceKind(actionItem) !== 'file' ||
+      !isMarkdownFile(actionItem.fileType, actionItem.name)
+    ) {
+      return;
+    }
+
+    try {
+      const ensuredDocument = await ensureNotebookDocumentFromFile(actionItem);
+      if (!ensuredDocument) {
+        toast.show('error', t.errorNetwork);
+        return;
+      }
+
+      const { documentId, nextItem } = ensuredDocument;
+      replaceResourceItem(nextItem, actionItem.id);
+      closeActionSheet();
+      haptics.success();
+      toast.show('success', t.fileEditAsDocumentSuccess);
+      navigateToNotebook(
+        appendCurrentPortalStackWithOrigin(
+          route.name,
+          route.params,
+          {
+            documentId,
+          },
+          resourceOrigin,
+        ),
+      );
+    } catch {
+      toast.show('error', t.errorNetwork);
+    }
+  }, [
+    actionItem,
+    closeActionSheet,
+    replaceResourceItem,
+    resourceOrigin,
+    route.name,
+    route.params,
+    t,
+    toast,
+  ]);
+
   const openItemShareSheet = useCallback((item: FileListItem) => {
     setShareTarget({
       id: item.id,
@@ -2803,11 +3493,11 @@ export default function ResourceScreen() {
   const handleBatchShareLink = useCallback(() => {
     if (selectedIds.size !== 1) return;
     const onlyId = Array.from(selectedIds)[0];
-    const item = files.find((f) => f.id === onlyId);
+    const item = onlyId ? resourceItemsById.get(onlyId) : undefined;
     if (!item) return;
     openItemShareSheet(item);
     clearSelection();
-  }, [clearSelection, files, openItemShareSheet, selectedIds]);
+  }, [clearSelection, openItemShareSheet, resourceItemsById, selectedIds]);
 
   const handleShareFromActionSheet = useCallback(
     (item: FileListItem) => {
@@ -2879,6 +3569,109 @@ export default function ResourceScreen() {
 
   const canMoveAction = !!sourceSetId;
 
+  const refreshResourceSurface = useCallback(async () => {
+    clearResourceListCache();
+    await Promise.all([loadFiles(true), refreshTreeData(), loadSourceSets()]);
+  }, [loadFiles, loadSourceSets, refreshTreeData]);
+
+  const openSourceSetAction = useCallback((ids: string[], mode: 'add' | 'move') => {
+    if (ids.length === 0) return;
+    setSourceSetActionIds(ids);
+    setSourceSetActionMode(mode);
+    setSourceSetActionVisible(true);
+  }, []);
+
+  const handleRemoveFromSourceSet = useCallback(
+    (ids: string[]) => {
+      if (!sourceSetId || ids.length === 0) return;
+
+      closeActionSheet();
+      Alert.alert(
+        t.resourceRemoveFromSourceSetConfirm,
+        t.resourceRemoveFromSourceSetDesc.replace('{count}', String(ids.length)),
+        [
+          { text: t.cancel, style: 'cancel' },
+          {
+            text: t.delete,
+            style: 'destructive',
+            onPress: () => {
+              void (async () => {
+                try {
+                  await sourceSetApi.removeFiles(sourceSetId, ids);
+                  clearSelection();
+                  await refreshResourceSurface();
+                  haptics.success();
+                  toast.show('success', t.resourceRemoveFromSourceSetSuccess);
+                } catch {
+                  toast.show('error', t.resourceRemoveFromSourceSetFailed);
+                }
+              })();
+            },
+          },
+        ],
+      );
+    },
+    [clearSelection, closeActionSheet, refreshResourceSurface, sourceSetId, t, toast],
+  );
+
+  const handleSelectSourceSetTarget = useCallback(
+    async (targetSourceSetId: string) => {
+      if (sourceSetActionSubmitting || sourceSetActionIds.length === 0) return;
+
+      setSourceSetActionSubmitting(true);
+      try {
+        if (sourceSetActionMode === 'move' && sourceSetId) {
+          await sourceSetApi.removeFiles(sourceSetId, sourceSetActionIds);
+          await Promise.all(
+            sourceSetActionIds.map(async (id) => {
+              const item = resourceItemsById.get(id);
+              if (!item?.parentId) return;
+
+              await resourceApi.moveResource(id, null, getCanonicalResourceKind(item));
+            }),
+          );
+        }
+
+        await sourceSetApi.addFiles(targetSourceSetId, sourceSetActionIds);
+        setSourceSetActionVisible(false);
+        setSourceSetActionIds([]);
+        clearSelection();
+        await refreshResourceSurface();
+        haptics.success();
+        toast.show(
+          'success',
+          sourceSetActionMode === 'move'
+            ? t.resourceMoveToSourceSetSuccess
+            : t.resourceAddToSourceSetSuccess,
+        );
+      } catch (error) {
+        const hasConflict = isSourceSetConflictError(error);
+
+        toast.show(
+          hasConflict ? 'info' : 'error',
+          hasConflict
+            ? t.resourceAddToSourceSetExists
+            : sourceSetActionMode === 'move'
+              ? t.resourceMoveToSourceSetFailed
+              : t.resourceAddToSourceSetFailed,
+        );
+      } finally {
+        setSourceSetActionSubmitting(false);
+      }
+    },
+    [
+      clearSelection,
+      refreshResourceSurface,
+      resourceItemsById,
+      sourceSetActionIds,
+      sourceSetActionMode,
+      sourceSetActionSubmitting,
+      sourceSetId,
+      t,
+      toast,
+    ],
+  );
+
   const handleSharedWithMePick = useCallback(
     async (row: SharedWithMeRow) => {
       setSharedWithMeVisible(false);
@@ -2899,6 +3692,7 @@ export default function ResourceScreen() {
         return;
       }
       if (rowKind === 'file') {
+        setPreviewOrigin(resourceOrigin);
         setPreviewItem(
           fileListItemFromShared({ kind: 'file', localId: row.localId, name: row.name }),
         );
@@ -2927,6 +3721,24 @@ export default function ResourceScreen() {
         toast.show('info', t.resourceSharedFolderHint);
         return;
       }
+
+      const notebookDocument = await notebookApi.get(row.localId).catch(() => null);
+      if (notebookDocument) {
+        haptics.light();
+        navigateToNotebook(
+          appendCurrentPortalStackWithOrigin(
+            route.name,
+            route.params,
+            {
+              documentId: row.localId,
+            },
+            resourceOrigin,
+          ),
+        );
+        return;
+      }
+
+      setPreviewOrigin(resourceOrigin);
       setPreviewItem(
         fileListItemFromShared({
           kind: 'document',
@@ -2938,7 +3750,15 @@ export default function ResourceScreen() {
       setPreviewVisible(true);
       haptics.light();
     },
-    [loadFolderBreadcrumb, loadSourceSets, toast, t.resourceSharedFolderHint],
+    [
+      loadFolderBreadcrumb,
+      loadSourceSets,
+      resourceOrigin,
+      route.name,
+      route.params,
+      toast,
+      t.resourceSharedFolderHint,
+    ],
   );
 
   // ── Filtered & sorted files ────────────────────────────────────────
@@ -3104,6 +3924,18 @@ export default function ResourceScreen() {
     if (sorter === 'name') return `${t.resourceSortName} ${sortOrder === 'asc' ? 'A-Z' : 'Z-A'}`;
     return `${t.resourceSortSize} ${sortOrder === 'asc' ? '↑' : '↓'}`;
   };
+  const previousPortalTarget = getPreviousPortalTarget(route.params?.portalStack);
+  const resourceOriginActionLabel = resourceOrigin?.threadId
+    ? t.threadOpen
+    : t.chatOpenConversation;
+
+  const handlePortalBack = useCallback(() => {
+    navigateBackFromPortal({
+      conversationOrigin: resourceOrigin,
+      navigation,
+      portalStack: route.params?.portalStack,
+    });
+  }, [navigation, resourceOrigin, route.params?.portalStack]);
 
   const toggleSearch = () => {
     setSearchVisible((value) => {
@@ -3130,356 +3962,391 @@ export default function ResourceScreen() {
   // ── Render ────────────────────────────────────────────────────────
 
   return (
-    <View className="flex-1 bg-background">
-      {/* Header */}
-      <ScreenHeader
-        headerLevel="root"
-        rightActions={
-          selectMode ? (
-            <TouchableOpacity
-              hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
-              onPress={clearSelection}
+    <PortalScaffold
+      active={route.name === 'PortalResources'}
+      headerLevel="root"
+      portalCurrentLabel={previewItem?.name || t.resourceTitle}
+      portalRouteName={route.name}
+      portalRouteParams={route.params}
+      headerChildren={
+        <>
+          {/* Source-set selector */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            className="mx-6 mb-2 flex-row items-center rounded-xl px-3.5 py-2.5"
+            style={{
+              backgroundColor: colors.fillQuaternary,
+              borderColor: colors.borderSubtle,
+              borderWidth: 1,
+            }}
+            onPress={() => setSourceSetSelectVisible(true)}
+          >
+            <FolderOpen color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+            <Text
+              className="ml-2.5 flex-1 text-[14px] font-medium text-foreground"
+              numberOfLines={1}
             >
-              <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '500' }}>
-                {t.resourceCancelSelect}
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <View className="flex-row items-center" style={{ gap: 6 }}>
-              <HeaderIconButton
-                accessibilityLabel={t.search}
-                active={searchVisible}
-                onPress={toggleSearch}
+              {currentSourceSetName}
+            </Text>
+            <ChevronRight color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+          </TouchableOpacity>
+
+          {/* Breadcrumb when in folder */}
+          {folderBreadcrumb.length > 0 && (
+            <ScrollView
+              horizontal
+              className="mx-6 mb-2"
+              contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              showsHorizontalScrollIndicator={false}
+            >
+              <TouchableOpacity
+                activeOpacity={0.7}
+                className="flex-row items-center rounded-full px-3 py-1.5"
+                style={{ backgroundColor: colors.fillTertiary }}
+                onPress={handleBackToRoot}
               >
-                {searchVisible ? (
-                  <X color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
-                ) : (
-                  <Search color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
-                )}
-              </HeaderIconButton>
-              <HeaderIconButton
-                accessibilityLabel={t.resourceSharedWithMe}
-                onPress={() => setSharedWithMeVisible(true)}
-              >
-                <Link2 color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
-              </HeaderIconButton>
-              {sourceSetId ? (
-                <HeaderIconButton
-                  accessibilityLabel={t.resourceShareSourceSetMenuTitle}
-                  onPress={() => setSourceSetSharingMenuVisible(true)}
+                <ArrowLeft color={colors.primary} size={14} strokeWidth={tokens.icon.strokeWidth} />
+                <Text className="ml-1 text-[12px] font-medium" style={{ color: colors.primary }}>
+                  {sourceSetId ? t.resourceFolderRoot : t.resourceSourceSetUnassigned}
+                </Text>
+              </TouchableOpacity>
+              {folderBreadcrumb.map((crumb, index) => (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  className="flex-row items-center rounded-full px-3 py-1.5"
+                  key={crumb.id}
+                  style={{
+                    backgroundColor:
+                      index === folderBreadcrumb.length - 1 ? colors.primary : colors.fillTertiary,
+                  }}
+                  onPress={() => handleBreadcrumbPress(crumb, index)}
                 >
-                  <MoreVertical
+                  <Text
+                    className="text-[12px] font-medium"
+                    numberOfLines={1}
+                    style={{
+                      color:
+                        index === folderBreadcrumb.length - 1 ? colors.iconOnPrimary : colors.muted,
+                      maxWidth: 80,
+                    }}
+                  >
+                    {crumb.name}
+                  </Text>
+                  {index < folderBreadcrumb.length - 1 && (
+                    <ChevronRight
+                      color={colors.muted}
+                      size={14}
+                      strokeWidth={tokens.icon.strokeWidth}
+                      style={{ marginLeft: 4 }}
+                    />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
+          {sourceSetId && treeMode ? (
+            <View className="mx-6 mb-2 rounded-2xl border border-border bg-card px-3 py-3">
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center">
+                  <FolderOpen
+                    color={colors.primary}
+                    size={16}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                  <Text className="ml-2 text-[13px] font-semibold text-foreground">
+                    {t.resourceExplorer}
+                  </Text>
+                </View>
+                <View className="flex-row items-center" style={{ gap: 6 }}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    className="rounded-full px-3 py-1.5"
+                    style={{ backgroundColor: colors.fillTertiary }}
+                    onPress={() => void handleExpandAllTree()}
+                  >
+                    <Text className="text-[11px] font-semibold" style={{ color: colors.primary }}>
+                      {t.resourceExpandAll}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    className="rounded-full px-3 py-1.5"
+                    style={{ backgroundColor: colors.fillTertiary }}
+                    onPress={handleCollapseAllTree}
+                  >
+                    <Text
+                      className="text-[11px] font-semibold"
+                      style={{ color: colors.secondaryText }}
+                    >
+                      {t.resourceCollapseAll}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {currentFolderId && folderBreadcrumb.length > 0 ? (
+                <Text
+                  className="mt-2 text-[11px] font-medium"
+                  style={{ color: colors.secondaryText }}
+                >
+                  {t.resourceCurrentFolder}:{' '}
+                  {folderBreadcrumb.map((crumb) => crumb.name).join(' / ')}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
+          {searchVisible ? (
+            <SearchField
+              accessibilityLabel={t.search}
+              containerClassName="mx-6 mb-2"
+              placeholder={t.search}
+              ref={searchRef}
+              returnKeyType="search"
+              size="compact"
+              value={searchText}
+              rightElement={
+                <TouchableOpacity
+                  hitSlop={8}
+                  onPress={() => {
+                    if (searchText.length > 0) {
+                      setSearchText('');
+                      return;
+                    }
+
+                    setSearchVisible(false);
+                  }}
+                >
+                  <X
+                    color={colors.muted}
+                    size={tokens.icon.size.sm}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                </TouchableOpacity>
+              }
+              onChangeText={setSearchText}
+              onSubmitEditing={() => loadFiles()}
+            />
+          ) : null}
+
+          {/* Filter tabs + sort */}
+          <View className="mx-6 mb-2">
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingRight: 12,
+              }}
+            >
+              {TABS.map((tab) => {
+                const active = category === tab.key;
+                return (
+                  <FilterChip
+                    active={active}
+                    key={tab.key}
+                    label={tab.label}
+                    onPress={() => {
+                      haptics.selection();
+                      setCategory(tab.key);
+                    }}
+                  />
+                );
+              })}
+              <FilterChip
+                active={activeGovernanceFilterCount > 0}
+                count={activeGovernanceFilterCount > 0 ? activeGovernanceFilterCount : undefined}
+                label={t.resourceGovernanceFilters}
+                icon={
+                  <Settings2
+                    color={activeGovernanceFilterCount > 0 ? colors.primary : colors.muted}
+                    size={tokens.icon.size.sm}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                }
+                onPress={openGovernanceSheet}
+              />
+              <FilterChip
+                label={getSortLabel()}
+                icon={
+                  <ArrowDownUp
+                    color={colors.primary}
+                    size={tokens.icon.size.sm}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                }
+                onPress={() => setSortMenuVisible(true)}
+              />
+            </ScrollView>
+            {hasGovernanceWorkbench ? (
+              <TouchableOpacity
+                activeOpacity={0.82}
+                className="mt-3 rounded-2xl border px-4 py-3"
+                style={{
+                  backgroundColor: colors.fillQuaternary,
+                  borderColor: colors.borderSubtle,
+                }}
+                onPress={openGovernanceSheet}
+              >
+                <View className="flex-row items-start justify-between gap-3">
+                  <View className="flex-1 min-w-0">
+                    <Text
+                      className="text-[11px] font-semibold uppercase tracking-[1.2px]"
+                      style={{ color: colors.secondaryText }}
+                    >
+                      {t.resourceGovernanceFilters}
+                    </Text>
+                    <Text
+                      className="mt-1 text-[14px] font-semibold"
+                      style={{ color: colors.foreground }}
+                    >
+                      {activeGovernanceFilterCount > 0
+                        ? governanceWorkbenchSummary
+                        : t.resourceGovernanceFiltersSubtitle}
+                    </Text>
+                    {governanceCapabilityHint && activeGovernanceFilterCount === 0 ? (
+                      <Text
+                        className="mt-1 text-[12px] leading-5"
+                        style={{ color: colors.secondaryText }}
+                      >
+                        {governanceCapabilityHint}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View className="items-end">
+                    <View
+                      className="rounded-full px-2.5 py-1"
+                      style={{
+                        backgroundColor:
+                          activeGovernanceFilterCount > 0
+                            ? colors.primaryMuted
+                            : colors.fillTertiary,
+                      }}
+                    >
+                      <Text
+                        className="text-[11px] font-semibold"
+                        style={{
+                          color:
+                            activeGovernanceFilterCount > 0 ? colors.primary : colors.secondaryText,
+                        }}
+                      >
+                        {activeGovernanceFilterCount > 0
+                          ? String(activeGovernanceFilterCount)
+                          : t.resourceGovernanceApply}
+                      </Text>
+                    </View>
+                    <ChevronRight
+                      color={colors.muted}
+                      size={16}
+                      strokeWidth={tokens.icon.strokeWidth}
+                      style={{ marginTop: 10 }}
+                    />
+                  </View>
+                </View>
+                {governanceFilterSummaryLabels.length > 0 ? (
+                  <View className="mt-3 flex-row flex-wrap" style={{ gap: 6 }}>
+                    {governanceFilterSummaryLabels.map((label) => (
+                      <MetaTag key={label} label={label} tone="accent" />
+                    ))}
+                  </View>
+                ) : null}
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </>
+      }
+      leftElement={
+        previousPortalTarget ? (
+          <ArrowLeft color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+        ) : undefined
+      }
+      rightActions={
+        selectMode ? (
+          <TouchableOpacity
+            hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
+            onPress={clearSelection}
+          >
+            <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '500' }}>
+              {t.resourceCancelSelect}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View className="flex-row items-center" style={{ gap: 6 }}>
+            {resourceOrigin?.sessionId ? (
+              <HeaderIconButton
+                accessibilityLabel={resourceOriginActionLabel}
+                onPress={() => navigateToConversationOrigin(resourceOrigin)}
+              >
+                {resourceOrigin.threadId ? (
+                  <GitBranch
                     color={colors.primary}
                     size={20}
                     strokeWidth={tokens.icon.strokeWidth}
                   />
-                </HeaderIconButton>
-              ) : null}
-              <HeaderIconButton
-                accessibilityLabel={t.resourceTrash}
-                onPress={() => setTrashModalVisible(true)}
-              >
-                <Trash2 color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
-              </HeaderIconButton>
-              <HeaderIconButton
-                onPress={() => setViewMode((m) => (m === 'list' ? 'grid' : 'list'))}
-              >
-                {viewMode === 'list' ? (
-                  <Grid3X3 color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
                 ) : (
-                  <List color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                  <MessageCircle
+                    color={colors.primary}
+                    size={20}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
                 )}
               </HeaderIconButton>
-            </View>
-          )
-        }
-        title={
-          selectMode
-            ? t.resourceSelectCount.replace('{count}', String(selectedIds.size))
-            : t.resourceTitle
-        }
-      >
-        {/* Source-set selector */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          className="mx-6 mb-2 flex-row items-center rounded-xl px-3.5 py-2.5"
-          style={{
-            backgroundColor: colors.fillQuaternary,
-            borderColor: colors.borderSubtle,
-            borderWidth: 1,
-          }}
-          onPress={() => setSourceSetSelectVisible(true)}
-        >
-          <FolderOpen color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
-          <Text className="ml-2.5 flex-1 text-[14px] font-medium text-foreground" numberOfLines={1}>
-            {currentSourceSetName}
-          </Text>
-          <ChevronRight color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
-        </TouchableOpacity>
-
-        {/* Breadcrumb when in folder */}
-        {folderBreadcrumb.length > 0 && (
-          <ScrollView
-            horizontal
-            className="mx-6 mb-2"
-            contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-            showsHorizontalScrollIndicator={false}
-          >
-            <TouchableOpacity
-              activeOpacity={0.7}
-              className="flex-row items-center rounded-full px-3 py-1.5"
-              style={{ backgroundColor: colors.fillTertiary }}
-              onPress={handleBackToRoot}
-            >
-              <ArrowLeft color={colors.primary} size={14} strokeWidth={tokens.icon.strokeWidth} />
-              <Text className="ml-1 text-[12px] font-medium" style={{ color: colors.primary }}>
-                {sourceSetId ? t.resourceFolderRoot : t.resourceSourceSetUnassigned}
-              </Text>
-            </TouchableOpacity>
-            {folderBreadcrumb.map((crumb, index) => (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                className="flex-row items-center rounded-full px-3 py-1.5"
-                key={crumb.id}
-                style={{
-                  backgroundColor:
-                    index === folderBreadcrumb.length - 1 ? colors.primary : colors.fillTertiary,
-                }}
-                onPress={() => handleBreadcrumbPress(crumb, index)}
-              >
-                <Text
-                  className="text-[12px] font-medium"
-                  numberOfLines={1}
-                  style={{
-                    color:
-                      index === folderBreadcrumb.length - 1 ? colors.iconOnPrimary : colors.muted,
-                    maxWidth: 80,
-                  }}
-                >
-                  {crumb.name}
-                </Text>
-                {index < folderBreadcrumb.length - 1 && (
-                  <ChevronRight
-                    color={colors.muted}
-                    size={14}
-                    strokeWidth={tokens.icon.strokeWidth}
-                    style={{ marginLeft: 4 }}
-                  />
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
-
-        {sourceSetId && treeMode ? (
-          <View className="mx-6 mb-2 rounded-2xl border border-border bg-card px-3 py-3">
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center">
-                <FolderOpen
-                  color={colors.primary}
-                  size={16}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-                <Text className="ml-2 text-[13px] font-semibold text-foreground">
-                  {t.resourceExplorer}
-                </Text>
-              </View>
-              <View className="flex-row items-center" style={{ gap: 6 }}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  className="rounded-full px-3 py-1.5"
-                  style={{ backgroundColor: colors.fillTertiary }}
-                  onPress={() => void handleExpandAllTree()}
-                >
-                  <Text className="text-[11px] font-semibold" style={{ color: colors.primary }}>
-                    {t.resourceExpandAll}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  className="rounded-full px-3 py-1.5"
-                  style={{ backgroundColor: colors.fillTertiary }}
-                  onPress={handleCollapseAllTree}
-                >
-                  <Text
-                    className="text-[11px] font-semibold"
-                    style={{ color: colors.secondaryText }}
-                  >
-                    {t.resourceCollapseAll}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-            {currentFolderId && folderBreadcrumb.length > 0 ? (
-              <Text
-                className="mt-2 text-[11px] font-medium"
-                style={{ color: colors.secondaryText }}
-              >
-                {t.resourceCurrentFolder}: {folderBreadcrumb.map((crumb) => crumb.name).join(' / ')}
-              </Text>
             ) : null}
-          </View>
-        ) : null}
-
-        {searchVisible ? (
-          <SearchField
-            accessibilityLabel={t.search}
-            containerClassName="mx-6 mb-2"
-            placeholder={t.search}
-            ref={searchRef}
-            returnKeyType="search"
-            size="compact"
-            value={searchText}
-            rightElement={
-              <TouchableOpacity
-                hitSlop={8}
-                onPress={() => {
-                  if (searchText.length > 0) {
-                    setSearchText('');
-                    return;
-                  }
-
-                  setSearchVisible(false);
-                }}
-              >
-                <X
-                  color={colors.muted}
-                  size={tokens.icon.size.sm}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-              </TouchableOpacity>
-            }
-            onChangeText={setSearchText}
-            onSubmitEditing={() => loadFiles()}
-          />
-        ) : null}
-
-        {/* Filter tabs + sort */}
-        <View className="mx-6 mb-2">
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 6,
-              paddingRight: 12,
-            }}
-          >
-            {TABS.map((tab) => {
-              const active = category === tab.key;
-              return (
-                <FilterChip
-                  active={active}
-                  key={tab.key}
-                  label={tab.label}
-                  onPress={() => {
-                    haptics.selection();
-                    setCategory(tab.key);
-                  }}
-                />
-              );
-            })}
-            <FilterChip
-              active={activeGovernanceFilterCount > 0}
-              count={activeGovernanceFilterCount > 0 ? activeGovernanceFilterCount : undefined}
-              label={t.resourceGovernanceFilters}
-              icon={
-                <Settings2
-                  color={activeGovernanceFilterCount > 0 ? colors.primary : colors.muted}
-                  size={tokens.icon.size.sm}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-              }
-              onPress={openGovernanceSheet}
-            />
-            <FilterChip
-              label={getSortLabel()}
-              icon={
-                <ArrowDownUp
-                  color={colors.primary}
-                  size={tokens.icon.size.sm}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-              }
-              onPress={() => setSortMenuVisible(true)}
-            />
-          </ScrollView>
-          {hasGovernanceWorkbench ? (
-            <TouchableOpacity
-              activeOpacity={0.82}
-              className="mt-3 rounded-2xl border px-4 py-3"
-              style={{
-                backgroundColor: colors.fillQuaternary,
-                borderColor: colors.borderSubtle,
-              }}
-              onPress={openGovernanceSheet}
+            <HeaderIconButton
+              accessibilityLabel={t.search}
+              active={searchVisible}
+              onPress={toggleSearch}
             >
-              <View className="flex-row items-start justify-between gap-3">
-                <View className="flex-1 min-w-0">
-                  <Text
-                    className="text-[11px] font-semibold uppercase tracking-[1.2px]"
-                    style={{ color: colors.secondaryText }}
-                  >
-                    {t.resourceGovernanceFilters}
-                  </Text>
-                  <Text
-                    className="mt-1 text-[14px] font-semibold"
-                    style={{ color: colors.foreground }}
-                  >
-                    {activeGovernanceFilterCount > 0
-                      ? governanceWorkbenchSummary
-                      : t.resourceGovernanceFiltersSubtitle}
-                  </Text>
-                  {governanceCapabilityHint && activeGovernanceFilterCount === 0 ? (
-                    <Text
-                      className="mt-1 text-[12px] leading-5"
-                      style={{ color: colors.secondaryText }}
-                    >
-                      {governanceCapabilityHint}
-                    </Text>
-                  ) : null}
-                </View>
-                <View className="items-end">
-                  <View
-                    className="rounded-full px-2.5 py-1"
-                    style={{
-                      backgroundColor:
-                        activeGovernanceFilterCount > 0 ? colors.primaryMuted : colors.fillTertiary,
-                    }}
-                  >
-                    <Text
-                      className="text-[11px] font-semibold"
-                      style={{
-                        color:
-                          activeGovernanceFilterCount > 0 ? colors.primary : colors.secondaryText,
-                      }}
-                    >
-                      {activeGovernanceFilterCount > 0
-                        ? String(activeGovernanceFilterCount)
-                        : t.resourceGovernanceApply}
-                    </Text>
-                  </View>
-                  <ChevronRight
-                    color={colors.muted}
-                    size={16}
-                    strokeWidth={tokens.icon.strokeWidth}
-                    style={{ marginTop: 10 }}
-                  />
-                </View>
-              </View>
-              {governanceFilterSummaryLabels.length > 0 ? (
-                <View className="mt-3 flex-row flex-wrap" style={{ gap: 6 }}>
-                  {governanceFilterSummaryLabels.map((label) => (
-                    <MetaTag key={label} label={label} tone="accent" />
-                  ))}
-                </View>
-              ) : null}
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      </ScreenHeader>
-
+              {searchVisible ? (
+                <X color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+              ) : (
+                <Search color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+              )}
+            </HeaderIconButton>
+            <HeaderIconButton
+              accessibilityLabel={t.resourceSharedWithMe}
+              onPress={() => setSharedWithMeVisible(true)}
+            >
+              <Link2 color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+            </HeaderIconButton>
+            {sourceSetId ? (
+              <HeaderIconButton
+                accessibilityLabel={t.resourceShareSourceSetMenuTitle}
+                onPress={() => setSourceSetSharingMenuVisible(true)}
+              >
+                <MoreVertical
+                  color={colors.primary}
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </HeaderIconButton>
+            ) : null}
+            <HeaderIconButton
+              accessibilityLabel={t.resourceTrash}
+              onPress={() => setTrashModalVisible(true)}
+            >
+              <Trash2 color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+            </HeaderIconButton>
+            <HeaderIconButton onPress={() => setViewMode((m) => (m === 'list' ? 'grid' : 'list'))}>
+              {viewMode === 'list' ? (
+                <Grid3X3 color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+              ) : (
+                <List color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+              )}
+            </HeaderIconButton>
+          </View>
+        )
+      }
+      title={
+        selectMode
+          ? t.resourceSelectCount.replace('{count}', String(selectedIds.size))
+          : t.resourceTitle
+      }
+      onDismiss={route.name === 'PortalResources' ? handlePortalBack : undefined}
+      onPressLeft={previousPortalTarget ? handlePortalBack : undefined}
+    >
       {/* Batch action bar */}
       {selectMode && selectedIds.size > 0 && (
         <View
@@ -3538,6 +4405,61 @@ export default function ResourceScreen() {
                 <Folder color={colors.primary} size={15} strokeWidth={tokens.icon.strokeWidth} />
                 <Text className="ml-2 text-[13px] font-semibold" style={{ color: colors.primary }}>
                   {t.resourceBatchMove}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            {!selectedHasSourceSetUnsupportedItems &&
+            sourceSetId &&
+            availableTargetSourceSets.length > 0 &&
+            selectedSourceSetEligibleIds.length > 0 ? (
+              <TouchableOpacity
+                activeOpacity={0.78}
+                className="flex-row items-center rounded-full px-3 py-2"
+                style={{ backgroundColor: colors.primaryMuted }}
+                onPress={() => openSourceSetAction(selectedSourceSetEligibleIds, 'move')}
+              >
+                <FolderOpen
+                  color={colors.primary}
+                  size={15}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+                <Text className="ml-2 text-[13px] font-semibold" style={{ color: colors.primary }}>
+                  {t.resourceMoveToSourceSet}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            {!selectedHasSourceSetUnsupportedItems &&
+            sourceSetId &&
+            selectedSourceSetEligibleIds.length > 0 ? (
+              <TouchableOpacity
+                activeOpacity={0.78}
+                className="flex-row items-center rounded-full px-3 py-2"
+                style={{ backgroundColor: `${colors.danger}12` }}
+                onPress={() => handleRemoveFromSourceSet(selectedSourceSetEligibleIds)}
+              >
+                <FolderOpen color={colors.danger} size={15} strokeWidth={tokens.icon.strokeWidth} />
+                <Text className="ml-2 text-[13px] font-semibold" style={{ color: colors.danger }}>
+                  {t.resourceRemoveFromSourceSet}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            {!selectedHasSourceSetUnsupportedItems &&
+            !sourceSetId &&
+            sourceSets.length > 0 &&
+            selectedSourceSetEligibleIds.length > 0 ? (
+              <TouchableOpacity
+                activeOpacity={0.78}
+                className="flex-row items-center rounded-full px-3 py-2"
+                style={{ backgroundColor: colors.primaryMuted }}
+                onPress={() => openSourceSetAction(selectedSourceSetEligibleIds, 'add')}
+              >
+                <FolderOpen
+                  color={colors.primary}
+                  size={15}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+                <Text className="ml-2 text-[13px] font-semibold" style={{ color: colors.primary }}>
+                  {t.resourceAddToSourceSet}
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -4083,9 +5005,10 @@ export default function ResourceScreen() {
       <FilePreviewModal
         apiBaseUrl={apiBase}
         item={previewItem}
+        origin={previewOrigin}
         remoteHeaders={resourceAuthHeaders}
         visible={previewVisible}
-        onClose={() => setPreviewVisible(false)}
+        onReplaceItem={replaceResourceItem}
         onCacheReady={(entry) => {
           setCachedResourceIds((prev) => {
             const next = new Set(prev);
@@ -4096,6 +5019,10 @@ export default function ResourceScreen() {
             ...prev,
             [entry.fileId]: entry,
           }));
+        }}
+        onClose={() => {
+          setPreviewVisible(false);
+          setPreviewOrigin(null);
         }}
       />
 
@@ -4267,6 +5194,23 @@ export default function ResourceScreen() {
               <Users color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
               <Text className="ml-3 text-base text-foreground">{t.resourceShareManage}</Text>
             </Pressable>
+            <Pressable
+              className="flex-row items-center py-3.5 px-5 active:bg-foreground/5"
+              onPress={openRenameSourceSetModal}
+            >
+              <Pencil color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
+            </Pressable>
+            <Pressable
+              className="flex-row items-center py-3.5 px-5 active:bg-foreground/5"
+              onPress={() => {
+                setSourceSetSharingMenuVisible(false);
+                handleDeleteSourceSet();
+              }}
+            >
+              <Trash2 color={colors.danger} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <Text className="ml-3 text-base text-red-500">{t.delete}</Text>
+            </Pressable>
             <View className="px-5 mt-1">
               <Pressable
                 className="items-center py-3.5 rounded-xl bg-foreground/[0.04]"
@@ -4313,6 +5257,26 @@ export default function ResourceScreen() {
                     <Text className="ml-3 text-base text-foreground">{t.notebookPreview}</Text>
                   </Pressable>
                 ) : null}
+                {!isFolder(actionItem) &&
+                getCanonicalResourceKind(actionItem) === 'file' &&
+                isMarkdownFile(actionItem.fileType, actionItem.name) ? (
+                  <Pressable
+                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                    onPress={() => void handleConvertActionItemToDocument()}
+                  >
+                    <FileText
+                      color={colors.muted}
+                      size={18}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                    <View className="ml-3 flex-1">
+                      <Text className="text-base text-foreground">{t.fileEditAsDocument}</Text>
+                      <Text className="mt-0.5 text-[12px]" style={{ color: colors.secondaryText }}>
+                        {t.fileEditAsDocumentDesc}
+                      </Text>
+                    </View>
+                  </Pressable>
+                ) : null}
                 {canMoveAction ? (
                   <Pressable
                     className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
@@ -4326,6 +5290,57 @@ export default function ResourceScreen() {
                   >
                     <Folder color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
                     <Text className="ml-3 text-base text-foreground">{t.resourceMoveToFolder}</Text>
+                  </Pressable>
+                ) : null}
+                {!isFolder(actionItem) && sourceSetId && availableTargetSourceSets.length > 0 ? (
+                  <Pressable
+                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                    onPress={() => {
+                      closeActionSheet();
+                      openSourceSetAction([actionItem.id], 'move');
+                    }}
+                  >
+                    <FolderOpen
+                      color={colors.muted}
+                      size={18}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                    <Text className="ml-3 text-base text-foreground">
+                      {t.resourceMoveToSourceSet}
+                    </Text>
+                  </Pressable>
+                ) : null}
+                {!isFolder(actionItem) && sourceSetId ? (
+                  <Pressable
+                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                    onPress={() => handleRemoveFromSourceSet([actionItem.id])}
+                  >
+                    <FolderOpen
+                      color={colors.danger}
+                      size={18}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                    <Text className="ml-3 text-base text-red-500">
+                      {t.resourceRemoveFromSourceSet}
+                    </Text>
+                  </Pressable>
+                ) : null}
+                {!isFolder(actionItem) && !sourceSetId && sourceSets.length > 0 ? (
+                  <Pressable
+                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                    onPress={() => {
+                      closeActionSheet();
+                      openSourceSetAction([actionItem.id], 'add');
+                    }}
+                  >
+                    <FolderOpen
+                      color={colors.muted}
+                      size={18}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                    <Text className="ml-3 text-base text-foreground">
+                      {t.resourceAddToSourceSet}
+                    </Text>
                   </Pressable>
                 ) : null}
                 <Pressable
@@ -4405,6 +5420,87 @@ export default function ResourceScreen() {
         onSubmit={handleRenameSubmit}
       />
 
+      <PromptModal
+        defaultValue={sourceSetNameDraft}
+        placeholder={t.resourceCreateSourceSetPlaceholder}
+        submitLabel={t.confirm}
+        visible={sourceSetNameModalVisible}
+        title={sourceSetNameMode === 'create' ? t.resourceCreateSourceSet : t.actionRename}
+        onCancel={() => setSourceSetNameModalVisible(false)}
+        onSubmit={handleSubmitSourceSetName}
+      />
+
+      <Modal
+        accessibilityViewIsModal
+        transparent
+        animationType="slide"
+        visible={sourceSetActionVisible}
+        onRequestClose={() => {
+          if (sourceSetActionSubmitting) return;
+          setSourceSetActionVisible(false);
+          setSourceSetActionIds([]);
+        }}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          className="flex-1 justify-end bg-black/40"
+          onPress={() => {
+            if (sourceSetActionSubmitting) return;
+            setSourceSetActionVisible(false);
+            setSourceSetActionIds([]);
+          }}
+        >
+          <View
+            className="rounded-t-2xl bg-card"
+            style={{ paddingBottom: insets.bottom + 16, maxHeight: '60%' }}
+          >
+            <View className="items-center pt-3 pb-2">
+              <View className="w-9 h-1 rounded-full bg-foreground/10" />
+            </View>
+            <View className="px-5">
+              <Text className="text-[18px] font-bold text-foreground">
+                {sourceSetActionMode === 'move'
+                  ? t.resourceMoveToSourceSet
+                  : t.resourceAddToSourceSet}
+              </Text>
+              <Text className="mt-1 text-[13px]" style={{ color: colors.secondaryText }}>
+                {t.resourceSelectSourceSetTarget}
+              </Text>
+            </View>
+            <ScrollView className="mt-3 max-h-72">
+              {availableTargetSourceSets.map((library) => (
+                <TouchableOpacity
+                  activeOpacity={0.72}
+                  className="mx-5 mt-1 flex-row items-center rounded-xl px-4 py-3"
+                  disabled={sourceSetActionSubmitting}
+                  key={library.id}
+                  style={{ backgroundColor: colors.fillTertiary }}
+                  onPress={() => void handleSelectSourceSetTarget(library.id)}
+                >
+                  <FolderOpen
+                    color={colors.primary}
+                    size={20}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                  <Text className="ml-3 flex-1 text-[16px] font-medium text-foreground">
+                    {library.name}
+                  </Text>
+                  {sourceSetActionSubmitting ? (
+                    <ActivityIndicator color={colors.primary} size="small" />
+                  ) : (
+                    <ChevronRight
+                      color={colors.muted}
+                      size={18}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Source-set select modal */}
       <Modal
         accessibilityViewIsModal
@@ -4425,9 +5521,21 @@ export default function ResourceScreen() {
             <View className="items-center pt-3 pb-2">
               <View className="w-9 h-1 rounded-full bg-foreground/10" />
             </View>
-            <Text className="px-5 text-[18px] font-bold text-foreground">
-              {t.resourceSourceSetSelect}
-            </Text>
+            <View className="flex-row items-center justify-between px-5">
+              <Text className="text-[18px] font-bold text-foreground">
+                {t.resourceSourceSetSelect}
+              </Text>
+              <TouchableOpacity
+                activeOpacity={0.78}
+                className="rounded-full px-3 py-2"
+                style={{ backgroundColor: colors.primarySubtle }}
+                onPress={openCreateSourceSetModal}
+              >
+                <Text className="text-[12px] font-semibold" style={{ color: colors.primary }}>
+                  {t.resourceCreateSourceSet}
+                </Text>
+              </TouchableOpacity>
+            </View>
             <ScrollView className="mt-2 max-h-64">
               <TouchableOpacity
                 activeOpacity={0.7}
@@ -4707,6 +5815,27 @@ export default function ResourceScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </PortalScaffold>
+  );
+}
+
+export function PortalResourceScreen({
+  navigation,
+  route,
+}: RootStackScreenProps<'PortalResources'>) {
+  return (
+    <ResourceScreenImpl
+      navigation={navigation as ResourceScreenImplProps['navigation']}
+      route={route as ResourceScreenImplProps['route']}
+    />
+  );
+}
+
+export default function ResourceScreen({ navigation, route }: MainTabScreenProps<'Resources'>) {
+  return (
+    <ResourceScreenImpl
+      navigation={navigation as ResourceScreenImplProps['navigation']}
+      route={route as ResourceScreenImplProps['route']}
+    />
   );
 }

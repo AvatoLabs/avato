@@ -2,6 +2,7 @@
  * MessageBubble — Renders a single chat message with actions.
  * Includes collapsible Thinking section, model info, token stats, save-to-topic.
  */
+import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import {
   AlertTriangle,
@@ -12,9 +13,11 @@ import {
   ChevronRight,
   Copy,
   Download,
+  GitBranch,
   Globe,
   Hand,
   Images,
+  LibraryBig,
   ListTodo,
   Pause,
   Pencil,
@@ -51,21 +54,26 @@ import {
   getMobileBuiltinRender,
   getMobileBuiltinStreaming,
 } from '../../features/BuiltinTools';
-import { fileApi } from '../../lib/api';
+import { fileApi, threadApi } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
 import type { I18nStore } from '../../lib/i18n';
 import { useI18n } from '../../lib/i18n';
 import { codeInlineRules } from '../../lib/markdownRules';
+import { navigateToNotebook, navigateToResources } from '../../lib/navigation';
+import { appendCurrentPortalStackWithOrigin } from '../../lib/portalNavigation';
 import { useResolvedRemoteAsset } from '../../lib/remoteAsset';
+import type { RootStackNavigationProp } from '../../navigation/types';
 import { useChatStore } from '../../store/chat';
 import { getAssistantChainActionMessageId } from '../../store/messageDisplay';
 import { useThemeStore } from '../../store/theme';
 import { getChatAccent, useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 import type {
+  ChatFileItem,
   ChatMessage,
   ChatToolPayload,
   CitationItem,
+  DocSelection,
   GroundingSearch,
   ImageCitationItem,
   MessageContentPart,
@@ -245,6 +253,8 @@ catch(e){document.getElementById('m').textContent=\`${escaped}\`}</script></body
 MathBlock.displayName = 'MathBlock';
 
 interface MessageBubbleProps {
+  disableMessageDetailNavigation?: boolean;
+  disableToolActions?: boolean;
   generating?: boolean;
   groupMembersById?: Record<string, GroupMessageSpeaker>;
   groupSupervisorId?: string;
@@ -252,8 +262,20 @@ interface MessageBubbleProps {
   isReasoning?: boolean;
   message: ChatMessage;
   onSaveToTopic?: () => void;
+  readOnly?: boolean;
   sessionId: string;
+  toolActionHandlers?: ToolActionHandlers;
   topicId?: string | null;
+}
+
+interface ToolActionHandlers {
+  continueToolIntervention?: (
+    assistantMessageId: string,
+    approvedTool: ChatToolPayload,
+  ) => Promise<void>;
+  rejectAndContinueToolIntervention?: (assistantMessageId: string, toolId: string) => Promise<void>;
+  rejectToolCall?: (messageId: string, toolId: string, reason?: string) => void | Promise<void>;
+  rejectToolMessage?: (messageId: string, reason?: string) => void | Promise<void>;
 }
 
 export interface GroupMessageSpeaker {
@@ -291,6 +313,20 @@ const getAssistantChainText = (messages: ChatMessage[]) =>
     .map((message) => message.content?.trim())
     .filter((content): content is string => !!content)
     .join('\n\n');
+
+const getMessageDocSelections = (message: ChatMessage): DocSelection[] => {
+  const rawSelections = message.metadata?.docSelections;
+  if (!Array.isArray(rawSelections)) return [];
+
+  return rawSelections.filter(
+    (selection): selection is DocSelection =>
+      !!selection &&
+      typeof selection === 'object' &&
+      typeof (selection as DocSelection).docId === 'string' &&
+      typeof (selection as DocSelection).id === 'string' &&
+      typeof (selection as DocSelection).content === 'string',
+  );
+};
 
 const ARTIFACT_TAG_REGEX = /<lobeArtifact\b([^>]*)>([\s\S]*?)(?:<\/lobeArtifact>|$)/g;
 const ARTIFACT_ATTR_REGEX = /(\w+)="([^"]*)"/g;
@@ -633,11 +669,35 @@ const CompareGroupBlock = memo<{
 
 CompareGroupBlock.displayName = 'CompareGroupBlock';
 
+const ThreadJumpButton = memo<{ label: string; onPress: () => void }>(({ label, onPress }) => {
+  const colors = useThemeColors();
+
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      activeOpacity={0.75}
+      className="mt-2 self-start rounded-full px-2.5 py-1.5"
+      style={{ backgroundColor: colors.primarySubtle }}
+      onPress={onPress}
+    >
+      <View className="flex-row items-center gap-1.5">
+        <GitBranch color={colors.primary} size={12} strokeWidth={2} />
+        <Text className="text-[11px] font-semibold" style={{ color: colors.primary }}>
+          {label}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+ThreadJumpButton.displayName = 'ThreadJumpButton';
+
 const GroupTasksBlock = memo<{
   groupMembersById?: Record<string, GroupMessageSpeaker>;
   message: ChatMessage;
+  onOpenThread?: (threadId: string, title?: string) => void;
   t: I18nStore['t'];
-}>(({ groupMembersById, message, t }) => {
+}>(({ groupMembersById, message, onOpenThread, t }) => {
   const colors = useThemeColors();
   const tasks = message.tasks ?? [];
   const taskAgentIds = [
@@ -689,6 +749,7 @@ const GroupTasksBlock = memo<{
               t.chatToolRunning ??
               '',
           );
+          const threadId = task.taskDetail?.threadId?.trim() || undefined;
           const status = task.taskDetail?.status;
           const isDone = status === 'completed' || status === 'Completed';
           const isError =
@@ -722,6 +783,12 @@ const GroupTasksBlock = memo<{
                   <X color={colors.danger} size={14} strokeWidth={2.5} />
                 ) : null}
               </View>
+              {threadId && onOpenThread ? (
+                <ThreadJumpButton
+                  label={t.threadOpen}
+                  onPress={() => onOpenThread(threadId, taskTitle)}
+                />
+              ) : null}
             </View>
           );
         })}
@@ -733,6 +800,8 @@ GroupTasksBlock.displayName = 'GroupTasksBlock';
 
 const MessageBubble = memo<MessageBubbleProps>(
   ({
+    disableMessageDetailNavigation = false,
+    disableToolActions = false,
     message,
     sessionId,
     topicId,
@@ -742,7 +811,11 @@ const MessageBubble = memo<MessageBubbleProps>(
     isGroupSession = false,
     isReasoning = false,
     onSaveToTopic,
+    readOnly = false,
+    toolActionHandlers,
   }) => {
+    const navigation = useNavigation<RootStackNavigationProp>();
+    const route = useRoute();
     const isUser = message.role === 'user';
     const isToolMessage = message.role === 'tool';
     const { t } = useI18n();
@@ -764,6 +837,8 @@ const MessageBubble = memo<MessageBubbleProps>(
     const [contentCollapsed, setContentCollapsed] = useState(true);
     const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
     const [downloadingProgress, setDownloadingProgress] = useState(0);
+    const [creatingThread, setCreatingThread] = useState(false);
+    const [readOnlyGroupExpanded, setReadOnlyGroupExpanded] = useState(false);
     const actionMessageId = isUser ? message.id : getAssistantChainActionMessageId(message);
     const assistantChainChildren =
       message.role === 'assistant' && message.children?.length ? message.children : null;
@@ -865,6 +940,34 @@ const MessageBubble = memo<MessageBubbleProps>(
         }
       },
       [downloadingFileId, t, toast],
+    );
+
+    const handleOpenResourceFile = useCallback(
+      (file: ChatFileItem) => {
+        haptics.light();
+        navigateToResources(
+          appendCurrentPortalStackWithOrigin(
+            route.name,
+            route.params,
+            {
+              openItem: {
+                ...(file.content ? { content: file.content } : {}),
+                fileType: file.fileType,
+                id: file.id,
+                name: file.name,
+                sourceType: 'file' as const,
+                url: file.url,
+              },
+            },
+            {
+              sessionId,
+              ...(message.threadId ? { threadId: message.threadId } : {}),
+              ...(topicId ? { topicId } : {}),
+            },
+          ),
+        );
+      },
+      [message.threadId, route.name, route.params, sessionId, topicId],
     );
 
     const mc = useMemo(
@@ -1197,6 +1300,7 @@ const MessageBubble = memo<MessageBubbleProps>(
       .slice(0, 1)
       .toUpperCase();
     const hasTools = !isUser && (message.tools?.length ?? 0) > 0;
+    const docSelections = isUser ? getMessageDocSelections(message) : [];
     const multimodalContentParts =
       !isToolMessage && message.metadata?.isMultimodal
         ? parseMessageContentParts(message.metadata?.tempDisplayContent)
@@ -1233,6 +1337,14 @@ const MessageBubble = memo<MessageBubbleProps>(
       message.search?.citations,
       message.search?.imageResults,
     );
+    const canOpenMessageDetail =
+      !disableMessageDetailNavigation &&
+      !isToolMessage &&
+      Math.max(
+        messageCopyText.length,
+        message.content.length,
+        message.reasoning?.content?.length ?? 0,
+      ) > CONTENT_COLLAPSE_THRESHOLD;
     const assistantContentWidth = { maxWidth: '100%' as const, minWidth: 0 };
     const userContentWidth = { maxWidth: '100%' as const, minWidth: 0 };
     const hasTextContent = !!(renderedContent?.trim() || multimodalContentParts?.length);
@@ -1245,9 +1357,21 @@ const MessageBubble = memo<MessageBubbleProps>(
         : null;
     const groupTasksMessages =
       message.role === 'groupTasks' && message.tasks?.length ? message.tasks : null;
+    const messageThreadId = message.taskDetail?.threadId?.trim() || undefined;
+    const messageThreadTitle = String(
+      (message.metadata as Record<string, unknown>)?.taskTitle ?? message.taskDetail?.title ?? '',
+    ).trim();
+    const seededThreadTitle =
+      messageThreadTitle || message.content.trim().split('\n')[0]?.trim().slice(0, 60) || undefined;
+    const canStartThread =
+      !!topicId &&
+      !!actionMessageId?.trim() &&
+      (message.role === 'assistant' || message.role === 'user');
     const isCompressedGroupExpanded =
       message.role === 'compressedGroup' &&
-      (message.metadata as Record<string, unknown>)?.expanded === true;
+      (readOnly
+        ? readOnlyGroupExpanded
+        : (message.metadata as Record<string, unknown>)?.expanded === true);
     const showMessageBubble =
       !showStandaloneUserAttachments ||
       !!assistantChainChildren?.length ||
@@ -1260,6 +1384,143 @@ const MessageBubble = memo<MessageBubbleProps>(
       !!message.error ||
       message.role === 'compressedGroup' ||
       message.role === 'groupTasks';
+
+    const handleOpenThread = useCallback(
+      (threadId: string, title?: string) => {
+        const normalizedThreadId = threadId.trim();
+        if (!normalizedThreadId) return;
+
+        haptics.light();
+        navigation.navigate(
+          'ThreadDetail',
+          appendCurrentPortalStackWithOrigin(
+            route.name,
+            route.params,
+            {
+              sessionId,
+              ...(title?.trim() ? { title: title.trim() } : {}),
+              threadId: normalizedThreadId,
+            },
+            {
+              ...(topicId ? { topicId } : {}),
+            },
+          ),
+        );
+      },
+      [navigation, route.name, route.params, sessionId, topicId],
+    );
+
+    const handleOpenMessageDetail = useCallback(() => {
+      navigation.navigate(
+        'MessageDetail',
+        appendCurrentPortalStackWithOrigin(
+          route.name,
+          route.params,
+          {
+            message,
+            messageId: message.id,
+            sessionId,
+          },
+          {
+            ...(message.threadId ? { threadId: message.threadId } : {}),
+            ...(topicId ? { topicId } : {}),
+          },
+        ),
+      );
+    }, [message, navigation, route.name, route.params, sessionId, topicId]);
+
+    const handleStartThread = useCallback(
+      async (type: 'continuation' | 'standalone') => {
+        const sourceMessageId = actionMessageId?.trim();
+        const normalizedTopicId = topicId?.trim();
+        if (!sourceMessageId || !normalizedTopicId || creatingThread) return;
+
+        setCreatingThread(true);
+        try {
+          const createdThreadId = await threadApi.create({
+            ...(seededThreadTitle ? { title: seededThreadTitle } : {}),
+            sourceMessageId,
+            topicId: normalizedTopicId,
+            type,
+          });
+
+          if (!createdThreadId?.trim()) {
+            throw new Error(t.threadCreateFailed);
+          }
+
+          haptics.success();
+          navigation.navigate(
+            'ThreadDetail',
+            appendCurrentPortalStackWithOrigin(
+              route.name,
+              route.params,
+              {
+                ...(seededThreadTitle ? { title: seededThreadTitle } : {}),
+                sessionId,
+                threadId: createdThreadId,
+              },
+              {
+                topicId: normalizedTopicId,
+              },
+            ),
+          );
+
+          void threadApi.generateTitle(createdThreadId).catch((error) => {
+            console.warn('[MessageBubble] Failed to generate thread title:', error);
+          });
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error && error.message.trim() ? error.message : t.threadCreateFailed;
+          toast.show('error', errorMessage);
+        } finally {
+          setCreatingThread(false);
+        }
+      },
+      [
+        actionMessageId,
+        creatingThread,
+        navigation,
+        route.name,
+        route.params,
+        seededThreadTitle,
+        sessionId,
+        t.threadCreateFailed,
+        toast,
+        topicId,
+      ],
+    );
+
+    const handlePressStartThread = useCallback(() => {
+      const sourceMessageId = actionMessageId?.trim();
+      const normalizedTopicId = topicId?.trim();
+      if (!sourceMessageId || !normalizedTopicId || creatingThread) return;
+
+      Alert.alert(t.threadStart, t.threadStartModePrompt, [
+        { style: 'cancel', text: t.cancel },
+        {
+          text: t.threadTypeStandalone,
+          onPress: () => {
+            void handleStartThread('standalone');
+          },
+        },
+        {
+          text: t.threadTypeContinuation,
+          onPress: () => {
+            void handleStartThread('continuation');
+          },
+        },
+      ]);
+    }, [
+      actionMessageId,
+      creatingThread,
+      handleStartThread,
+      t.cancel,
+      t.threadStart,
+      t.threadStartModePrompt,
+      t.threadTypeContinuation,
+      t.threadTypeStandalone,
+      topicId,
+    ]);
 
     return (
       <Animated.View entering={FadeIn.duration(200)}>
@@ -1385,7 +1646,8 @@ const MessageBubble = memo<MessageBubbleProps>(
                     fileList={message.fileList}
                     imageList={message.imageList}
                     isUser={isUser}
-                    onOpenFile={handleDownloadFile}
+                    onDownloadFile={handleDownloadFile}
+                    onOpenFile={handleOpenResourceFile}
                     onOpenImage={(url) => {
                       setViewerUri(url);
                       setShowImageViewer(true);
@@ -1478,12 +1740,81 @@ const MessageBubble = memo<MessageBubbleProps>(
                             fileList={message.fileList}
                             imageList={message.imageList}
                             isUser={isUser}
-                            onOpenFile={handleDownloadFile}
+                            onDownloadFile={handleDownloadFile}
+                            onOpenFile={handleOpenResourceFile}
                             onOpenImage={(url) => {
                               setViewerUri(url);
                               setShowImageViewer(true);
                             }}
                           />
+                        </View>
+                      ) : null}
+
+                      {docSelections.length > 0 ? (
+                        <View className="mb-2 gap-2">
+                          {docSelections.map((selection) => (
+                            <TouchableOpacity
+                              activeOpacity={0.85}
+                              className="flex-row items-center rounded-2xl px-3 py-2"
+                              key={selection.id}
+                              style={{
+                                backgroundColor: isUser
+                                  ? colors.userBubbleSubtleBg
+                                  : chatAccent.subtleBg,
+                              }}
+                              onPress={() => {
+                                haptics.light();
+                                navigateToNotebook(
+                                  appendCurrentPortalStackWithOrigin(
+                                    route.name,
+                                    route.params,
+                                    {
+                                      documentId: selection.docId,
+                                    },
+                                    {
+                                      sessionId,
+                                      ...(message.threadId ? { threadId: message.threadId } : {}),
+                                      ...(topicId ? { topicId } : {}),
+                                    },
+                                  ),
+                                );
+                              }}
+                            >
+                              <View
+                                className="mr-2 h-7 w-7 items-center justify-center rounded-lg"
+                                style={{
+                                  backgroundColor: isUser
+                                    ? colors.userBubbleCodeBg
+                                    : colors.fillTertiary,
+                                }}
+                              >
+                                <LibraryBig
+                                  color={isUser ? colors.userBubbleText : colors.primary}
+                                  size={16}
+                                  strokeWidth={tokens.icon.strokeWidth}
+                                />
+                              </View>
+                              <View className="flex-1">
+                                <Text
+                                  className="text-[11px] font-semibold"
+                                  style={{
+                                    color: isUser
+                                      ? colors.userBubbleTextMuted
+                                      : colors.secondaryText,
+                                  }}
+                                >
+                                  {t.fileChatContext}
+                                </Text>
+                                <Text
+                                  className="text-[12px] font-medium"
+                                  numberOfLines={1}
+                                  style={{ color: isUser ? colors.userBubbleText : mc.heading }}
+                                >
+                                  {selection.content.trim().slice(0, 48) || selection.docId}
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          ))}
                         </View>
                       ) : null}
 
@@ -1494,7 +1825,10 @@ const MessageBubble = memo<MessageBubbleProps>(
                       {!assistantChainChildren?.length && hasTools && message.tools && (
                         <ToolCallsBlock
                           assistantMessageId={message.id}
+                          disableToolActions={disableToolActions}
                           sessionId={sessionId}
+                          threadId={message.threadId ?? undefined}
+                          toolActionHandlers={toolActionHandlers}
                           tools={message.tools}
                           topicId={topicId ?? undefined}
                         />
@@ -1522,11 +1856,13 @@ const MessageBubble = memo<MessageBubbleProps>(
                       {assistantChainChildren?.length ? (
                         <AssistantChainBlock
                           childrenMessages={assistantChainChildren}
+                          disableToolActions={disableToolActions}
                           markdownRules={markdownRules}
                           markdownStyles={markdownStyles}
                           reasoningMarkdownStyles={reasoningMarkdownStyles}
                           sessionId={sessionId}
                           t={t}
+                          toolActionHandlers={toolActionHandlers}
                           topicId={topicId ?? undefined}
                           onOpenLink={handleOpenLink}
                         />
@@ -1545,6 +1881,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                           groupMembersById={groupMembersById}
                           message={message}
                           t={t}
+                          onOpenThread={handleOpenThread}
                         />
                       ) : compressedGroupMessages?.length ? (
                         isCompressedGroupExpanded ? (
@@ -1563,6 +1900,10 @@ const MessageBubble = memo<MessageBubbleProps>(
                               className="mt-1 py-1"
                               onPress={() => {
                                 haptics.light();
+                                if (readOnly) {
+                                  setReadOnlyGroupExpanded(false);
+                                  return;
+                                }
                                 toggleMessageCollapsed(sessionId, message.id, false);
                               }}
                             >
@@ -1603,6 +1944,10 @@ const MessageBubble = memo<MessageBubbleProps>(
                               className="mt-2 py-2 rounded-xl bg-foreground/[0.04] items-center"
                               onPress={() => {
                                 haptics.light();
+                                if (readOnly) {
+                                  setReadOnlyGroupExpanded(true);
+                                  return;
+                                }
                                 toggleMessageCollapsed(sessionId, message.id, true);
                               }}
                             >
@@ -1616,7 +1961,13 @@ const MessageBubble = memo<MessageBubbleProps>(
                           </View>
                         )
                       ) : isToolMessage ? (
-                        <ToolResultBlock message={message} />
+                        <ToolResultBlock
+                          disableToolActions={disableToolActions}
+                          message={message}
+                          sessionId={sessionId}
+                          toolActionHandlers={toolActionHandlers}
+                          topicId={topicId ?? undefined}
+                        />
                       ) : !message.content && !multimodalContentParts && generating ? (
                         isReasoning ? null : (
                           <TypingIndicator color={colors.typingIndicator} />
@@ -1657,24 +2008,67 @@ const MessageBubble = memo<MessageBubbleProps>(
                             ) : null,
                           )}
                           {isLongContent && (
-                            <TouchableOpacity
-                              activeOpacity={0.7}
-                              className="mt-1 py-1"
-                              onPress={() => setContentCollapsed((v) => !v)}
-                            >
-                              <Text
-                                className="text-[12px] font-medium"
-                                style={{ color: colors.primary }}
+                            <View className="mt-1 flex-row items-center gap-4">
+                              <TouchableOpacity
+                                activeOpacity={0.7}
+                                className="py-1"
+                                onPress={() => setContentCollapsed((v) => !v)}
                               >
-                                {contentCollapsed ? t.chatShowMore : t.chatShowLess}
-                              </Text>
-                            </TouchableOpacity>
+                                <Text
+                                  className="text-[12px] font-medium"
+                                  style={{ color: colors.primary }}
+                                >
+                                  {contentCollapsed ? t.chatShowMore : t.chatShowLess}
+                                </Text>
+                              </TouchableOpacity>
+                              {canOpenMessageDetail ? (
+                                <TouchableOpacity
+                                  accessibilityLabel={t.messageDetailOpen}
+                                  activeOpacity={0.7}
+                                  className="py-1"
+                                  onPress={handleOpenMessageDetail}
+                                >
+                                  <Text
+                                    className="text-[12px] font-medium"
+                                    style={{ color: colors.primary }}
+                                  >
+                                    {t.messageDetailOpen}
+                                  </Text>
+                                </TouchableOpacity>
+                              ) : null}
+                            </View>
                           )}
                         </>
                       ) : null}
+                      {canOpenMessageDetail && !isLongContent ? (
+                        <TouchableOpacity
+                          accessibilityLabel={t.messageDetailOpen}
+                          activeOpacity={0.7}
+                          className="mt-2 self-start py-1"
+                          onPress={handleOpenMessageDetail}
+                        >
+                          <Text
+                            className="text-[12px] font-medium"
+                            style={{ color: colors.primary }}
+                          >
+                            {t.messageDetailOpen}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
                       {!isUser && !generating && message.error && (
-                        <ErrorBlock error={message.error} onRetry={handleRegenerate} />
+                        <ErrorBlock
+                          error={message.error}
+                          onRetry={readOnly ? undefined : handleRegenerate}
+                        />
                       )}
+                      {!isUser && messageThreadId ? (
+                        <ThreadJumpButton
+                          label={t.threadOpen}
+                          onPress={() =>
+                            handleOpenThread(messageThreadId, messageThreadTitle || undefined)
+                          }
+                        />
+                      ) : null}
                       {!isUser && message.search?.citations?.length ? (
                         <CitationFootnotesBlock
                           citations={message.search.citations}
@@ -1703,7 +2097,7 @@ const MessageBubble = memo<MessageBubbleProps>(
               )}
 
               {/* Action Bar */}
-              {!generating && !isEditing && (
+              {!readOnly && !generating && !isEditing && (
                 <Animated.View
                   className={`flex-row items-center mt-2 gap-1 ${isUser ? 'justify-end' : 'justify-start'}`}
                   entering={FadeIn.duration(200)}
@@ -1728,6 +2122,21 @@ const MessageBubble = memo<MessageBubbleProps>(
                       onPress={handleEdit}
                     >
                       <Pencil color={colors.muted} size={14} strokeWidth={2} />
+                    </TouchableOpacity>
+                  )}
+                  {canStartThread && (
+                    <TouchableOpacity
+                      accessibilityLabel={t.threadStart}
+                      activeOpacity={0.5}
+                      className="w-8 h-8 rounded-full items-center justify-center"
+                      style={{ backgroundColor: colors.fillTertiary }}
+                      onPress={handlePressStartThread}
+                    >
+                      {creatingThread ? (
+                        <ActivityIndicator color={colors.primary} size="small" />
+                      ) : (
+                        <GitBranch color={colors.primary} size={14} strokeWidth={2} />
+                      )}
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity
@@ -2017,6 +2426,7 @@ const AttachmentBlock = memo<{
   fileList?: ChatMessage['fileList'];
   imageList?: ChatMessage['imageList'];
   isUser: boolean;
+  onDownloadFile: (file: NonNullable<ChatMessage['fileList']>[number]) => void;
   onOpenFile: (file: NonNullable<ChatMessage['fileList']>[number]) => void;
   onOpenImage: (url: string) => void;
 }>(
@@ -2024,11 +2434,13 @@ const AttachmentBlock = memo<{
     imageList,
     fileList,
     isUser,
+    onDownloadFile,
     onOpenFile,
     onOpenImage,
     downloadingFileId,
     downloadingProgress = 0,
   }) => {
+    const { t } = useI18n();
     const colors = useThemeColors();
     const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
     const mc = useMemo(
@@ -2115,11 +2527,22 @@ const AttachmentBlock = memo<{
                       </Text>
                     </View>
                   ) : (
-                    <Download
-                      color={isUser ? colors.userBubbleText : chatAccent.badgeText}
-                      size={16}
-                      strokeWidth={1.9}
-                    />
+                    <TouchableOpacity
+                      accessibilityLabel={t.resourceDownload}
+                      activeOpacity={0.75}
+                      className="rounded-full p-1"
+                      hitSlop={{ bottom: 6, left: 6, right: 6, top: 6 }}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        onDownloadFile(file);
+                      }}
+                    >
+                      <Download
+                        color={isUser ? colors.userBubbleText : chatAccent.badgeText}
+                        size={16}
+                        strokeWidth={1.9}
+                      />
+                    </TouchableOpacity>
                   )}
                 </View>
               </TouchableOpacity>
@@ -2525,6 +2948,7 @@ const ToolCard = memo<{
   error?: unknown;
   interventionContent?: React.ReactNode;
   onApprove?: () => void | Promise<void>;
+  onOpenDetail?: () => void;
   onReject?: () => void;
   onRejectAndContinue?: () => void | Promise<void>;
   resultReady?: boolean;
@@ -2543,6 +2967,7 @@ const ToolCard = memo<{
     collapsible = false,
     interventionContent,
     onApprove,
+    onOpenDetail,
     onReject,
     onRejectAndContinue,
     streamingContent,
@@ -2694,6 +3119,21 @@ const ToolCard = memo<{
               </View>
             )}
 
+            {showDetail && onOpenDetail ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                className="mt-2 self-start"
+                onPress={(event) => {
+                  event.stopPropagation();
+                  onOpenDetail();
+                }}
+              >
+                <Text className="text-[11px] font-medium" style={{ color: colors.primary }}>
+                  {t.toolDetailOpen}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
             {showDetail && isRejected && (
               <Text className="mt-2 text-[11px] leading-4" style={{ color: colors.tertiaryText }}>
                 {t.chatToolRejectedDesc}
@@ -2803,268 +3243,401 @@ const MOBILE_TOOL_INTERVENTION_ENABLED = true;
 /** One tool row: keeps draft arguments in a ref (sync) so approve sees edits after registerBeforeApprove flush. */
 const ToolCallItem = memo<{
   assistantMessageId?: string;
+  disableToolActions?: boolean;
   locale: string;
   sessionId?: string;
+  threadId?: string;
   tool: ChatToolPayload;
+  toolActionHandlers?: ToolActionHandlers;
   topicId?: string;
-}>(({ tool, sessionId, topicId, assistantMessageId, locale }) => {
-  const continueToolIntervention = useChatStore((s) => s.continueToolIntervention);
-  const rejectAndContinueToolIntervention = useChatStore(
-    (s) => s.rejectAndContinueToolIntervention,
-  );
-  const rejectToolCall = useChatStore((s) => s.rejectToolCall);
-  const mergedArgsRef = useRef(tool.arguments || '{}');
-  const beforeApproveCallbacksRef = useRef<Array<() => Promise<void>>>([]);
-  const [argsRenderKey, setArgsRenderKey] = useState(0);
-
-  useEffect(() => {
-    mergedArgsRef.current = tool.arguments || '{}';
-    setArgsRenderKey((k) => k + 1);
-  }, [tool.arguments]);
-
-  const parsedArgs = useMemo(() => {
-    try {
-      return JSON.parse(mergedArgsRef.current) as Record<string, unknown>;
-    } catch {
-      return {};
-    }
-  }, [argsRenderKey]);
-
-  const onArgsChange = useCallback((partial: Record<string, unknown>) => {
-    let base: Record<string, unknown>;
-    try {
-      base = JSON.parse(mergedArgsRef.current) as Record<string, unknown>;
-    } catch {
-      base = {};
-    }
-    mergedArgsRef.current = JSON.stringify({ ...base, ...partial });
-    setArgsRenderKey((k) => k + 1);
-  }, []);
-
-  const registerBeforeApprove = useCallback(
-    (_hookId: string, callback: () => void | Promise<void>) => {
-      const wrapped = () => Promise.resolve(callback());
-      beforeApproveCallbacksRef.current.push(wrapped);
-      return () => {
-        beforeApproveCallbacksRef.current = beforeApproveCallbacksRef.current.filter(
-          (fn) => fn !== wrapped,
-        );
-      };
-    },
-    [],
-  );
-
-  const hasResult = isToolResultReady(tool);
-  const isPending = tool.intervention?.status === 'pending';
-  const { argumentsText, BuiltinRender, displayTitle, useBuiltinRender } = buildToolDisplayProps(
+}>(
+  ({
     tool,
-    tool.apiName || tool.identifier || '',
+    sessionId,
+    threadId,
+    topicId,
+    assistantMessageId,
     locale,
-    hasResult,
-    isPending,
-  );
+    disableToolActions = false,
+    toolActionHandlers,
+  }) => {
+    const navigation = useNavigation<RootStackNavigationProp>();
+    const route = useRoute();
+    const continueToolIntervention = useChatStore((s) => s.continueToolIntervention);
+    const rejectAndContinueToolIntervention = useChatStore(
+      (s) => s.rejectAndContinueToolIntervention,
+    );
+    const rejectToolCall = useChatStore((s) => s.rejectToolCall);
+    const mergedArgsRef = useRef(tool.arguments || '{}');
+    const beforeApproveCallbacksRef = useRef<Array<() => Promise<void>>>([]);
+    const [_argsRenderKey, setArgsRenderKey] = useState(0);
 
-  const BuiltinIntervention = getMobileBuiltinIntervention(tool.identifier, tool.apiName);
-  const showIntervention = MOBILE_TOOL_INTERVENTION_ENABLED && isPending && BuiltinIntervention;
+    useEffect(() => {
+      mergedArgsRef.current = tool.arguments || '{}';
+      setArgsRenderKey((k) => k + 1);
+    }, [tool.arguments]);
 
-  const handleApprove = useCallback(async () => {
-    const callbacks = [...beforeApproveCallbacksRef.current];
-    for (const fn of callbacks) {
-      await fn();
-    }
-    const approvedTool: ChatToolPayload = {
-      ...tool,
-      arguments: mergedArgsRef.current || '{}',
-    };
-    await continueToolIntervention(sessionId!, topicId, assistantMessageId!, approvedTool);
-  }, [assistantMessageId, continueToolIntervention, sessionId, tool, topicId]);
+    const parsedArgs = (() => {
+      try {
+        return JSON.parse(mergedArgsRef.current) as Record<string, unknown>;
+      } catch {
+        return {};
+      }
+    })();
 
-  const handleReject =
-    sessionId && assistantMessageId
-      ? () => rejectToolCall(sessionId, assistantMessageId, tool.id)
+    const onArgsChange = useCallback((partial: Record<string, unknown>) => {
+      let base: Record<string, unknown>;
+      try {
+        base = JSON.parse(mergedArgsRef.current) as Record<string, unknown>;
+      } catch {
+        base = {};
+      }
+      mergedArgsRef.current = JSON.stringify({ ...base, ...partial });
+      setArgsRenderKey((k) => k + 1);
+    }, []);
+
+    const registerBeforeApprove = useCallback(
+      (_hookId: string, callback: () => void | Promise<void>) => {
+        const wrapped = () => Promise.resolve(callback());
+        beforeApproveCallbacksRef.current.push(wrapped);
+        return () => {
+          beforeApproveCallbacksRef.current = beforeApproveCallbacksRef.current.filter(
+            (fn) => fn !== wrapped,
+          );
+        };
+      },
+      [],
+    );
+
+    const hasResult = isToolResultReady(tool);
+    const isPending = tool.intervention?.status === 'pending';
+    const { argumentsText, BuiltinRender, displayTitle, useBuiltinRender } = buildToolDisplayProps(
+      tool,
+      tool.apiName || tool.identifier || '',
+      locale,
+      hasResult,
+      isPending,
+    );
+
+    const BuiltinIntervention = getMobileBuiltinIntervention(tool.identifier, tool.apiName);
+    const showIntervention =
+      !disableToolActions && MOBILE_TOOL_INTERVENTION_ENABLED && isPending && BuiltinIntervention;
+
+    const handleApprove = useCallback(async () => {
+      const callbacks = [...beforeApproveCallbacksRef.current];
+      for (const fn of callbacks) {
+        await fn();
+      }
+      const approvedTool: ChatToolPayload = {
+        ...tool,
+        arguments: mergedArgsRef.current || '{}',
+      };
+      if (toolActionHandlers?.continueToolIntervention && assistantMessageId) {
+        await toolActionHandlers.continueToolIntervention(assistantMessageId, approvedTool);
+        return;
+      }
+
+      await continueToolIntervention(sessionId!, topicId, assistantMessageId!, approvedTool);
+    }, [
+      assistantMessageId,
+      continueToolIntervention,
+      sessionId,
+      tool,
+      toolActionHandlers,
+      topicId,
+    ]);
+
+    const handleReject = assistantMessageId
+      ? () => {
+          if (toolActionHandlers?.rejectToolCall) {
+            void toolActionHandlers.rejectToolCall(assistantMessageId, tool.id);
+            return;
+          }
+
+          if (sessionId) {
+            rejectToolCall(sessionId, assistantMessageId, tool.id);
+          }
+        }
       : undefined;
 
-  const handleRejectAndContinue = useCallback(async () => {
-    await rejectAndContinueToolIntervention(sessionId!, topicId, assistantMessageId!, tool.id);
-  }, [assistantMessageId, rejectAndContinueToolIntervention, sessionId, tool.id, topicId]);
+    const handleRejectAndContinue = useCallback(async () => {
+      if (toolActionHandlers?.rejectAndContinueToolIntervention && assistantMessageId) {
+        await toolActionHandlers.rejectAndContinueToolIntervention(assistantMessageId, tool.id);
+        return;
+      }
 
-  const showApprovalButtons = showIntervention || (MOBILE_TOOL_INTERVENTION_ENABLED && isPending);
+      await rejectAndContinueToolIntervention(sessionId!, topicId, assistantMessageId!, tool.id);
+    }, [
+      assistantMessageId,
+      rejectAndContinueToolIntervention,
+      sessionId,
+      tool.id,
+      toolActionHandlers,
+      topicId,
+    ]);
 
-  const BuiltinStreaming = getMobileBuiltinStreaming(tool.identifier, tool.apiName);
-  const showStreaming = !hasResult && !isPending && BuiltinStreaming;
+    const showApprovalButtons =
+      !disableToolActions && (showIntervention || (MOBILE_TOOL_INTERVENTION_ENABLED && isPending));
+    const canOpenToolDetail = !!(
+      tool.result_content ||
+      tool.pluginState ||
+      tool.arguments ||
+      tool.pluginError
+    );
+    const handleOpenDetail = useCallback(() => {
+      if (!canOpenToolDetail) return;
 
-  const interventionContent =
-    showIntervention && BuiltinIntervention ? (
-      <BuiltinIntervention
-        args={parsedArgs}
-        registerBeforeApprove={registerBeforeApprove}
-        onArgsChange={onArgsChange}
-      />
-    ) : undefined;
+      navigation.navigate(
+        'ToolDetail',
+        appendCurrentPortalStackWithOrigin(
+          route.name,
+          route.params,
+          {
+            apiName: tool.apiName,
+            arguments: tool.arguments,
+            content: tool.result_content,
+            error: tool.pluginError,
+            identifier: tool.identifier,
+            pluginState: tool.pluginState,
+            title: displayTitle,
+            toolCallId: tool.id,
+          },
+          {
+            ...(sessionId ? { sessionId } : {}),
+            ...(threadId ? { threadId } : {}),
+            ...(topicId ? { topicId } : {}),
+          },
+        ),
+      );
+    }, [
+      canOpenToolDetail,
+      displayTitle,
+      navigation,
+      route.name,
+      route.params,
+      sessionId,
+      threadId,
+      tool.apiName,
+      tool.arguments,
+      tool.id,
+      tool.identifier,
+      tool.pluginError,
+      tool.pluginState,
+      tool.result_content,
+      topicId,
+    ]);
 
-  const streamingContent =
-    showStreaming && BuiltinStreaming ? (
-      <BuiltinStreaming apiName={tool.apiName} args={parsedArgs} identifier={tool.identifier} />
-    ) : undefined;
+    const BuiltinStreaming = getMobileBuiltinStreaming(tool.identifier, tool.apiName);
+    const showStreaming = !hasResult && !isPending && BuiltinStreaming;
 
-  const onApprove =
-    sessionId && assistantMessageId && showApprovalButtons ? handleApprove : undefined;
-  const onRejectAndContinue =
-    sessionId && assistantMessageId && showApprovalButtons ? handleRejectAndContinue : undefined;
+    const interventionContent =
+      showIntervention && BuiltinIntervention ? (
+        <BuiltinIntervention
+          args={parsedArgs}
+          registerBeforeApprove={registerBeforeApprove}
+          onArgsChange={onArgsChange}
+        />
+      ) : undefined;
 
-  if (useBuiltinRender && BuiltinRender) {
+    const streamingContent =
+      showStreaming && BuiltinStreaming ? (
+        <BuiltinStreaming apiName={tool.apiName} args={parsedArgs} identifier={tool.identifier} />
+      ) : undefined;
+
+    const onApprove = assistantMessageId && showApprovalButtons ? handleApprove : undefined;
+    const onRejectAndContinue =
+      assistantMessageId && showApprovalButtons ? handleRejectAndContinue : undefined;
+
+    if (useBuiltinRender && BuiltinRender) {
+      return (
+        <ToolCard
+          collapsible
+          argumentsText={argumentsText || undefined}
+          error={tool.pluginError}
+          interventionContent={interventionContent}
+          resultReady={hasResult}
+          status={tool.intervention?.status ?? null}
+          streamingContent={streamingContent}
+          title={displayTitle}
+          customContent={
+            hasResult ? (
+              <BuiltinRender
+                apiName={tool.apiName}
+                arguments={tool.arguments}
+                content={tool.result_content}
+                identifier={tool.identifier}
+                pluginState={tool.pluginState}
+                sessionId={sessionId}
+                threadId={threadId}
+                toolCallId={tool.id}
+                topicId={topicId}
+              />
+            ) : undefined
+          }
+          onApprove={onApprove}
+          onOpenDetail={canOpenToolDetail ? handleOpenDetail : undefined}
+          onReject={showApprovalButtons ? handleReject : undefined}
+          onRejectAndContinue={onRejectAndContinue}
+        />
+      );
+    }
+
     return (
       <ToolCard
         collapsible
         argumentsText={argumentsText || undefined}
+        content={tool.result_content || undefined}
         error={tool.pluginError}
         interventionContent={interventionContent}
         resultReady={hasResult}
         status={tool.intervention?.status ?? null}
         streamingContent={streamingContent}
         title={displayTitle}
-        customContent={
-          hasResult ? (
-            <BuiltinRender
-              apiName={tool.apiName}
-              arguments={tool.arguments}
-              content={tool.result_content}
-              identifier={tool.identifier}
-              pluginState={tool.pluginState}
-              toolCallId={tool.id}
-            />
-          ) : undefined
-        }
         onApprove={onApprove}
+        onOpenDetail={canOpenToolDetail ? handleOpenDetail : undefined}
         onReject={showApprovalButtons ? handleReject : undefined}
         onRejectAndContinue={onRejectAndContinue}
       />
     );
-  }
-
-  return (
-    <ToolCard
-      collapsible
-      argumentsText={argumentsText || undefined}
-      content={tool.result_content || undefined}
-      error={tool.pluginError}
-      interventionContent={interventionContent}
-      resultReady={hasResult}
-      status={tool.intervention?.status ?? null}
-      streamingContent={streamingContent}
-      title={displayTitle}
-      onApprove={onApprove}
-      onReject={showApprovalButtons ? handleReject : undefined}
-      onRejectAndContinue={onRejectAndContinue}
-    />
-  );
-});
+  },
+);
 
 ToolCallItem.displayName = 'ToolCallItem';
 
 const ToolCallsBlock = memo<{
   assistantMessageId?: string;
+  disableToolActions?: boolean;
   sessionId?: string;
+  threadId?: string;
+  toolActionHandlers?: ToolActionHandlers;
   topicId?: string;
   tools: ChatToolPayload[];
-}>(({ tools, sessionId, topicId, assistantMessageId }) => {
-  const { t } = useI18n();
-  const colors = useThemeColors();
-  const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
-  const hasPending = tools.some((tool) => tool.intervention?.status === 'pending');
-  const allCompleted = tools.every((tool) => isToolSettled(tool));
-  const [expanded, setExpanded] = useState(true);
-  const locale = useI18n((s) => s.locale);
+}>(
+  ({
+    tools,
+    sessionId,
+    threadId,
+    topicId,
+    assistantMessageId,
+    disableToolActions = false,
+    toolActionHandlers,
+  }) => {
+    const { t } = useI18n();
+    const colors = useThemeColors();
+    const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
+    const hasPending = tools.some((tool) => tool.intervention?.status === 'pending');
+    const allCompleted = tools.every((tool) => isToolSettled(tool));
+    const [expanded, setExpanded] = useState(true);
+    const locale = useI18n((s) => s.locale);
 
-  useEffect(() => {
-    if (hasPending) {
-      setExpanded(true);
-      return;
-    }
+    useEffect(() => {
+      if (hasPending) {
+        setExpanded(true);
+        return;
+      }
 
-    if (allCompleted) {
-      setExpanded(false);
-    }
-  }, [allCompleted, hasPending]);
+      if (allCompleted) {
+        setExpanded(false);
+      }
+    }, [allCompleted, hasPending]);
 
-  return (
-    <View
-      className="mb-2 rounded-2xl px-3 py-2"
-      style={{
-        backgroundColor: hasPending ? colors.primarySubtle : chatAccent.sectionBg,
-      }}
-    >
-      <TouchableOpacity
-        activeOpacity={0.7}
-        className="flex-row items-center justify-between"
-        onPress={() => setExpanded((value) => !value)}
+    return (
+      <View
+        className="mb-2 rounded-2xl px-3 py-2"
+        style={{
+          backgroundColor: hasPending ? colors.primarySubtle : chatAccent.sectionBg,
+        }}
       >
-        <View className="flex-row items-center flex-1">
-          <Wrench
-            color={
-              hasPending ? colors.primary : allCompleted ? colors.iconSuccess : colors.textGray
-            }
-            size={14}
-            strokeWidth={2}
-          />
-          <Text className="ml-2 text-[12px] font-medium" style={{ color: colors.secondaryText }}>
-            {t.chatToolsTitle} ({tools.length})
-          </Text>
-          {hasPending && (
-            <View
-              className="ml-2 rounded-full px-2 py-0.5"
-              style={{ backgroundColor: colors.primaryMuted }}
-            >
-              <Text className="text-[9px] font-semibold" style={{ color: colors.primary }}>
-                {t.chatToolPending}
-              </Text>
-            </View>
-          )}
-          {allCompleted && !hasPending && (
-            <View
-              className="ml-2 rounded-full px-2 py-0.5"
-              style={{ backgroundColor: colors.successMuted }}
-            >
-              <Text className="text-[9px] font-semibold" style={{ color: colors.iconSuccess }}>
-                {t.chatToolCompleted || 'Done'}
-              </Text>
-            </View>
-          )}
-        </View>
-        {expanded ? (
-          <ChevronDown color={colors.iconMuted} size={14} strokeWidth={2.5} />
-        ) : (
-          <ChevronRight color={colors.iconMuted} size={14} strokeWidth={2.5} />
-        )}
-      </TouchableOpacity>
-
-      {expanded ? (
-        <View className="mt-3 gap-2">
-          {tools.map((tool) => (
-            <ToolCallItem
-              assistantMessageId={assistantMessageId}
-              key={tool.id}
-              locale={locale}
-              sessionId={sessionId}
-              tool={tool}
-              topicId={topicId}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          className="flex-row items-center justify-between"
+          onPress={() => setExpanded((value) => !value)}
+        >
+          <View className="flex-row items-center flex-1">
+            <Wrench
+              size={14}
+              strokeWidth={2}
+              color={
+                hasPending ? colors.primary : allCompleted ? colors.iconSuccess : colors.textGray
+              }
             />
-          ))}
-        </View>
-      ) : null}
-    </View>
-  );
-});
+            <Text className="ml-2 text-[12px] font-medium" style={{ color: colors.secondaryText }}>
+              {t.chatToolsTitle} ({tools.length})
+            </Text>
+            {hasPending && (
+              <View
+                className="ml-2 rounded-full px-2 py-0.5"
+                style={{ backgroundColor: colors.primaryMuted }}
+              >
+                <Text className="text-[9px] font-semibold" style={{ color: colors.primary }}>
+                  {t.chatToolPending}
+                </Text>
+              </View>
+            )}
+            {allCompleted && !hasPending && (
+              <View
+                className="ml-2 rounded-full px-2 py-0.5"
+                style={{ backgroundColor: colors.successMuted }}
+              >
+                <Text className="text-[9px] font-semibold" style={{ color: colors.iconSuccess }}>
+                  {t.chatToolCompleted || 'Done'}
+                </Text>
+              </View>
+            )}
+          </View>
+          {expanded ? (
+            <ChevronDown color={colors.iconMuted} size={14} strokeWidth={2.5} />
+          ) : (
+            <ChevronRight color={colors.iconMuted} size={14} strokeWidth={2.5} />
+          )}
+        </TouchableOpacity>
+
+        {expanded ? (
+          <View className="mt-3 gap-2">
+            {tools.map((tool) => (
+              <ToolCallItem
+                assistantMessageId={assistantMessageId}
+                disableToolActions={disableToolActions}
+                key={tool.id}
+                locale={locale}
+                sessionId={sessionId}
+                threadId={threadId}
+                tool={tool}
+                toolActionHandlers={toolActionHandlers}
+                topicId={topicId}
+              />
+            ))}
+          </View>
+        ) : null}
+      </View>
+    );
+  },
+);
 
 ToolCallsBlock.displayName = 'ToolCallsBlock';
 
 const ToolResultBlock = memo<{
+  disableToolActions?: boolean;
   message: ChatMessage;
-}>(({ message }) => {
+  sessionId?: string;
+  toolActionHandlers?: ToolActionHandlers;
+  topicId?: string;
+}>(({ message, sessionId, topicId, disableToolActions = false, toolActionHandlers }) => {
+  const navigation = useNavigation<RootStackNavigationProp>();
+  const route = useRoute();
   const locale = useI18n((s) => s.locale);
+  const continueToolIntervention = useChatStore((s) => s.continueToolIntervention);
+  const fetchMessages = useChatStore((s) => s.fetchMessages);
+  const rejectAndContinueToolIntervention = useChatStore(
+    (s) => s.rejectAndContinueToolIntervention,
+  );
+  const rejectToolMessage = useChatStore((s) => s.rejectToolMessage);
   const toolName = message.plugin?.apiName || message.plugin?.identifier || 'Tool';
   const identifier = message.plugin?.identifier || '';
   const apiName = message.plugin?.apiName || '';
+  const mergedArgsRef = useRef(message.plugin?.arguments || '{}');
+  const beforeApproveCallbacksRef = useRef<Array<() => Promise<void>>>([]);
+  const [_argsRenderKey, setArgsRenderKey] = useState(0);
   const toolPayload: Pick<ChatToolPayload, 'apiName' | 'arguments' | 'identifier'> = {
     apiName,
     arguments: message.plugin?.arguments || '',
@@ -3081,12 +3654,209 @@ const ToolResultBlock = memo<{
     hasResult,
     isPending || hasError,
   );
+  const parsedArgs = (() => {
+    try {
+      return JSON.parse(mergedArgsRef.current) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  })();
+
+  useEffect(() => {
+    mergedArgsRef.current = message.plugin?.arguments || '{}';
+    setArgsRenderKey((key) => key + 1);
+  }, [message.plugin?.arguments]);
+
+  const onArgsChange = useCallback((partial: Record<string, unknown>) => {
+    let base: Record<string, unknown>;
+    try {
+      base = JSON.parse(mergedArgsRef.current) as Record<string, unknown>;
+    } catch {
+      base = {};
+    }
+    mergedArgsRef.current = JSON.stringify({ ...base, ...partial });
+    setArgsRenderKey((key) => key + 1);
+  }, []);
+
+  const registerBeforeApprove = useCallback(
+    (_hookId: string, callback: () => void | Promise<void>) => {
+      const wrapped = () => Promise.resolve(callback());
+      beforeApproveCallbacksRef.current.push(wrapped);
+      return () => {
+        beforeApproveCallbacksRef.current = beforeApproveCallbacksRef.current.filter(
+          (fn) => fn !== wrapped,
+        );
+      };
+    },
+    [],
+  );
+
+  const BuiltinIntervention = getMobileBuiltinIntervention(identifier, apiName);
+  const showIntervention =
+    !disableToolActions && MOBILE_TOOL_INTERVENTION_ENABLED && isPending && BuiltinIntervention;
+  const targetAssistantMessageId = message.parentId || message.id;
+  const canOpenToolDetail = !!(
+    message.content ||
+    message.pluginState ||
+    message.plugin?.arguments ||
+    message.pluginError
+  );
+  const handleOpenDetail = useCallback(() => {
+    if (!canOpenToolDetail) return;
+
+    navigation.navigate(
+      'ToolDetail',
+      appendCurrentPortalStackWithOrigin(
+        route.name,
+        route.params,
+        {
+          apiName,
+          arguments: message.plugin?.arguments,
+          content: message.content,
+          error: message.pluginError,
+          identifier,
+          pluginState:
+            typeof message.pluginState === 'object' && message.pluginState
+              ? (message.pluginState as Record<string, unknown>)
+              : undefined,
+          title: displayTitle,
+          toolCallId: message.toolCallId ?? undefined,
+        },
+        {
+          sessionId,
+          ...(message.threadId ? { threadId: message.threadId } : {}),
+          ...(topicId ? { topicId } : {}),
+        },
+      ),
+    );
+  }, [
+    apiName,
+    canOpenToolDetail,
+    displayTitle,
+    identifier,
+    message.content,
+    message.plugin?.arguments,
+    message.pluginError,
+    message.pluginState,
+    message.threadId,
+    message.toolCallId,
+    navigation,
+    route.name,
+    route.params,
+    sessionId,
+    topicId,
+  ]);
+
+  const handleApprove = useCallback(async () => {
+    const callbacks = [...beforeApproveCallbacksRef.current];
+    for (const fn of callbacks) {
+      await fn();
+    }
+
+    const approvedTool: ChatToolPayload = {
+      apiName,
+      arguments: mergedArgsRef.current || '{}',
+      id: message.toolCallId || message.id,
+      identifier: identifier || toolName,
+      intervention: message.pluginIntervention ?? message.plugin?.intervention ?? undefined,
+      pluginError:
+        typeof message.pluginError === 'object' && message.pluginError
+          ? message.pluginError
+          : undefined,
+      pluginState:
+        typeof message.pluginState === 'object' && message.pluginState
+          ? (message.pluginState as Record<string, unknown>)
+          : undefined,
+      result_content: message.content || undefined,
+      result_msg_id: message.id,
+      type: message.plugin?.type || 'function',
+    };
+
+    if (toolActionHandlers?.continueToolIntervention) {
+      await toolActionHandlers.continueToolIntervention(targetAssistantMessageId, approvedTool);
+      return;
+    }
+
+    if (!sessionId) return;
+
+    await continueToolIntervention(sessionId, topicId, targetAssistantMessageId, approvedTool);
+    await fetchMessages(sessionId, topicId, { preserveOnEmpty: true });
+  }, [
+    apiName,
+    continueToolIntervention,
+    fetchMessages,
+    identifier,
+    message.content,
+    message.id,
+    message.plugin?.intervention,
+    message.plugin?.type,
+    message.pluginError,
+    message.pluginIntervention,
+    message.pluginState,
+    message.toolCallId,
+    sessionId,
+    targetAssistantMessageId,
+    toolName,
+    toolActionHandlers,
+    topicId,
+  ]);
+
+  const handleReject = useCallback(() => {
+    if (toolActionHandlers?.rejectToolMessage) {
+      void toolActionHandlers.rejectToolMessage(message.id);
+      return;
+    }
+
+    if (!sessionId) return;
+    rejectToolMessage(sessionId, message.id);
+  }, [message.id, rejectToolMessage, sessionId, toolActionHandlers]);
+
+  const handleRejectAndContinue = useCallback(async () => {
+    if (toolActionHandlers?.rejectAndContinueToolIntervention) {
+      await toolActionHandlers.rejectAndContinueToolIntervention(
+        targetAssistantMessageId,
+        message.toolCallId || message.id,
+      );
+      return;
+    }
+
+    if (!sessionId) return;
+
+    await rejectAndContinueToolIntervention(
+      sessionId,
+      topicId,
+      targetAssistantMessageId,
+      message.toolCallId || message.id,
+    );
+    await fetchMessages(sessionId, topicId, { preserveOnEmpty: true });
+  }, [
+    fetchMessages,
+    message.id,
+    message.toolCallId,
+    rejectAndContinueToolIntervention,
+    sessionId,
+    targetAssistantMessageId,
+    toolActionHandlers,
+    topicId,
+  ]);
+
+  const interventionContent =
+    showIntervention && BuiltinIntervention ? (
+      <BuiltinIntervention
+        args={parsedArgs}
+        registerBeforeApprove={registerBeforeApprove}
+        onArgsChange={onArgsChange}
+      />
+    ) : undefined;
+
+  const showApprovalButtons = !disableToolActions && MOBILE_TOOL_INTERVENTION_ENABLED && isPending;
 
   return (
     <ToolCard
       argumentsText={argumentsText || undefined}
       content={useBuiltinRender ? undefined : message.content || undefined}
       error={message.pluginError}
+      interventionContent={interventionContent}
       resultReady={hasResult && !message.pluginError}
       status={message.pluginIntervention?.status ?? null}
       title={displayTitle}
@@ -3098,10 +3868,17 @@ const ToolResultBlock = memo<{
             content={message.content}
             identifier={identifier}
             pluginState={message.pluginState as Record<string, unknown> | undefined}
+            sessionId={sessionId}
+            threadId={message.threadId ?? undefined}
             toolCallId={message.toolCallId ?? undefined}
+            topicId={topicId}
           />
         ) : undefined
       }
+      onApprove={showApprovalButtons ? handleApprove : undefined}
+      onOpenDetail={canOpenToolDetail ? handleOpenDetail : undefined}
+      onReject={showApprovalButtons ? handleReject : undefined}
+      onRejectAndContinue={showApprovalButtons ? handleRejectAndContinue : undefined}
     />
   );
 });
@@ -3110,22 +3887,26 @@ ToolResultBlock.displayName = 'ToolResultBlock';
 
 const AssistantChainBlock = memo<{
   childrenMessages: ChatMessage[];
+  disableToolActions?: boolean;
   markdownRules?: Record<string, any>;
   markdownStyles: Record<string, any>;
   onOpenLink: (url?: string) => void;
   reasoningMarkdownStyles: Record<string, any>;
   sessionId: string;
   t: I18nStore['t'];
+  toolActionHandlers?: ToolActionHandlers;
   topicId?: string;
 }>(
   ({
     childrenMessages,
+    disableToolActions = false,
     markdownRules,
     markdownStyles,
     onOpenLink,
     reasoningMarkdownStyles,
     sessionId,
     t,
+    toolActionHandlers,
     topicId,
   }) => {
     return (
@@ -3224,7 +4005,9 @@ const AssistantChainBlock = memo<{
               {childMessage.tools?.length ? (
                 <ToolCallsBlock
                   assistantMessageId={childMessage.id}
+                  disableToolActions={disableToolActions}
                   sessionId={sessionId}
+                  toolActionHandlers={toolActionHandlers}
                   tools={childMessage.tools}
                   topicId={topicId}
                 />

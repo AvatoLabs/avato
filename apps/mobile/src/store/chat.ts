@@ -73,7 +73,7 @@ interface UploadedAttachment {
   url: string;
 }
 
-const buildAssistantMessageMetadata = (
+export const buildAssistantMessageMetadata = (
   performance?: Record<string, any>,
   usage?: Record<string, any>,
   contentMetadata?: ChatMessage['metadata'],
@@ -86,7 +86,7 @@ const buildAssistantMessageMetadata = (
       }
     : undefined;
 
-const mergeMessageMetadata = (
+export const mergeMessageMetadata = (
   existing: ChatMessage['metadata'],
   contentState?: Pick<StreamContentState, 'isMultimodal' | 'tempDisplayContent'>,
 ) => {
@@ -101,7 +101,7 @@ const mergeMessageMetadata = (
   };
 };
 
-const buildReasoningState = (
+export const buildReasoningState = (
   reasoning: StreamReasoningState,
   duration?: number,
 ): NonNullable<ChatMessage['reasoning']> => ({
@@ -111,7 +111,7 @@ const buildReasoningState = (
   ...(reasoning.tempDisplayContent ? { tempDisplayContent: reasoning.tempDisplayContent } : {}),
 });
 
-const buildPersistedReasoning = (
+export const buildPersistedReasoning = (
   reasoning: ChatMessage['reasoning'],
 ): NonNullable<ChatMessage['reasoning']> | undefined => {
   if (!reasoning) return undefined;
@@ -778,7 +778,7 @@ const toToolCalls = (message: ChatMessage): MobileMessageToolCall[] | undefined 
   }));
 };
 
-const buildContextMessage = (message: ChatMessage): MobileChatMessage | null => {
+export const buildContextMessage = (message: ChatMessage): MobileChatMessage | null => {
   if (message.role === 'user') {
     const attachments = toUploadedAttachment(message);
     const docSelections = getMessageDocSelections(message);
@@ -935,8 +935,10 @@ interface ChatState {
     content: string,
     topicId?: string,
     options?: {
+      chatContextSelections?: ChatContextSelection[];
       memoryEffort?: MobileMemoryEffort;
       memoryEnabled?: boolean;
+      preserveChatContextSelections?: boolean;
       plugins?: string[];
       searchEnabled?: boolean;
     },
@@ -1159,8 +1161,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     content: string,
     topicId?: string,
     options?: {
+      chatContextSelections?: ChatContextSelection[];
       memoryEffort?: MobileMemoryEffort;
       memoryEnabled?: boolean;
+      preserveChatContextSelections?: boolean;
       plugins?: string[];
       searchEnabled?: boolean;
     },
@@ -1170,7 +1174,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const textContent = content.trim();
     const fileState = useFileStore.getState();
     const attachments = fileState.pendingFiles.filter((f) => f.status !== 'error');
-    const chatContextSelections = fileState.chatContextSelections;
+    const chatContextSelections = options?.chatContextSelections ?? fileState.chatContextSelections;
     const docSelections = toDocSelections(chatContextSelections);
     if (attachments.some((f) => f.status === 'uploading')) {
       return false;
@@ -1341,8 +1345,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
         }
 
-        if (uploadedAttachments.length > 0 || chatContextSelections.length > 0) {
+        if (uploadedAttachments.length > 0) {
           useFileStore.getState().clearPending();
+        }
+        if (chatContextSelections.length > 0 && !options?.preserveChatContextSelections) {
           useFileStore.getState().clearChatContextSelections();
         }
 
@@ -1820,8 +1826,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ],
       },
     }));
-    if (uploadedAttachments.length > 0 || chatContextSelections.length > 0) {
+    if (uploadedAttachments.length > 0) {
       useFileStore.getState().clearPending();
+    }
+    if (chatContextSelections.length > 0 && !options?.preserveChatContextSelections) {
       useFileStore.getState().clearChatContextSelections();
     }
 

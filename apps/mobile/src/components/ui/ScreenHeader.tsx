@@ -9,6 +9,7 @@ import { useThemeStore } from '../../store/theme';
 import { useThemeColors } from '../../theme/colors';
 import { enteringSection } from '../../theme/motion';
 import { tokens } from '../../theme/tokens';
+import PortalChromeBar from './PortalChromeBar';
 import PressableScale from './PressableScale';
 
 type HeaderStyle = 'flat' | 'blur';
@@ -22,6 +23,9 @@ interface ScreenHeaderProps {
   leftElement?: React.ReactNode;
   onPressLeft?: () => void;
   onPressRight?: () => void;
+  portalCurrentLabel?: string;
+  portalRouteName?: string;
+  portalRouteParams?: unknown;
   rightAccessibilityHint?: string;
   rightAccessibilityLabel?: string;
   rightActions?: React.ReactNode;
@@ -99,6 +103,9 @@ export function ScreenHeader({
   titleIcon,
   titleNode,
   headerStyle = 'flat',
+  portalCurrentLabel,
+  portalRouteName,
+  portalRouteParams,
   onPressLeft,
   onPressRight,
 }: ScreenHeaderProps) {
@@ -110,6 +117,13 @@ export function ScreenHeader({
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const blurTint = effectiveTheme === 'dark' ? 'dark' : 'light';
   const useFlat = headerStyle === 'flat' || Platform.OS === 'android';
+  const portalChrome = portalRouteName ? (
+    <PortalChromeBar
+      currentLabel={portalCurrentLabel}
+      routeName={portalRouteName}
+      routeParams={portalRouteParams}
+    />
+  ) : null;
 
   const headerContent = (content: React.ReactNode) =>
     useFlat ? (
@@ -194,6 +208,7 @@ export function ScreenHeader({
           )}
         </View>
       </Animated.View>
+      {portalChrome}
       {children}
     </>
   );
@@ -278,6 +293,7 @@ export function ScreenHeader({
           </View>
         </View>
       </Animated.View>
+      {portalChrome}
       {children}
     </>
   );
@@ -352,6 +368,7 @@ export function ScreenHeader({
           </View>
         </View>
       </Animated.View>
+      {portalChrome}
       {children}
     </>
   );

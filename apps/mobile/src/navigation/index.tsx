@@ -2,7 +2,10 @@
  * Navigation — single unified navigator with all screens.
  */
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import {
+  createNativeStackNavigator,
+  type NativeStackNavigationOptions,
+} from '@react-navigation/native-stack';
 import { BlurView } from 'expo-blur';
 import { FolderOpen, MessageCircle, Palette, Store } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
@@ -33,6 +36,7 @@ import DataManagementScreen from '../screens/DataManagementScreen';
 import LoginScreen from '../screens/LoginScreen';
 import MemoryDetailScreen from '../screens/MemoryDetailScreen';
 import MemoryScreen from '../screens/MemoryScreen';
+import MessageDetailScreen from '../screens/MessageDetailScreen';
 import ModelPickerScreen from '../screens/ModelPickerScreen';
 import NotebookScreen from '../screens/NotebookScreen';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
@@ -40,10 +44,13 @@ import ProfileEditScreen from '../screens/ProfileEditScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProviderDetailScreen from '../screens/ProviderDetailScreen';
 import PublicResourceShareScreen from '../screens/PublicResourceShareScreen';
-import ResourceScreen from '../screens/ResourceScreen';
+import ResourceScreen, { PortalResourceScreen } from '../screens/ResourceScreen';
 import ServerConfigScreen from '../screens/ServerConfigScreen';
 import StatsScreen from '../screens/StatsScreen';
 import StoreScreen from '../screens/StoreScreen';
+import ThreadDetailScreen from '../screens/ThreadDetailScreen';
+import ThreadListScreen from '../screens/ThreadListScreen';
+import ToolDetailScreen from '../screens/ToolDetailScreen';
 import TopicListScreen from '../screens/TopicListScreen';
 import { useThemeStore } from '../store/theme';
 import { useThemeColors } from '../theme/colors';
@@ -55,6 +62,21 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const TAB_TRANSITION_ANIMATION = 'shift' as const;
 const STACK_CARD_ANIMATION = Platform.OS === 'android' ? 'ios_from_right' : 'default';
 const STACK_ENTRY_ANIMATION = Platform.OS === 'android' ? 'ios_from_right' : 'simple_push';
+const PORTAL_SCREEN_OPTIONS: NativeStackNavigationOptions =
+  Platform.OS === 'ios'
+    ? {
+        animation: 'slide_from_bottom',
+        animationMatchesGesture: true,
+        contentStyle: { backgroundColor: 'transparent' },
+        fullScreenGestureEnabled: true,
+        gestureDirection: 'vertical',
+        presentation: 'containedTransparentModal',
+      }
+    : {
+        animation: 'fade_from_bottom',
+        contentStyle: { backgroundColor: 'transparent' },
+        presentation: 'containedTransparentModal',
+      };
 const IOS_STACK_GESTURE_OPTIONS =
   Platform.OS === 'ios'
     ? ({
@@ -67,6 +89,9 @@ const IOS_STACK_GESTURE_OPTIONS =
     : ({
         freezeOnBlur: true,
       } as const);
+
+const isPortalNotebookRoute = (params: RootStackParamList['Notebook']) =>
+  !!params?.documentId || !!params?.portalStack?.length;
 
 /** Floating tab bar layout — matte surfaces only, no specular / highlight treatments */
 
@@ -423,7 +448,18 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
       <Stack.Screen component={ChatDetailScreen} name="ChatDetail" />
       <Stack.Screen component={ChatSettingsScreen} name="ChatSettings" />
       <Stack.Screen component={TopicListScreen} name="TopicList" />
-      <Stack.Screen component={NotebookScreen} name="Notebook" />
+      <Stack.Screen
+        component={NotebookScreen}
+        name="Notebook"
+        options={({ route }) => (isPortalNotebookRoute(route.params) ? PORTAL_SCREEN_OPTIONS : {})}
+      />
+      <Stack.Group screenOptions={PORTAL_SCREEN_OPTIONS}>
+        <Stack.Screen component={MessageDetailScreen} name="MessageDetail" />
+        <Stack.Screen component={PortalResourceScreen} name="PortalResources" />
+        <Stack.Screen component={ToolDetailScreen} name="ToolDetail" />
+        <Stack.Screen component={ThreadDetailScreen} name="ThreadDetail" />
+        <Stack.Screen component={ThreadListScreen} name="ThreadList" />
+      </Stack.Group>
 
       {/* Settings */}
       <Stack.Screen component={AIProvidersScreen} name="AIProviders" />

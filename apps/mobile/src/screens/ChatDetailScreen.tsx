@@ -69,6 +69,7 @@ import {
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
+import { appendCurrentPortalStack } from '../lib/portalNavigation';
 import { getCanonicalResourceKind } from '../lib/resourceList';
 import { isGroupSessionLike } from '../lib/session';
 import { loadSkillPickerSelection, saveSkillPickerSelection } from '../lib/skillPicker';
@@ -85,6 +86,7 @@ import { useThemeColors } from '../theme/colors';
 import type {
   AgentSkillItem,
   ChatMessage,
+  ConversationFileItem,
   FileListItem,
   InstalledPlugin,
   MobileMemoryEffort,
@@ -192,8 +194,10 @@ export default function ChatDetailScreen({
 
   const pendingFiles = useFileStore((s) => s.pendingFiles);
   const addFile = useFileStore((s) => s.addFile);
-  const chatContextSelections = useFileStore((s) => s.chatContextSelections);
-  const addChatContextSelection = useFileStore((s) => s.addChatContextSelection);
+  const chatContextSelections = useFileStore((s) =>
+    sessionId ? (s.sessionChatContextSelections[sessionId] ?? []) : [],
+  );
+  const addSessionChatContextSelection = useFileStore((s) => s.addSessionChatContextSelection);
 
   const [inputText, setInputText] = useState('');
   const [searchEnabled, setSearchEnabled] = useState(false);
@@ -230,6 +234,7 @@ export default function ChatDetailScreen({
   const [enabledPlugins, setEnabledPlugins] = useState<Set<string>>(() => new Set());
   const [agentId, setAgentId] = useState<string | null>(null);
   const [groupDetail, setGroupDetail] = useState<AgentGroupDetail | null>(null);
+  const [conversationFiles, setConversationFiles] = useState<ConversationFileItem[]>([]);
 
   const sessionModel = useModelStore((s) => s.selectedModel);
   const sessionProvider = useModelStore((s) => s.selectedProvider);
@@ -255,6 +260,21 @@ export default function ChatDetailScreen({
     hasObservedTopicChange.current = false;
     prevGenForMessageSyncRef.current = null;
     prevTopicForMessageSyncRef.current = undefined;
+    setConversationFiles([]);
+  }, [sessionId]);
+
+  const loadConversationFiles = useCallback(async () => {
+    if (!sessionId) {
+      setConversationFiles([]);
+      return;
+    }
+
+    try {
+      const nextFiles = await sessionApi.getConversationFiles({ sessionId });
+      setConversationFiles((nextFiles ?? []).filter((item) => item.enabled));
+    } catch {
+      setConversationFiles([]);
+    }
   }, [sessionId]);
 
   useEffect(() => {
@@ -315,6 +335,12 @@ export default function ChatDetailScreen({
     useCallback(() => {
       void loadGroupDetail();
     }, [loadGroupDetail]),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadConversationFiles();
+    }, [loadConversationFiles]),
   );
 
   // Refresh messages/topics only when the screen actually gains focus (align with Web revalidateOnFocus).
@@ -735,8 +761,10 @@ export default function ChatDetailScreen({
     transform: [{ scale: sendScale.value }],
   }));
   const composerAttachmentCount = pendingFiles.length + chatContextSelections.length;
+  const composerPreviewCount = composerAttachmentCount + conversationFiles.length;
+  const composerPreviewVisible = composerPreviewCount > 0;
   const composerActive =
-    keyboardOffset > 0 || Boolean(inputText.trim()) || composerAttachmentCount > 0 || generating;
+    keyboardOffset > 0 || Boolean(inputText.trim()) || composerPreviewCount > 0 || generating;
 
   const autoScrollToEnd = useCallback(() => {
     if (!listRef.current || messages.length === 0) return;
@@ -775,8 +803,10 @@ export default function ChatDetailScreen({
     setInputText('');
     Keyboard.dismiss();
     const success = await sendMessage(sessionId, textToSend, activeTopic ?? undefined, {
+      chatContextSelections,
       memoryEffort,
       memoryEnabled,
+      preserveChatContextSelections: true,
       plugins: enabledPlugins.size > 0 ? [...enabledPlugins] : undefined,
       searchEnabled,
     });
@@ -790,6 +820,7 @@ export default function ChatDetailScreen({
     sessionId,
     enabledPlugins,
     activeTopic,
+    chatContextSelections,
     composerAttachmentCount,
     memoryEffort,
     memoryEnabled,
@@ -868,11 +899,27 @@ export default function ChatDetailScreen({
     setResourcePickerVisible(true);
   }, []);
 
+  const handleRemoveConversationFile = useCallback(
+    async (fileId: string) => {
+      if (!sessionId) return;
+
+      try {
+        await sessionApi.deleteConversationFile(fileId, { sessionId });
+        setConversationFiles((prev) => prev.filter((item) => item.id !== fileId));
+      } catch {
+        toast.show('error', t.fileUploadFailed);
+      }
+    },
+    [sessionId, t.fileUploadFailed, toast],
+  );
+
   const handleWorkspaceSelect = useCallback(
     async (items: FileListItem[]) => {
       const base = await getApiUrl();
       const baseUrl = base?.replace(/\/$/, '') ?? '';
+      const conversationFileIds = new Set<string>();
       let failedContextCount = 0;
+
       for (const item of items) {
         if (!item.id) continue;
         const itemKind = getCanonicalResourceKind(item);
@@ -880,7 +927,7 @@ export default function ChatDetailScreen({
         if (isChatContextEligibleResource(item)) {
           const context = await createChatContextSelectionFromResource(item).catch(() => null);
           if (context) {
-            addChatContextSelection(context);
+            if (sessionId) addSessionChatContextSelection(sessionId, context);
             continue;
           }
 
@@ -891,6 +938,11 @@ export default function ChatDetailScreen({
         }
 
         if (itemKind !== 'file') continue;
+
+        if (sessionId) {
+          conversationFileIds.add(item.id);
+          continue;
+        }
 
         const fileUrl = item.url?.startsWith('http')
           ? item.url
@@ -908,11 +960,29 @@ export default function ChatDetailScreen({
         });
       }
 
+      if (sessionId && conversationFileIds.size > 0) {
+        try {
+          await sessionApi.addConversationFiles([...conversationFileIds], { sessionId });
+          await loadConversationFiles();
+          toast.show('success', t.fileAddToConversationSuccess);
+        } catch {
+          toast.show('error', t.fileUploadFailed);
+        }
+      }
+
       if (failedContextCount > 0) {
         toast.show('error', t.fileUploadFailed);
       }
     },
-    [addChatContextSelection, addFile, t.fileUploadFailed, toast],
+    [
+      addFile,
+      addSessionChatContextSelection,
+      loadConversationFiles,
+      sessionId,
+      t.fileAddToConversationSuccess,
+      t.fileUploadFailed,
+      toast,
+    ],
   );
 
   // ── Toolbar: Model ────────────────────────────────────────────────
@@ -1049,6 +1119,19 @@ export default function ChatDetailScreen({
     toast,
   ]);
 
+  const handleOpenThreads = useCallback(() => {
+    if (!sessionId) return;
+
+    const topicId = activeTopic ?? initialTopicId;
+    if (!topicId) return;
+
+    haptics.light();
+    navigation.navigate(
+      'ThreadList',
+      appendCurrentPortalStack(route.name, route.params, { sessionId, topicId }),
+    );
+  }, [activeTopic, initialTopicId, navigation, route.name, route.params, sessionId]);
+
   const renderMessage = useCallback(
     ({ item }: { item: ChatMessage }) => (
       <MessageBubble
@@ -1127,6 +1210,7 @@ export default function ChatDetailScreen({
         sessionTitle={session?.title}
         toolbarProviderLogo={toolbarProviderLogo}
         onOpenNotebook={handleOpenNotebook}
+        onOpenThreads={(activeTopic ?? initialTopicId) ? handleOpenThreads : undefined}
       />
 
       {/* Message List + Input */}
@@ -1250,7 +1334,7 @@ export default function ChatDetailScreen({
             generating={generating}
             memoryEnabled={memoryEnabled}
             modelDrawerVisible={modelDrawerVisible}
-            pendingFilesCount={composerAttachmentCount}
+            pendingFilesCount={composerPreviewCount}
             placeholder={generating ? t.chatGenerating : hints[hintIndex]}
             pluginsEnabled={enabledPlugins.size > 0}
             providerLogoError={providerLogoError}
@@ -1269,9 +1353,14 @@ export default function ChatDetailScreen({
                 : undefined
             }
             topSlot={
-              composerAttachmentCount > 0 ? (
+              composerPreviewVisible ? (
                 <View className="px-3 pt-2">
-                  <FilePreview sessionId={sessionId} />
+                  <FilePreview
+                    conversationFiles={conversationFiles}
+                    sessionId={sessionId}
+                    topicId={activeTopic ?? initialTopicId ?? undefined}
+                    onRemoveConversationFile={handleRemoveConversationFile}
+                  />
                 </View>
               ) : undefined
             }

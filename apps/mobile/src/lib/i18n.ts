@@ -29,6 +29,8 @@ export type TranslationKeys = {
   tabMe: string;
   /** Create tab — header action to open artwork/video options */
   createOpenOptionsA11y: string;
+  createCurrentSetup: string;
+  createHistory: string;
 
   // Chat List
   chatListTitle: string;
@@ -263,6 +265,9 @@ export type TranslationKeys = {
   notebookDiscard: string;
   notebookPreview: string;
   notebookEdit: string;
+  notebookTableAddColumn: string;
+  notebookTableAddRow: string;
+  notebookTableLabel: string;
 
   // Settings
   settingsTitle: string;
@@ -398,6 +403,8 @@ export type TranslationKeys = {
   homeQuickCreate: string;
   homeAgentAll: string;
   homeRecents: string;
+  homeRecentDocs: string;
+  homeRecentFiles: string;
   homeSeeAll: string;
   homeAssistants: string;
   homeStartChat: string;
@@ -439,6 +446,44 @@ export type TranslationKeys = {
   msgActionDeleteConfirm: string;
   msgActionCopied: string;
   msgActionSaveToTopic: string;
+  chatOpenConversation: string;
+  messageDetailTitle: string;
+  messageDetailOpen: string;
+  messageDetailLoadFailed: string;
+  messageDetailEmpty: string;
+  messageDetailEmptyDesc: string;
+  toolDetailTitle: string;
+  toolDetailOpen: string;
+  toolDetailEmpty: string;
+  toolDetailEmptyDesc: string;
+  threadListTitle: string;
+  threadDetailTitle: string;
+  threadEmpty: string;
+  threadEmptyDesc: string;
+  threadUntitled: string;
+  threadLoadFailed: string;
+  threadDeleteConfirm: string;
+  threadDeleted: string;
+  threadDeleteFailed: string;
+  threadStatusProcessing: string;
+  threadStatusCompleted: string;
+  threadStatusFailed: string;
+  threadStatusInterrupted: string;
+  threadStatusInReview: string;
+  threadOpen: string;
+  threadStart: string;
+  threadStartModePrompt: string;
+  threadCreateFailed: string;
+  threadInputPlaceholder: string;
+  threadSendFailed: string;
+  threadTypeContinuation: string;
+  threadTypeStandalone: string;
+  threadTypeIsolation: string;
+  threadContextLabel: string;
+  threadStartDivider: string;
+  threadMessageNoContent: string;
+  threadMessageTools: string;
+  threadMessageTasks: string;
   msgStatTokens: string;
   msgStatUncachedInput: string;
   msgStatCachedInput: string;
@@ -488,10 +533,20 @@ export type TranslationKeys = {
   // File / Attachment
   fileAttach: string;
   fileAttachDesc: string;
+  fileAddToChatContext: string;
+  fileAddToChatContextDesc: string;
+  fileAddToChatContextSuccess: string;
+  fileAddToConversationSuccess: string;
   fileCamera: string;
   fileCameraDesc: string;
+  fileConversationFile: string;
+  fileChatContext: string;
+  fileOpen: string;
   fileDocument: string;
   fileDocumentDesc: string;
+  fileEditAsDocument: string;
+  fileEditAsDocumentDesc: string;
+  fileEditAsDocumentSuccess: string;
   fileFromWorkspace: string;
   fileFromWorkspaceDesc: string;
   fileGallery: string;
@@ -790,6 +845,9 @@ export type TranslationKeys = {
   resourceExplorer: string;
   resourceOpenExternal: string;
   resourcePreviewUnavailable: string;
+  resourceTablePreviewReadOnly: string;
+  resourceTablePreviewUnavailable: string;
+  resourceTablePreviewSummary: string;
   resourceDeleteFailed: string;
   resourceRenameFailed: string;
   resourceRenamePlaceholder: string;
@@ -878,6 +936,39 @@ export type TranslationKeys = {
   resourcePublicShareNotFoundHint: string;
   resourcePublicShareDownloadFailed: string;
   resourcePublicShareSourceSetHint: string;
+  resourceGovernanceUsageInternal: string;
+  resourceGovernanceUsagePublic: string;
+  resourceGovernanceUsageRestricted: string;
+  resourceGovernanceReviewDraft: string;
+  resourceGovernanceReviewApproved: string;
+  resourceGovernanceReviewArchived: string;
+  resourceGovernanceClassificationGeneral: string;
+  resourceGovernanceClassificationBrand: string;
+  resourceGovernanceClassificationFinance: string;
+  resourceGovernanceClassificationHr: string;
+  resourceGovernanceClassificationLegal: string;
+  resourceGovernanceClassificationProduct: string;
+  resourceGovernanceRenditionCaption: string;
+  resourceGovernanceRenditionEmbedding: string;
+  resourceGovernanceRenditionPreview: string;
+  resourceGovernanceRenditionPrint: string;
+  resourceGovernanceRenditionThumbnail: string;
+  resourceGovernanceRenditionTranscript: string;
+  resourceGovernanceRenditionWeb: string;
+  resourceGovernanceFilters: string;
+  resourceGovernanceFiltersSubtitle: string;
+  resourceGovernanceSectionReview: string;
+  resourceGovernanceSectionUsage: string;
+  resourceGovernanceSectionClassification: string;
+  resourceGovernanceSectionRightsOwner: string;
+  resourceGovernanceRightsOwnerPlaceholder: string;
+  resourceGovernanceRightsOwnerSummary: string;
+  resourceGovernanceCapabilitiesViewerHint: string;
+  resourceGovernanceCapabilitiesEditorHint: string;
+  resourceGovernanceCapabilitiesManagerHint: string;
+  resourceGovernanceClear: string;
+  resourceGovernanceApply: string;
+  resourceGovernanceAny: string;
   resourceBytes: string;
   resourceKB: string;
   resourceMB: string;
@@ -885,6 +976,25 @@ export type TranslationKeys = {
   resourceAllFiles: string;
   resourceSourceSetUnassigned: string;
   resourceSourceSetSelect: string;
+  resourceCreateSourceSet: string;
+  resourceCreateSourceSetPlaceholder: string;
+  resourceSourceSetCreated: string;
+  resourceDeleteSourceSetConfirm: string;
+  resourceDeleteSourceSetDesc: string;
+  resourceSourceSetDeleted: string;
+  resourceAddToSourceSet: string;
+  resourceAddToSourceSetSuccess: string;
+  resourceAddToSourceSetFailed: string;
+  resourceAddToSourceSetExists: string;
+  resourceMoveToSourceSet: string;
+  resourceMoveToSourceSetSuccess: string;
+  resourceMoveToSourceSetFailed: string;
+  resourceRemoveFromSourceSet: string;
+  resourceRemoveFromSourceSetConfirm: string;
+  resourceRemoveFromSourceSetDesc: string;
+  resourceRemoveFromSourceSetSuccess: string;
+  resourceRemoveFromSourceSetFailed: string;
+  resourceSelectSourceSetTarget: string;
   resourceFolderRoot: string;
   resourceNewFolder: string;
   resourceMoveToFolder: string;
@@ -1109,6 +1219,99 @@ export type TranslationKeys = {
   memoryEmptyDesc: string;
   memoryPersona: string;
   memoryPersonaEmpty: string;
+  memoryHomePersonal: string;
+  memoryHomeSpaces: string;
+  memoryHomePersonalEmpty: string;
+  memoryHomePersonalEmptyDesc: string;
+  memorySpacesTitle: string;
+  memorySpacesDesc: string;
+  memorySpacesEmpty: string;
+  memorySpaceKindTeam: string;
+  memorySpaceRoleOwner: string;
+  memorySpaceRoleAdmin: string;
+  memorySpaceRoleEditor: string;
+  memorySpaceRoleViewer: string;
+  memorySpaceCanCreate: string;
+  memorySpaceCreateAction: string;
+  memorySpaceCreateFailed: string;
+  memorySpaceCreateSuccess: string;
+  memorySpaceCanReview: string;
+  memorySpaceInboxCount: string;
+  memorySpacePublishedCount: string;
+  memorySpacePlaybooksCount: string;
+  memorySpacePoliciesCount: string;
+  memorySpaceRecallActive: string;
+  memorySpaceRecallDisabled: string;
+  memorySpaceRecallExpired: string;
+  memorySpaceRecallStale: string;
+  memorySpaceBrowse: string;
+  memorySpaceEntriesEmpty: string;
+  memorySpaceEntriesEmptyDesc: string;
+  memorySpaceBackToList: string;
+  memorySpaceDetailOverview: string;
+  memorySpaceDetailAudit: string;
+  memorySpaceEntryCandidate: string;
+  memorySpaceEntryMemory: string;
+  memorySpaceSummaryUnavailable: string;
+  memorySpaceSummaryRetry: string;
+  memorySpaceAuditTitle: string;
+  memorySpaceAuditEmpty: string;
+  memorySpaceAuditShareAction: string;
+  memorySpaceAuditShareSectionAction: string;
+  memorySpaceAuditShareFailed: string;
+  memorySpaceAuditActionMerged: string;
+  memorySpaceAuditActionPolicyUpdated: string;
+  memorySpaceAuditActionPublished: string;
+  memorySpaceAuditByline: string;
+  memorySpaceAuditChangeFromTo: string;
+  memorySpaceAuditChangeSet: string;
+  memorySpaceAuditChangeUnset: string;
+  memorySpaceAuditResolutionMerged: string;
+  memorySpaceFieldTitle: string;
+  memorySpaceFieldRecall: string;
+  memorySpaceFieldExpiresAt: string;
+  memorySpaceFieldLastVerifiedAt: string;
+  memorySpaceFieldStaleAt: string;
+  memorySpaceReviewHintTitle: string;
+  memorySpaceReviewHintDesc: string;
+  memorySpaceReviewHintMatchTitle: string;
+  memorySpaceReviewHintPublishedAt: string;
+  memorySpaceReviewHintImpactTitle: string;
+  memorySpaceReviewHintUpdatesTitle: string;
+  memorySpaceReviewHintUpdatesSummary: string;
+  memorySpaceReviewHintUpdatesContent: string;
+  memorySpaceReviewHintAddsSources: string;
+  memorySpaceReviewActionsTitle: string;
+  memorySpaceMergeAction: string;
+  memorySpacePublishAction: string;
+  memorySpaceRejectAction: string;
+  memorySpaceMarkNeedsReviewAction: string;
+  memorySpaceRevalidateAction: string;
+  memorySpaceMergeSuccess: string;
+  memorySpacePublishSuccess: string;
+  memorySpaceRejectSuccess: string;
+  memorySpaceMarkNeedsReviewSuccess: string;
+  memorySpaceRevalidateSuccess: string;
+  memorySpaceReviewActionFailed: string;
+  memorySpaceLoadFailed: string;
+  memorySpaceSectionInbox: string;
+  memorySpaceSectionPlaybooks: string;
+  memorySpaceSectionPolicies: string;
+  memorySpaceSectionPublished: string;
+  memorySpaceIntakeAutomation: string;
+  memorySpaceIntakeHarness: string;
+  memorySpaceIntakeManual: string;
+  memorySpaceRecallLabel: string;
+  memorySpaceRecallStateActive: string;
+  memorySpaceRecallStateAll: string;
+  memorySpaceRecallStateDisabled: string;
+  memorySpaceRecallStateExpired: string;
+  memorySpaceRecallStateStale: string;
+  memorySpaceSources: string;
+  memorySpaceSourceCount: string;
+  memorySpaceUpdatedAt: string;
+  memorySpacePublishedAt: string;
+  memorySpaceActor: string;
   memorySearch: string;
   memoryDeleteConfirm: string;
   memoryDeleteDesc: string;
@@ -1144,8 +1347,12 @@ export type TranslationKeys = {
   memoryAssociatedLocations: string;
   memoryTotalCount: string;
   memoryEdit: string;
+  memoryReset: string;
   memorySave: string;
+  memorySavingChanges: string;
+  memoryAllChangesSaved: string;
   memorySaved: string;
+  memoryUnsavedChanges: string;
   memoryCreateIdentity: string;
   memoryCreateTitle: string;
   memoryCreateTitlePlaceholder: string;
@@ -1242,7 +1449,7 @@ export type TranslationKeys = {
   videoStatusError: string;
 };
 
-const en: TranslationKeys = {
+export const enUS: TranslationKeys = {
   cancel: 'Cancel',
   confirm: 'Confirm',
   delete: 'Delete',
@@ -1256,6 +1463,8 @@ const en: TranslationKeys = {
   tabDiscover: 'Discover',
   tabMe: 'Me',
   createOpenOptionsA11y: 'Open image and video creation settings',
+  createCurrentSetup: 'Current setup',
+  createHistory: 'History',
 
   chatListTitle: 'Avato',
   chatListSearch: 'Search sessions and messages',
@@ -1488,6 +1697,9 @@ const en: TranslationKeys = {
   notebookDiscard: 'Discard',
   notebookPreview: 'Preview',
   notebookEdit: 'Edit',
+  notebookTableAddColumn: 'Add Column',
+  notebookTableAddRow: 'Add Row',
+  notebookTableLabel: 'Table',
 
   settingsTitle: 'Settings',
   settingsServer: 'Server',
@@ -1615,6 +1827,8 @@ const en: TranslationKeys = {
   homeQuickCreate: 'Art',
   homeAgentAll: 'All',
   homeRecents: 'Assistants',
+  homeRecentDocs: 'Recent docs',
+  homeRecentFiles: 'Recent files',
   homeSeeAll: 'See all',
   homeAssistants: 'Assistants',
   homeStartChat: 'Start Chat',
@@ -1654,6 +1868,44 @@ const en: TranslationKeys = {
   msgActionDeleteConfirm: 'Delete this message?',
   msgActionCopied: 'Copied',
   msgActionSaveToTopic: 'Save to Topic',
+  chatOpenConversation: 'Open conversation',
+  messageDetailTitle: 'Message details',
+  messageDetailOpen: 'View details',
+  messageDetailLoadFailed: 'Unable to load message details',
+  messageDetailEmpty: 'Message unavailable',
+  messageDetailEmptyDesc: 'This message could not be found or is no longer available.',
+  toolDetailTitle: 'Tool details',
+  toolDetailOpen: 'Open tool view',
+  toolDetailEmpty: 'Tool details unavailable',
+  toolDetailEmptyDesc: 'This tool result has no additional details to display.',
+  threadListTitle: 'Threads',
+  threadDetailTitle: 'Thread',
+  threadEmpty: 'No threads yet',
+  threadEmptyDesc: 'This topic does not have any threads to inspect yet.',
+  threadUntitled: 'Untitled thread',
+  threadLoadFailed: 'Could not load threads',
+  threadDeleteConfirm: 'Delete thread',
+  threadDeleted: 'Thread deleted',
+  threadDeleteFailed: 'Could not delete thread',
+  threadStatusProcessing: 'Processing',
+  threadStatusCompleted: 'Completed',
+  threadStatusFailed: 'Failed',
+  threadStatusInterrupted: 'Interrupted',
+  threadStatusInReview: 'In review',
+  threadOpen: 'Open thread',
+  threadStart: 'Start thread',
+  threadStartModePrompt: 'Include the earlier conversation, or branch from this message only?',
+  threadCreateFailed: 'Could not create thread',
+  threadInputPlaceholder: 'Continue this thread...',
+  threadSendFailed: 'Could not send thread message',
+  threadTypeContinuation: 'Continuation',
+  threadTypeStandalone: 'Standalone',
+  threadTypeIsolation: 'Isolation',
+  threadContextLabel: 'Source context',
+  threadStartDivider: 'Thread starts here',
+  threadMessageNoContent: 'No text content',
+  threadMessageTools: 'Tool activity · {count}',
+  threadMessageTasks: 'Task activity · {count}',
   msgStatTokens: 'tokens',
   msgStatUncachedInput: 'Uncached Input',
   msgStatCachedInput: 'Cached Input',
@@ -1699,10 +1951,20 @@ const en: TranslationKeys = {
 
   fileAttach: 'Attach',
   fileAttachDesc: 'Choose a source. Everything goes into this composer.',
+  fileAddToChatContext: 'Add to Chat Context',
+  fileAddToChatContextDesc: 'Attach this document as context instead of a binary file.',
+  fileAddToChatContextSuccess: 'Added to chat context',
+  fileAddToConversationSuccess: 'Added to conversation files',
   fileCamera: 'Camera',
   fileCameraDesc: 'Take a photo and attach it right away.',
+  fileConversationFile: 'Conversation file',
+  fileChatContext: 'Document context',
+  fileOpen: 'Open',
   fileDocument: 'Document',
   fileDocumentDesc: 'Attach files, notes, PDFs, or other supporting material.',
+  fileEditAsDocument: 'Edit as document',
+  fileEditAsDocumentDesc: 'Convert this file into a document you can edit in place.',
+  fileEditAsDocumentSuccess: 'Opened as document',
   fileFromWorkspace: 'From Workspace',
   fileFromWorkspaceDesc: 'Import files from Content.',
   fileGallery: 'Photo Library',
@@ -1994,6 +2256,9 @@ const en: TranslationKeys = {
   resourceExplorer: 'Content Explorer',
   resourceOpenExternal: 'Open in Browser',
   resourcePreviewUnavailable: 'Unable to load preview',
+  resourceTablePreviewReadOnly: 'Read-only table preview',
+  resourceTablePreviewUnavailable: 'This table can only be previewed on mobile right now',
+  resourceTablePreviewSummary: '{rows} rows · {columns} columns',
   resourceDeleteFailed: 'Delete failed',
   resourceRenameFailed: 'Rename failed',
   resourceRenamePlaceholder: 'Enter new name',
@@ -2085,6 +2350,39 @@ const en: TranslationKeys = {
     'Check the link and password. A wrong password looks the same as an expired or invalid link.',
   resourcePublicShareDownloadFailed: 'Could not open the download link.',
   resourcePublicShareSourceSetHint: 'For the full source set and file list, use LobeHub in a browser.',
+  resourceGovernanceUsageInternal: 'Internal',
+  resourceGovernanceUsagePublic: 'Public',
+  resourceGovernanceUsageRestricted: 'Restricted',
+  resourceGovernanceReviewDraft: 'Draft',
+  resourceGovernanceReviewApproved: 'Approved',
+  resourceGovernanceReviewArchived: 'Archived',
+  resourceGovernanceClassificationGeneral: 'General',
+  resourceGovernanceClassificationBrand: 'Brand',
+  resourceGovernanceClassificationFinance: 'Finance',
+  resourceGovernanceClassificationHr: 'HR',
+  resourceGovernanceClassificationLegal: 'Legal',
+  resourceGovernanceClassificationProduct: 'Product',
+  resourceGovernanceRenditionCaption: 'Caption',
+  resourceGovernanceRenditionEmbedding: 'Embedding',
+  resourceGovernanceRenditionPreview: 'Preview',
+  resourceGovernanceRenditionPrint: 'Print',
+  resourceGovernanceRenditionThumbnail: 'Thumbnail',
+  resourceGovernanceRenditionTranscript: 'Transcript',
+  resourceGovernanceRenditionWeb: 'Web',
+  resourceGovernanceFilters: 'Governance',
+  resourceGovernanceFiltersSubtitle: 'Filter files by review status, usage policy, classification, or rights owner.',
+  resourceGovernanceSectionReview: 'Review status',
+  resourceGovernanceSectionUsage: 'Usage policy',
+  resourceGovernanceSectionClassification: 'Classification',
+  resourceGovernanceSectionRightsOwner: 'Rights owner',
+  resourceGovernanceRightsOwnerPlaceholder: 'Enter rights owner',
+  resourceGovernanceRightsOwnerSummary: 'Rights owner: {rightsOwner}',
+  resourceGovernanceCapabilitiesViewerHint: 'You can review governance metadata in this scope.',
+  resourceGovernanceCapabilitiesEditorHint: 'This scope allows governance editing on supported surfaces.',
+  resourceGovernanceCapabilitiesManagerHint: 'This scope allows governance approval and archiving on supported surfaces.',
+  resourceGovernanceClear: 'Clear',
+  resourceGovernanceApply: 'Apply',
+  resourceGovernanceAny: 'Any',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
@@ -2093,6 +2391,25 @@ const en: TranslationKeys = {
   resourceSourceSetUnassigned: 'Uncategorized',
   resourceFolderRoot: 'Root',
   resourceSourceSetSelect: 'Select Source Set',
+  resourceCreateSourceSet: 'Create source set',
+  resourceCreateSourceSetPlaceholder: 'Source set name',
+  resourceSourceSetCreated: 'Source set created',
+  resourceDeleteSourceSetConfirm: 'Delete source set',
+  resourceDeleteSourceSetDesc: 'The source set will be deleted. Files can remain if you choose to keep them.',
+  resourceSourceSetDeleted: 'Source set deleted',
+  resourceAddToSourceSet: 'Add to source set',
+  resourceAddToSourceSetSuccess: 'Added to source set',
+  resourceAddToSourceSetFailed: 'Could not add these items to the source set',
+  resourceAddToSourceSetExists: 'Some items are already in that source set',
+  resourceMoveToSourceSet: 'Move to source set',
+  resourceMoveToSourceSetSuccess: 'Moved to source set',
+  resourceMoveToSourceSetFailed: 'Could not move these items to the source set',
+  resourceRemoveFromSourceSet: 'Remove from source set',
+  resourceRemoveFromSourceSetConfirm: 'Remove from source set',
+  resourceRemoveFromSourceSetDesc: 'Remove {count} item(s) from the current source set?',
+  resourceRemoveFromSourceSetSuccess: 'Removed from source set',
+  resourceRemoveFromSourceSetFailed: 'Could not remove these items from the source set',
+  resourceSelectSourceSetTarget: 'Choose where these items should go.',
   resourceNewFolder: 'New Folder',
   resourceMoveToFolder: 'Move to Folder',
   resourceFolderDeleteConfirm: 'Delete Folder',
@@ -2314,6 +2631,100 @@ const en: TranslationKeys = {
   memoryEmptyDesc: 'AI will automatically extract memories from your conversations.',
   memoryPersona: 'Persona',
   memoryPersonaEmpty: 'No persona generated yet. Chat more to build your profile.',
+  memoryHomePersonal: 'Personal',
+  memoryHomeSpaces: 'Spaces',
+  memoryHomePersonalEmpty: 'No personal memory profile yet',
+  memoryHomePersonalEmptyDesc: 'Chat more and run extraction to build your personal memory.',
+  memorySpacesTitle: 'Team memory spaces',
+  memorySpacesDesc: 'Space-first memory governance and recall status across your team spaces.',
+  memorySpacesEmpty: 'You are not in any team spaces with memory summaries yet.',
+  memorySpaceKindTeam: 'Team space',
+  memorySpaceRoleOwner: 'Owner',
+  memorySpaceRoleAdmin: 'Admin',
+  memorySpaceRoleEditor: 'Editor',
+  memorySpaceRoleViewer: 'Viewer',
+  memorySpaceCanCreate: 'Can create',
+  memorySpaceCreateAction: 'New draft',
+  memorySpaceCreateFailed: 'Could not add the draft right now.',
+  memorySpaceCreateSuccess: 'Draft added to inbox.',
+  memorySpaceCanReview: 'Can review',
+  memorySpaceInboxCount: '{count} inbox',
+  memorySpacePublishedCount: '{count} published',
+  memorySpacePlaybooksCount: '{count} playbooks',
+  memorySpacePoliciesCount: '{count} policies',
+  memorySpaceRecallActive: '{count} active',
+  memorySpaceRecallDisabled: '{count} paused',
+  memorySpaceRecallExpired: '{count} expired',
+  memorySpaceRecallStale: '{count} stale',
+  memorySpaceBrowse: 'Browse memory',
+  memorySpaceEntriesEmpty: 'No memory entries in this section yet',
+  memorySpaceEntriesEmptyDesc:
+    'Try another section or come back after your team publishes more memory.',
+  memorySpaceBackToList: 'Back to list',
+  memorySpaceDetailOverview: 'Entry overview',
+  memorySpaceDetailAudit: 'Activity',
+  memorySpaceEntryCandidate: 'Candidate',
+  memorySpaceEntryMemory: 'Published',
+  memorySpaceSummaryUnavailable: 'This team space is temporarily unavailable',
+  memorySpaceSummaryRetry: 'Retry space',
+  memorySpaceAuditTitle: 'Recent activity',
+  memorySpaceAuditEmpty: 'No audit activity yet',
+  memorySpaceAuditShareAction: 'Share audit',
+  memorySpaceAuditShareSectionAction: 'Share section audit',
+  memorySpaceAuditShareFailed: 'Could not share the audit link right now.',
+  memorySpaceAuditActionMerged: 'Merged into published memory',
+  memorySpaceAuditActionPolicyUpdated: 'Policy updated',
+  memorySpaceAuditActionPublished: 'Published',
+  memorySpaceAuditByline: 'By {name} · {date}',
+  memorySpaceAuditChangeFromTo: '{field}: {before} -> {after}',
+  memorySpaceAuditChangeSet: '{field}: {value}',
+  memorySpaceAuditChangeUnset: '{field}: cleared',
+  memorySpaceAuditResolutionMerged: 'Merged changes into {title}',
+  memorySpaceFieldTitle: 'Title',
+  memorySpaceFieldRecall: 'Recall',
+  memorySpaceFieldExpiresAt: 'Expires',
+  memorySpaceFieldLastVerifiedAt: 'Verified',
+  memorySpaceFieldStaleAt: 'Stale',
+  memorySpaceReviewHintTitle: 'Possible duplicate',
+  memorySpaceReviewHintDesc: 'Review merge impact before publishing this candidate.',
+  memorySpaceReviewHintMatchTitle: 'Matches {name}',
+  memorySpaceReviewHintPublishedAt: 'Published {date}',
+  memorySpaceReviewHintImpactTitle: 'Merge impact',
+  memorySpaceReviewHintUpdatesTitle: 'Updates title',
+  memorySpaceReviewHintUpdatesSummary: 'Updates summary',
+  memorySpaceReviewHintUpdatesContent: 'Updates content',
+  memorySpaceReviewHintAddsSources: 'Adds {count} sources',
+  memorySpaceReviewActionsTitle: 'Review actions',
+  memorySpaceMergeAction: 'Merge',
+  memorySpacePublishAction: 'Publish',
+  memorySpaceRejectAction: 'Reject',
+  memorySpaceMarkNeedsReviewAction: 'Mark Needs Review',
+  memorySpaceRevalidateAction: 'Revalidate',
+  memorySpaceMergeSuccess: 'Candidate merged',
+  memorySpacePublishSuccess: 'Candidate published',
+  memorySpaceRejectSuccess: 'Candidate rejected',
+  memorySpaceMarkNeedsReviewSuccess: 'Memory marked as needing review',
+  memorySpaceRevalidateSuccess: 'Memory revalidated',
+  memorySpaceReviewActionFailed: 'Failed to update candidate',
+  memorySpaceLoadFailed: 'Failed to load team memory',
+  memorySpaceSectionInbox: 'Inbox',
+  memorySpaceSectionPlaybooks: 'Playbooks',
+  memorySpaceSectionPolicies: 'Policies',
+  memorySpaceSectionPublished: 'Published',
+  memorySpaceIntakeAutomation: 'Automation',
+  memorySpaceIntakeHarness: 'Harness',
+  memorySpaceIntakeManual: 'Manual',
+  memorySpaceRecallLabel: 'Recall',
+  memorySpaceRecallStateActive: 'Active',
+  memorySpaceRecallStateAll: 'All',
+  memorySpaceRecallStateDisabled: 'Paused',
+  memorySpaceRecallStateExpired: 'Expired',
+  memorySpaceRecallStateStale: 'Needs review',
+  memorySpaceSources: 'Sources',
+  memorySpaceSourceCount: '{count} sources',
+  memorySpaceUpdatedAt: 'Updated {date}',
+  memorySpacePublishedAt: 'Published {date}',
+  memorySpaceActor: 'By {name}',
   memorySearch: 'Search memories...',
   memoryDeleteConfirm: 'Delete Memory',
   memoryDeleteDesc: 'Are you sure you want to delete this memory? This action cannot be undone.',
@@ -2349,8 +2760,12 @@ const en: TranslationKeys = {
   memoryAssociatedLocations: 'Locations',
   memoryTotalCount: '{count} memories',
   memoryEdit: 'Edit',
+  memoryReset: 'Reset',
   memorySave: 'Save',
+  memorySavingChanges: 'Saving changes',
+  memoryAllChangesSaved: 'All changes saved',
   memorySaved: 'Memory saved',
+  memoryUnsavedChanges: 'Unsaved changes',
   memoryCreateIdentity: 'Create Identity',
   memoryCreateTitle: 'Title',
   memoryCreateTitlePlaceholder: 'Enter identity title...',
@@ -2459,6 +2874,8 @@ const zh_tw: TranslationKeys = {
   tabDiscover: '發現',
   tabMe: '我的',
   createOpenOptionsA11y: '開啟圖片與影片創作設定',
+  createCurrentSetup: '當前配置',
+  createHistory: '歷史紀錄',
 
   chatListTitle: 'Avato',
   chatListSearch: '搜尋會話與訊息',
@@ -2685,6 +3102,9 @@ const zh_tw: TranslationKeys = {
   notebookDiscard: '捨棄',
   notebookPreview: '預覽',
   notebookEdit: '編輯',
+  notebookTableAddColumn: '新增欄位',
+  notebookTableAddRow: '新增列',
+  notebookTableLabel: '表格',
   chatSettingsClearDesc: '這將清空此會話中的所有訊息。',
 
   settingsTitle: '設定',
@@ -2813,6 +3233,8 @@ const zh_tw: TranslationKeys = {
   homeQuickCreate: '作圖',
   homeAgentAll: '全部',
   homeRecents: '智能体',
+  homeRecentDocs: '最近文檔',
+  homeRecentFiles: '最近檔案',
   homeSeeAll: '檢視全部',
   homeAssistants: '助手',
   homeStartChat: '開始聊天',
@@ -2851,6 +3273,44 @@ const zh_tw: TranslationKeys = {
   msgActionDeleteConfirm: '確定刪除這則訊息嗎？',
   msgActionCopied: '已複製',
   msgActionSaveToTopic: '儲存為話題',
+  chatOpenConversation: '打開對話',
+  messageDetailTitle: '訊息詳情',
+  messageDetailOpen: '查看詳情',
+  messageDetailLoadFailed: '無法載入訊息詳情',
+  messageDetailEmpty: '訊息不可用',
+  messageDetailEmptyDesc: '找不到這則訊息，或它已不可用。',
+  toolDetailTitle: '工具詳情',
+  toolDetailOpen: '打開工具視圖',
+  toolDetailEmpty: '工具詳情不可用',
+  toolDetailEmptyDesc: '這個工具結果沒有更多可顯示的內容。',
+  threadListTitle: '執行緒',
+  threadDetailTitle: '執行緒詳情',
+  threadEmpty: '目前沒有執行緒',
+  threadEmptyDesc: '這個話題目前還沒有可檢視的執行緒。',
+  threadUntitled: '未命名執行緒',
+  threadLoadFailed: '無法載入執行緒',
+  threadDeleteConfirm: '刪除執行緒',
+  threadDeleted: '執行緒已刪除',
+  threadDeleteFailed: '無法刪除執行緒',
+  threadStatusProcessing: '處理中',
+  threadStatusCompleted: '已完成',
+  threadStatusFailed: '失敗',
+  threadStatusInterrupted: '已中斷',
+  threadStatusInReview: '待人工審核',
+  threadOpen: '打開執行緒',
+  threadStart: '建立執行緒',
+  threadStartModePrompt: '要包含先前對話上下文，還是只從這則訊息分叉？',
+  threadCreateFailed: '無法建立執行緒',
+  threadInputPlaceholder: '繼續這個執行緒…',
+  threadSendFailed: '無法傳送執行緒訊息',
+  threadTypeContinuation: '延續',
+  threadTypeStandalone: '獨立',
+  threadTypeIsolation: '隔離',
+  threadContextLabel: '來源上下文',
+  threadStartDivider: '執行緒從這裡開始',
+  threadMessageNoContent: '沒有文字內容',
+  threadMessageTools: '工具活動 · {count}',
+  threadMessageTasks: '任務活動 · {count}',
   msgStatTokens: 'tokens',
   msgStatUncachedInput: '未快取輸入',
   msgStatCachedInput: '快取輸入',
@@ -2896,10 +3356,20 @@ const zh_tw: TranslationKeys = {
 
   fileAttach: '附件',
   fileAttachDesc: '選擇來源，內容會直接加入目前的輸入框。',
+  fileAddToChatContext: '加入聊天上下文',
+  fileAddToChatContextDesc: '把這份文檔作為上下文加入，而不是作為二進位附件。',
+  fileAddToChatContextSuccess: '已加入聊天上下文',
+  fileAddToConversationSuccess: '已加入對話文件',
   fileCamera: '拍照',
   fileCameraDesc: '拍一張照片並立即附加。',
+  fileConversationFile: '對話文件',
+  fileChatContext: '文檔上下文',
+  fileOpen: '打開',
   fileDocument: '文件',
   fileDocumentDesc: '附加文件、筆記、PDF 或其他補充資料。',
+  fileEditAsDocument: '作為文檔編輯',
+  fileEditAsDocumentDesc: '先轉成文檔，再直接在這裡編輯內容。',
+  fileEditAsDocumentSuccess: '已作為文檔開啟',
   fileFromWorkspace: '從工作區',
   fileFromWorkspaceDesc: '從內容頁導入文件。',
   fileGallery: '相簿',
@@ -3189,6 +3659,9 @@ const zh_tw: TranslationKeys = {
   resourceExplorer: '內容目錄',
   resourceOpenExternal: '在瀏覽器中打開',
   resourcePreviewUnavailable: '無法載入預覽',
+  resourceTablePreviewReadOnly: '唯讀表格預覽',
+  resourceTablePreviewUnavailable: '此表格目前僅支援在行動端預覽',
+  resourceTablePreviewSummary: '{rows} 列 · {columns} 欄',
   resourceDeleteFailed: '刪除失敗',
   resourceRenameFailed: '重新命名失敗',
   resourceRenamePlaceholder: '輸入新名稱',
@@ -3279,6 +3752,39 @@ const zh_tw: TranslationKeys = {
     '請確認連結與密碼是否正確；密碼錯誤時顯示可能與連結過期相同。',
   resourcePublicShareDownloadFailed: '無法開啟下載連結。',
   resourcePublicShareSourceSetHint: '若要瀏覽完整來源集與檔案列表，請在瀏覽器使用 LobeHub。',
+  resourceGovernanceUsageInternal: '內部',
+  resourceGovernanceUsagePublic: '公開',
+  resourceGovernanceUsageRestricted: '受限',
+  resourceGovernanceReviewDraft: '草稿',
+  resourceGovernanceReviewApproved: '已核准',
+  resourceGovernanceReviewArchived: '已封存',
+  resourceGovernanceClassificationGeneral: '一般',
+  resourceGovernanceClassificationBrand: '品牌',
+  resourceGovernanceClassificationFinance: '財務',
+  resourceGovernanceClassificationHr: '人資',
+  resourceGovernanceClassificationLegal: '法務',
+  resourceGovernanceClassificationProduct: '產品',
+  resourceGovernanceRenditionCaption: '說明',
+  resourceGovernanceRenditionEmbedding: '向量',
+  resourceGovernanceRenditionPreview: '預覽',
+  resourceGovernanceRenditionPrint: '列印',
+  resourceGovernanceRenditionThumbnail: '縮圖',
+  resourceGovernanceRenditionTranscript: '逐字稿',
+  resourceGovernanceRenditionWeb: '網頁',
+  resourceGovernanceFilters: '治理篩選',
+  resourceGovernanceFiltersSubtitle: '依審核狀態、使用政策、分類或權利歸屬方篩選檔案。',
+  resourceGovernanceSectionReview: '審核狀態',
+  resourceGovernanceSectionUsage: '使用政策',
+  resourceGovernanceSectionClassification: '分類',
+  resourceGovernanceSectionRightsOwner: '權利歸屬方',
+  resourceGovernanceRightsOwnerPlaceholder: '輸入權利歸屬方',
+  resourceGovernanceRightsOwnerSummary: '權利歸屬方：{rightsOwner}',
+  resourceGovernanceCapabilitiesViewerHint: '你可以在此範圍檢視治理中繼資料。',
+  resourceGovernanceCapabilitiesEditorHint: '此範圍允許在支援的介面上編輯治理資料。',
+  resourceGovernanceCapabilitiesManagerHint: '此範圍允許在支援的介面上審核與封存治理資料。',
+  resourceGovernanceClear: '清除',
+  resourceGovernanceApply: '套用',
+  resourceGovernanceAny: '全部',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
@@ -3287,6 +3793,25 @@ const zh_tw: TranslationKeys = {
   resourceSourceSetUnassigned: '未分類',
   resourceFolderRoot: '根目錄',
   resourceSourceSetSelect: '選擇來源集',
+  resourceCreateSourceSet: '建立來源集',
+  resourceCreateSourceSetPlaceholder: '來源集名稱',
+  resourceSourceSetCreated: '來源集已建立',
+  resourceDeleteSourceSetConfirm: '刪除來源集',
+  resourceDeleteSourceSetDesc: '來源集將被刪除；若保留檔案，可稍後重新整理。',
+  resourceSourceSetDeleted: '來源集已刪除',
+  resourceAddToSourceSet: '加入來源集',
+  resourceAddToSourceSetSuccess: '已加入來源集',
+  resourceAddToSourceSetFailed: '無法將這些項目加入來源集',
+  resourceAddToSourceSetExists: '部分項目已存在於該來源集中',
+  resourceMoveToSourceSet: '移動到來源集',
+  resourceMoveToSourceSetSuccess: '已移動到來源集',
+  resourceMoveToSourceSetFailed: '無法將這些項目移動到來源集',
+  resourceRemoveFromSourceSet: '從來源集移除',
+  resourceRemoveFromSourceSetConfirm: '從來源集移除',
+  resourceRemoveFromSourceSetDesc: '要從目前來源集中移除 {count} 個項目嗎？',
+  resourceRemoveFromSourceSetSuccess: '已從來源集移除',
+  resourceRemoveFromSourceSetFailed: '無法從來源集移除這些項目',
+  resourceSelectSourceSetTarget: '選擇這些項目的目標來源集。',
   resourceNewFolder: '新建資料夾',
   resourceMoveToFolder: '移至資料夾',
   resourceFolderDeleteConfirm: '刪除資料夾',
@@ -3506,6 +4031,99 @@ const zh_tw: TranslationKeys = {
   memoryEmptyDesc: 'AI 會自動從你的對話中擷取記憶。',
   memoryPersona: '人格畫像',
   memoryPersonaEmpty: '尚未產生人格畫像。多聊聊天來建構你的畫像。',
+  memoryHomePersonal: '個人',
+  memoryHomeSpaces: '空間',
+  memoryHomePersonalEmpty: '尚未建立個人記憶檔案',
+  memoryHomePersonalEmptyDesc: '多聊聊天並執行擷取，即可建立你的個人記憶。',
+  memorySpacesTitle: '團隊記憶空間',
+  memorySpacesDesc: '查看你所屬團隊空間中的記憶治理與 recall 狀態。',
+  memorySpacesEmpty: '你目前還沒有可用的團隊記憶空間摘要。',
+  memorySpaceKindTeam: '團隊空間',
+  memorySpaceRoleOwner: '擁有者',
+  memorySpaceRoleAdmin: '管理員',
+  memorySpaceRoleEditor: '編輯者',
+  memorySpaceRoleViewer: '檢視者',
+  memorySpaceCanCreate: '可建立',
+  memorySpaceCreateAction: '新增草稿',
+  memorySpaceCreateFailed: '目前無法新增草稿。',
+  memorySpaceCreateSuccess: '草稿已加入待處理。',
+  memorySpaceCanReview: '可治理',
+  memorySpaceInboxCount: '{count} 個待處理',
+  memorySpacePublishedCount: '{count} 個已發布',
+  memorySpacePlaybooksCount: '{count} 個手冊',
+  memorySpacePoliciesCount: '{count} 個政策',
+  memorySpaceRecallActive: '{count} 個啟用',
+  memorySpaceRecallDisabled: '{count} 個暫停',
+  memorySpaceRecallExpired: '{count} 個已過期',
+  memorySpaceRecallStale: '{count} 個待驗證',
+  memorySpaceBrowse: '瀏覽記憶',
+  memorySpaceEntriesEmpty: '此區段目前還沒有記憶條目',
+  memorySpaceEntriesEmptyDesc: '可切換其他區段，或等團隊發布更多記憶後再查看。',
+  memorySpaceBackToList: '返回列表',
+  memorySpaceDetailOverview: '條目概覽',
+  memorySpaceDetailAudit: '活動',
+  memorySpaceEntryCandidate: '候選項',
+  memorySpaceEntryMemory: '已發布',
+  memorySpaceSummaryUnavailable: '這個團隊空間暫時無法載入',
+  memorySpaceSummaryRetry: '重試空間',
+  memorySpaceAuditTitle: '最近活動',
+  memorySpaceAuditEmpty: '目前還沒有審計活動',
+  memorySpaceAuditShareAction: '分享審計',
+  memorySpaceAuditShareSectionAction: '分享區段審計',
+  memorySpaceAuditShareFailed: '目前無法分享審計連結。',
+  memorySpaceAuditActionMerged: '已合併到正式記憶',
+  memorySpaceAuditActionPolicyUpdated: '已更新政策',
+  memorySpaceAuditActionPublished: '已發布',
+  memorySpaceAuditByline: '由 {name} 於 {date}',
+  memorySpaceAuditChangeFromTo: '{field}：{before} -> {after}',
+  memorySpaceAuditChangeSet: '{field}：{value}',
+  memorySpaceAuditChangeUnset: '{field}：已清除',
+  memorySpaceAuditResolutionMerged: '已合併變更到 {title}',
+  memorySpaceFieldTitle: '標題',
+  memorySpaceFieldRecall: 'Recall',
+  memorySpaceFieldExpiresAt: '到期',
+  memorySpaceFieldLastVerifiedAt: '驗證',
+  memorySpaceFieldStaleAt: '過期待驗證',
+  memorySpaceReviewHintTitle: '可能重複',
+  memorySpaceReviewHintDesc: '發布候選前，先檢查合併影響。',
+  memorySpaceReviewHintMatchTitle: '匹配 {name}',
+  memorySpaceReviewHintPublishedAt: '發布於 {date}',
+  memorySpaceReviewHintImpactTitle: '合併影響',
+  memorySpaceReviewHintUpdatesTitle: '更新標題',
+  memorySpaceReviewHintUpdatesSummary: '更新摘要',
+  memorySpaceReviewHintUpdatesContent: '更新內容',
+  memorySpaceReviewHintAddsSources: '新增 {count} 個來源',
+  memorySpaceReviewActionsTitle: '審核動作',
+  memorySpaceMergeAction: '合併',
+  memorySpacePublishAction: '發布',
+  memorySpaceRejectAction: '拒絕',
+  memorySpaceMarkNeedsReviewAction: '標記為待審核',
+  memorySpaceRevalidateAction: '重新驗證',
+  memorySpaceMergeSuccess: '候選項已合併',
+  memorySpacePublishSuccess: '候選項已發布',
+  memorySpaceRejectSuccess: '候選項已拒絕',
+  memorySpaceMarkNeedsReviewSuccess: '記憶已標記為待審核',
+  memorySpaceRevalidateSuccess: '記憶已重新驗證',
+  memorySpaceReviewActionFailed: '更新候選項失敗',
+  memorySpaceLoadFailed: '載入團隊記憶失敗',
+  memorySpaceSectionInbox: '待處理',
+  memorySpaceSectionPlaybooks: '手冊',
+  memorySpaceSectionPolicies: '政策',
+  memorySpaceSectionPublished: '已發布',
+  memorySpaceIntakeAutomation: '自動化',
+  memorySpaceIntakeHarness: 'Harness',
+  memorySpaceIntakeManual: '手動',
+  memorySpaceRecallLabel: 'Recall',
+  memorySpaceRecallStateActive: '啟用中',
+  memorySpaceRecallStateAll: '全部',
+  memorySpaceRecallStateDisabled: '已暫停',
+  memorySpaceRecallStateExpired: '已過期',
+  memorySpaceRecallStateStale: '待驗證',
+  memorySpaceSources: '來源',
+  memorySpaceSourceCount: '{count} 個來源',
+  memorySpaceUpdatedAt: '更新於 {date}',
+  memorySpacePublishedAt: '發布於 {date}',
+  memorySpaceActor: '由 {name}',
   memorySearch: '搜尋記憶...',
   memoryDeleteConfirm: '刪除記憶',
   memoryDeleteDesc: '確定要刪除這則記憶嗎？此操作無法復原。',
@@ -3541,8 +4159,12 @@ const zh_tw: TranslationKeys = {
   memoryAssociatedLocations: '關聯地點',
   memoryTotalCount: '{count} 則記憶',
   memoryEdit: '編輯',
+  memoryReset: '重設',
   memorySave: '儲存',
+  memorySavingChanges: '正在儲存變更',
+  memoryAllChangesSaved: '所有變更已儲存',
   memorySaved: '記憶已儲存',
+  memoryUnsavedChanges: '尚有未儲存的變更',
   memoryCreateIdentity: '建立身分',
   memoryCreateTitle: '標題',
   memoryCreateTitlePlaceholder: '輸入身分標題...',
@@ -3651,6 +4273,8 @@ const zh: TranslationKeys = {
   tabDiscover: '发现',
   tabMe: '我的',
   createOpenOptionsA11y: '打开图片与视频创作设置',
+  createCurrentSetup: '当前配置',
+  createHistory: '历史记录',
 
   chatListTitle: 'Avato',
   chatListSearch: '搜索会话与消息',
@@ -3878,6 +4502,9 @@ const zh: TranslationKeys = {
   notebookDiscard: '丢弃',
   notebookPreview: '预览',
   notebookEdit: '编辑',
+  notebookTableAddColumn: '新增列',
+  notebookTableAddRow: '新增行',
+  notebookTableLabel: '表格',
 
   settingsTitle: '设置',
   settingsServer: '服务器',
@@ -4005,6 +4632,8 @@ const zh: TranslationKeys = {
   homeQuickCreate: '作图',
   homeAgentAll: '全部',
   homeRecents: '智能体',
+  homeRecentDocs: '最近文档',
+  homeRecentFiles: '最近文件',
   homeSeeAll: '查看全部',
   homeAssistants: '助手',
   homeStartChat: '开始聊天',
@@ -4043,6 +4672,44 @@ const zh: TranslationKeys = {
   msgActionDeleteConfirm: '确定删除这条消息吗？',
   msgActionCopied: '已复制',
   msgActionSaveToTopic: '存为话题',
+  chatOpenConversation: '打开对话',
+  messageDetailTitle: '消息详情',
+  messageDetailOpen: '查看详情',
+  messageDetailLoadFailed: '无法加载消息详情',
+  messageDetailEmpty: '消息不可用',
+  messageDetailEmptyDesc: '找不到这条消息，或它已不可用。',
+  toolDetailTitle: '工具详情',
+  toolDetailOpen: '打开工具视图',
+  toolDetailEmpty: '工具详情不可用',
+  toolDetailEmptyDesc: '这个工具结果没有更多可显示的内容。',
+  threadListTitle: '线程',
+  threadDetailTitle: '线程详情',
+  threadEmpty: '当前没有线程',
+  threadEmptyDesc: '这个话题里还没有可查看的线程。',
+  threadUntitled: '未命名线程',
+  threadLoadFailed: '无法加载线程',
+  threadDeleteConfirm: '删除线程',
+  threadDeleted: '线程已删除',
+  threadDeleteFailed: '无法删除线程',
+  threadStatusProcessing: '处理中',
+  threadStatusCompleted: '已完成',
+  threadStatusFailed: '失败',
+  threadStatusInterrupted: '已中断',
+  threadStatusInReview: '待人工审核',
+  threadOpen: '打开线程',
+  threadStart: '新建线程',
+  threadStartModePrompt: '要包含之前的对话上下文，还是只从这条消息分叉？',
+  threadCreateFailed: '无法创建线程',
+  threadInputPlaceholder: '继续这个线程…',
+  threadSendFailed: '无法发送线程消息',
+  threadTypeContinuation: '延续',
+  threadTypeStandalone: '独立',
+  threadTypeIsolation: '隔离',
+  threadContextLabel: '来源上下文',
+  threadStartDivider: '线程从这里开始',
+  threadMessageNoContent: '没有文本内容',
+  threadMessageTools: '工具活动 · {count}',
+  threadMessageTasks: '任务活动 · {count}',
   msgStatTokens: 'tokens',
   msgStatUncachedInput: '未缓存输入',
   msgStatCachedInput: '缓存输入',
@@ -4088,10 +4755,20 @@ const zh: TranslationKeys = {
 
   fileAttach: '附件',
   fileAttachDesc: '选择来源，内容会直接加入当前输入框。',
+  fileAddToChatContext: '添加到聊天上下文',
+  fileAddToChatContextDesc: '把这份文档作为上下文添加，而不是作为二进制附件。',
+  fileAddToChatContextSuccess: '已添加到聊天上下文',
+  fileAddToConversationSuccess: '已加入对话文件',
   fileCamera: '拍照',
   fileCameraDesc: '拍一张照片并立即附加。',
+  fileConversationFile: '对话文件',
+  fileChatContext: '文档上下文',
+  fileOpen: '打开',
   fileDocument: '文档',
   fileDocumentDesc: '附加文件、笔记、PDF 或其他补充材料。',
+  fileEditAsDocument: '作为文档编辑',
+  fileEditAsDocumentDesc: '先转换成文档，再直接在这里编辑内容。',
+  fileEditAsDocumentSuccess: '已作为文档打开',
   fileFromWorkspace: '从工作区',
   fileFromWorkspaceDesc: '从内容页导入文件。',
   fileGallery: '相册',
@@ -4382,6 +5059,9 @@ const zh: TranslationKeys = {
   resourceExplorer: '内容目录',
   resourceOpenExternal: '在浏览器中打开',
   resourcePreviewUnavailable: '无法加载预览',
+  resourceTablePreviewReadOnly: '只读表格预览',
+  resourceTablePreviewUnavailable: '该表格目前仅支持在移动端预览',
+  resourceTablePreviewSummary: '{rows} 行 · {columns} 列',
   resourceDeleteFailed: '删除失败',
   resourceRenameFailed: '重命名失败',
   resourceRenamePlaceholder: '输入新名称',
@@ -4471,6 +5151,39 @@ const zh: TranslationKeys = {
   resourcePublicShareNotFoundHint: '请核对链接与密码；密码错误时提示可能与链接过期相同。',
   resourcePublicShareDownloadFailed: '无法打开下载链接。',
   resourcePublicShareSourceSetHint: '若要查看完整来源集与文件列表，请在浏览器中使用 LobeHub。',
+  resourceGovernanceUsageInternal: '内部',
+  resourceGovernanceUsagePublic: '公开',
+  resourceGovernanceUsageRestricted: '受限',
+  resourceGovernanceReviewDraft: '草稿',
+  resourceGovernanceReviewApproved: '已批准',
+  resourceGovernanceReviewArchived: '已归档',
+  resourceGovernanceClassificationGeneral: '通用',
+  resourceGovernanceClassificationBrand: '品牌',
+  resourceGovernanceClassificationFinance: '财务',
+  resourceGovernanceClassificationHr: '人事',
+  resourceGovernanceClassificationLegal: '法务',
+  resourceGovernanceClassificationProduct: '产品',
+  resourceGovernanceRenditionCaption: '说明',
+  resourceGovernanceRenditionEmbedding: '向量',
+  resourceGovernanceRenditionPreview: '预览',
+  resourceGovernanceRenditionPrint: '打印',
+  resourceGovernanceRenditionThumbnail: '缩略图',
+  resourceGovernanceRenditionTranscript: '转录',
+  resourceGovernanceRenditionWeb: '网页',
+  resourceGovernanceFilters: '治理筛选',
+  resourceGovernanceFiltersSubtitle: '按审核状态、使用策略、分类或权利归属方筛选文件。',
+  resourceGovernanceSectionReview: '审核状态',
+  resourceGovernanceSectionUsage: '使用策略',
+  resourceGovernanceSectionClassification: '分类',
+  resourceGovernanceSectionRightsOwner: '权利归属方',
+  resourceGovernanceRightsOwnerPlaceholder: '输入权利归属方',
+  resourceGovernanceRightsOwnerSummary: '权利归属方：{rightsOwner}',
+  resourceGovernanceCapabilitiesViewerHint: '你可以在当前范围查看治理元数据。',
+  resourceGovernanceCapabilitiesEditorHint: '当前范围允许在受支持的界面上编辑治理数据。',
+  resourceGovernanceCapabilitiesManagerHint: '当前范围允许在受支持的界面上审批和归档治理数据。',
+  resourceGovernanceClear: '清除',
+  resourceGovernanceApply: '应用',
+  resourceGovernanceAny: '全部',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
@@ -4479,6 +5192,25 @@ const zh: TranslationKeys = {
   resourceSourceSetUnassigned: '未归类',
   resourceFolderRoot: '根目录',
   resourceSourceSetSelect: '选择来源集',
+  resourceCreateSourceSet: '创建来源集',
+  resourceCreateSourceSetPlaceholder: '来源集名称',
+  resourceSourceSetCreated: '来源集已创建',
+  resourceDeleteSourceSetConfirm: '删除来源集',
+  resourceDeleteSourceSetDesc: '来源集将被删除；如果保留文件，之后仍可重新整理。',
+  resourceSourceSetDeleted: '来源集已删除',
+  resourceAddToSourceSet: '加入来源集',
+  resourceAddToSourceSetSuccess: '已加入来源集',
+  resourceAddToSourceSetFailed: '无法将这些项目加入来源集',
+  resourceAddToSourceSetExists: '部分项目已存在于该来源集中',
+  resourceMoveToSourceSet: '移动到来源集',
+  resourceMoveToSourceSetSuccess: '已移动到来源集',
+  resourceMoveToSourceSetFailed: '无法将这些项目移动到来源集',
+  resourceRemoveFromSourceSet: '从来源集移除',
+  resourceRemoveFromSourceSetConfirm: '从来源集移除',
+  resourceRemoveFromSourceSetDesc: '要从当前来源集中移除 {count} 个项目吗？',
+  resourceRemoveFromSourceSetSuccess: '已从来源集移除',
+  resourceRemoveFromSourceSetFailed: '无法从来源集中移除这些项目',
+  resourceSelectSourceSetTarget: '选择这些项目的目标来源集。',
   resourceNewFolder: '新建文件夹',
   resourceMoveToFolder: '移动到文件夹',
   resourceFolderDeleteConfirm: '删除文件夹',
@@ -4698,6 +5430,99 @@ const zh: TranslationKeys = {
   memoryEmptyDesc: 'AI 会自动从你的对话中提取记忆。',
   memoryPersona: '人格画像',
   memoryPersonaEmpty: '还没有生成人格画像。多聊聊天来构建你的画像。',
+  memoryHomePersonal: '个人',
+  memoryHomeSpaces: '空间',
+  memoryHomePersonalEmpty: '还没有个人记忆档案',
+  memoryHomePersonalEmptyDesc: '多聊聊天并执行提取，就能建立你的个人记忆。',
+  memorySpacesTitle: '团队记忆空间',
+  memorySpacesDesc: '查看你所在团队空间中的记忆治理与 recall 状态。',
+  memorySpacesEmpty: '你当前还没有可用的团队记忆空间摘要。',
+  memorySpaceKindTeam: '团队空间',
+  memorySpaceRoleOwner: '所有者',
+  memorySpaceRoleAdmin: '管理员',
+  memorySpaceRoleEditor: '编辑者',
+  memorySpaceRoleViewer: '查看者',
+  memorySpaceCanCreate: '可创建',
+  memorySpaceCreateAction: '新增草稿',
+  memorySpaceCreateFailed: '暂时无法新增草稿。',
+  memorySpaceCreateSuccess: '草稿已加入待处理。',
+  memorySpaceCanReview: '可治理',
+  memorySpaceInboxCount: '{count} 个待处理',
+  memorySpacePublishedCount: '{count} 个已发布',
+  memorySpacePlaybooksCount: '{count} 个手册',
+  memorySpacePoliciesCount: '{count} 个策略',
+  memorySpaceRecallActive: '{count} 个启用',
+  memorySpaceRecallDisabled: '{count} 个暂停',
+  memorySpaceRecallExpired: '{count} 个已过期',
+  memorySpaceRecallStale: '{count} 个待验证',
+  memorySpaceBrowse: '浏览记忆',
+  memorySpaceEntriesEmpty: '这个分区目前还没有记忆条目',
+  memorySpaceEntriesEmptyDesc: '可以切换其他分区，或等团队发布更多记忆后再回来查看。',
+  memorySpaceBackToList: '返回列表',
+  memorySpaceDetailOverview: '条目概览',
+  memorySpaceDetailAudit: '活动',
+  memorySpaceEntryCandidate: '候选项',
+  memorySpaceEntryMemory: '已发布',
+  memorySpaceSummaryUnavailable: '这个团队空间暂时无法加载',
+  memorySpaceSummaryRetry: '重试空间',
+  memorySpaceAuditTitle: '最近活动',
+  memorySpaceAuditEmpty: '目前还没有审计活动',
+  memorySpaceAuditShareAction: '分享审计',
+  memorySpaceAuditShareSectionAction: '分享分区审计',
+  memorySpaceAuditShareFailed: '暂时无法分享审计链接。',
+  memorySpaceAuditActionMerged: '已合并到正式记忆',
+  memorySpaceAuditActionPolicyUpdated: '已更新策略',
+  memorySpaceAuditActionPublished: '已发布',
+  memorySpaceAuditByline: '由 {name} 于 {date}',
+  memorySpaceAuditChangeFromTo: '{field}：{before} -> {after}',
+  memorySpaceAuditChangeSet: '{field}：{value}',
+  memorySpaceAuditChangeUnset: '{field}：已清除',
+  memorySpaceAuditResolutionMerged: '已合并变更到 {title}',
+  memorySpaceFieldTitle: '标题',
+  memorySpaceFieldRecall: 'Recall',
+  memorySpaceFieldExpiresAt: '到期',
+  memorySpaceFieldLastVerifiedAt: '验证',
+  memorySpaceFieldStaleAt: '过期待验证',
+  memorySpaceReviewHintTitle: '可能重复',
+  memorySpaceReviewHintDesc: '发布候选前，先检查合并影响。',
+  memorySpaceReviewHintMatchTitle: '匹配 {name}',
+  memorySpaceReviewHintPublishedAt: '发布于 {date}',
+  memorySpaceReviewHintImpactTitle: '合并影响',
+  memorySpaceReviewHintUpdatesTitle: '更新标题',
+  memorySpaceReviewHintUpdatesSummary: '更新摘要',
+  memorySpaceReviewHintUpdatesContent: '更新内容',
+  memorySpaceReviewHintAddsSources: '新增 {count} 个来源',
+  memorySpaceReviewActionsTitle: '审核动作',
+  memorySpaceMergeAction: '合并',
+  memorySpacePublishAction: '发布',
+  memorySpaceRejectAction: '拒绝',
+  memorySpaceMarkNeedsReviewAction: '标记为待审核',
+  memorySpaceRevalidateAction: '重新验证',
+  memorySpaceMergeSuccess: '候选项已合并',
+  memorySpacePublishSuccess: '候选项已发布',
+  memorySpaceRejectSuccess: '候选项已拒绝',
+  memorySpaceMarkNeedsReviewSuccess: '记忆已标记为待审核',
+  memorySpaceRevalidateSuccess: '记忆已重新验证',
+  memorySpaceReviewActionFailed: '更新候选项失败',
+  memorySpaceLoadFailed: '加载团队记忆失败',
+  memorySpaceSectionInbox: '待处理',
+  memorySpaceSectionPlaybooks: '手册',
+  memorySpaceSectionPolicies: '策略',
+  memorySpaceSectionPublished: '已发布',
+  memorySpaceIntakeAutomation: '自动化',
+  memorySpaceIntakeHarness: 'Harness',
+  memorySpaceIntakeManual: '手动',
+  memorySpaceRecallLabel: 'Recall',
+  memorySpaceRecallStateActive: '启用中',
+  memorySpaceRecallStateAll: '全部',
+  memorySpaceRecallStateDisabled: '已暂停',
+  memorySpaceRecallStateExpired: '已过期',
+  memorySpaceRecallStateStale: '待验证',
+  memorySpaceSources: '来源',
+  memorySpaceSourceCount: '{count} 个来源',
+  memorySpaceUpdatedAt: '更新于 {date}',
+  memorySpacePublishedAt: '发布于 {date}',
+  memorySpaceActor: '由 {name}',
   memorySearch: '搜索记忆...',
   memoryDeleteConfirm: '删除记忆',
   memoryDeleteDesc: '确定要删除这条记忆吗？此操作无法撤销。',
@@ -4733,8 +5558,12 @@ const zh: TranslationKeys = {
   memoryAssociatedLocations: '关联地点',
   memoryTotalCount: '{count} 条记忆',
   memoryEdit: '编辑',
+  memoryReset: '重置',
   memorySave: '保存',
+  memorySavingChanges: '正在保存更改',
+  memoryAllChangesSaved: '所有更改已保存',
   memorySaved: '记忆已保存',
+  memoryUnsavedChanges: '有未保存的更改',
   memoryCreateIdentity: '创建身份',
   memoryCreateTitle: '标题',
   memoryCreateTitlePlaceholder: '输入身份标题...',
@@ -4830,7 +5659,7 @@ const zh: TranslationKeys = {
 };
 
 const translations: Record<Locale, TranslationKeys> = {
-  'en-US': en,
+  'en-US': enUS,
   'zh-CN': zh,
   'zh-TW': zh_tw,
 
@@ -4853,9 +5682,9 @@ export const LOCALE_DISPLAY_NAMES: Record<Locale, string> = {
 
 export const useI18n = create<I18nStore>((set) => ({
   locale: 'en-US',
-  t: en,
+  t: enUS,
   setLocale: async (locale: Locale) => {
-    set({ locale, t: translations[locale] || en });
+    set({ locale, t: translations[locale] || enUS });
 
     try {
       await AsyncStorage.setItem(STORAGE_KEY, locale);

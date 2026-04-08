@@ -19,6 +19,7 @@ import MemoryAddPreference from './memory/AddPreferenceMemory';
 import MemorySearchUser from './memory/SearchUserMemory';
 import NotebookCreateDocument from './notebook/CreateDocument';
 import SkillStoreSearchSkill from './skillStore/SearchSkill';
+import SourceSetReadFilesRender from './sourceSet/ReadSourceFiles';
 import SourceSetSearchRender from './sourceSet/SearchSourceSet';
 import type { MobileBuiltinRender, MobileBuiltinRenderProps } from './types';
 import WebBrowsingSearchResult from './webBrowsing/SearchResult';
@@ -70,6 +71,7 @@ const MemoryApiName = {
 const CloudSandboxApiName = { executeCode: 'executeCode' } as const;
 const WebBrowsingApiName = { search: 'search' } as const;
 const SourceSetApiName = { searchSourceSet: 'searchSourceSet' } as const;
+const SourceSetReadApiName = { readSourceFiles: 'readSourceFiles' } as const;
 const GroupManagementApiName = { broadcast: 'broadcast', speak: 'speak' } as const;
 const SkillStoreApiName = { searchSkill: 'searchSkill' } as const;
 const SkillsApiName = { searchSkill: 'searchSkill' } as const;
@@ -163,6 +165,7 @@ const BUILTIN_RENDERS: Record<
     [WebBrowsingApiName.search]: WebBrowsingSearchResult,
   },
   [SOURCE_SET_ID]: {
+    [SourceSetReadApiName.readSourceFiles]: SourceSetReadFilesRender,
     [SourceSetApiName.searchSourceSet]: SourceSetSearchRender,
   },
   [GROUP_MANAGEMENT_ID]: {

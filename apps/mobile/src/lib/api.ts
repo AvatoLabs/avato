@@ -27,6 +27,7 @@ import type {
   ChatPluginPayload,
   ChatSession,
   ChatToolPayload,
+  ConversationFileItem,
   CreateSessionConfig,
   DiscoverModel,
   FileAssetCapabilities,
@@ -58,6 +59,7 @@ import type {
   MobileSpaceMemorySectionResult,
   MobileSpaceMemorySummary,
   MobileSSOProvider,
+  MobileThreadItem,
   MobileUserState,
   ModelRankItem,
   RecentTopic,
@@ -536,6 +538,7 @@ const normalizeMessage = (message: any, parentSessionId?: string): ChatMessage =
     role: message?.role,
     search: (message?.search as GroundingSearch | null | undefined) ?? null,
     sessionId,
+    threadId: message?.threadId ?? message?.thread_id ?? null,
     toolCallId: message?.tool_call_id ?? undefined,
     tools: (message?.tools as ChatToolPayload[] | null | undefined) ?? null,
     taskDetail: message?.taskDetail ?? message?.task_detail ?? undefined,
@@ -863,6 +866,21 @@ export const sessionApi = {
   },
   updateChatConfig: (id: string, config: Record<string, unknown>) =>
     trpcMutate('session.updateSessionChatConfig', { id, value: config }),
+  getConversationFiles: (context: { agentId?: string; groupId?: string | null; sessionId?: string | null }) =>
+    trpcQuery<ConversationFileItem[]>('session.getConversationFiles', context),
+  addConversationFiles: (
+    fileIds: string[],
+    context: { agentId?: string; groupId?: string | null; sessionId?: string | null },
+  ) => trpcMutate('session.createConversationFiles', { ...context, fileIds }),
+  deleteConversationFile: (
+    fileId: string,
+    context: { agentId?: string; groupId?: string | null; sessionId?: string | null },
+  ) => trpcMutate('session.deleteConversationFile', { ...context, fileId }),
+  toggleConversationFile: (
+    fileId: string,
+    enabled: boolean,
+    context: { agentId?: string; groupId?: string | null; sessionId?: string | null },
+  ) => trpcMutate('session.toggleConversationFile', { ...context, enabled, fileId }),
 
   /** Update session-level agent config (for session-only chats with no linked agent). */
   updateSessionConfig: (id: string, config: Record<string, unknown>) =>
@@ -1078,6 +1096,7 @@ export interface CreateMessageParams {
   role: 'user' | 'assistant';
   search?: GroundingSearch | null;
   sessionId?: string | null;
+  threadId?: string | null;
   tools?: ChatToolPayload[] | null;
   topicId?: string;
   traceId?: string;
@@ -1107,12 +1126,12 @@ export const messageApi = {
   list: (
     sessionId: string,
     topicId?: string,
-    options?: { sessionType?: 'agent' | 'group' },
+    options?: { sessionType?: 'agent' | 'group'; threadId?: string },
   ) => {
     const params =
       options?.sessionType === 'group'
-        ? { groupId: sessionId, topicId }
-        : { sessionId, topicId };
+        ? { groupId: sessionId, threadId: options?.threadId, topicId }
+        : { sessionId, threadId: options?.threadId, topicId };
     return trpcQuery<any[]>('message.getMessages', params).then((messages) =>
       (messages ?? []).map((message) => normalizeMessage(message)),
     );
@@ -1144,6 +1163,21 @@ export const messageApi = {
     trpcMutate('message.removeMessages', { ids }),
   search: (keywords: string) =>
     trpcQuery<MessageSearchResult[]>('message.searchMessages', { keywords }),
+};
+
+export const threadApi = {
+  create: (params: {
+    parentThreadId?: string;
+    sourceMessageId?: string;
+    title?: string;
+    topicId: string;
+    type: 'continuation' | 'isolation' | 'standalone';
+  }) => trpcMutate<string>('thread.createThread', params),
+  list: (topicId: string) => trpcQuery<MobileThreadItem[]>('thread.getThreads', { topicId }),
+  generateTitle: (id: string) => trpcMutate<string | null>('thread.generateThreadTitle', { id }),
+  remove: (id: string) => trpcMutate('thread.removeThread', { id }),
+  update: (id: string, value: Record<string, unknown>) =>
+    trpcMutate('thread.updateThread', { id, value }),
 };
 
 // ── AI Chat API ─────────────────────────────────────────────────────
@@ -2218,6 +2252,22 @@ interface PreviewFileDocument {
 }
 
 export const resourceApi = {
+  getRecentFiles: (limit: number = 6) =>
+    trpcQuery<FileListItem[]>('file.recentFiles', { limit }).then((items) =>
+      (items ?? []).map((item) => ({
+        ...item,
+        sourceType: 'file' as const,
+      })),
+    ),
+
+  getRecentPages: (limit: number = 6) =>
+    trpcQuery<FileListItem[]>('file.recentPages', { limit }).then((items) =>
+      (items ?? []).map((item) => ({
+        ...item,
+        sourceType: 'document' as const,
+      })),
+    ),
+
   getKnowledgeItems: (params: ResourceQueryParams) =>
     trpcQuery<ResourceListResponse>('file.getKnowledgeItems', {
       limit: 50,
@@ -2235,6 +2285,7 @@ export const resourceApi = {
       editorData?: Record<string, any> | null;
       fileType?: string | null;
       id: string;
+      metadata?: Record<string, any> | null;
       sourceSetId?: string | null;
       parentId?: string | null;
       slug?: string | null;
@@ -2275,12 +2326,19 @@ export const resourceApi = {
     id: string,
     updates: {
       content?: string;
+      editorData?: Record<string, any> | null;
       fileType?: string;
       parentId?: string | null;
       title?: string;
     },
   ) =>
-    trpcMutate('document.updateDocument', { id, ...updates }),
+    trpcMutate('document.updateDocument', {
+      id,
+      ...updates,
+      ...(updates.editorData !== undefined
+        ? { editorData: JSON.stringify(updates.editorData) }
+        : {}),
+    }),
 
   deleteDocument: (id: string, trash: boolean = true) =>
     trpcMutate('document.deleteDocument', { id, trash }),
@@ -3499,6 +3557,7 @@ export interface NotebookDocument {
   content?: string | null;
   createdAt?: string;
   description?: string | null;
+  editorData?: Record<string, any> | null;
   fileType?: string | null;
   id: string;
   metadata?: Record<string, any> | null;
