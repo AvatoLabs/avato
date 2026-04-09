@@ -8,6 +8,15 @@ const streamedTool = {
   type: 'function',
 };
 
+const mockReadAsStringAsync = vi.fn();
+const mockGetInfoAsync = vi.fn();
+const mockMakeDirectoryAsync = vi.fn();
+const mockCopyAsync = vi.fn();
+const mockUploadAsync = vi.fn();
+const mockCreateUploadTask = vi.fn(() => ({
+  uploadAsync: mockUploadAsync,
+}));
+
 vi.mock('@lobechat/fetch-sse/sseParser', () => ({
   createSSEChunkParser: vi.fn(() => {
     return (chunk: string) =>
@@ -25,9 +34,20 @@ vi.mock('@lobechat/fetch-sse/sseParser', () => ({
 }));
 
 vi.mock('expo-file-system/legacy', () => ({
+  EncodingType: {
+    Base64: 'base64',
+  },
+  FileSystemUploadType: {
+    BINARY_CONTENT: 'binary',
+    MULTIPART: 'multipart',
+  },
   cacheDirectory: '/tmp/',
+  copyAsync: mockCopyAsync,
+  createUploadTask: mockCreateUploadTask,
   documentDirectory: '/tmp/',
-  readAsStringAsync: vi.fn(),
+  getInfoAsync: mockGetInfoAsync,
+  makeDirectoryAsync: mockMakeDirectoryAsync,
+  readAsStringAsync: mockReadAsStringAsync,
 }));
 
 vi.mock('./lib/auth', () => ({
@@ -95,6 +115,12 @@ class MockXMLHttpRequest {
 describe('aiChatApi', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCopyAsync.mockReset();
+    mockCreateUploadTask.mockClear();
+    mockGetInfoAsync.mockReset();
+    mockMakeDirectoryAsync.mockReset();
+    mockReadAsStringAsync.mockReset();
+    mockUploadAsync.mockReset();
     MockXMLHttpRequest.instances = [];
     vi.stubGlobal('XMLHttpRequest', MockXMLHttpRequest as unknown as typeof XMLHttpRequest);
   });
@@ -528,6 +554,58 @@ describe('resourceApi', () => {
   });
 });
 
+describe('contentShareApi', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('creates content share links with the expected tRPC envelope', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          result: {
+            data: {
+              json: {
+                expiresAt: '2026-04-10T08:00:00.000Z',
+                fileShareDownloadUrl: 'https://example.com/share/f/tok_1',
+                id: 'share-link-1',
+                shareUrl: 'https://example.com/share/r/tok_1',
+              },
+            },
+          },
+        }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { contentShareApi } = await import('./lib/api');
+    const result = await contentShareApi.createContentShareLink({
+      expiresInDays: 7,
+      id: 'file-1',
+      kind: 'file',
+      password: 'secret',
+    });
+
+    expect(result.id).toBe('share-link-1');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, { body: string; method: string }];
+
+    expect(url).toContain('/trpc/mobile/contentShare.createContentShareLink');
+    expect(options.method).toBe('POST');
+    expect(options.body).toContain('"id":"file-1"');
+    expect(options.body).toContain('"kind":"file"');
+    expect(options.body).toContain('"expiresInDays":7');
+    expect(options.body).toContain('"password":"secret"');
+  });
+});
+
 describe('threadApi', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -757,5 +835,111 @@ describe('sessionApi conversation file wrappers', () => {
     expect(options.method).toBe('POST');
     expect(options.body).toContain('"sessionId":"session-1"');
     expect(options.body).toContain('"fileIds":["file-1","file-2"]');
+  });
+});
+
+describe('fileApi upload flow', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCopyAsync.mockReset();
+    mockCreateUploadTask.mockClear();
+    mockGetInfoAsync.mockReset();
+    mockMakeDirectoryAsync.mockReset();
+    mockReadAsStringAsync.mockReset();
+    mockUploadAsync.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('uploads files through prepareResourceUpload → presigned PUT → completeResourceUpload → createFile', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            result: {
+              data: {
+                json: {
+                  isExist: false,
+                },
+              },
+            },
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            result: {
+              data: {
+                json: {
+                  presignedUrl: 'https://upload.example.com/presigned',
+                  sessionId: 'upload-session-1',
+                  storageKey: 'v2/files/2026/roadmap.pdf',
+                },
+              },
+            },
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ result: { data: { json: null } } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            result: {
+              data: {
+                json: {
+                  id: 'file-1',
+                  url: 'https://example.com/f/file-1',
+                },
+              },
+            },
+          }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    mockGetInfoAsync.mockResolvedValue({ exists: true, size: 3 });
+    mockReadAsStringAsync.mockResolvedValue('YWJj');
+    mockUploadAsync.mockResolvedValue({ status: 200 });
+
+    const onProgress = vi.fn();
+    const { fileApi } = await import('./lib/api');
+    const result = await fileApi.upload(
+      'file:///tmp/roadmap.pdf',
+      'Roadmap.pdf',
+      'application/pdf',
+      {
+        onProgress,
+        spaceId: 'space-1',
+      },
+    );
+
+    expect(result).toEqual({
+      id: 'file-1',
+      url: 'https://example.com/f/file-1',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('/trpc/mobile/file.checkSpaceBlob');
+    expect(fetchMock.mock.calls[1]?.[0]).toContain('/trpc/mobile/upload.prepareResourceUpload');
+    expect(fetchMock.mock.calls[2]?.[0]).toContain('/trpc/mobile/upload.completeResourceUpload');
+    expect(fetchMock.mock.calls[3]?.[0]).toContain('/trpc/mobile/file.createFile');
+
+    expect(mockCreateUploadTask).toHaveBeenCalledTimes(1);
+    const firstUploadTaskCall = mockCreateUploadTask.mock.calls[0] as unknown[] | undefined;
+    expect(firstUploadTaskCall?.[0]).toBe('https://upload.example.com/presigned');
+    expect(firstUploadTaskCall?.[1]).toBe('file:///tmp/roadmap.pdf');
+    expect(onProgress).toHaveBeenCalledWith(5);
   });
 });
