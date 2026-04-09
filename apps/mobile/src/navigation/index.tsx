@@ -1,7 +1,7 @@
 /**
  * Navigation — single unified navigator with all screens.
  */
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { type BottomTabBarProps, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
   createNativeStackNavigator,
   type NativeStackNavigationOptions,
@@ -9,7 +9,8 @@ import {
 import { BlurView } from 'expo-blur';
 import { FolderOpen, MessageCircle, Palette, Store } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Image as RNImage, Platform, StyleSheet, View } from 'react-native';
+import { Image as RNImage, Keyboard, Platform, StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -21,6 +22,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import PressableScale from '../components/ui/PressableScale';
 import { TAB_BAR_FLOAT_GAP, TAB_BAR_HEIGHT, TAB_BAR_HORIZONTAL_INSET } from '../lib/bottomChrome';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -93,7 +95,10 @@ const IOS_STACK_GESTURE_OPTIONS =
 const isPortalNotebookRoute = (params: RootStackParamList['Notebook']) =>
   !!params?.documentId || !!params?.portalStack?.length;
 
-/** Floating tab bar layout — matte surfaces only, no specular / highlight treatments */
+/** Fixed bottom tab bar layout — matte surfaces only, no floating capsule treatment */
+const TAB_BAR_ACTIVE_INDICATOR_HEIGHT = 36;
+const TAB_BAR_ACTIVE_INDICATOR_HORIZONTAL_INSET = 12;
+const TAB_BAR_HIDE_TRANSLATE_EXTRA = 12;
 
 function MeTabIcon({
   focused,
@@ -106,7 +111,7 @@ function MeTabIcon({
 }) {
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const colors = useThemeColors();
-  const logoSize = Math.round(Math.max(size + 1, 24) * 1.15);
+  const logoSize = Math.round(Math.max(size - 2, 20));
   const rotation = useSharedValue(0);
   const scale = useSharedValue(1);
 
@@ -166,20 +171,20 @@ function MeTabIcon({
 function AnimatedTabLabel({ focused, label }: { focused: boolean; label: string }) {
   const colors = useThemeColors();
   const opacity = useSharedValue(focused ? 1 : 0.7);
-  const scale = useSharedValue(focused ? 1 : 0.94);
-  const translateY = useSharedValue(focused ? 0 : 1.5);
+  const scale = useSharedValue(focused ? 1 : 0.97);
+  const translateY = useSharedValue(focused ? 0 : 0.75);
 
   useEffect(() => {
     opacity.value = withTiming(focused ? 1 : 0.7, {
-      duration: 180,
+      duration: 220,
       easing: Easing.out(Easing.quad),
     });
-    scale.value = withTiming(focused ? 1 : 0.94, {
-      duration: 180,
+    scale.value = withTiming(focused ? 1 : 0.97, {
+      duration: 220,
       easing: Easing.out(Easing.quad),
     });
-    translateY.value = withTiming(focused ? 0 : 1.5, {
-      duration: 180,
+    translateY.value = withTiming(focused ? 0 : 1, {
+      duration: 220,
       easing: Easing.out(Easing.quad),
     });
   }, [focused, opacity, scale, translateY]);
@@ -195,9 +200,11 @@ function AnimatedTabLabel({ focused, label }: { focused: boolean; label: string 
         {
           color: focused ? colors.foreground : colors.secondaryText,
           fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
-          fontSize: 11,
+          fontSize: 10.5,
           fontWeight: tokens.typography.weight.medium as any,
-          marginTop: 2,
+          lineHeight: 13,
+          marginTop: 0,
+          textAlign: 'center',
         },
         animatedStyle,
       ]}
@@ -208,17 +215,16 @@ function AnimatedTabLabel({ focused, label }: { focused: boolean; label: string 
 }
 
 function AnimatedTabIcon({ children, focused }: { children: React.ReactNode; focused: boolean }) {
-  const colors = useThemeColors();
-  const iconScale = useSharedValue(focused ? 1 : 0.96);
-  const translateY = useSharedValue(focused ? -1 : 0);
+  const iconScale = useSharedValue(focused ? 1 : 0.97);
+  const translateY = useSharedValue(focused ? -0.5 : 0.5);
 
   useEffect(() => {
-    iconScale.value = withSpring(focused ? 1 : 0.96, {
-      damping: 20,
-      stiffness: 220,
+    iconScale.value = withSpring(focused ? 1 : 0.97, {
+      damping: 18,
+      stiffness: 180,
     });
-    translateY.value = withTiming(focused ? -1 : 0.5, {
-      duration: 160,
+    translateY.value = withTiming(focused ? -0.5 : 0.5, {
+      duration: 220,
       easing: Easing.out(Easing.quad),
     });
   }, [focused, iconScale, translateY]);
@@ -228,16 +234,14 @@ function AnimatedTabIcon({ children, focused }: { children: React.ReactNode; foc
   }));
 
   return (
-    <View style={{ alignItems: 'center', height: 34, justifyContent: 'center', width: 34 }}>
+    <View style={{ alignItems: 'center', height: 26, justifyContent: 'center', width: 26 }}>
       <Animated.View
         style={[
           {
             alignItems: 'center',
-            backgroundColor: focused ? colors.fillTertiary : 'transparent',
-            borderRadius: tokens.radius.full,
-            height: 34,
+            height: 26,
             justifyContent: 'center',
-            width: 34,
+            width: 26,
           },
           iconAnimatedStyle,
         ]}
@@ -248,31 +252,29 @@ function AnimatedTabIcon({ children, focused }: { children: React.ReactNode; foc
   );
 }
 
-function FloatingTabBarBackground() {
+function MainTabBarBackground({ height }: { height: number }) {
   const colors = useThemeColors();
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const blurTint = effectiveTheme === 'dark' ? 'dark' : 'light';
   const overlay = (
     <View
       pointerEvents="none"
-      style={[
-        StyleSheet.absoluteFillObject,
-        {
-          backgroundColor: colors.surfaceElevated,
-          borderColor: colors.borderSubtle,
-          borderRadius: tokens.radius.xl,
-          borderWidth: StyleSheet.hairlineWidth,
-          opacity: Platform.OS === 'ios' ? 0.88 : 0.96,
-        },
-      ]}
+      style={{
+        backgroundColor: colors.surfaceElevated,
+        borderTopColor: colors.borderSubtle,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        height,
+        opacity: Platform.OS === 'ios' ? 0.8 : 0.92,
+        width: '100%',
+      }}
     />
   );
 
   if (Platform.OS === 'ios') {
     return (
       <BlurView
-        intensity={72}
-        style={[StyleSheet.absoluteFill, { borderRadius: tokens.radius.xl, overflow: 'hidden' }]}
+        intensity={48}
+        style={{ height, left: 0, overflow: 'hidden', position: 'absolute', right: 0, top: 0 }}
         tint={blurTint}
       >
         {overlay}
@@ -281,22 +283,210 @@ function FloatingTabBarBackground() {
   }
 
   return (
-    <View style={[StyleSheet.absoluteFill, { borderRadius: tokens.radius.xl, overflow: 'hidden' }]}>
+    <View style={{ height, left: 0, overflow: 'hidden', position: 'absolute', right: 0, top: 0 }}>
       {overlay}
     </View>
   );
 }
 
-function BottomTabs() {
-  const themeColors = useThemeColors();
-  const { t } = useI18n();
-  const insets = useSafeAreaInsets();
-  const [meIconTrigger, setMeIconTrigger] = useState(0);
+function useTabBarKeyboardVisible() {
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
-  const tabBarBottom = TAB_BAR_FLOAT_GAP + insets.bottom;
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSubscription = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSubscription = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
+  return keyboardVisible;
+}
+
+function MainTabBar({ descriptors, navigation, state }: BottomTabBarProps) {
+  const themeColors = useThemeColors();
+  const insets = useSafeAreaInsets();
+  const keyboardVisible = useTabBarKeyboardVisible();
+  const [layoutWidth, setLayoutWidth] = useState(0);
+  const tabBarVisibility = useSharedValue(keyboardVisible ? 1 : 0);
+  const activeIndicatorX = useSharedValue(0);
+
+  const tabBarBottomSpacing = Platform.OS === 'ios' ? Math.max(Math.min(insets.bottom, 10), 6) : 0;
+  const tabBarVisualHeight = TAB_BAR_HEIGHT;
+  const tabBarHeight = tabBarVisualHeight + tabBarBottomSpacing;
+  const tabWidth = layoutWidth > 0 ? layoutWidth / state.routes.length : 0;
+  const activeIndicatorWidth =
+    tabWidth > 0 ? Math.max(44, tabWidth - TAB_BAR_ACTIVE_INDICATOR_HORIZONTAL_INSET * 2) : 0;
+  const activeIndicatorTargetX =
+    tabWidth > 0 ? state.index * tabWidth + (tabWidth - activeIndicatorWidth) / 2 : 0;
+
+  useEffect(() => {
+    tabBarVisibility.value = withTiming(keyboardVisible ? 1 : 0, {
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [keyboardVisible, tabBarVisibility]);
+
+  useEffect(() => {
+    if (tabWidth <= 0) return;
+
+    activeIndicatorX.value = withSpring(activeIndicatorTargetX, {
+      damping: 18,
+      mass: 0.9,
+      stiffness: 190,
+    });
+  }, [activeIndicatorTargetX, activeIndicatorX, tabWidth]);
+
+  const containerAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: 1 - tabBarVisibility.value,
+    transform: [
+      { translateY: tabBarVisibility.value * (tabBarHeight + TAB_BAR_HIDE_TRANSLATE_EXTRA) },
+    ],
+  }));
+
+  const indicatorAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: activeIndicatorX.value }],
+  }));
+  const backgroundBlockerGesture = Gesture.Tap()
+    .enabled(!keyboardVisible)
+    .maxDuration(10_000)
+    .onStart(() => {
+      'worklet';
+    });
+
+  return (
+    <Animated.View
+      pointerEvents={keyboardVisible ? 'none' : 'auto'}
+      style={[
+        {
+          backgroundColor: 'transparent',
+          bottom: TAB_BAR_FLOAT_GAP,
+          elevation: 48,
+          height: tabBarHeight,
+          left: TAB_BAR_HORIZONTAL_INSET,
+          position: 'absolute',
+          right: TAB_BAR_HORIZONTAL_INSET,
+          zIndex: 48,
+        },
+        containerAnimatedStyle,
+      ]}
+    >
+      <GestureDetector gesture={backgroundBlockerGesture}>
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={{ bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 }}
+        >
+          <MainTabBarBackground height={tabBarVisualHeight} />
+        </View>
+      </GestureDetector>
+      <View
+        style={{
+          flexDirection: 'row',
+          height: tabBarVisualHeight,
+          left: 0,
+          position: 'absolute',
+          right: 0,
+          top: 0,
+          width: '100%',
+          zIndex: 1,
+        }}
+        onLayout={(event) => setLayoutWidth(event.nativeEvent.layout.width)}
+      >
+        {activeIndicatorWidth > 0 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              {
+                backgroundColor: themeColors.fillQuaternary,
+                borderRadius: TAB_BAR_ACTIVE_INDICATOR_HEIGHT / 2,
+                height: TAB_BAR_ACTIVE_INDICATOR_HEIGHT,
+                left: 0,
+                position: 'absolute',
+                top: (tabBarVisualHeight - TAB_BAR_ACTIVE_INDICATOR_HEIGHT) / 2,
+                width: activeIndicatorWidth,
+              },
+              indicatorAnimatedStyle,
+            ]}
+          />
+        ) : null}
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const isFocused = state.index === index;
+          const color = isFocused ? themeColors.foreground : themeColors.secondaryText;
+          const labelText =
+            typeof options.tabBarLabel === 'string'
+              ? options.tabBarLabel
+              : options.title || route.name;
+
+          const icon =
+            typeof options.tabBarIcon === 'function'
+              ? options.tabBarIcon({ color, focused: isFocused, size: 24 })
+              : null;
+          const label =
+            typeof options.tabBarLabel === 'function' ? (
+              options.tabBarLabel({
+                children: labelText,
+                color,
+                focused: isFocused,
+                position: 'below-icon',
+              })
+            ) : (
+              <AnimatedTabLabel focused={isFocused} label={labelText} />
+            );
+
+          const onPress = () => {
+            const event = navigation.emit({
+              canPreventDefault: true,
+              target: route.key,
+              type: 'tabPress',
+            });
+
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name, route.params);
+            }
+          };
+
+          const onLongPress = () => {
+            navigation.emit({
+              target: route.key,
+              type: 'tabLongPress',
+            });
+          };
+
+          return (
+            <PressableScale
+              accessibilityLabel={options.tabBarAccessibilityLabel}
+              accessibilityRole="button"
+              activeScale={0.96}
+              containerStyle={{ flex: 1 }}
+              key={route.key}
+              style={{ alignItems: 'center', justifyContent: 'center', paddingTop: 2 }}
+              onLongPress={onLongPress}
+              onPress={onPress}
+            >
+              {icon}
+              {label}
+            </PressableScale>
+          );
+        })}
+      </View>
+    </Animated.View>
+  );
+}
+
+function BottomTabs() {
+  const { t } = useI18n();
+  const [meIconTrigger, setMeIconTrigger] = useState(0);
 
   return (
     <Tab.Navigator
+      tabBar={(props) => <MainTabBar {...props} />}
       screenListeners={{
         tabPress: () => {
           haptics.selection();
@@ -306,29 +496,6 @@ function BottomTabs() {
         animation: TAB_TRANSITION_ANIMATION,
         freezeOnBlur: true,
         headerShown: false,
-        tabBarActiveTintColor: themeColors.iconOnPrimary,
-        tabBarInactiveTintColor: themeColors.secondaryText,
-        tabBarBackground: () => <FloatingTabBarBackground />,
-        tabBarHideOnKeyboard: true,
-        tabBarItemStyle: {
-          paddingTop: 4,
-        },
-        tabBarStyle: {
-          backgroundColor: 'transparent',
-          borderTopWidth: 0,
-          bottom: tabBarBottom,
-          elevation: Platform.OS === 'android' ? 6 : 0,
-          height: TAB_BAR_HEIGHT,
-          left: TAB_BAR_HORIZONTAL_INSET,
-          overflow: 'hidden',
-          paddingTop: 4,
-          position: 'absolute',
-          right: TAB_BAR_HORIZONTAL_INSET,
-          shadowColor: themeColors.shadow,
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: Platform.OS === 'ios' ? 0.07 : 0.09,
-          shadowRadius: 16,
-        },
       }}
     >
       <Tab.Screen

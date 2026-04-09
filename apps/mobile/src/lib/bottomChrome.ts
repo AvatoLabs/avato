@@ -1,5 +1,5 @@
 /**
- * Floating main-tab bar metrics + padding helpers.
+ * Main-tab bar metrics + padding helpers.
  * Keep in sync with tabBarStyle in navigation/index.tsx (single source for layout math).
  */
 import { useCallback, useMemo, useState } from 'react';
@@ -7,12 +7,12 @@ import { Platform } from 'react-native';
 import { runOnJS,useAnimatedKeyboard, useAnimatedReaction } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-/** Gap between safe-area bottom and floating tab bar pill */
-export const TAB_BAR_FLOAT_GAP = 10;
-export const TAB_BAR_HORIZONTAL_INSET = 16;
-export const TAB_BAR_HEIGHT = Platform.OS === 'android' ? 60 : 62;
+/** Fixed bottom tab bar: no floating gap or horizontal inset */
+export const TAB_BAR_FLOAT_GAP = 0;
+export const TAB_BAR_HORIZONTAL_INSET = 0;
+export const TAB_BAR_HEIGHT = Platform.OS === 'android' ? 52 : 54;
 
-/** Vertical extent of the tab pill above the home indicator (safe area excluded) */
+/** Vertical extent of the tab bar above the home indicator (safe area excluded) */
 export const FLOATING_TAB_BAR_STACK_EXTENT = TAB_BAR_FLOAT_GAP + TAB_BAR_HEIGHT;
 
 /** Space between composer bottom and top of tab bar */
@@ -57,7 +57,7 @@ export function stackScreenComposerPaddingBottom(safeBottom: number): number {
   return Math.max(safeBottom, 8);
 }
 
-/** Main tabs: composer sits above the floating tab bar */
+/** Main tabs: composer sits above the fixed tab bar */
 export function mainTabComposerPaddingBottom(safeBottom: number): number {
   return safeBottom + FLOATING_TAB_BAR_STACK_EXTENT + COMPOSER_ABOVE_TAB_GAP;
 }

@@ -28,6 +28,7 @@ import { sessionRouter } from '../lambda/session';
 import { sessionGroupRouter } from '../lambda/sessionGroup';
 import { sourceSetRouter } from '../lambda/sourceSet';
 import { tagRouter } from '../lambda/tag';
+import { threadRouter } from '../lambda/thread';
 import { topicRouter } from '../lambda/topic';
 import { uploadRouter } from '../lambda/upload';
 import { userRouter } from '../lambda/user';
@@ -62,6 +63,7 @@ export const mobileRouter = router({
   sessionGroup: sessionGroupRouter,
   sourceSet: sourceSetRouter,
   tag: tagRouter,
+  thread: threadRouter,
   topic: topicRouter,
   upload: uploadRouter,
   user: userRouter,

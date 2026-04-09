@@ -51,6 +51,8 @@ import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { ChatMessage, Tag as TagItem } from '../types';
 
+const EMPTY_MESSAGES: ChatMessage[] = [];
+
 const sortTags = (tags: TagItem[]) =>
   [...tags].sort((left, right) => {
     const leftSort = left.sort ?? Number.MAX_SAFE_INTEGER;
@@ -112,7 +114,7 @@ export default function ChatSettingsScreen({
   const updateSessionTitle = useSessionStore((s) => s.updateSessionTitle);
   const fetchSessions = useSessionStore((s) => s.fetchSessions);
   const clearMessages = useChatStore((s) => s.clearMessages);
-  const rawMessages = useChatStore((s) => s.messagesBySession[sessionId] ?? []);
+  const rawMessages = useChatStore((s) => s.messagesBySession[sessionId] ?? EMPTY_MESSAGES);
   const fetchTopics = useTopicStore((s) => s.fetchTopics);
   const createTopic = useTopicStore((s) => s.createTopic);
   const updateTopicTag = useTopicStore((s) => s.updateTopicTag);

@@ -85,6 +85,7 @@ import { getUserMemorySettings } from '../store/user';
 import { useThemeColors } from '../theme/colors';
 import type {
   AgentSkillItem,
+  ChatContextSelection,
   ChatMessage,
   ConversationFileItem,
   FileListItem,
@@ -92,6 +93,7 @@ import type {
   MobileMemoryEffort,
 } from '../types';
 
+const EMPTY_CHAT_CONTEXT_SELECTIONS: ChatContextSelection[] = [];
 const EMPTY_MESSAGES: ChatMessage[] = [];
 const MESSAGE_ESTIMATE_SAMPLE_SIZE = 12;
 const extractPersistedMessageIds = (messages: ChatMessage[]) =>
@@ -167,11 +169,15 @@ export default function ChatDetailScreen({
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === sessionId));
   const fetchSessions = useSessionStore((s) => s.fetchSessions);
   const isGroupSession = isGroupSessionLike(sessionId, session?.type);
+  const [pendingRouteTopicId, setPendingRouteTopicId] = useState<string | null>(initialTopicId);
 
   const rawMessages = useChatStore((s) => s.messagesBySession[sessionKey] ?? EMPTY_MESSAGES);
+  const routeTopicTransitioning = pendingRouteTopicId != null;
+  const visibleRawMessages =
+    routeTopicTransitioning && rawMessages.length === 0 ? EMPTY_MESSAGES : rawMessages;
   const messages = useMemo(
-    () => buildDisplayMessages(rawMessages, isGroupSession),
-    [rawMessages, isGroupSession],
+    () => buildDisplayMessages(visibleRawMessages, isGroupSession),
+    [visibleRawMessages, isGroupSession],
   );
   const fetchingMessages = useChatStore((s) => s.fetchingMessagesBySession[sessionKey] ?? false);
   const generating = useChatStore((s) => s.generating && s.activeStreamingSessionId === sessionKey);
@@ -195,7 +201,9 @@ export default function ChatDetailScreen({
   const pendingFiles = useFileStore((s) => s.pendingFiles);
   const addFile = useFileStore((s) => s.addFile);
   const chatContextSelections = useFileStore((s) =>
-    sessionId ? (s.sessionChatContextSelections[sessionId] ?? []) : [],
+    sessionId
+      ? (s.sessionChatContextSelections[sessionId] ?? EMPTY_CHAT_CONTEXT_SELECTIONS)
+      : EMPTY_CHAT_CONTEXT_SELECTIONS,
   );
   const addSessionChatContextSelection = useFileStore((s) => s.addSessionChatContextSelection);
 
@@ -290,6 +298,25 @@ export default function ChatDetailScreen({
       switchTopic(sessionId, initialTopicId);
     }
   }, [initialTopicId, sessionId, switchTopic]);
+
+  useEffect(() => {
+    if (!sessionId || initialTopicId == null) {
+      setPendingRouteTopicId(null);
+      return;
+    }
+
+    let disposed = false;
+    setPendingRouteTopicId(initialTopicId);
+
+    void fetchMessages(sessionId, initialTopicId).finally(() => {
+      if (disposed) return;
+      setPendingRouteTopicId((current) => (current === initialTopicId ? null : current));
+    });
+
+    return () => {
+      disposed = true;
+    };
+  }, [fetchMessages, initialTopicId, sessionId]);
 
   useEffect(() => {
     if (!sessionId || session) return;

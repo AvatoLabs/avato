@@ -565,7 +565,7 @@ describe('threadApi', () => {
 
     const [url, options] = fetchMock.mock.calls[0] as [string, { body: string; method: string }];
 
-    expect(url).toContain('/trpc/mobile/thread.createThread');
+    expect(url).toContain('/trpc/lambda/thread.createThread');
     expect(options.method).toBe('POST');
     expect(options.body).toContain('"sourceMessageId":"msg-1"');
     expect(options.body).toContain('"topicId":"topic-1"');

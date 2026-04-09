@@ -129,7 +129,6 @@ export default function MessageDetailScreen({
           }}
         >
           <MessageBubble
-            disableMessageDetailNavigation
             disableToolActions
             readOnly
             message={message}

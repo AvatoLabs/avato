@@ -228,7 +228,10 @@ export function ScreenHeader({
             className="flex-row items-center justify-between"
             style={{ minHeight: HEADER_CONTENT_HEIGHT }}
           >
-            <View className="mr-4 flex-1 justify-center">
+            <View className="mr-4 flex-1 flex-row items-center justify-center">
+              {leftActions ? (
+                <View className="mr-3 flex-row items-center justify-center">{leftActions}</View>
+              ) : null}
               {titleNode ? (
                 <View className="flex-1 justify-center">{titleNode}</View>
               ) : (

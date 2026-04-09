@@ -253,7 +253,6 @@ catch(e){document.getElementById('m').textContent=\`${escaped}\`}</script></body
 MathBlock.displayName = 'MathBlock';
 
 interface MessageBubbleProps {
-  disableMessageDetailNavigation?: boolean;
   disableToolActions?: boolean;
   generating?: boolean;
   groupMembersById?: Record<string, GroupMessageSpeaker>;
@@ -313,6 +312,18 @@ const getAssistantChainText = (messages: ChatMessage[]) =>
     .map((message) => message.content?.trim())
     .filter((content): content is string => !!content)
     .join('\n\n');
+
+const isPersistedMessageId = (id?: string | null) => {
+  const normalizedId = id?.trim() ?? '';
+  if (!normalizedId) return false;
+
+  return (
+    !normalizedId.startsWith('assistant-') &&
+    !normalizedId.startsWith('local-') &&
+    !normalizedId.startsWith('tmp_') &&
+    !normalizedId.startsWith('user-')
+  );
+};
 
 const getMessageDocSelections = (message: ChatMessage): DocSelection[] => {
   const rawSelections = message.metadata?.docSelections;
@@ -800,7 +811,6 @@ GroupTasksBlock.displayName = 'GroupTasksBlock';
 
 const MessageBubble = memo<MessageBubbleProps>(
   ({
-    disableMessageDetailNavigation = false,
     disableToolActions = false,
     message,
     sessionId,
@@ -1337,16 +1347,13 @@ const MessageBubble = memo<MessageBubbleProps>(
       message.search?.citations,
       message.search?.imageResults,
     );
-    const canOpenMessageDetail =
-      !disableMessageDetailNavigation &&
-      !isToolMessage &&
-      Math.max(
-        messageCopyText.length,
-        message.content.length,
-        message.reasoning?.content?.length ?? 0,
-      ) > CONTENT_COLLAPSE_THRESHOLD;
     const assistantContentWidth = { maxWidth: '100%' as const, minWidth: 0 };
-    const userContentWidth = { maxWidth: '100%' as const, minWidth: 0 };
+    const userContentWidth = {
+      alignSelf: 'flex-end' as const,
+      flexShrink: 1,
+      maxWidth: '82%' as const,
+      minWidth: 0,
+    };
     const hasTextContent = !!(renderedContent?.trim() || multimodalContentParts?.length);
     const showStandaloneUserAttachments = isUser && hasAttachments && !hasTextContent;
     const compareGroupChildren =
@@ -1365,7 +1372,7 @@ const MessageBubble = memo<MessageBubbleProps>(
       messageThreadTitle || message.content.trim().split('\n')[0]?.trim().slice(0, 60) || undefined;
     const canStartThread =
       !!topicId &&
-      !!actionMessageId?.trim() &&
+      isPersistedMessageId(actionMessageId) &&
       (message.role === 'assistant' || message.role === 'user');
     const isCompressedGroupExpanded =
       message.role === 'compressedGroup' &&
@@ -1409,25 +1416,6 @@ const MessageBubble = memo<MessageBubbleProps>(
       },
       [navigation, route.name, route.params, sessionId, topicId],
     );
-
-    const handleOpenMessageDetail = useCallback(() => {
-      navigation.navigate(
-        'MessageDetail',
-        appendCurrentPortalStackWithOrigin(
-          route.name,
-          route.params,
-          {
-            message,
-            messageId: message.id,
-            sessionId,
-          },
-          {
-            ...(message.threadId ? { threadId: message.threadId } : {}),
-            ...(topicId ? { topicId } : {}),
-          },
-        ),
-      );
-    }, [message, navigation, route.name, route.params, sessionId, topicId]);
 
     const handleStartThread = useCallback(
       async (type: 'continuation' | 'standalone') => {
@@ -1661,8 +1649,10 @@ const MessageBubble = memo<MessageBubbleProps>(
                   style={
                     isUser
                       ? {
+                          alignSelf: 'flex-end',
                           backgroundColor: colors.userBubbleBg,
                           elevation: 2,
+                          flexShrink: 1,
                           shadowColor: colors.primary,
                           shadowOffset: { width: 0, height: 1 },
                           shadowOpacity: 0.08,
@@ -2021,39 +2011,9 @@ const MessageBubble = memo<MessageBubbleProps>(
                                   {contentCollapsed ? t.chatShowMore : t.chatShowLess}
                                 </Text>
                               </TouchableOpacity>
-                              {canOpenMessageDetail ? (
-                                <TouchableOpacity
-                                  accessibilityLabel={t.messageDetailOpen}
-                                  activeOpacity={0.7}
-                                  className="py-1"
-                                  onPress={handleOpenMessageDetail}
-                                >
-                                  <Text
-                                    className="text-[12px] font-medium"
-                                    style={{ color: colors.primary }}
-                                  >
-                                    {t.messageDetailOpen}
-                                  </Text>
-                                </TouchableOpacity>
-                              ) : null}
                             </View>
                           )}
                         </>
-                      ) : null}
-                      {canOpenMessageDetail && !isLongContent ? (
-                        <TouchableOpacity
-                          accessibilityLabel={t.messageDetailOpen}
-                          activeOpacity={0.7}
-                          className="mt-2 self-start py-1"
-                          onPress={handleOpenMessageDetail}
-                        >
-                          <Text
-                            className="text-[12px] font-medium"
-                            style={{ color: colors.primary }}
-                          >
-                            {t.messageDetailOpen}
-                          </Text>
-                        </TouchableOpacity>
                       ) : null}
                       {!isUser && !generating && message.error && (
                         <ErrorBlock

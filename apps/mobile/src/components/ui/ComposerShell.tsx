@@ -118,8 +118,7 @@ export function ComposerShell({ active = false, children, style }: ComposerShell
         ]}
       />
       <Animated.View
-        className="overflow-hidden"
-        style={[shellInnerAnimatedStyle, { borderRadius: COMPOSER_RADIUS }]}
+        style={[shellInnerAnimatedStyle, { borderRadius: COMPOSER_RADIUS, overflow: 'hidden' }]}
       >
         {useNativeBlur ? (
           <BlurView
@@ -192,7 +191,7 @@ export function ComposerIconButton({
         }}
       >
         {children}
-        {badge ? <View className="absolute -right-1.5 -top-0.5">{badge}</View> : null}
+        {badge ? <View style={{ position: 'absolute', right: -6, top: -2 }}>{badge}</View> : null}
       </View>
     </AnimatedTouchableOpacity>
   );
@@ -352,16 +351,17 @@ export function ComposerCountBadge({ color, value }: { color: string; value: num
 
   return (
     <View
-      className="items-center justify-center rounded-full px-1"
       style={{
+        alignItems: 'center',
         backgroundColor: color,
+        borderRadius: 999,
+        justifyContent: 'center',
         minHeight: 14,
         minWidth: 14,
+        paddingHorizontal: 4,
       }}
     >
-      <Text className="text-[9px] font-semibold" style={{ color: colors.iconOnPrimary }}>
-        {value}
-      </Text>
+      <Text style={{ color: colors.iconOnPrimary, fontSize: 9, fontWeight: '600' }}>{value}</Text>
     </View>
   );
 }

@@ -145,13 +145,14 @@ const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDon
           numberOfLines={isError ? 6 : 1}
           style={{
             color: colors.iconOnPrimary,
-            flex: 1,
+            flexShrink: 1,
             fontSize: isError ? 13 : 14,
             fontWeight: '600',
             letterSpacing: -0.2,
             lineHeight: isError ? 18 : undefined,
             marginLeft: 7,
             maxWidth: showRetry ? 220 : 300,
+            minWidth: 0,
           }}
         >
           {item.message}
@@ -165,7 +166,9 @@ const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDon
             className="ml-2 py-1 px-2"
             onPress={handleRetry}
           >
-            <Text style={{ color: colors.iconOnPrimary, fontSize: 13, fontWeight: '700' }}>{retryLabel}</Text>
+            <Text style={{ color: colors.iconOnPrimary, fontSize: 13, fontWeight: '700' }}>
+              {retryLabel}
+            </Text>
           </TouchableOpacity>
         ) : null}
       </View>

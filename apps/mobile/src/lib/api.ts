@@ -6,8 +6,8 @@
  * without pulling in Next.js / Node dependencies.
  *
  * All endpoints follow the tRPC HTTP convention:
- *   GET  /trpc/mobile/<procedure>?input=<json>
- *   POST /trpc/mobile/<procedure>  body: { json: input }
+ *   GET  /trpc/<namespace>/<procedure>?input=<json>
+ *   POST /trpc/<namespace>/<procedure>  body: { json: input }
  */
 
 import { createSSEChunkParser } from '@lobechat/fetch-sse/sseParser';
@@ -653,16 +653,18 @@ const unwrapTrpcPayload = <T>(payload: any) => {
 async function requestTrpc<T = any>(params: {
   action: 'mutation' | 'query';
   input?: unknown;
+  namespace?: 'lambda' | 'mobile';
   procedure: string;
 }): Promise<T> {
   const base = await getBaseUrl();
   const envelope = params.input !== undefined ? { json: params.input } : undefined;
+  const namespace = params.namespace ?? 'mobile';
   const url =
     params.action === 'query'
       ? envelope
-        ? `${base}/trpc/mobile/${params.procedure}?input=${encodeURIComponent(JSON.stringify(envelope))}`
-        : `${base}/trpc/mobile/${params.procedure}`
-      : `${base}/trpc/mobile/${params.procedure}`;
+        ? `${base}/trpc/${namespace}/${params.procedure}?input=${encodeURIComponent(JSON.stringify(envelope))}`
+        : `${base}/trpc/${namespace}/${params.procedure}`
+      : `${base}/trpc/${namespace}/${params.procedure}`;
 
   const res = await fetch(url, {
     body: params.action === 'mutation' ? JSON.stringify(envelope ?? { json: undefined }) : undefined,
@@ -687,12 +689,20 @@ async function requestTrpc<T = any>(params: {
   return unwrapTrpcPayload<T>(payload);
 }
 
-async function trpcQuery<T = any>(procedure: string, input?: unknown): Promise<T> {
-  return requestTrpc<T>({ action: 'query', input, procedure });
+async function trpcQuery<T = any>(
+  procedure: string,
+  input?: unknown,
+  options?: { namespace?: 'lambda' | 'mobile' },
+): Promise<T> {
+  return requestTrpc<T>({ action: 'query', input, namespace: options?.namespace, procedure });
 }
 
-async function trpcMutate<T = any>(procedure: string, input?: unknown): Promise<T> {
-  return requestTrpc<T>({ action: 'mutation', input, procedure });
+async function trpcMutate<T = any>(
+  procedure: string,
+  input?: unknown,
+  options?: { namespace?: 'lambda' | 'mobile' },
+): Promise<T> {
+  return requestTrpc<T>({ action: 'mutation', input, namespace: options?.namespace, procedure });
 }
 
 const pickFirstNonEmptyString = (...values: Array<string | null | undefined>) => {
@@ -1172,12 +1182,14 @@ export const threadApi = {
     title?: string;
     topicId: string;
     type: 'continuation' | 'isolation' | 'standalone';
-  }) => trpcMutate<string>('thread.createThread', params),
-  list: (topicId: string) => trpcQuery<MobileThreadItem[]>('thread.getThreads', { topicId }),
-  generateTitle: (id: string) => trpcMutate<string | null>('thread.generateThreadTitle', { id }),
-  remove: (id: string) => trpcMutate('thread.removeThread', { id }),
+  }) => trpcMutate<string>('thread.createThread', params, { namespace: 'lambda' }),
+  list: (topicId: string) =>
+    trpcQuery<MobileThreadItem[]>('thread.getThreads', { topicId }, { namespace: 'lambda' }),
+  generateTitle: (id: string) =>
+    trpcMutate<string | null>('thread.generateThreadTitle', { id }, { namespace: 'lambda' }),
+  remove: (id: string) => trpcMutate('thread.removeThread', { id }, { namespace: 'lambda' }),
   update: (id: string, value: Record<string, unknown>) =>
-    trpcMutate('thread.updateThread', { id, value }),
+    trpcMutate('thread.updateThread', { id, value }, { namespace: 'lambda' }),
 };
 
 // ── AI Chat API ─────────────────────────────────────────────────────

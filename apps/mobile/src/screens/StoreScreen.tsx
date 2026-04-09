@@ -1440,7 +1440,7 @@ function StoreItemModal({
 
 export default function StoreScreen() {
   const insets = useSafeAreaInsets();
-  const scrollListPaddingBottom = useMainTabScrollableContentPaddingBottom();
+  const scrollListPaddingBottom = useMainTabScrollableContentPaddingBottom() + 16;
   const colors = useThemeColors();
   const { t } = useI18n();
   const locale = useI18n((s) => s.locale);
@@ -2549,31 +2549,34 @@ export default function StoreScreen() {
           renderItem={renderMarketItem}
           showsVerticalScrollIndicator={false}
           ListFooterComponent={
-            <View className="items-center pb-6 pt-3">
-              {activeExploreTotalCount > 0 ? (
-                <Text className="mb-2 text-[12px]" style={{ color: colors.secondaryText }}>
-                  {marketItems.length} / {activeExploreTotalCount}
-                </Text>
-              ) : null}
-              {marketLoadingMore ? (
-                <ActivityIndicator color={colors.primary} size="small" />
-              ) : marketHasMore ? (
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  className="rounded-full px-4 py-2"
-                  style={{ backgroundColor: colors.fillTertiary }}
-                  onPress={() => void loadMoreMarket()}
-                >
-                  <Text className="text-[12px] font-semibold" style={{ color: colors.primary }}>
-                    {t.storeLoadMore}
+            <View>
+              <View className="items-center pb-6 pt-3">
+                {activeExploreTotalCount > 0 ? (
+                  <Text className="mb-2 text-[12px]" style={{ color: colors.secondaryText }}>
+                    {marketItems.length} / {activeExploreTotalCount}
                   </Text>
-                </TouchableOpacity>
-              ) : null}
+                ) : null}
+                {marketLoadingMore ? (
+                  <ActivityIndicator color={colors.primary} size="small" />
+                ) : marketHasMore ? (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    className="rounded-full px-4 py-2"
+                    style={{ backgroundColor: colors.fillTertiary }}
+                    onPress={() => void loadMoreMarket()}
+                  >
+                    <Text className="text-[12px] font-semibold" style={{ color: colors.primary }}>
+                      {t.storeLoadMore}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <View pointerEvents="none" style={{ height: scrollListPaddingBottom }} />
             </View>
           }
           contentContainerStyle={{
             paddingTop: 12,
-            paddingBottom: scrollListPaddingBottom,
+            paddingBottom: 12,
           }}
           refreshControl={
             <RefreshControl
@@ -2588,13 +2591,16 @@ export default function StoreScreen() {
       ) : (
         <FlatList
           ItemSeparatorComponent={InstalledSeparator}
+          ListFooterComponent={
+            <View pointerEvents="none" style={{ height: scrollListPaddingBottom }} />
+          }
           data={filteredInstalled}
           keyExtractor={(item) => `${item.kind}-${item.id}`}
           renderItem={renderInstalledItem}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             paddingTop: 8,
-            paddingBottom: scrollListPaddingBottom,
+            paddingBottom: 12,
           }}
           refreshControl={
             <RefreshControl
