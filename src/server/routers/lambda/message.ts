@@ -1,5 +1,6 @@
 import {
   CreateNewMessageParamsSchema,
+  ThreadType,
   UpdateMessageParamsSchema,
   UpdateMessagePluginSchema,
   UpdateMessageRAGParamsSchema,
@@ -220,6 +221,33 @@ export const messageRouter = router({
       });
 
       return normalizeMessageFileUrlsForClient(messages);
+    }),
+
+  getThreadDraftMessages: messageProcedure
+    .input(
+      z.object({
+        sourceMessageId: z.string(),
+        threadType: z.enum([ThreadType.Continuation, ThreadType.Standalone, ThreadType.Isolation]),
+        topicId: z.string(),
+      }),
+    )
+    .query(async ({ input, ctx }) => {
+      const parentMessages = await ctx.messageModel.getThreadParentMessages({
+        sourceMessageId: input.sourceMessageId,
+        threadType: input.threadType,
+        topicId: input.topicId,
+      });
+      const parentMessageIds = parentMessages.map((message) => String(message.id));
+      const hydratedMessages = await ctx.messageModel.queryByIds(parentMessageIds, {
+        postProcessUrl: createAuthenticatedAttachmentUrlResolver(),
+      });
+      const hydratedMessageMap = new Map(hydratedMessages.map((message) => [message.id, message]));
+
+      return normalizeMessageFileUrlsForClient(
+        parentMessageIds
+          .map((id) => hydratedMessageMap.get(id))
+          .filter((message): message is NonNullable<typeof message> => !!message),
+      );
     }),
 
   rankModels: messageProcedure.query(async ({ ctx }) => {

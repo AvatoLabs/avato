@@ -38,7 +38,19 @@ const samePortalEntry = (left: PortalStackEntry, right: PortalStackEntry) => {
       );
     }
     case 'ThreadDetail': {
-      return left.params.threadId === (right.params as ThreadDetailRouteParams).threadId;
+      const leftParams = left.params as ThreadDetailRouteParams;
+      const rightParams = right.params as ThreadDetailRouteParams;
+
+      if (leftParams.threadId || rightParams.threadId) {
+        return leftParams.threadId === rightParams.threadId;
+      }
+
+      return (
+        leftParams.sessionId === rightParams.sessionId &&
+        leftParams.sourceMessageId === rightParams.sourceMessageId &&
+        leftParams.threadType === rightParams.threadType &&
+        leftParams.topicId === rightParams.topicId
+      );
     }
     case 'ThreadList': {
       return left.params.topicId === (right.params as ThreadListRouteParams).topicId;
@@ -122,7 +134,9 @@ export const createPortalEntry = (
       return {
         params: {
           sessionId: params.sessionId,
-          threadId: params.threadId,
+          ...(params.sourceMessageId ? { sourceMessageId: params.sourceMessageId } : {}),
+          ...(params.threadId ? { threadId: params.threadId } : {}),
+          ...(params.threadType ? { threadType: params.threadType } : {}),
           ...(params.title ? { title: params.title } : {}),
           ...(params.topicId ? { topicId: params.topicId } : {}),
         },

@@ -54,9 +54,13 @@ export interface ToolDetailRouteParams extends ConversationOriginRouteParams {
   toolCallId?: string;
 }
 
+export type ThreadDetailDraftType = 'continuation' | 'isolation' | 'standalone';
+
 export interface ThreadDetailRouteParams {
   sessionId: string;
-  threadId: string;
+  sourceMessageId?: string;
+  threadId?: string;
+  threadType?: ThreadDetailDraftType;
   title?: string;
   topicId?: string;
 }

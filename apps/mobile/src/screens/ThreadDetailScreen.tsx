@@ -1,6 +1,13 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, MessageCircle, Send } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -47,11 +54,13 @@ import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { ChatMessage, ChatToolPayload } from '../types';
 
+const THREAD_STREAM_THROTTLE_MS = 100;
+
 export default function ThreadDetailScreen({
   navigation,
   route,
 }: RootStackScreenProps<'ThreadDetail'>) {
-  const { sessionId, threadId, title, topicId } = route.params;
+  const { sessionId, sourceMessageId, threadId, threadType, title, topicId } = route.params;
   const { t } = useI18n();
   const colors = useThemeColors();
   const toast = useToast();
@@ -60,6 +69,9 @@ export default function ThreadDetailScreen({
   const isGroupSession = isGroupSessionLike(sessionId, session?.type);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const messagesRef = useRef<ChatMessage[]>([]);
+  const initialThreadId = threadId?.trim() || undefined;
+  const normalizedSourceMessageId = sourceMessageId?.trim() || undefined;
+  const normalizedTopicId = topicId?.trim() || undefined;
 
   const [screenTitle, setScreenTitle] = useState(title?.trim() || t.threadDetailTitle);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -68,40 +80,97 @@ export default function ThreadDetailScreen({
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [pendingAssistantId, setPendingAssistantId] = useState<string | null>(null);
+  const [currentThreadId, setCurrentThreadId] = useState(initialThreadId);
+  const activeThreadId = currentThreadId?.trim() || undefined;
+  const isDraftThread =
+    !activeThreadId && !!normalizedSourceMessageId && !!normalizedTopicId && !!threadType;
   const handleOpenConversation = useCallback(() => {
-    navigateToConversationOrigin({ sessionId, topicId });
-  }, [sessionId, topicId]);
+    navigateToConversationOrigin({ sessionId, topicId: normalizedTopicId });
+  }, [normalizedTopicId, sessionId]);
   const handleBack = useCallback(() => {
     navigateBackFromPortal({
-      conversationOrigin: { sessionId, ...(topicId ? { topicId } : {}) },
+      conversationOrigin: {
+        sessionId,
+        ...(normalizedTopicId ? { topicId: normalizedTopicId } : {}),
+      },
       navigation,
       portalStack: route.params.portalStack,
     });
-  }, [navigation, route.params.portalStack, sessionId, topicId]);
+  }, [navigation, normalizedTopicId, route.params.portalStack, sessionId]);
 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
 
-  const refreshThreadTitle = useCallback(async () => {
-    try {
-      const nextTitle = await threadApi.generateTitle(threadId);
-      if (nextTitle?.trim()) setScreenTitle(nextTitle.trim());
-    } catch (error) {
-      console.warn('[ThreadDetailScreen] Failed to refresh thread title:', error);
-    }
-  }, [threadId]);
+  useEffect(() => {
+    setCurrentThreadId(initialThreadId);
+  }, [initialThreadId]);
+
+  useEffect(() => {
+    setScreenTitle(title?.trim() || t.threadDetailTitle);
+  }, [initialThreadId, normalizedSourceMessageId, t.threadDetailTitle, threadType, title]);
+
+  const setThreadMessages = useCallback((value: SetStateAction<ChatMessage[]>) => {
+    setMessages((prev) => {
+      const nextMessages =
+        typeof value === 'function'
+          ? (value as (prevState: ChatMessage[]) => ChatMessage[])(prev)
+          : value;
+      messagesRef.current = nextMessages;
+      return nextMessages;
+    });
+  }, []);
+
+  const updateThreadMessage = useCallback(
+    (messageId: string, updater: (message: ChatMessage) => ChatMessage) => {
+      setThreadMessages((prev) => {
+        let didUpdate = false;
+        const nextMessages = prev.map((message) => {
+          if (message.id !== messageId) return message;
+          didUpdate = true;
+          return updater(message);
+        });
+
+        return didUpdate ? nextMessages : prev;
+      });
+    },
+    [setThreadMessages],
+  );
+
+  const refreshThreadTitle = useCallback(
+    async (targetThreadId?: string) => {
+      const normalizedThreadId = targetThreadId?.trim() || activeThreadId;
+      if (!normalizedThreadId) return;
+
+      try {
+        const nextTitle = await threadApi.generateTitle(normalizedThreadId);
+        if (nextTitle?.trim()) setScreenTitle(nextTitle.trim());
+      } catch (error) {
+        console.warn('[ThreadDetailScreen] Failed to refresh thread title:', error);
+      }
+    },
+    [activeThreadId],
+  );
 
   const loadMessages = useCallback(
-    async (showSpinner = false) => {
+    async (showSpinner = false, targetThreadId?: string) => {
       if (showSpinner) setLoading(true);
 
       try {
-        const nextMessages = await messageApi.list(sessionId, topicId, {
-          sessionType: isGroupSession ? 'group' : 'agent',
-          threadId,
-        });
-        setMessages(nextMessages);
+        const normalizedThreadId = targetThreadId?.trim() || activeThreadId;
+        const nextMessages = normalizedThreadId
+          ? await messageApi.list(sessionId, normalizedTopicId, {
+              sessionType: isGroupSession ? 'group' : 'agent',
+              threadId: normalizedThreadId,
+            })
+          : isDraftThread
+            ? await messageApi.listThreadDraftMessages({
+                sourceMessageId: normalizedSourceMessageId!,
+                threadType: threadType!,
+                topicId: normalizedTopicId!,
+              })
+            : [];
+        setThreadMessages(nextMessages);
       } catch {
         toast.show('error', t.threadLoadFailed);
       } finally {
@@ -109,16 +178,27 @@ export default function ThreadDetailScreen({
         setRefreshing(false);
       }
     },
-    [isGroupSession, sessionId, t.threadLoadFailed, threadId, toast, topicId],
+    [
+      activeThreadId,
+      isDraftThread,
+      isGroupSession,
+      normalizedSourceMessageId,
+      normalizedTopicId,
+      sessionId,
+      t.threadLoadFailed,
+      threadType,
+      toast,
+      setThreadMessages,
+    ],
   );
 
   useFocusEffect(
     useCallback(() => {
       void loadMessages(true);
-      if (!title?.trim()) {
+      if (!title?.trim() && activeThreadId) {
         void refreshThreadTitle();
       }
-    }, [loadMessages, refreshThreadTitle, title]),
+    }, [activeThreadId, loadMessages, refreshThreadTitle, title]),
   );
 
   const handleRefresh = useCallback(() => {
@@ -153,7 +233,7 @@ export default function ThreadDetailScreen({
     setInputText('');
     setSending(true);
     setPendingAssistantId(assistantTempId);
-    setMessages((prev) => [...prev, optimisticUser, optimisticAssistant]);
+    setThreadMessages((prev) => [...prev, optimisticUser, optimisticAssistant]);
 
     const createBaseParams = isGroupSession ? { groupId: sessionId } : { sessionId };
     const contextMessages = [...messagesRef.current, optimisticUser]
@@ -163,33 +243,89 @@ export default function ThreadDetailScreen({
       );
 
     let userMessageId: string | undefined;
+    let nextThreadId = activeThreadId;
     let shouldReloadThread = false;
+    let pendingAssistantDraft: ChatMessage | null = null;
+    let throttleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const flushPendingAssistant = () => {
+      throttleTimer = null;
+      const nextAssistant = pendingAssistantDraft;
+      pendingAssistantDraft = null;
+
+      if (!nextAssistant) return;
+
+      updateThreadMessage(assistantTempId, () => nextAssistant);
+    };
+
+    const flushPendingAssistantNow = () => {
+      if (throttleTimer) {
+        clearTimeout(throttleTimer);
+        throttleTimer = null;
+      }
+
+      flushPendingAssistant();
+    };
+
+    const scheduleAssistantUpdate = (updater: (message: ChatMessage) => ChatMessage) => {
+      const currentAssistant =
+        pendingAssistantDraft ??
+        messagesRef.current.find((message) => message.id === assistantTempId);
+
+      if (!currentAssistant) return;
+
+      pendingAssistantDraft = updater(currentAssistant);
+
+      if (!throttleTimer) {
+        throttleTimer = setTimeout(flushPendingAssistant, THREAD_STREAM_THROTTLE_MS);
+      }
+    };
 
     try {
-      const createdUser = await messageApi.create({
-        ...createBaseParams,
-        content: text,
-        role: 'user',
-        threadId,
-        topicId,
-      });
-      userMessageId = createdUser.id;
+      if (nextThreadId) {
+        const createdUser = await messageApi.create({
+          ...createBaseParams,
+          content: text,
+          role: 'user',
+          threadId: nextThreadId,
+          topicId: normalizedTopicId,
+        });
+        userMessageId = createdUser.id;
+      } else if (isDraftThread) {
+        const createdThread = await threadApi.createWithMessage({
+          ...(screenTitle.trim() ? { title: screenTitle.trim() } : {}),
+          message: {
+            ...createBaseParams,
+            content: text,
+            role: 'user',
+            topicId: normalizedTopicId,
+          },
+          sourceMessageId: normalizedSourceMessageId,
+          topicId: normalizedTopicId!,
+          type: threadType!,
+        });
+
+        if (!createdThread.threadId?.trim() || !createdThread.messageId?.trim()) {
+          throw new Error(t.threadCreateFailed);
+        }
+
+        nextThreadId = createdThread.threadId.trim();
+        userMessageId = createdThread.messageId.trim();
+        setCurrentThreadId(nextThreadId);
+        shouldReloadThread = true;
+      } else {
+        throw new Error(t.threadCreateFailed);
+      }
 
       const chatOptions = await getSessionChatOptions(sessionId);
       const provider =
         chatOptions.provider || resolveProviderByModel(chatOptions.model) || 'openai';
 
-      setMessages((prev) =>
-        prev.map((message) =>
-          message.id === assistantTempId
-            ? {
-                ...message,
-                model: chatOptions.model,
-                provider,
-              }
-            : message,
-        ),
-      );
+      updateThreadMessage(assistantTempId, (message) => ({
+        ...message,
+        model: chatOptions.model,
+        provider,
+      }));
 
       const result = await aiChatApi.createAssistantMessageStream(
         provider,
@@ -202,102 +338,75 @@ export default function ThreadDetailScreen({
         },
         {
           onContent: (contentState: StreamContentState) => {
-            setMessages((prev) =>
-              prev.map((message) => {
-                if (message.id !== assistantTempId) return message;
+            scheduleAssistantUpdate((message) => {
+              const nextMetadata = mergeMessageMetadata(message.metadata, contentState);
 
-                const nextMetadata = mergeMessageMetadata(message.metadata, contentState);
-
-                return {
-                  ...message,
-                  content: contentState.content,
-                  ...(nextMetadata ? { metadata: nextMetadata } : {}),
-                  updatedAt: new Date().toISOString(),
-                };
-              }),
-            );
+              return {
+                ...message,
+                content: contentState.content,
+                ...(nextMetadata ? { metadata: nextMetadata } : {}),
+                updatedAt: new Date().toISOString(),
+              };
+            });
           },
           onImages: (images) => {
-            setMessages((prev) =>
-              prev.map((message) =>
-                message.id === assistantTempId
-                  ? { ...message, imageList: images, updatedAt: new Date().toISOString() }
-                  : message,
-              ),
-            );
+            scheduleAssistantUpdate((message) => ({
+              ...message,
+              imageList: images,
+              updatedAt: new Date().toISOString(),
+            }));
           },
           onPerformance: (performance) => {
-            setMessages((prev) =>
-              prev.map((message) =>
-                message.id === assistantTempId
-                  ? {
-                      ...message,
-                      performance: performance as any,
-                      updatedAt: new Date().toISOString(),
-                    }
-                  : message,
-              ),
-            );
+            scheduleAssistantUpdate((message) => ({
+              ...message,
+              performance: performance as any,
+              updatedAt: new Date().toISOString(),
+            }));
           },
           onReasoning: (reasoningState: StreamReasoningState) => {
-            setMessages((prev) =>
-              prev.map((message) =>
-                message.id === assistantTempId
-                  ? {
-                      ...message,
-                      reasoning: buildReasoningState(reasoningState),
-                      updatedAt: new Date().toISOString(),
-                    }
-                  : message,
-              ),
-            );
+            scheduleAssistantUpdate((message) => ({
+              ...message,
+              reasoning: buildReasoningState(reasoningState),
+              updatedAt: new Date().toISOString(),
+            }));
           },
           onSearch: (search) => {
-            setMessages((prev) =>
-              prev.map((message) =>
-                message.id === assistantTempId
-                  ? { ...message, search, updatedAt: new Date().toISOString() }
-                  : message,
-              ),
-            );
+            scheduleAssistantUpdate((message) => ({
+              ...message,
+              search,
+              updatedAt: new Date().toISOString(),
+            }));
           },
           onToolExecutions: (executions) => {
-            setMessages((prev) =>
-              prev.map((message) => {
-                if (message.id !== assistantTempId) return message;
+            scheduleAssistantUpdate((message) => {
+              const resolvedTools = mergeResolvedToolPayloads(
+                message.tools ?? undefined,
+                executions,
+              );
 
-                const resolvedTools = mergeResolvedToolPayloads(
-                  message.tools ?? undefined,
-                  executions,
-                );
-
-                return resolvedTools
-                  ? { ...message, tools: resolvedTools, updatedAt: new Date().toISOString() }
-                  : message;
-              }),
-            );
+              return resolvedTools
+                ? { ...message, tools: resolvedTools, updatedAt: new Date().toISOString() }
+                : message;
+            });
           },
           onTools: (tools) => {
-            setMessages((prev) =>
-              prev.map((message) =>
-                message.id === assistantTempId
-                  ? { ...message, tools, updatedAt: new Date().toISOString() }
-                  : message,
-              ),
-            );
+            scheduleAssistantUpdate((message) => ({
+              ...message,
+              tools,
+              updatedAt: new Date().toISOString(),
+            }));
           },
           onUsage: (usage) => {
-            setMessages((prev) =>
-              prev.map((message) =>
-                message.id === assistantTempId
-                  ? { ...message, usage: usage as any, updatedAt: new Date().toISOString() }
-                  : message,
-              ),
-            );
+            scheduleAssistantUpdate((message) => ({
+              ...message,
+              updatedAt: new Date().toISOString(),
+              usage: usage as any,
+            }));
           },
         },
       );
 
+      flushPendingAssistantNow();
       const localAssistant = messagesRef.current.find((message) => message.id === assistantTempId);
       const resolvedTools = mergeResolvedToolPayloads(result.tools, result.toolExecutions);
 
@@ -318,49 +427,62 @@ export default function ThreadDetailScreen({
           provider,
           reasoning: buildPersistedReasoning(localAssistant?.reasoning),
           role: 'assistant',
-          threadId,
-          topicId,
+          threadId: nextThreadId,
+          topicId: normalizedTopicId,
         });
         shouldReloadThread = true;
       } catch (error) {
         console.warn('[ThreadDetailScreen] Failed to persist assistant message:', error);
       }
 
-      if (!title?.trim()) {
-        void refreshThreadTitle();
+      if (nextThreadId && (!title?.trim() || !activeThreadId)) {
+        void refreshThreadTitle(nextThreadId);
       }
     } catch (error) {
       if (userMessageId) shouldReloadThread = true;
 
       const errorMessage =
-        error instanceof Error && error.message.trim() ? error.message : t.threadSendFailed;
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : activeThreadId || isDraftThread
+            ? t.threadSendFailed
+            : t.threadCreateFailed;
       toast.show('error', errorMessage);
 
       if (!userMessageId) {
-        setMessages((prev) =>
+        setThreadMessages((prev) =>
           prev.filter((message) => message.id !== userTempId && message.id !== assistantTempId),
         );
         setInputText(text);
       }
     } finally {
+      flushPendingAssistantNow();
       if (shouldReloadThread) {
-        await loadMessages(false);
+        await loadMessages(false, nextThreadId);
       }
       setPendingAssistantId(null);
       setSending(false);
     }
   }, [
+    activeThreadId,
     inputText,
+    isDraftThread,
     isGroupSession,
     loadMessages,
+    normalizedSourceMessageId,
+    normalizedTopicId,
     refreshThreadTitle,
+    screenTitle,
     sending,
     sessionId,
+    setThreadMessages,
+    t.threadCreateFailed,
     t.threadSendFailed,
-    threadId,
     title,
     toast,
     topicId,
+    threadType,
+    updateThreadMessage,
   ]);
 
   const listEmpty = useMemo(
@@ -379,14 +501,6 @@ export default function ThreadDetailScreen({
   }, [messages]);
 
   const canSend = inputText.trim().length > 0 && !sending;
-  const updateThreadMessage = useCallback(
-    (messageId: string, updater: (message: ChatMessage) => ChatMessage) => {
-      setMessages((prev) =>
-        prev.map((message) => (message.id === messageId ? updater(message) : message)),
-      );
-    },
-    [],
-  );
 
   const applyThreadToolExecutions = useCallback(
     (assistantMessageId: string, executions: ToolExecutionItem[], tools?: ChatToolPayload[]) => {
@@ -624,7 +738,7 @@ export default function ThreadDetailScreen({
       portalCurrentLabel={screenTitle}
       portalRouteName={route.name}
       portalRouteParams={route.params}
-      subtitle={threadId}
+      subtitle={activeThreadId}
       title={screenTitle}
       leftElement={
         <ArrowLeft color={colors.foreground} size={20} strokeWidth={tokens.icon.strokeWidth} />

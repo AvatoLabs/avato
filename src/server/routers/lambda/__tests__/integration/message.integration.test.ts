@@ -670,6 +670,52 @@ describe('Message Router Integration Tests', () => {
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe(msg1.id);
     });
+
+    it('should return ordered draft thread parent messages without threaded replies', async () => {
+      const caller = messageRouter.createCaller(createTestContext(userId));
+
+      const sourceMessage = await caller.createMessage({
+        content: 'Source message',
+        role: 'user',
+        sessionId: testSessionId,
+        topicId: testTopicId,
+      });
+
+      const assistantMessage = await caller.createMessage({
+        content: 'Assistant reply',
+        role: 'assistant',
+        sessionId: testSessionId,
+        topicId: testTopicId,
+      });
+
+      const { threads } = await import('@/database/schemas');
+      const [thread] = (await serverDB
+        .insert(threads)
+        .values({
+          sourceMessageId: assistantMessage.id,
+          topicId: testTopicId,
+          type: 'continuation',
+          userId,
+        })
+        .returning()) as any;
+
+      await caller.createMessage({
+        content: 'Thread-only reply',
+        role: 'assistant',
+        sessionId: testSessionId,
+        threadId: thread.id,
+        topicId: testTopicId,
+      });
+
+      const result = await caller.getThreadDraftMessages({
+        sourceMessageId: assistantMessage.id,
+        threadType: 'continuation',
+        topicId: testTopicId,
+      });
+
+      expect(result.map((message) => message.id)).toEqual([sourceMessage.id, assistantMessage.id]);
+      expect(result.every((message) => !message.threadId)).toBe(true);
+    });
   });
 
   describe('removeMessages', () => {

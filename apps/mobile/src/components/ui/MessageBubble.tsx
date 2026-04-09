@@ -54,7 +54,7 @@ import {
   getMobileBuiltinRender,
   getMobileBuiltinStreaming,
 } from '../../features/BuiltinTools';
-import { fileApi, threadApi } from '../../lib/api';
+import { fileApi } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
 import type { I18nStore } from '../../lib/i18n';
 import { useI18n } from '../../lib/i18n';
@@ -62,6 +62,7 @@ import { codeInlineRules } from '../../lib/markdownRules';
 import { navigateToNotebook, navigateToResources } from '../../lib/navigation';
 import { appendCurrentPortalStackWithOrigin } from '../../lib/portalNavigation';
 import { useResolvedRemoteAsset } from '../../lib/remoteAsset';
+import { isGroupSessionLike } from '../../lib/session';
 import type { RootStackNavigationProp } from '../../navigation/types';
 import { useChatStore } from '../../store/chat';
 import { getAssistantChainActionMessageId } from '../../store/messageDisplay';
@@ -847,7 +848,6 @@ const MessageBubble = memo<MessageBubbleProps>(
     const [contentCollapsed, setContentCollapsed] = useState(true);
     const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
     const [downloadingProgress, setDownloadingProgress] = useState(0);
-    const [creatingThread, setCreatingThread] = useState(false);
     const [readOnlyGroupExpanded, setReadOnlyGroupExpanded] = useState(false);
     const actionMessageId = isUser ? message.id : getAssistantChainActionMessageId(message);
     const assistantChainChildren =
@@ -1373,6 +1373,8 @@ const MessageBubble = memo<MessageBubbleProps>(
     const canStartThread =
       !!topicId &&
       isPersistedMessageId(actionMessageId) &&
+      !isGroupSessionLike(sessionId) &&
+      route.name !== 'ThreadDetail' &&
       (message.role === 'assistant' || message.role === 'user');
     const isCompressedGroupExpanded =
       message.role === 'compressedGroup' &&
@@ -1418,62 +1420,36 @@ const MessageBubble = memo<MessageBubbleProps>(
     );
 
     const handleStartThread = useCallback(
-      async (type: 'continuation' | 'standalone') => {
+      (type: 'continuation' | 'standalone') => {
         const sourceMessageId = actionMessageId?.trim();
         const normalizedTopicId = topicId?.trim();
-        if (!sourceMessageId || !normalizedTopicId || creatingThread) return;
+        if (!sourceMessageId || !normalizedTopicId) return;
 
-        setCreatingThread(true);
-        try {
-          const createdThreadId = await threadApi.create({
-            ...(seededThreadTitle ? { title: seededThreadTitle } : {}),
-            sourceMessageId,
-            topicId: normalizedTopicId,
-            type,
-          });
-
-          if (!createdThreadId?.trim()) {
-            throw new Error(t.threadCreateFailed);
-          }
-
-          haptics.success();
-          navigation.navigate(
-            'ThreadDetail',
-            appendCurrentPortalStackWithOrigin(
-              route.name,
-              route.params,
-              {
-                ...(seededThreadTitle ? { title: seededThreadTitle } : {}),
-                sessionId,
-                threadId: createdThreadId,
-              },
-              {
-                topicId: normalizedTopicId,
-              },
-            ),
-          );
-
-          void threadApi.generateTitle(createdThreadId).catch((error) => {
-            console.warn('[MessageBubble] Failed to generate thread title:', error);
-          });
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error && error.message.trim() ? error.message : t.threadCreateFailed;
-          toast.show('error', errorMessage);
-        } finally {
-          setCreatingThread(false);
-        }
+        haptics.success();
+        navigation.navigate(
+          'ThreadDetail',
+          appendCurrentPortalStackWithOrigin(
+            route.name,
+            route.params,
+            {
+              ...(seededThreadTitle ? { title: seededThreadTitle } : {}),
+              sessionId,
+              sourceMessageId,
+              threadType: type,
+            },
+            {
+              topicId: normalizedTopicId,
+            },
+          ),
+        );
       },
       [
         actionMessageId,
-        creatingThread,
         navigation,
         route.name,
         route.params,
         seededThreadTitle,
         sessionId,
-        t.threadCreateFailed,
-        toast,
         topicId,
       ],
     );
@@ -1481,7 +1457,7 @@ const MessageBubble = memo<MessageBubbleProps>(
     const handlePressStartThread = useCallback(() => {
       const sourceMessageId = actionMessageId?.trim();
       const normalizedTopicId = topicId?.trim();
-      if (!sourceMessageId || !normalizedTopicId || creatingThread) return;
+      if (!sourceMessageId || !normalizedTopicId) return;
 
       Alert.alert(t.threadStart, t.threadStartModePrompt, [
         { style: 'cancel', text: t.cancel },
@@ -1500,7 +1476,6 @@ const MessageBubble = memo<MessageBubbleProps>(
       ]);
     }, [
       actionMessageId,
-      creatingThread,
       handleStartThread,
       t.cancel,
       t.threadStart,
@@ -2092,11 +2067,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                       style={{ backgroundColor: colors.fillTertiary }}
                       onPress={handlePressStartThread}
                     >
-                      {creatingThread ? (
-                        <ActivityIndicator color={colors.primary} size="small" />
-                      ) : (
-                        <GitBranch color={colors.primary} size={14} strokeWidth={2} />
-                      )}
+                      <GitBranch color={colors.primary} size={14} strokeWidth={2} />
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity

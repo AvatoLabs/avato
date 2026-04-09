@@ -76,6 +76,13 @@ vi.mock('./lib/server', () => ({
   testConnection: vi.fn(),
 }));
 
+vi.mock('./constants/session', () => ({
+  AVATO_INBOX_ICON_ASSET: 1,
+  DEFAULT_INBOX_AVATAR: '/icons/icon-192x192.png',
+  INBOX_SESSION_ID: 'inbox',
+  isBuiltinInboxAvatar: vi.fn().mockReturnValue(false),
+}));
+
 class MockXMLHttpRequest {
   static instances: MockXMLHttpRequest[] = [];
 
@@ -690,6 +697,95 @@ describe('threadApi', () => {
     expect(result).toHaveLength(2);
     expect(result[0]?.threadId).toBeNull();
     expect(result[1]?.threadId).toBe('thread-1');
+  });
+
+  it('wraps createThreadWithMessage mutations with the expected lambda input envelope', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          result: {
+            data: {
+              json: {
+                messageId: 'message-created-1',
+                threadId: 'thread-created-2',
+              },
+            },
+          },
+        }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { threadApi } = await import('./lib/api');
+    const result = await threadApi.createWithMessage({
+      message: {
+        content: 'hello',
+        role: 'user',
+        sessionId: 'session-1',
+      },
+      sourceMessageId: 'msg-1',
+      topicId: 'topic-1',
+      type: 'continuation',
+    });
+
+    expect(result).toEqual({
+      messageId: 'message-created-1',
+      threadId: 'thread-created-2',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, { body: string; method: string }];
+
+    expect(url).toContain('/trpc/lambda/thread.createThreadWithMessage');
+    expect(options.method).toBe('POST');
+    expect(options.body).toContain('"sourceMessageId":"msg-1"');
+    expect(options.body).toContain('"topicId":"topic-1"');
+    expect(options.body).toContain('"type":"continuation"');
+    expect(options.body).toContain('"content":"hello"');
+    expect(options.body).toContain('"sessionId":"session-1"');
+  });
+
+  it('queries draft thread context messages through the mobile message router', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          result: {
+            data: {
+              json: [
+                {
+                  content: 'Source context',
+                  createdAt: '2026-04-08T00:00:00.000Z',
+                  id: 'msg-1',
+                  role: 'user',
+                  sessionId: 'session-1',
+                  threadId: null,
+                  updatedAt: '2026-04-08T00:00:00.000Z',
+                },
+              ],
+            },
+          },
+        }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { messageApi } = await import('./lib/api');
+    const result = await messageApi.listThreadDraftMessages({
+      sourceMessageId: 'msg-1',
+      threadType: 'continuation',
+      topicId: 'topic-1',
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe('msg-1');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, { method: string }];
+
+    expect(url).toContain('/trpc/mobile/message.getThreadDraftMessages');
+    expect(options.method).toBe('GET');
   });
 });
 

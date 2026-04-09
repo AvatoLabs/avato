@@ -14,6 +14,7 @@ import { createSSEChunkParser } from '@lobechat/fetch-sse/sseParser';
 import * as FileSystem from 'expo-file-system/legacy';
 import { sha256 } from 'js-sha256';
 
+import { INBOX_SESSION_ID } from '../constants/session';
 import type {
   AgentSkillItem,
   AiProviderDetailItem,
@@ -1132,6 +1133,16 @@ const normalizeCreateMessageParams = (params: CreateMessageParams): CreateMessag
   return params;
 };
 
+const normalizeThreadCreateMessageParams = (params: CreateMessageParams): CreateMessageParams => {
+  const normalized = normalizeCreateMessageParams(params);
+
+  if (normalized.sessionId === INBOX_SESSION_ID) {
+    return { ...normalized, sessionId: null };
+  }
+
+  return normalized;
+};
+
 export const messageApi = {
   list: (
     sessionId: string,
@@ -1155,6 +1166,15 @@ export const messageApi = {
       id: result.id,
       messages: (result.messages ?? []).map((message) => normalizeMessage(message)),
     })),
+
+  listThreadDraftMessages: (params: {
+    sourceMessageId: string;
+    threadType: 'continuation' | 'isolation' | 'standalone';
+    topicId: string;
+  }) =>
+    trpcQuery<any[]>('message.getThreadDraftMessages', params).then((messages) =>
+      (messages ?? []).map((message) => normalizeMessage(message)),
+    ),
 
   remove: (id: string) => trpcMutate('message.removeMessage', { id }),
   /** Remove all messages in a topic (agent session). Aligns with Web clearMessage. */
@@ -1183,6 +1203,22 @@ export const threadApi = {
     topicId: string;
     type: 'continuation' | 'isolation' | 'standalone';
   }) => trpcMutate<string>('thread.createThread', params, { namespace: 'lambda' }),
+  createWithMessage: (params: {
+    message: CreateMessageParams;
+    parentThreadId?: string;
+    sourceMessageId?: string;
+    title?: string;
+    topicId: string;
+    type: 'continuation' | 'isolation' | 'standalone';
+  }) =>
+    trpcMutate<{ messageId: string; threadId: string }>(
+      'thread.createThreadWithMessage',
+      {
+        ...params,
+        message: normalizeThreadCreateMessageParams(params.message),
+      },
+      { namespace: 'lambda' },
+    ),
   list: (topicId: string) =>
     trpcQuery<MobileThreadItem[]>('thread.getThreads', { topicId }, { namespace: 'lambda' }),
   generateTitle: (id: string) =>
