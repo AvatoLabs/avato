@@ -45,7 +45,7 @@ interface ItemProps {
 
 const Item = memo<ItemProps>(({ identifier, title, description, avatar }) => {
   const { t } = useTranslation('plugin');
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
   const [configOpen, setConfigOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
 
@@ -66,10 +66,15 @@ const Item = memo<ItemProps>(({ identifier, title, description, avatar }) => {
       centered: true,
       okButtonProps: { danger: true },
       onOk: async () => {
-        if (isPluginEnabledInAgent) {
-          await togglePlugin(identifier, false);
+        try {
+          if (isPluginEnabledInAgent) {
+            await togglePlugin(identifier, false);
+          }
+          await uninstallPlugin(identifier);
+        } catch (error) {
+          console.error('Failed to uninstall custom plugin:', error);
+          message.error(t('store.actions.uninstallFailed'));
         }
-        await uninstallPlugin(identifier);
       },
       title: t('store.actions.confirmUninstall'),
       type: 'error',

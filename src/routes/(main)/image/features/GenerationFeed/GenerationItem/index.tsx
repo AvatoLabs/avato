@@ -9,7 +9,6 @@ import { useDownloadImage } from '@/hooks/useDownloadImage';
 import { useImageStore } from '@/store/image';
 import { imageGenerationConfigSelectors } from '@/store/image/selectors';
 import { AsyncTaskStatus } from '@/types/asyncTask';
-import { resolveClientMediaUrl } from '@/utils/client/resolveClientMediaUrl';
 import { inferFileExtensionFromImageUrl } from '@/utils/url';
 
 import { ErrorState } from './ErrorState';
@@ -17,6 +16,7 @@ import { LoadingState } from './LoadingState';
 import { SuccessState } from './SuccessState';
 import { type GenerationItemProps } from './types';
 import { getAspectRatio } from './utils';
+import { resolveClientMediaUrl } from '../../../../../../utils/client/resolveClientMediaUrl';
 
 const isSupportedParamSelector = imageGenerationConfigSelectors.isSupportedParam;
 
@@ -65,8 +65,9 @@ export const GenerationItem = memo<GenerationItemProps>(
         await deleteGeneration(generation.id);
       } catch (error) {
         console.error('Failed to delete generation:', error);
+        message.error(t('generation.actions.deleteFailed'));
       }
-    }, [deleteGeneration, generation.id]);
+    }, [deleteGeneration, generation.id, message, t]);
 
     const handleDownloadImage = useCallback(async () => {
       const rawUrl = generation.fileId ? `/f/${generation.fileId}` : generation.asset?.url;
@@ -82,8 +83,13 @@ export const GenerationItem = memo<GenerationItemProps>(
       const fileExtension = inferFileExtensionFromImageUrl(generation.asset.url);
       const fileName = `${safePrompt}_${timestamp}.${fileExtension}`;
 
-      await downloadImage(downloadUrl, fileName);
-    }, [downloadImage, generation.asset?.url, generation.createdAt, generation.fileId, prompt]);
+      try {
+        await downloadImage(downloadUrl, fileName);
+      } catch (error) {
+        console.error('Failed to download image:', error);
+        message.error(t('generation.actions.downloadFailed'));
+      }
+    }, [downloadImage, generation.asset?.url, generation.createdAt, generation.fileId, message, prompt, t]);
 
     const handleCopySeed = useCallback(async () => {
       if (!generation.seed) return;

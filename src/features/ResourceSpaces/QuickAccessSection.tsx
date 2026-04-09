@@ -6,16 +6,30 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
+import { useFileScope } from '@/features/ContentManager/useFileScope';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { TrashNavItem } from '@/features/ResourceTrash';
+import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 
 import { buildSharedFilesPath } from './paths';
+import { useSpaceName } from './useSpaceName';
 
 const QuickAccessSection = memo<{ itemKey: string }>(({ itemKey }) => {
   const { t } = useTranslation('file');
   const location = useLocation();
   const navigate = useNavigate();
   const { spaceId: currentSpaceId } = useParams<{ spaceId?: string }>();
+  const currentSpaceName = useSpaceName(currentSpaceId);
+  const { sourceSetId } = useFileScope(currentSpaceId);
+  const sourceSetName = useSourceSetStore(
+    sourceSetSelectors.getSourceSetNameById(sourceSetId || ''),
+  );
+  const sharedTitle = `${t('space.quickAccessTitle')} / ${t('shared.title')}`;
+  const trashTitle = sourceSetName
+    ? `${sourceSetName} / ${t('trash.title')}`
+    : currentSpaceName
+      ? `${currentSpaceName} / ${t('trash.title')}`
+      : `${t('space.quickAccessTitle')} / ${t('trash.title')}`;
 
   return (
     <AccordionItem
@@ -32,10 +46,14 @@ const QuickAccessSection = memo<{ itemKey: string }>(({ itemKey }) => {
         <NavItem
           active={location.pathname === buildSharedFilesPath()}
           icon={Share2Icon}
-          title={t('shared.title')}
+          title={sharedTitle}
           onClick={() => navigate(buildSharedFilesPath())}
         />
-        <TrashNavItem spaceId={currentSpaceId} />
+        <TrashNavItem
+          sourceSetId={sourceSetId || undefined}
+          spaceId={currentSpaceId}
+          title={trashTitle}
+        />
       </Flexbox>
     </AccordionItem>
   );

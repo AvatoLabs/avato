@@ -1,5 +1,6 @@
 import {
   type FileAssetClassification,
+  type FileAssetRenditionKind,
   type FileAssetReviewStatus,
   type FileAssetUsagePolicy,
   type FilesTabs,
@@ -11,6 +12,16 @@ import {
  * Used by ContentManager for optimistic updates and local-first state management
  */
 export interface ContentItem {
+  assetClassification?: FileAssetClassification | null;
+  assetLatestGovernanceAuditAction?: string | null;
+  assetLatestGovernanceAuditActorDisplayName?: string | null;
+  assetLatestGovernanceAuditAt?: Date | null;
+  assetPrimaryRenditionKind?: FileAssetRenditionKind | null;
+  assetPrimaryRenditionLabel?: string | null;
+  assetRenditionCount?: number | null;
+  assetReviewStatus?: FileAssetReviewStatus | null;
+  assetUsagePolicy?: FileAssetUsagePolicy | null;
+  assetVersionLabel?: string | null;
   // Optimistic tracking (UI state, not persisted)
   _optimistic?: {
     error?: Error;
@@ -83,6 +94,7 @@ export interface SyncOperation {
  */
 export interface ContentQueryParams {
   assetClassification?: FileAssetClassification;
+  assetRightsOwner?: string;
   assetReviewStatus?: FileAssetReviewStatus;
   assetUsagePolicy?: FileAssetUsagePolicy;
   category?: FilesTabs;
@@ -106,10 +118,12 @@ export interface CreateFileParams {
   metadata?: Record<string, any>;
   name: string;
   parentId?: string;
+  sha256: string;
   size: number;
   sourceSetId?: string;
+  spaceId?: string;
   sourceType: 'file';
-  url: string;
+  storageKey: string;
 }
 
 /**
@@ -123,6 +137,7 @@ export interface CreateDocumentParams {
   parentId?: string;
   slug?: string;
   sourceSetId?: string;
+  spaceId?: string;
   sourceType: 'document';
   title: string;
 }

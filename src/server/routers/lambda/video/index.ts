@@ -21,7 +21,7 @@ import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { keyVaults, serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 import { FileService } from '@/server/services/file';
-import { resolveProviderReadableFileReference } from '@/server/services/file/resolveProviderReadableFileReference';
+import { resolveRuntimeFileInput } from '@/server/services/file/resolveRuntimeFileInput';
 import {
   AsyncTaskError,
   AsyncTaskErrorType,
@@ -79,7 +79,7 @@ export const videoRouter = router({
     // Process first-frame imageUrl
     if (typeof params.imageUrl === 'string' && params.imageUrl) {
       try {
-        const providerReadable = await resolveProviderReadableFileReference({
+        const resolvedInput = await resolveRuntimeFileInput({
           db: serverDB,
           fileService,
           sourceIp: ctx.clientIp ?? null,
@@ -89,23 +89,12 @@ export const videoRouter = router({
           via: 'video_generation_input',
         });
 
-        if (providerReadable) {
+        if (resolvedInput) {
           log('Resolved internal imageUrl to provider-readable URL: %s', params.imageUrl);
-          configForDatabase = { ...configForDatabase, imageUrl: providerReadable.key };
-          generationParams = { ...generationParams, imageUrl: providerReadable.url };
+          configForDatabase = { ...configForDatabase, imageUrl: resolvedInput.key };
+          generationParams = { ...generationParams, imageUrl: resolvedInput.url };
         } else {
-          const key = await fileService.getKeyFromFullUrl(params.imageUrl);
-          if (key) {
-            log('Converted imageUrl to key: %s -> %s', params.imageUrl, key);
-            configForDatabase = { ...configForDatabase, imageUrl: key };
-
-            if (process.env.NODE_ENV === 'development') {
-              const s3Url = await fileService.getFullFileUrl(key);
-              if (s3Url) {
-                generationParams = { ...generationParams, imageUrl: s3Url };
-              }
-            }
-          }
+          log('Failed to extract key from imageUrl: %s', params.imageUrl);
         }
       } catch (error) {
         if (error instanceof TRPCError) throw error;
@@ -116,7 +105,7 @@ export const videoRouter = router({
     // Process last-frame endImageUrl
     if (typeof params.endImageUrl === 'string' && params.endImageUrl) {
       try {
-        const providerReadable = await resolveProviderReadableFileReference({
+        const resolvedInput = await resolveRuntimeFileInput({
           db: serverDB,
           fileService,
           sourceIp: ctx.clientIp ?? null,
@@ -126,23 +115,12 @@ export const videoRouter = router({
           via: 'video_generation_input',
         });
 
-        if (providerReadable) {
+        if (resolvedInput) {
           log('Resolved internal endImageUrl to provider-readable URL: %s', params.endImageUrl);
-          configForDatabase = { ...configForDatabase, endImageUrl: providerReadable.key };
-          generationParams = { ...generationParams, endImageUrl: providerReadable.url };
+          configForDatabase = { ...configForDatabase, endImageUrl: resolvedInput.key };
+          generationParams = { ...generationParams, endImageUrl: resolvedInput.url };
         } else {
-          const key = await fileService.getKeyFromFullUrl(params.endImageUrl);
-          if (key) {
-            log('Converted endImageUrl to key: %s -> %s', params.endImageUrl, key);
-            configForDatabase = { ...configForDatabase, endImageUrl: key };
-
-            if (process.env.NODE_ENV === 'development') {
-              const s3Url = await fileService.getFullFileUrl(key);
-              if (s3Url) {
-                generationParams = { ...generationParams, endImageUrl: s3Url };
-              }
-            }
-          }
+          log('Failed to extract key from endImageUrl: %s', params.endImageUrl);
         }
       } catch (error) {
         if (error instanceof TRPCError) throw error;

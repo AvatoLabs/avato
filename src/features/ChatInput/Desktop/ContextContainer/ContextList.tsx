@@ -10,6 +10,9 @@ import FileItem from '../FilePreview/FileItem';
 import ContextItem from './ContextItem';
 import SelectionItem from './SelectionItem';
 
+const getSelectionDedupKey = (item: { content?: string; id: string; preview?: string }) =>
+  item.id.startsWith('document-context-') ? item.id : item.preview || item.content || item.id;
+
 const styles = createStaticStyles(({ css }) => ({
   container: css`
     overflow-x: scroll;
@@ -42,7 +45,8 @@ const ContextList = memo(() => {
 
   // Filter duplicates based on preview content
   const selectionList = rawSelectionList.filter(
-    (item, index, self) => index === self.findIndex((t) => t.preview === item.preview),
+    (item, index, self) =>
+      index === self.findIndex((target) => getSelectionDedupKey(target) === getSelectionDedupKey(item)),
   );
 
   // Separate files into uploading/error and completed

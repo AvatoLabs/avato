@@ -2,6 +2,7 @@
 
 import { type MenuProps } from '@lobehub/ui';
 import { Icon } from '@lobehub/ui';
+import { App } from 'antd';
 import { FileText, Filter, FolderOpen, Hash, LucideCheck, Table2 } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +18,7 @@ import { TABLE_PAGE_KIND } from '@/utils/docs';
 
 export const useDropdownMenu = (): MenuProps['items'] => {
   const { t } = useTranslation();
+  const { message } = App.useApp();
   const pageKind = usePageKind();
   const pageSpaceId = usePageSpaceId();
   const { scope, setScope, sourceSetId: currentSourceSetScopeId } = usePageScope();
@@ -36,6 +38,14 @@ export const useDropdownMenu = (): MenuProps['items'] => {
     s.updateSystemStatus,
   ]);
 
+  const handleCreateError = useCallback(
+    (error: unknown) => {
+      console.error('Failed to create page:', error);
+      message.error(t('pageList.createFailed', { ns: 'file' }));
+    },
+    [message, t],
+  );
+
   const handleCreateInSourceSet = useCallback(
     (sourceSetId: string) => {
       if (pageKind === TABLE_PAGE_KIND) {
@@ -44,7 +54,7 @@ export const useDropdownMenu = (): MenuProps['items'] => {
         void createNewTable(t('pageList.tableUntitled', { ns: 'file' }), {
           sourceSetId,
           spaceId: targetSourceSet?.spaceId ?? undefined,
-        });
+        }).catch(handleCreateError);
         return;
       }
 
@@ -53,9 +63,9 @@ export const useDropdownMenu = (): MenuProps['items'] => {
       void createNewPage(t('pageList.untitled', { ns: 'file' }), {
         sourceSetId,
         spaceId: targetSourceSet?.spaceId ?? undefined,
-      });
+      }).catch(handleCreateError);
     },
-    [createNewPage, createNewTable, pageKind, sourceSets, t],
+    [createNewPage, createNewTable, handleCreateError, pageKind, sourceSets, t],
   );
 
   return useMemo(() => {
@@ -136,14 +146,14 @@ export const useDropdownMenu = (): MenuProps['items'] => {
             void createNewTable(t('pageList.tableUntitled', { ns: 'file' }), {
               sourceSetId: currentSourceSetScopeId || undefined,
               spaceId: currentSourceSet?.spaceId ?? pageSpaceId,
-            });
+            }).catch(handleCreateError);
             return;
           }
 
           void createNewPage(t('pageList.untitled', { ns: 'file' }), {
             sourceSetId: currentSourceSetScopeId || undefined,
             spaceId: currentSourceSet?.spaceId ?? pageSpaceId,
-          });
+          }).catch(handleCreateError);
         },
       });
     }
@@ -156,6 +166,7 @@ export const useDropdownMenu = (): MenuProps['items'] => {
     currentSourceSet,
     currentSourceSetName,
     currentSourceSetScopeId,
+    handleCreateError,
     pageSpaceId,
     pageKind,
     sourceSets,

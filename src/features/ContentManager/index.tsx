@@ -60,6 +60,20 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       position: relative;
       overflow: hidden;
     `,
+    explorerStage: css`
+      height: 100%;
+      transition:
+        opacity 180ms ease,
+        transform 180ms ease,
+        visibility 0s linear;
+    `,
+    explorerStage_inert: css`
+      pointer-events: none;
+      user-select: none;
+      visibility: hidden;
+      opacity: 0;
+      transform: scale(0.992);
+    `,
     editorOverlay: css`
       position: absolute;
       z-index: 1;
@@ -67,8 +81,15 @@ const styles = createStaticStyles(({ css, cssVar }) => {
 
       width: 100%;
       height: 100%;
+      padding: clamp(10px, 1.8vw, 18px);
 
-      background-color: var(--editor-overlay-bg, ${cssVar.colorBgContainer});
+      background:
+        radial-gradient(circle at top left, rgb(82 149 255 / 8%), transparent 28%),
+        linear-gradient(
+          180deg,
+          var(--editor-overlay-bg, ${cssVar.colorBgContainer}) 0%,
+          ${cssVar.colorBgLayout} 100%
+        );
     `,
     docEditorOverlay: css`
       position: absolute;
@@ -77,8 +98,44 @@ const styles = createStaticStyles(({ css, cssVar }) => {
 
       width: 100%;
       height: 100%;
+      padding: clamp(10px, 1.8vw, 18px);
 
-      background-color: ${cssVar.colorBgLayout};
+      background:
+        radial-gradient(circle at top left, rgb(82 149 255 / 8%), transparent 28%),
+        linear-gradient(180deg, ${cssVar.colorBgLayout} 0%, ${cssVar.colorBgContainer} 100%);
+    `,
+    overlayStage: css`
+      overflow: hidden;
+
+      width: 100%;
+      height: 100%;
+      border: 1px solid color-mix(in srgb, ${cssVar.colorBorderSecondary} 90%, transparent);
+      border-radius: 24px;
+
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, ${cssVar.colorBgContainer} 97%, ${cssVar.colorBgElevated}) 0%,
+          color-mix(in srgb, ${cssVar.colorBgContainer} 92%, ${cssVar.colorBgLayout}) 100%
+        );
+      box-shadow:
+        0 28px 72px -48px color-mix(in srgb, ${cssVar.colorText} 24%, transparent),
+        inset 0 1px 0 color-mix(in srgb, white 55%, transparent);
+      backdrop-filter: blur(16px);
+
+      @media (max-width: 768px) {
+        border-radius: 18px;
+      }
+    `,
+    overlayStage_doc: css`
+      background: color-mix(in srgb, ${cssVar.colorBgLayout} 96%, ${cssVar.colorBgContainer});
+    `,
+    overlayStage_editor: css`
+      background: color-mix(
+        in srgb,
+        var(--editor-overlay-bg, ${cssVar.colorBgContainer}) 96%,
+        ${cssVar.colorBgContainer}
+      );
     `,
   };
 });
@@ -127,6 +184,7 @@ const ContentManager = memo(() => {
     }),
     [theme.colorBgContainerSecondary],
   );
+  const isOverlayMode = mode !== 'explorer';
 
   // Fetch the current doc when switching to doc mode if it is not already loaded.
   useEffect(() => {
@@ -169,7 +227,6 @@ const ContentManager = memo(() => {
     setCurrentViewItemId(undefined);
     const nextParams = new URLSearchParams(location.search);
     nextParams.delete('file');
-    nextParams.delete('files');
 
     const nextPath = stripFilesItemPath(location.pathname);
     const nextSearch = nextParams.toString();
@@ -202,32 +259,53 @@ const ContentManager = memo(() => {
 
   return (
     <>
-      <DragUploadZone enabledFiles style={{ height: '100%' }} onUploadFiles={handleUploadFiles}>
+      <DragUploadZone
+        disabled={isOverlayMode}
+        enabledFiles
+        style={{ height: '100%' }}
+        onUploadFiles={handleUploadFiles}
+      >
         <Flexbox className={styles.container} height={'100%'} style={cssVariables}>
           {/* Explorer is always rendered to preserve its state */}
-          <Explorer />
+          <div
+            aria-hidden={isOverlayMode}
+            data-testid={'content-manager-explorer-stage'}
+            className={`${styles.explorerStage} ${isOverlayMode ? styles.explorerStage_inert : ''}`}
+          >
+            <Explorer />
+          </div>
 
           {/* Editor overlay */}
           {mode === 'editor' && (
             <Flexbox className={styles.editorOverlay}>
-              <FileEditor onBack={handleBack} />
+              <div
+                className={`${styles.overlayStage} ${styles.overlayStage_editor}`}
+                data-testid={'content-manager-editor-stage'}
+              >
+                <FileEditor onBack={handleBack} />
+              </div>
             </Flexbox>
           )}
 
           {/* Doc editor overlay */}
           {mode === 'doc' && (
             <Flexbox className={styles.docEditorOverlay}>
-              <PageEditor
-                emoji={currentDocument?.metadata?.emoji as string | undefined}
-                pageId={currentViewItemId}
-                pageKind={getPageKindFromDocument(currentDocument)}
-                sourceSetId={sourceSetId}
-                title={currentDocument?.title}
-                onBack={handleBack}
-                onDelete={handleBack}
-                onEmojiChange={handleEmojiChange}
-                onTitleChange={handleTitleChange}
-              />
+              <div
+                className={`${styles.overlayStage} ${styles.overlayStage_doc}`}
+                data-testid={'content-manager-doc-stage'}
+              >
+                <PageEditor
+                  emoji={currentDocument?.metadata?.emoji as string | undefined}
+                  pageId={currentViewItemId}
+                  pageKind={getPageKindFromDocument(currentDocument)}
+                  sourceSetId={sourceSetId}
+                  title={currentDocument?.title}
+                  onBack={handleBack}
+                  onDelete={handleBack}
+                  onEmojiChange={handleEmojiChange}
+                  onTitleChange={handleTitleChange}
+                />
+              </div>
             </Flexbox>
           )}
         </Flexbox>

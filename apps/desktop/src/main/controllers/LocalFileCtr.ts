@@ -611,12 +611,12 @@ export default class LocalFileCtr extends ControllerModule {
   async handlePrepareSkillDirectory({
     forceRefresh,
     url,
-    zipHash,
+    zipSha256,
   }: PrepareSkillDirectoryParams): Promise<PrepareSkillDirectoryResult> {
     const cacheRoot = path.join(this.app.appStoragePath, 'file-storage', 'skills');
-    const extractedDir = path.join(cacheRoot, 'extracted', zipHash);
+    const extractedDir = path.join(cacheRoot, 'extracted', zipSha256);
     const markerPath = path.join(extractedDir, '.prepared');
-    const zipPath = path.join(cacheRoot, 'archives', `${zipHash}.zip`);
+    const zipPath = path.join(cacheRoot, 'archives', `${zipSha256}.zip`);
 
     try {
       if (!forceRefresh) {
@@ -656,7 +656,11 @@ export default class LocalFileCtr extends ControllerModule {
         await writeFile(targetPath, Buffer.from(fileContent as Uint8Array));
       }
 
-      await writeFile(markerPath, JSON.stringify({ preparedAt: Date.now(), url, zipHash }), 'utf8');
+      await writeFile(
+        markerPath,
+        JSON.stringify({ preparedAt: Date.now(), url, zipSha256 }),
+        'utf8',
+      );
 
       return { extractedDir, success: true, zipPath };
     } catch (error) {
@@ -673,9 +677,9 @@ export default class LocalFileCtr extends ControllerModule {
   async handleResolveSkillResourcePath({
     path: resourcePath,
     url,
-    zipHash,
+    zipSha256,
   }: ResolveSkillResourcePathParams): Promise<ResolveSkillResourcePathResult> {
-    const prepared = await this.handlePrepareSkillDirectory({ url, zipHash });
+    const prepared = await this.handlePrepareSkillDirectory({ url, zipSha256 });
 
     if (!prepared.success) {
       return { error: prepared.error, success: false };

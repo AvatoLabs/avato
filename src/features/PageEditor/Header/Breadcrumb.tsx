@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { buildPageScopeSearch, createSourceSetPageScope } from '@/features/Pages/usePageScope';
 import {
-  buildSpaceRootPath,
+  buildFilesRootPath,
   SurfaceBreadcrumb,
   type SurfaceBreadcrumbSegment,
   useSpaceName,
@@ -50,7 +50,7 @@ const Breadcrumb = memo(() => {
             {
               key: 'space',
               label: resolvedSpaceLabel,
-              onClick: () => navigate(buildSpaceRootPath(spaceId)),
+              onClick: () => navigate(buildFilesRootPath(spaceId)),
             },
           ]
         : []),

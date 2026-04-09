@@ -64,7 +64,7 @@ const ChatList = memo<ChatListProps>(({ disableActionsBar, welcome, itemContent 
   const effectiveMemoryEffort =
     agentChatConfig.memory?.effort ?? currentMemorySettings.effort ?? 'medium';
   const topicMemoryRetrieval = useUserMemoryStore(
-    agentMemorySelectors.topicMemoryRetrieval(context.topicId),
+    agentMemorySelectors.topicMemoryRetrieval(context.topicId ?? undefined),
   );
 
   useFetchTopicMemories({

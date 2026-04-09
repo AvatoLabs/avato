@@ -2,8 +2,8 @@
 
 import { Block, Flexbox, Icon, Tag, Text } from '@lobehub/ui';
 import { createStaticStyles, cx } from 'antd-style';
-import { Blocks, FileTextIcon } from 'lucide-react';
-import { type ComponentType, memo } from 'react';
+import { Blocks, FileTextIcon, type LucideIcon } from 'lucide-react';
+import { type FC, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -192,13 +192,13 @@ interface BaseAction {
 }
 
 interface ModeQuickAction extends BaseAction {
-  icon: ComponentType<{ size?: number }>;
+  icon: FC<any> | LucideIcon;
   kind: 'mode';
   mode: ModeAction;
 }
 
 interface UtilityQuickAction extends BaseAction {
-  icon: ComponentType<{ size?: number }>;
+  icon: FC<any> | LucideIcon;
   kind: 'utility';
   onClick: () => void;
 }

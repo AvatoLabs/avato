@@ -2,7 +2,9 @@ import { Database } from 'lucide-react';
 
 import { getRouteById } from '@/config/routes';
 import {
+  buildFilesTrashPath,
   buildFilesRootPath,
+  buildSharedFilesPath,
   buildSpaceMembersPath,
   buildSpaceSettingsPath,
 } from '@/features/ResourceSpaces';
@@ -14,7 +16,7 @@ import { createPageReference } from './types';
 const resourceIcon = getRouteById('resource')?.icon || Database;
 
 const RESOURCE_PATH_REGEX =
-  /^\/(?:content\/(shared|trash)|spaces\/([^/]+)\/(files|settings|members)(?:\/([^/?]+))?)$/;
+  /^\/(?:spaces\/(shared|trash)|spaces\/([^/]+)\/(files|settings|members)(?:\/([^/?]+))?)$/;
 
 // Section to title key mapping
 const sectionTitleKeys: Record<string, string> = {
@@ -38,7 +40,12 @@ export const resourcePlugin: RecentlyViewedPlugin<'resource'> = {
   generateUrl(reference: PageReference<'resource'>): string {
     const { section, spaceId } = reference.params;
 
-    if (!spaceId) return `/content/${section}`;
+    if (!spaceId) {
+      if (section === 'shared') return buildSharedFilesPath();
+      if (section === 'trash') return buildFilesTrashPath();
+
+      return buildFilesRootPath();
+    }
 
     if (section === 'settings') return buildSpaceSettingsPath(spaceId);
     if (section === 'members') return buildSpaceMembersPath(spaceId);

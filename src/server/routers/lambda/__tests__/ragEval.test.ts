@@ -9,6 +9,8 @@ const mockEvalEvaluationUpdate = vi.fn();
 const mockEvaluationRecordFindByEvaluationId = vi.fn();
 const mockFileServiceUploadContent = vi.fn();
 const mockFileServiceGetFullFileUrl = vi.fn();
+const mockFileServiceCreateOpaqueUserBlobPath = vi.fn();
+const mockSourceSetFindByIdAny = vi.fn();
 
 vi.mock('@/database/models/file', () => ({
   FileModel: vi.fn(() => ({})),
@@ -31,12 +33,19 @@ vi.mock('@/database/models/ragEval', () => ({
   })),
 }));
 
+vi.mock('@/database/models/sourceSet', () => ({
+  SourceSetModel: vi.fn(() => ({
+    findByIdAny: mockSourceSetFindByIdAny,
+  })),
+}));
+
 vi.mock('@/server/routers/async', () => ({
   createAsyncCaller: vi.fn(),
 }));
 
 vi.mock('@/server/services/file', () => ({
   FileService: vi.fn(() => ({
+    createOpaqueUserBlobPath: mockFileServiceCreateOpaqueUserBlobPath,
     getFullFileUrl: mockFileServiceGetFullFileUrl,
     uploadContent: mockFileServiceUploadContent,
   })),
@@ -56,12 +65,18 @@ const createCaller = (ctxOverrides: Partial<any> = {}) =>
 describe('ragEvalRouter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFileServiceCreateOpaqueUserBlobPath.mockResolvedValue({
+      key: 'v2/spaces/spc_eval/blobs/rag-eval-records/test-id.jsonl',
+      spaceId: 'spc_eval',
+    });
+    mockSourceSetFindByIdAny.mockResolvedValue({ id: 'ss-1', spaceId: 'spc_eval' });
   });
 
   it('persists the raw eval record storage key instead of a presigned URL', async () => {
     mockEvalEvaluationFindById.mockResolvedValue({
       id: 'eval-1',
       name: 'Bench',
+      sourceSetId: 'ss-1',
     });
     mockEvaluationRecordFindByEvaluationId.mockResolvedValue([
       {
@@ -78,13 +93,18 @@ describe('ragEvalRouter', () => {
 
     expect(result).toEqual({ success: true });
     expect(mockFileServiceUploadContent).toHaveBeenCalledWith(
-      expect.stringMatching(/^rag_eval_records\//),
+      'v2/spaces/spc_eval/blobs/rag-eval-records/test-id.jsonl',
       expect.any(String),
+    );
+    expect(mockFileServiceCreateOpaqueUserBlobPath).toHaveBeenCalledWith(
+      'rag-eval-records',
+      'jsonl',
+      'spc_eval',
     );
     expect(mockEvalEvaluationUpdate).toHaveBeenCalledWith(
       'eval-1',
       expect.objectContaining({
-        evalRecordsUrl: expect.stringMatching(/^rag_eval_records\//),
+        evalRecordsUrl: 'v2/spaces/spc_eval/blobs/rag-eval-records/test-id.jsonl',
         status: EvalEvaluationStatus.Success,
       }),
     );
@@ -96,7 +116,7 @@ describe('ragEvalRouter', () => {
       {
         createdAt: new Date('2026-04-05T00:00:00Z'),
         dataset: { id: 'dataset-1', name: 'Dataset' },
-        evalRecordsUrl: 'rag_eval_records/records.jsonl',
+        evalRecordsUrl: 'v2/spaces/spc_eval/blobs/rag-eval-records/records.jsonl',
         id: 'eval-1',
         name: 'Bench',
         recordsStats: { success: 1, total: 1 },

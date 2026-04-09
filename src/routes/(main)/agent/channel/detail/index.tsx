@@ -229,6 +229,7 @@ const PlatformDetail = memo<PlatformDetailProps>(({ provider, agentId, currentCo
         testResult={testResult}
         testing={testing}
         onCopied={() => msg.success(t('channel.copied'))}
+        onCopyFailed={() => msg.error(t('channel.copyFailed'))}
         onDelete={handleDelete}
         onSave={handleSave}
         onTestConnection={handleTestConnection}

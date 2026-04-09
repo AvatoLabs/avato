@@ -1,6 +1,8 @@
+import { App } from 'antd';
 import { Skeleton } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
 import { type FC } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import InstantSwitch from '@/components/InstantSwitch';
 import { aiProviderSelectors, useAiInfraStore } from '@/store/aiInfra';
@@ -20,6 +22,8 @@ interface SwitchProps {
 }
 
 const Switch = ({ id, Component }: SwitchProps) => {
+  const { message } = App.useApp();
+  const { t } = useTranslation('modelProvider');
   const [toggleProviderEnabled, enabled, isLoading] = useAiInfraStore((s) => [
     s.toggleProviderEnabled,
     aiProviderSelectors.isProviderEnabled(id)(s),
@@ -35,7 +39,13 @@ const Switch = ({ id, Component }: SwitchProps) => {
     <InstantSwitch
       enabled={enabled}
       onChange={async (enabled) => {
-        await toggleProviderEnabled(id as any, enabled);
+        try {
+          await toggleProviderEnabled(id as any, enabled);
+        } catch (error) {
+          console.error('Failed to update provider enabled state:', error);
+          message.error(t('updateAiProvider.toggleError'));
+          throw error;
+        }
       }}
     />
   );

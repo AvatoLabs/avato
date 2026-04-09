@@ -26,7 +26,7 @@ export const useDropdownMenu = ({
   toggleEditing,
 }: ActionProps): (() => MenuProps['items']) => {
   const { t } = useTranslation(['file', 'common', 'sourceSet']);
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
   const removeSourceSet = useSourceSetStore((s) => s.removeSourceSet);
   const { open } = useCreateSourceSetModal();
 
@@ -37,7 +37,12 @@ export const useDropdownMenu = ({
       centered: true,
       okButtonProps: { danger: true },
       onOk: async () => {
-        await removeSourceSet(id);
+        try {
+          await removeSourceSet(id);
+        } catch (error) {
+          console.error('Failed to delete source set from content list:', error);
+          message.error(t('sourceSet.list.removeError'));
+        }
       },
       title: t('sourceSet.list.confirmRemoveSourceSet'),
     });

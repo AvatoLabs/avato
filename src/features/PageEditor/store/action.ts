@@ -24,7 +24,7 @@ interface MetaSaveSnapshot {
 
 export interface Action {
   flushMetaSave: () => void;
-  handleCopyLink: (t: (key: string) => string, message: any) => void;
+  handleCopyLink: (t: (key: string) => string, message: any) => Promise<void>;
   handleDelete: (
     t: (key: string) => string,
     message: any,
@@ -72,7 +72,7 @@ export const store: (initState?: Partial<State>) => StateCreator<Store> =
         debouncedMetaSave?.flush();
       },
 
-      handleCopyLink: (t, message) => {
+      handleCopyLink: async (t, message) => {
         const { documentId } = get();
         if (!documentId) return;
 
@@ -90,8 +90,13 @@ export const store: (initState?: Partial<State>) => StateCreator<Store> =
         );
         const url = `${window.location.origin}${spaBase}${pagePath}`;
 
-        navigator.clipboard.writeText(url);
-        message.success(t('docEditor.linkCopied'));
+        try {
+          await navigator.clipboard.writeText(url);
+          message.success(t('docEditor.linkCopied'));
+        } catch (error) {
+          console.error('[PageEditor] Failed to copy link:', error);
+          message.error(t('docEditor.linkCopyError'));
+        }
       },
 
       handleDelete: async (t, message, modal, onDeleteCallback) => {

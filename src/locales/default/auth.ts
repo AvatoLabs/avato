@@ -167,6 +167,7 @@ export default {
   'profile.authorizations.actions.revoke': 'Revoke',
   'profile.authorizations.revoke.description':
     'After revoking, the tool will no longer have access to your data. Re-authorization is required to use it again.',
+  'profile.authorizations.revoke.error': 'Failed to revoke authorization for {{name}}.',
   'profile.authorizations.revoke.title': 'Revoke authorization for {{name}}?',
   'profile.authorizations.title': 'Manage Authorizations',
   'profile.avatar': 'Avatar',
@@ -185,11 +186,13 @@ export default {
   'profile.save': 'Save',
   'profile.setPassword': 'Set password',
   'profile.sso.link.button': 'Connect Account',
+  'profile.sso.link.error': 'Failed to connect {{provider}}',
   'profile.sso.link.success': 'Account linked successfully',
   'profile.sso.loading': 'Loading linked third-party accounts',
   'profile.sso.providers': 'Connected Accounts',
   'profile.sso.unlink.description':
     'Re-authorization or re-linking is required to sign in with {{provider}} again after unlinking.',
+  'profile.sso.unlink.error': 'Failed to unlink {{provider}}',
   'profile.sso.unlink.forbidden': 'You must retain at least one login method.',
   'profile.sso.unlink.title': 'Unlink {{provider}} account?',
   'profile.title': 'Profile',

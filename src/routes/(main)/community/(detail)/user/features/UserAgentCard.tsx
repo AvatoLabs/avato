@@ -169,7 +169,6 @@ const UserAgentCard = memo<UserAgentCardProps>(
           // Agent doesn't exist locally, fetch from market and create
           const marketAgent = await discoverService.getAssistantDetail({
             identifier,
-            source: 'new',
           });
 
           if (!marketAgent) {
@@ -193,9 +192,14 @@ const UserAgentCard = memo<UserAgentCardProps>(
 
           await refreshAgentList();
 
-          if (result.agentId) {
-            navigate(urlJoin('/agent', result.agentId, 'profile'));
+          const resolvedAgentId =
+            result.agentId || (await agentService.getAgentByMarketIdentifier(identifier));
+
+          if (!resolvedAgentId) {
+            throw new Error('Unable to resolve local agent id after import');
           }
+
+          navigate(urlJoin('/agent', resolvedAgentId, 'profile'));
         }
       } catch (error) {
         console.error('[UserAgentCard] handleEdit error:', error);

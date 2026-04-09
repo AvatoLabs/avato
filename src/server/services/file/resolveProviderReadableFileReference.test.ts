@@ -289,7 +289,7 @@ describe('resolveProviderReadableFileReference', () => {
     const db = {
       select: vi.fn(() => ({
         from: vi.fn(() => ({
-          innerJoin: vi.fn(function () {
+          innerJoin: vi.fn(function (this: any) {
             return this;
           }),
           where: vi.fn(() => ({

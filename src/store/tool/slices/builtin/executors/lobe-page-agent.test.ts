@@ -20,7 +20,7 @@ describe('ReadyDocsAgentRuntime', () => {
     const runtime = new ReadyDocsAgentRuntime();
     runtime.setEditor(editor as any);
 
-    const pending = runtime.initPage({ markdown: 'Hello world' });
+    const pending = runtime.initDoc({ markdown: 'Hello world' });
 
     expect(editor.setDocument).not.toHaveBeenCalled();
 
@@ -42,7 +42,7 @@ describe('ReadyDocsAgentRuntime', () => {
     runtime.setTitleHandlers(null, () => 'Draft Title');
     runtime.setEditor(editor as any);
 
-    expect(runtime.getPageContentContext('both')).toEqual({
+    expect(runtime.getDocContentContext('both')).toEqual({
       markdown: '',
       metadata: {
         charCount: 0,
@@ -56,7 +56,7 @@ describe('ReadyDocsAgentRuntime', () => {
   it('returns fallback page content when external text context is provided', () => {
     const runtime = new ReadyDocsAgentRuntime();
 
-    runtime.setFallbackPageContentContext({
+    runtime.setFallbackDocContentContext({
       markdown: '# Resource Title\n\nLoaded from resource viewer.',
       metadata: {
         title: 'Resource Title',
@@ -64,7 +64,7 @@ describe('ReadyDocsAgentRuntime', () => {
       xml: '<document></document>',
     });
 
-    expect(runtime.getPageContentContext('both')).toEqual({
+    expect(runtime.getDocContentContext('both')).toEqual({
       markdown: '# Resource Title\n\nLoaded from resource viewer.',
       metadata: {
         charCount: 46,
@@ -78,7 +78,7 @@ describe('ReadyDocsAgentRuntime', () => {
   it('isolates fallback page content by conversation key', async () => {
     const runtime = new ReadyDocsAgentRuntime();
 
-    runtime.setScopedFallbackPageContentContext({
+    runtime.setScopedFallbackDocContentContext({
       context: {
         markdown: '# Topic A\n\nOnly visible in topic A.',
         metadata: { title: 'Topic A' },
@@ -88,7 +88,7 @@ describe('ReadyDocsAgentRuntime', () => {
       docId: 'file-topic-a',
     });
 
-    expect(runtime.getScopedPageContentContext('both', 'page_agent-1_topic-a')).toEqual({
+    expect(runtime.getScopedDocContentContext('both', 'page_agent-1_topic-a')).toEqual({
       markdown: '# Topic A\n\nOnly visible in topic A.',
       metadata: {
         charCount: 35,
@@ -98,7 +98,7 @@ describe('ReadyDocsAgentRuntime', () => {
       xml: '<topic-a />',
     });
 
-    expect(runtime.getScopedPageContentContext('both', 'page_agent-1_topic-b')).toEqual({
+    expect(runtime.getScopedDocContentContext('both', 'page_agent-1_topic-b')).toEqual({
       markdown: '',
       metadata: {
         charCount: 0,
@@ -109,7 +109,7 @@ describe('ReadyDocsAgentRuntime', () => {
     });
 
     await expect(
-      runtime.getScopedPageContent({ format: 'both' }, 'page_agent-1_topic-a'),
+      runtime.getScopedDocContent({ format: 'both' }, 'page_agent-1_topic-a'),
     ).resolves.toEqual({
       charCount: 35,
       documentId: 'file-topic-a',

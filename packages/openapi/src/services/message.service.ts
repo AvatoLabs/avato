@@ -1,3 +1,4 @@
+import type { FileItem } from '@lobechat/types';
 import { and, asc, count, desc, eq, ilike, inArray, isNull } from 'drizzle-orm';
 
 import { ContentModel } from '@/database/models/content';
@@ -8,11 +9,7 @@ import { ContentAuthorizer } from '@/server/services/content';
 import { FileService as CoreFileService } from '@/server/services/file';
 
 import { BaseService } from '../common/base.service';
-import {
-  isSameOriginAppUrl,
-  isStableAppFileProxyUrl,
-  toAbsoluteStableAppFileProxyUrl,
-} from '../helpers/file';
+import { ensureFileResponseUrl } from '../helpers/file';
 import { processPaginationConditions } from '../helpers/pagination';
 import type { ServiceResult } from '../types';
 import type {
@@ -58,13 +55,10 @@ export class MessageService extends BaseService {
         kind: 'file',
       });
 
-      const resolvedUrl =
-        (file.url.startsWith('http://') || file.url.startsWith('https://')) &&
-        !isSameOriginAppUrl(file.url)
-          ? file.url
-          : isStableAppFileProxyUrl(file.url)
-            ? toAbsoluteStableAppFileProxyUrl(file.url)
-            : await this.coreFileService.getFullFileUrl(file.url);
+      const resolvedUrl = await ensureFileResponseUrl({
+        getFullFileUrl: this.coreFileService.getFullFileUrl.bind(this.coreFileService),
+        url: file.url,
+      });
 
       try {
         await this.contentModel.createAccessEvent({

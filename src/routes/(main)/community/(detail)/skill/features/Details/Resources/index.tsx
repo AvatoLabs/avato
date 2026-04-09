@@ -10,7 +10,7 @@ import InlineTable from '@/components/InlineTable';
 import { useDetailContext } from '../../DetailProvider';
 
 type ResourceMeta = {
-  fileHash?: string;
+  sha256?: string;
   size?: number;
 };
 
@@ -26,8 +26,8 @@ const Resources = memo(() => {
   const dataSource = useMemo<ResourceItem[]>(() => {
     return Object.entries((resources || {}) as Record<string, ResourceMeta>)
       .map(([name, meta]) => ({
-        fileHash: meta?.fileHash,
         name,
+        sha256: meta?.sha256,
         size: meta?.size,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));

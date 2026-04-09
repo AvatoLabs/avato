@@ -53,16 +53,24 @@ export class SourceSetCrudActionImpl {
   };
 
   removeSourceSet = async (id: string): Promise<void> => {
-    await sourceSetService.deleteSourceSet(id);
-    await this.#get().refreshSourceSetList();
+    this.#get().internal_setSourceSetLoading(id, true);
+
+    try {
+      await sourceSetService.deleteSourceSet(id);
+      await this.#get().refreshSourceSetList();
+    } finally {
+      this.#get().internal_setSourceSetLoading(id, false);
+    }
   };
 
   updateSourceSet = async (id: string, value: CreateSourceSetParams): Promise<void> => {
     this.#get().internal_setSourceSetLoading(id, true);
-    await sourceSetService.updateSourceSet(id, value);
-    await this.#get().refreshSourceSetList();
-
-    this.#get().internal_setSourceSetLoading(id, false);
+    try {
+      await sourceSetService.updateSourceSet(id, value);
+      await this.#get().refreshSourceSetList();
+    } finally {
+      this.#get().internal_setSourceSetLoading(id, false);
+    }
   };
 
   useFetchSourceSetItem = (id: string): SWRResponse<SourceSetItem | undefined> => {

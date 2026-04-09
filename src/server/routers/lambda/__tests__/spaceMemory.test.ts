@@ -1,5 +1,6 @@
 // @vitest-environment node
-import { getSpaceMemorySurfaceContract } from '@lobechat/types';
+import * as spaceMemoryTypes from '@lobechat/types';
+import { getSpaceMemorySurfaceContract, resolveSpaceMemorySurfaceState } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -72,6 +73,9 @@ describe('spaceMemoryRouter', () => {
     vi.clearAllMocks();
     mockGetSummary.mockImplementation(async (input) => ({
       ...input,
+      canCreate: input.contract?.canCreate ?? false,
+      canPublish: input.contract?.canManageRecall ?? false,
+      canReview: input.contract?.canManageRecall ?? false,
       sections: {
         inbox: { count: 0, recall: { active: 0, disabled: 0, expired: 0, stale: 0 } },
         playbooks: { count: 0, recall: { active: 0, disabled: 0, expired: 0, stale: 0 } },
@@ -388,9 +392,6 @@ describe('spaceMemoryRouter', () => {
     const result = await caller.getSummary({ spaceId: 'spc_team' });
 
     expect(mockGetSummary).toHaveBeenCalledWith({
-      canCreate: true,
-      canPublish: true,
-      canReview: true,
       contract: getSpaceMemorySurfaceContract('reviewer'),
       id: 'spc_team',
       kind: 'team',
@@ -440,6 +441,54 @@ describe('spaceMemoryRouter', () => {
     expect(result.contract).toEqual(getSpaceMemorySurfaceContract('personal'));
   });
 
+  it('includes create capability inside the summary contract for team editors', async () => {
+    mockFindAccessibleSpaceById.mockResolvedValue({
+      id: 'spc_team',
+      kind: 'team',
+      membershipRole: 'editor',
+      name: 'Operations',
+    });
+
+    const caller = spaceMemoryRouter.createCaller({
+      serverDB: {} as any,
+      userId: 'user-1',
+    } as any);
+
+    const result = await caller.getSummary({ spaceId: 'spc_team' });
+
+    expect(result.contract).toMatchObject({
+      canCreate: true,
+      canManageRecall: true,
+    });
+  });
+
+  it('supports create-only viewer contract overrides without exposing review controls', () => {
+    expect(getSpaceMemorySurfaceContract('viewer', { canCreate: true })).toEqual({
+      canAccessAudit: false,
+      canCreate: true,
+      canManageRecall: false,
+      canViewInbox: true,
+      detailViews: ['overview'],
+      recallFilters: ['all'],
+      sections: ['inbox', 'published', 'playbooks', 'policies'],
+    });
+  });
+
+  it('exposes a shared resolved surface state helper for space memory contracts', () => {
+    expect(resolveSpaceMemorySurfaceState({ kind: 'team', membershipRole: 'editor' })).toEqual({
+      canCreate: true,
+      canReview: true,
+      contract: getSpaceMemorySurfaceContract('reviewer', { canCreate: true }),
+      surface: 'reviewer',
+    });
+    expect(resolveSpaceMemorySurfaceState({ kind: 'personal', membershipRole: 'owner' })).toEqual({
+      canCreate: false,
+      canReview: false,
+      contract: getSpaceMemorySurfaceContract('personal', { canCreate: false }),
+      surface: 'personal',
+    });
+  });
+
   it('strips recall breakdown from summary payloads for non-reviewer roles', async () => {
     mockFindAccessibleSpaceById.mockResolvedValue({
       id: 'spc_team',
@@ -457,7 +506,7 @@ describe('spaceMemoryRouter', () => {
       name: 'Operations',
       surface: 'viewer',
       sections: {
-        inbox: { count: 0, recall: { active: 0, disabled: 0, expired: 0, stale: 0 } },
+        inbox: { count: 4, recall: { active: 3, disabled: 0, expired: 0, stale: 1 } },
         playbooks: { count: 2, recall: { active: 1, disabled: 0, expired: 0, stale: 1 } },
         policies: { count: 1, recall: { active: 0, disabled: 1, expired: 0, stale: 0 } },
         published: { count: 3, recall: { active: 2, disabled: 0, expired: 1, stale: 0 } },
@@ -471,6 +520,13 @@ describe('spaceMemoryRouter', () => {
 
     const result = await caller.getSummary({ spaceId: 'spc_team' });
 
+    expect(result.sections.inbox.count).toBe(0);
+    expect(result.sections.inbox.recall).toEqual({
+      active: 0,
+      disabled: 0,
+      expired: 0,
+      stale: 0,
+    });
     expect(result.sections.playbooks.recall).toEqual({
       active: 0,
       disabled: 0,
@@ -502,6 +558,7 @@ describe('spaceMemoryRouter', () => {
     const result = await caller.listEntries({ section: 'published', spaceId: 'spc_team' });
 
     expect(mockListEntries).toHaveBeenCalledWith({
+      recallFilter: 'all',
       section: 'published',
       spaceId: 'spc_team',
     });
@@ -510,6 +567,42 @@ describe('spaceMemoryRouter', () => {
       items: [],
       section: 'published',
       surface: 'viewer',
+    });
+  });
+
+  it('passes recall filters through for published sections and normalizes inbox to all', async () => {
+    mockFindAccessibleSpaceById.mockResolvedValue({
+      id: 'spc_team',
+      kind: 'team',
+      membershipRole: 'editor',
+      name: 'Operations',
+    });
+
+    const caller = spaceMemoryRouter.createCaller({
+      serverDB: {} as any,
+      userId: 'user-1',
+    } as any);
+
+    await caller.listEntries({
+      recallFilter: 'stale',
+      section: 'published',
+      spaceId: 'spc_team',
+    });
+    expect(mockListEntries).toHaveBeenLastCalledWith({
+      recallFilter: 'stale',
+      section: 'published',
+      spaceId: 'spc_team',
+    });
+
+    await caller.listEntries({
+      recallFilter: 'stale',
+      section: 'inbox',
+      spaceId: 'spc_team',
+    });
+    expect(mockListEntries).toHaveBeenLastCalledWith({
+      recallFilter: 'all',
+      section: 'inbox',
+      spaceId: 'spc_team',
     });
   });
 
@@ -985,6 +1078,68 @@ describe('spaceMemoryRouter', () => {
     );
   });
 
+  it('allows inbox reads when the explicit contract grants canViewInbox without review access', async () => {
+    const resolveSurfaceStateSpy = vi
+      .spyOn(spaceMemoryTypes, 'resolveSpaceMemorySurfaceState')
+      .mockReturnValue({
+        canCreate: true,
+        canReview: false,
+        contract: getSpaceMemorySurfaceContract('viewer', { canCreate: true }),
+        surface: 'viewer',
+      });
+    mockFindAccessibleSpaceById.mockResolvedValue({
+      id: 'spc_team',
+      kind: 'team',
+      membershipRole: 'viewer',
+      name: 'Operations',
+    });
+    mockListEntries.mockResolvedValue({
+      items: [
+        {
+          actor: { id: 'user-2', name: 'Reviewer' },
+          category: 'general',
+          history: [{ action: 'published', at: '2026-04-04T09:00:00.000Z' }],
+          id: 'mem_candidate',
+          intake: { origin: 'automation', producer: 'memory-harness', traceId: 'trace-1' },
+          kind: 'candidate',
+          reviewHint: {
+            kind: 'duplicate_published',
+            match: {
+              id: 'mem_published',
+              publishedAt: '2026-04-04T10:00:00.000Z',
+              title: 'Release checklist',
+            },
+          },
+          sourceCount: 0,
+          sourceRefs: [],
+          title: 'Draft memory',
+          updatedAt: '2026-04-04T10:00:00.000Z',
+        },
+      ],
+      section: 'inbox',
+    });
+
+    const caller = spaceMemoryRouter.createCaller({
+      serverDB: {} as any,
+      userId: 'user-1',
+    } as any);
+
+    const result = await caller.listEntries({ section: 'inbox', spaceId: 'spc_team' });
+
+    expect(result.contract).toEqual(getSpaceMemorySurfaceContract('viewer', { canCreate: true }));
+    expect(result.items[0]).toMatchObject({
+      id: 'mem_candidate',
+      kind: 'candidate',
+      title: 'Draft memory',
+    });
+    expect(result.items[0]?.actor).toBeUndefined();
+    expect(result.items[0]?.history).toBeUndefined();
+    expect(result.items[0]?.intake).toBeUndefined();
+    expect(result.items[0]?.reviewHint).toBeUndefined();
+
+    resolveSurfaceStateSpy.mockRestore();
+  });
+
   it('rejects candidate detail reads for non-reviewer roles', async () => {
     mockFindAccessibleSpaceById.mockResolvedValue({
       id: 'spc_team',
@@ -1010,6 +1165,63 @@ describe('spaceMemoryRouter', () => {
     await expect(caller.getEntry({ id: 'mem_candidate', spaceId: 'spc_team' })).rejects.toThrow(
       new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_MEMORY_REVIEW_DENIED' }),
     );
+  });
+
+  it('allows candidate detail reads when the explicit contract grants canViewInbox without review access', async () => {
+    const resolveSurfaceStateSpy = vi
+      .spyOn(spaceMemoryTypes, 'resolveSpaceMemorySurfaceState')
+      .mockReturnValue({
+        canCreate: true,
+        canReview: false,
+        contract: getSpaceMemorySurfaceContract('viewer', { canCreate: true }),
+        surface: 'viewer',
+      });
+    mockFindAccessibleSpaceById.mockResolvedValue({
+      id: 'spc_team',
+      kind: 'team',
+      membershipRole: 'viewer',
+      name: 'Operations',
+    });
+    mockGetEntry.mockResolvedValue({
+      actor: { id: 'user-2', name: 'Reviewer' },
+      category: 'general',
+      history: [{ action: 'published', at: '2026-04-04T09:00:00.000Z' }],
+      id: 'mem_candidate',
+      intake: { origin: 'automation', producer: 'memory-harness', traceId: 'trace-1' },
+      kind: 'candidate',
+      reviewHint: {
+        kind: 'duplicate_published',
+        match: {
+          id: 'mem_published',
+          publishedAt: '2026-04-04T10:00:00.000Z',
+          title: 'Release checklist',
+        },
+      },
+      sourceCount: 0,
+      sourceRefs: [],
+      title: 'Draft memory',
+      updatedAt: '2026-04-04T10:00:00.000Z',
+    });
+
+    const caller = spaceMemoryRouter.createCaller({
+      serverDB: {} as any,
+      userId: 'user-1',
+    } as any);
+
+    const result = await caller.getEntry({ id: 'mem_candidate', spaceId: 'spc_team' });
+
+    expect(result.contract).toEqual(getSpaceMemorySurfaceContract('viewer', { canCreate: true }));
+    expect(result.entry).toMatchObject({
+      id: 'mem_candidate',
+      kind: 'candidate',
+      title: 'Draft memory',
+    });
+    expect(result.entry.actor).toBeUndefined();
+    expect(result.entry.history).toBeUndefined();
+    expect(result.entry.intake).toBeUndefined();
+    expect(result.entry.reviewHint).toBeUndefined();
+
+    resolveSurfaceStateSpy.mockRestore();
   });
 
   it('rejects audit export for candidate entries', async () => {

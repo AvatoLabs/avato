@@ -235,13 +235,19 @@ const UserFavoriteAgents = memo<UserFavoriteAgentsProps>(({ rows = 4 }) => {
   const removeFavorite = useDiscoverStore((s) => s.removeFavorite);
 
   const { data, mutate } = useFavoriteAgents(user.id);
+  const rawData = data?.items ?? (data as any)?.data ?? [];
 
   const handleUnfavorite = useCallback(
     async (identifier: string) => {
       try {
-        const agent = data?.items.find((a) => a.identifier === identifier);
-        if (agent) {
-          await removeFavorite('agent', (agent as any).id);
+        const favoriteItem = rawData.find((item: any) => {
+          const agent = item.agent || item;
+          return agent.identifier === identifier;
+        });
+        const agent = favoriteItem?.agent || favoriteItem;
+
+        if (agent?.id) {
+          await removeFavorite('agent', agent.id);
           await mutate();
           message.success(t('user.unfavoriteSuccess'));
         }
@@ -250,11 +256,10 @@ const UserFavoriteAgents = memo<UserFavoriteAgentsProps>(({ rows = 4 }) => {
         message.error(t('user.unfavoriteFailed'));
       }
     },
-    [data, removeFavorite, mutate, message, t],
+    [rawData, removeFavorite, mutate, message, t],
   );
 
   // SDK returns { data: [{ agent: {...}, favoritedAt: string }] } or flat array
-  const rawData = data?.items ?? (data as any)?.data ?? [];
   const agents: FavoriteAgentItem[] = rawData.map((item: any) => {
     const agent = item.agent || item;
     return {

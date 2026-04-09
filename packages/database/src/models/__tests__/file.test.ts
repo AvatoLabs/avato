@@ -37,9 +37,26 @@ const fileModel = new FileModel(serverDB, userId);
 const documentModel = new DocumentModel(serverDB, userId);
 
 const sourceSet = { id: 'kb1', userId, name: 'sourceSet' };
-beforeEach(async () => {
+
+const resetFileTestDb = async () => {
   await serverDB.delete(agentSkills);
+  await serverDB.delete(filesToSessions);
+  await serverDB.delete(fileAssets);
+  await serverDB.delete(fileChunks);
+  await serverDB.delete(embeddings);
+  await serverDB.delete(chunks);
+  await serverDB.delete(documents);
+  await serverDB.delete(sourceSetFiles);
+  await serverDB.delete(sessions);
+  await serverDB.delete(sourceSets);
+  await serverDB.delete(files);
+  await serverDB.delete(globalFiles);
+  await serverDB.delete(spaces);
   await serverDB.delete(users);
+};
+
+beforeEach(async () => {
+  await resetFileTestDb();
   await serverDB.insert(users).values([{ id: userId }, { id: 'user2' }]);
   await serverDB.insert(spaces).values([
     { createdBy: userId, id: 'spc_file_a', kind: 'team', name: 'File Space A' },
@@ -49,14 +66,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await serverDB.delete(agentSkills);
-  await serverDB.delete(filesToSessions);
-  await serverDB.delete(fileAssets);
-  await serverDB.delete(documents);
-  await serverDB.delete(spaces);
-  await serverDB.delete(users);
-  await serverDB.delete(files);
-  await serverDB.delete(globalFiles);
+  await resetFileTestDb();
 });
 
 describe('FileModel', () => {
@@ -184,9 +194,9 @@ describe('FileModel', () => {
     });
   });
 
-  describe('canAccessGlobalFileByHash', () => {
+  describe('canAccessGlobalFileBySha256', () => {
     it('should deny when hash missing', async () => {
-      await expect(fileModel.canAccessGlobalFileByHash('missing')).resolves.toBe(false);
+      await expect(fileModel.canAccessGlobalFileBySha256('missing')).resolves.toBe(false);
     });
 
     it('should allow creator', async () => {
@@ -197,7 +207,7 @@ describe('FileModel', () => {
         size: 1,
         url: 'u',
       });
-      await expect(fileModel.canAccessGlobalFileByHash('h-creator')).resolves.toBe(true);
+      await expect(fileModel.canAccessGlobalFileBySha256('h-creator')).resolves.toBe(true);
     });
 
     it('should deny other user without link', async () => {
@@ -208,7 +218,7 @@ describe('FileModel', () => {
         size: 1,
         url: 'u',
       });
-      await expect(fileModel.canAccessGlobalFileByHash('h-other')).resolves.toBe(false);
+      await expect(fileModel.canAccessGlobalFileBySha256('h-other')).resolves.toBe(false);
     });
 
     it('should allow when user owns a file row with same hash', async () => {
@@ -226,7 +236,7 @@ describe('FileModel', () => {
         size: 1,
         url: 'u2',
       });
-      await expect(fileModel.canAccessGlobalFileByHash('h-shared')).resolves.toBe(true);
+      await expect(fileModel.canAccessGlobalFileBySha256('h-shared')).resolves.toBe(true);
     });
 
     it('should allow when skill resources reference hash', async () => {
@@ -240,13 +250,13 @@ describe('FileModel', () => {
       await serverDB.insert(agentSkills).values({
         description: 'd',
         identifier: 'id1',
-        manifest: {},
+        manifest: { description: 'd', name: 'n1' },
         name: 'n1',
-        resources: { '/a.md': { fileHash: 'h-res', size: 1 } },
+        resources: { '/a.md': { sha256: 'h-res', size: 1 } },
         source: 'user',
         userId,
       });
-      await expect(fileModel.canAccessGlobalFileByHash('h-res')).resolves.toBe(true);
+      await expect(fileModel.canAccessGlobalFileBySha256('h-res')).resolves.toBe(true);
     });
   });
 
@@ -863,11 +873,11 @@ describe('FileModel', () => {
           createdBy: userId,
           fileId: 'file2',
           spaceId: 'spc_file_a',
-          usagePolicy: 'restricted',
+          usagePolicy: FileAssetUsagePolicy.Restricted,
         });
 
         const result = await fileModel.query({
-          assetUsagePolicy: 'restricted',
+          assetUsagePolicy: FileAssetUsagePolicy.Restricted,
           showFilesInSourceSet: true,
         });
 
@@ -879,12 +889,29 @@ describe('FileModel', () => {
         await serverDB.insert(fileAssets).values({
           createdBy: userId,
           fileId: 'file2',
-          reviewStatus: 'approved',
+          reviewStatus: FileAssetReviewStatus.Approved,
           spaceId: 'spc_file_a',
         });
 
         const result = await fileModel.query({
-          assetReviewStatus: 'approved',
+          assetReviewStatus: FileAssetReviewStatus.Approved,
+          showFilesInSourceSet: true,
+        });
+
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('file2');
+      });
+
+      it('should filter files by asset rights owner', async () => {
+        await serverDB.insert(fileAssets).values({
+          createdBy: userId,
+          fileId: 'file2',
+          rightsOwner: 'Brand Team',
+          spaceId: 'spc_file_a',
+        });
+
+        const result = await fileModel.query({
+          assetRightsOwner: 'Brand',
           showFilesInSourceSet: true,
         });
 
@@ -1567,14 +1594,14 @@ describe('FileModel', () => {
   });
 
   describe('deleteFileChunks error handling', () => {
-    let consoleWarnSpy: any;
+    let consoleWarnSpy: ReturnType<typeof vi.spyOn> | undefined;
 
     beforeEach(() => {
       consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     });
 
     afterEach(() => {
-      consoleWarnSpy.mockRestore();
+      consoleWarnSpy?.mockRestore();
     });
 
     it('should delete file even when chunks deletion fails', async () => {

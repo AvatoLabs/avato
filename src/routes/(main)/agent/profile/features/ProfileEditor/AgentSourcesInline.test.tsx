@@ -76,7 +76,10 @@ vi.mock('@/features/ResourceSpaces', () => ({
 }));
 
 vi.mock('@/helpers/activeWorkspaceSpace', async () => {
-  const actual = await vi.importActual('@/helpers/activeWorkspaceSpace');
+  const actual =
+    await vi.importActual<typeof import('@/helpers/activeWorkspaceSpace')>(
+      '@/helpers/activeWorkspaceSpace',
+    );
 
   return {
     ...actual,

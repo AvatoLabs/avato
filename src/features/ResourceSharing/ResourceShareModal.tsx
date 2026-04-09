@@ -16,6 +16,7 @@ import {
 import { TRPCClientError } from '@trpc/client';
 import { useDebounce } from 'ahooks';
 import { Alert, App, Switch } from 'antd';
+import { createStyles } from 'antd-style';
 import { memo, useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useSWR from 'swr';
@@ -66,8 +67,53 @@ const getTRPCError = (error: unknown) => {
 
 const isForbiddenError = (error: TRPCClientError<any> | null) => error?.data?.code === 'FORBIDDEN';
 
+const useStyles = createStyles(({ css, token }) => ({
+  formRow: css`
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  `,
+  resultsList: css`
+    display: grid;
+    gap: 8px;
+  `,
+  section: css`
+    display: grid;
+    gap: 12px;
+  `,
+  shell: css`
+    display: grid;
+    gap: 16px;
+    width: min(760px, 100%);
+    margin: 0 auto;
+    padding: 8px 8px 16px;
+  `,
+  summaryMeta: css`
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  `,
+  summaryText: css`
+    max-width: 62ch;
+  `,
+  topRow: css`
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+    justify-content: space-between;
+  `,
+  workbenchCard: css`
+    padding: 12px;
+    border: 1px solid ${token.colorBorderSecondary};
+    border-radius: ${token.borderRadiusLG}px;
+    background: ${token.colorFillQuaternary};
+  `,
+}));
+
 const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) => {
   const { t } = useTranslation('file');
+  const { styles } = useStyles();
   const { message } = App.useApp();
   const [expiresInDays, setExpiresInDays] = useState<1 | 7 | 30>(7);
   const [latestShareUrl, setLatestShareUrl] = useState<string | null>(null);
@@ -275,27 +321,37 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
   };
 
   return (
-    <Flexbox gap={16} paddingInline={8} style={{ paddingBottom: 8 }}>
+    <Flexbox className={styles.shell}>
       <Block padding={16} variant={'outlined'}>
-        <Flexbox gap={4}>
-          <Text as={'h3'}>{name}</Text>
-          <Text type={'secondary'}>
-            {accessLoading
-              ? t('share.loading')
-              : access?.matchedBy
-                ? t('share.accessSummary', {
-                    authzEpoch: access.authzEpoch,
-                    reason: access.reason || access.matchedBy,
-                  })
-                : t('share.accessUnknown')}
-          </Text>
+        <Flexbox gap={10}>
+          <div className={styles.topRow}>
+            <Flexbox gap={4}>
+              <Text as={'h3'}>{name}</Text>
+              <Text className={styles.summaryText} type={'secondary'}>
+                {accessLoading
+                  ? t('share.loading')
+                  : access?.matchedBy
+                    ? t('share.accessSummary', {
+                        authzEpoch: access.authzEpoch,
+                        reason: access.reason || access.matchedBy,
+                      })
+                    : t('share.accessUnknown')}
+              </Text>
+            </Flexbox>
+            <div className={styles.summaryMeta}>
+              <Tag
+                size={'small'}
+              >{`${t('share.members.currentTitle')} · ${permissions?.length || 0}`}</Tag>
+              <Tag size={'small'}>{`${t('share.links.currentTitle')} · ${links?.length || 0}`}</Tag>
+            </div>
+          </div>
         </Flexbox>
       </Block>
 
       {noManageSections && <Alert showIcon message={t('share.manage.unavailable')} type={'info'} />}
 
       <Block padding={16} variant={'outlined'}>
-        <Flexbox gap={12}>
+        <div className={styles.section}>
           <Flexbox gap={4}>
             <Text strong>{t('share.members.title')}</Text>
             <Text type={'secondary'}>{t('share.members.subtitle')}</Text>
@@ -310,33 +366,73 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
             </Flexbox>
           ) : (
             <Flexbox gap={12}>
-              <Flexbox gap={8}>
-                <SearchBar
-                  allowClear
-                  placeholder={t('share.members.usernamePlaceholder')}
-                  value={memberQuery}
-                  variant="outlined"
-                  onInputChange={(value) => {
-                    const nextValue = value || '';
+              <div className={styles.workbenchCard}>
+                <Flexbox gap={8}>
+                  <SearchBar
+                    allowClear
+                    placeholder={t('share.members.usernamePlaceholder')}
+                    value={memberQuery}
+                    variant="outlined"
+                    onInputChange={(value) => {
+                      const nextValue = value || '';
 
-                    setMemberQuery(nextValue);
+                      setMemberQuery(nextValue);
 
-                    if (selectedMember && nextValue.trim() !== selectedMember.username) {
-                      setSelectedMember(null);
-                    }
-                  }}
-                  onSearch={(value) => {
-                    setMemberQuery(value);
+                      if (selectedMember && nextValue.trim() !== selectedMember.username) {
+                        setSelectedMember(null);
+                      }
+                    }}
+                    onSearch={(value) => {
+                      setMemberQuery(value);
 
-                    if (selectedMember && value.trim() !== selectedMember.username) {
-                      setSelectedMember(null);
-                    }
-                  }}
-                />
-                <Text fontSize={12} type={'secondary'}>
-                  {t('share.members.searchHint')}
-                </Text>
-              </Flexbox>
+                      if (selectedMember && value.trim() !== selectedMember.username) {
+                        setSelectedMember(null);
+                      }
+                    }}
+                  />
+                  <Text fontSize={12} type={'secondary'}>
+                    {t('share.members.searchHint')}
+                  </Text>
+
+                  {activeMember && (
+                    <Block padding={12} variant={'outlined'}>
+                      <Flexbox horizontal align={'center'} gap={12}>
+                        <Avatar alt={getMemberLabel(activeMember)} avatar={activeMember.avatar} />
+                        <Flexbox flex={1} gap={2} style={{ minWidth: 0 }}>
+                          <Text ellipsis strong>
+                            {getMemberLabel(activeMember)}
+                          </Text>
+                          <Text ellipsis fontSize={12} type={'secondary'}>
+                            {getMemberSubLabel(activeMember)}
+                          </Text>
+                        </Flexbox>
+                        <Tag size={'small'}>{t('share.members.selected')}</Tag>
+                      </Flexbox>
+                    </Block>
+                  )}
+
+                  <div className={styles.formRow}>
+                    <Select
+                      style={{ minWidth: 180 }}
+                      value={role}
+                      options={[
+                        { label: t('share.roles.viewer'), value: 'viewer' },
+                        { label: t('share.roles.editor'), value: 'editor' },
+                        { label: t('space.roles.owner'), value: 'owner' },
+                      ]}
+                      onChange={(value) => setRole(value as 'editor' | 'owner' | 'viewer')}
+                    />
+                    <Button
+                      disabled={!activeMember?.username}
+                      loading={granting}
+                      type={'primary'}
+                      onClick={handleGrant}
+                    >
+                      {t('share.members.add')}
+                    </Button>
+                  </div>
+                </Flexbox>
+              </div>
 
               {searchMembersError && (
                 <Alert showIcon message={t('share.members.searchFailed')} type={'error'} />
@@ -348,7 +444,7 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
                   {searchMembersLoading ? (
                     <Text type={'secondary'}>{t('share.members.searching')}</Text>
                   ) : searchedMembers?.length ? (
-                    <Flexbox gap={8}>
+                    <div className={styles.resultsList}>
                       {searchedMembers.map((member) => {
                         const isActive = activeMember?.id === member.id;
                         const isGranted = grantedMemberIds.has(member.id);
@@ -395,50 +491,12 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
                           </Block>
                         );
                       })}
-                    </Flexbox>
+                    </div>
                   ) : (
                     <Text type={'secondary'}>{t('share.members.searchEmpty')}</Text>
                   )}
                 </Flexbox>
               )}
-
-              {activeMember && (
-                <Block padding={12} variant={'outlined'}>
-                  <Flexbox horizontal align={'center'} gap={12}>
-                    <Avatar alt={getMemberLabel(activeMember)} avatar={activeMember.avatar} />
-                    <Flexbox flex={1} gap={2} style={{ minWidth: 0 }}>
-                      <Text ellipsis strong>
-                        {getMemberLabel(activeMember)}
-                      </Text>
-                      <Text ellipsis fontSize={12} type={'secondary'}>
-                        {getMemberSubLabel(activeMember)}
-                      </Text>
-                    </Flexbox>
-                    <Tag size={'small'}>{t('share.members.selected')}</Tag>
-                  </Flexbox>
-                </Block>
-              )}
-
-              <Flexbox horizontal gap={8} wrap={'wrap'}>
-                <Select
-                  style={{ minWidth: 180 }}
-                  value={role}
-                  options={[
-                    { label: t('share.roles.viewer'), value: 'viewer' },
-                    { label: t('share.roles.editor'), value: 'editor' },
-                    { label: t('space.roles.owner'), value: 'owner' },
-                  ]}
-                  onChange={(value) => setRole(value as 'editor' | 'owner' | 'viewer')}
-                />
-                <Button
-                  disabled={!activeMember?.username}
-                  loading={granting}
-                  type={'primary'}
-                  onClick={handleGrant}
-                >
-                  {t('share.members.add')}
-                </Button>
-              </Flexbox>
 
               <Collapse
                 defaultActiveKey={[]}
@@ -516,117 +574,109 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
                 ]}
               />
 
-              <Collapse
-                defaultActiveKey={[]}
-                expandIconPlacement={'end'}
-                variant={'outlined'}
-                items={[
-                  {
-                    children: (
-                      <Flexbox gap={8}>
-                        {!!permissions?.length && (
-                          <SearchBar
-                            allowClear
-                            placeholder={t('share.members.filterPlaceholder')}
-                            value={memberFilter}
-                            variant="outlined"
-                            onInputChange={(value) => setMemberFilter(value || '')}
-                            onSearch={(value) => setMemberFilter(value)}
+              <Flexbox gap={8}>
+                <Flexbox
+                  horizontal
+                  align={'center'}
+                  gap={12}
+                  justify={'space-between'}
+                  wrap={'wrap'}
+                >
+                  <Text
+                    strong
+                  >{`${t('share.members.currentTitle')} (${permissions?.length || 0})`}</Text>
+                  {!!permissions?.length && (
+                    <SearchBar
+                      allowClear
+                      placeholder={t('share.members.filterPlaceholder')}
+                      value={memberFilter}
+                      variant="outlined"
+                      onInputChange={(value) => setMemberFilter(value || '')}
+                      onSearch={(value) => setMemberFilter(value)}
+                    />
+                  )}
+                </Flexbox>
+
+                {permissionsLoading ? (
+                  <Text type={'secondary'}>{t('share.loading')}</Text>
+                ) : permissions?.length ? (
+                  filteredPermissions.length ? (
+                    <div className={styles.resultsList}>
+                      {filteredPermissions.map((permission) => (
+                        <Block
+                          horizontal
+                          align={'center'}
+                          gap={12}
+                          key={permission.id}
+                          padding={12}
+                          variant={'outlined'}
+                        >
+                          <Avatar
+                            alt={getPermissionLabel(permission)}
+                            avatar={permission.subjectAvatar}
                           />
-                        )}
-
-                        {permissionsLoading ? (
-                          <Text type={'secondary'}>{t('share.loading')}</Text>
-                        ) : permissions?.length ? (
-                          filteredPermissions.length ? (
-                            <Flexbox gap={8}>
-                              {filteredPermissions.map((permission) => (
-                                <Block
-                                  horizontal
-                                  align={'center'}
-                                  gap={12}
-                                  key={permission.id}
-                                  padding={12}
-                                  variant={'outlined'}
-                                >
-                                  <Avatar
-                                    alt={getPermissionLabel(permission)}
-                                    avatar={permission.subjectAvatar}
-                                  />
-                                  <Flexbox flex={1} gap={6} style={{ minWidth: 0 }}>
-                                    <Flexbox gap={2} style={{ minWidth: 0 }}>
-                                      <Text ellipsis strong>
-                                        {getPermissionLabel(permission)}
-                                      </Text>
-                                      <Text ellipsis fontSize={12} type={'secondary'}>
-                                        {getPermissionSubLabel(permission)}
-                                      </Text>
-                                    </Flexbox>
-                                    <Flexbox horizontal gap={8} wrap={'wrap'}>
-                                      <Tag size={'small'}>
-                                        {t(getPermissionRoleKey(permission.role))}
-                                      </Tag>
-                                      {permission.role === 'editor' && permission.canReshare && (
-                                        <Tag size={'small'}>
-                                          {t('share.members.canReshareEnabled')}
-                                        </Tag>
-                                      )}
-                                      <Tag size={'small'}>
-                                        {permission.inheritsToChildren
-                                          ? t('share.members.inheritsEnabled')
-                                          : t('share.members.inheritsDisabled')}
-                                      </Tag>
-                                      <Tag size={'small'}>
-                                        {permission.expiresAt
-                                          ? t('share.members.expiresAtValue', {
-                                              date: permission.expiresAt.toLocaleString(),
-                                            })
-                                          : t('share.members.noExpiry')}
-                                      </Tag>
-                                    </Flexbox>
-                                  </Flexbox>
-                                  <Button
-                                    danger
-                                    loading={revokingPermissionId === permission.id}
-                                    onClick={async () => {
-                                      setRevokingPermissionId(permission.id);
-
-                                      try {
-                                        await lambdaClient.contentShare.revokeContentPermission.mutate(
-                                          {
-                                            permissionId: permission.id,
-                                          },
-                                        );
-                                        await refresh();
-                                        message.success(t('share.members.revoked'));
-                                      } catch (error) {
-                                        message.error(getErrorMessage(error));
-                                      } finally {
-                                        setRevokingPermissionId(null);
-                                      }
-                                    }}
-                                  >
-                                    {t('share.members.revoke')}
-                                  </Button>
-                                </Block>
-                              ))}
+                          <Flexbox flex={1} gap={6} style={{ minWidth: 0 }}>
+                            <Flexbox gap={2} style={{ minWidth: 0 }}>
+                              <Text ellipsis strong>
+                                {getPermissionLabel(permission)}
+                              </Text>
+                              <Text ellipsis fontSize={12} type={'secondary'}>
+                                {getPermissionSubLabel(permission)}
+                              </Text>
                             </Flexbox>
-                          ) : (
-                            <Text type={'secondary'}>{t('share.members.filterEmpty')}</Text>
-                          )
-                        ) : (
-                          <Text type={'secondary'}>{t('share.members.empty')}</Text>
-                        )}
-                      </Flexbox>
-                    ),
-                    key: 'granted-members',
-                    label: `${t('share.members.currentTitle')} (${permissions?.length || 0})`,
-                  },
-                ]}
-              />
+                            <Flexbox horizontal gap={8} wrap={'wrap'}>
+                              <Tag size={'small'}>{t(getPermissionRoleKey(permission.role))}</Tag>
+                              {permission.role === 'editor' && permission.canReshare && (
+                                <Tag size={'small'}>{t('share.members.canReshareEnabled')}</Tag>
+                              )}
+                              <Tag size={'small'}>
+                                {permission.inheritsToChildren
+                                  ? t('share.members.inheritsEnabled')
+                                  : t('share.members.inheritsDisabled')}
+                              </Tag>
+                              <Tag size={'small'}>
+                                {permission.expiresAt
+                                  ? t('share.members.expiresAtValue', {
+                                      date: permission.expiresAt.toLocaleString(),
+                                    })
+                                  : t('share.members.noExpiry')}
+                              </Tag>
+                            </Flexbox>
+                          </Flexbox>
+                          <Button
+                            danger
+                            loading={revokingPermissionId === permission.id}
+                            onClick={async () => {
+                              setRevokingPermissionId(permission.id);
+
+                              try {
+                                await lambdaClient.contentShare.revokeContentPermission.mutate({
+                                  permissionId: permission.id,
+                                });
+                                await refresh();
+                                message.success(t('share.members.revoked'));
+                              } catch (error) {
+                                message.error(getErrorMessage(error));
+                              } finally {
+                                setRevokingPermissionId(null);
+                              }
+                            }}
+                          >
+                            {t('share.members.revoke')}
+                          </Button>
+                        </Block>
+                      ))}
+                    </div>
+                  ) : (
+                    <Text type={'secondary'}>{t('share.members.filterEmpty')}</Text>
+                  )
+                ) : (
+                  <Text type={'secondary'}>{t('share.members.empty')}</Text>
+                )}
+              </Flexbox>
             </Flexbox>
           )}
-        </Flexbox>
+        </div>
       </Block>
 
       {linksUnavailable ? (
@@ -637,139 +687,137 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
           <Button onClick={retryLinks}>{t('share.manage.retry')}</Button>
         </Flexbox>
       ) : (
-        <Collapse
-          defaultActiveKey={[]}
-          expandIconPlacement={'end'}
-          variant={'outlined'}
-          items={[
-            {
-              children: (
-                <Flexbox gap={12} padding={16}>
-                  <Text type={'secondary'}>{t('share.links.subtitle')}</Text>
+        <Block padding={16} variant={'outlined'}>
+          <div className={styles.section}>
+            <Flexbox gap={4}>
+              <Text strong>{t('share.links.title')}</Text>
+              <Text type={'secondary'}>{t('share.links.subtitle')}</Text>
+            </Flexbox>
 
-                  <Flexbox horizontal gap={8} wrap={'wrap'}>
-                    <Select
-                      style={{ minWidth: 160 }}
-                      value={expiresInDays}
-                      options={[
-                        { label: t('share.links.expiry.1'), value: 1 },
-                        { label: t('share.links.expiry.7'), value: 7 },
-                        { label: t('share.links.expiry.30'), value: 30 },
-                      ]}
-                      onChange={(value) => setExpiresInDays(value as 1 | 7 | 30)}
-                    />
-                    <Input
-                      placeholder={t('share.links.passwordPlaceholder')}
-                      style={{ flex: 1, minWidth: 240 }}
-                      type="password"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                    />
-                    <Button loading={creatingLink} type={'primary'} onClick={handleCreateLink}>
-                      {t('share.links.create')}
-                    </Button>
-                  </Flexbox>
+            <div className={styles.workbenchCard}>
+              <Flexbox gap={12}>
+                <div className={styles.formRow}>
+                  <Select
+                    style={{ minWidth: 160 }}
+                    value={expiresInDays}
+                    options={[
+                      { label: t('share.links.expiry.1'), value: 1 },
+                      { label: t('share.links.expiry.7'), value: 7 },
+                      { label: t('share.links.expiry.30'), value: 30 },
+                    ]}
+                    onChange={(value) => setExpiresInDays(value as 1 | 7 | 30)}
+                  />
+                  <Input
+                    placeholder={t('share.links.passwordPlaceholder')}
+                    style={{ flex: 1, minWidth: 240 }}
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                  <Button loading={creatingLink} type={'primary'} onClick={handleCreateLink}>
+                    {t('share.links.create')}
+                  </Button>
+                </div>
 
-                  {latestShareUrl && (
-                    <Block padding={12} variant={'outlined'}>
-                      <Flexbox gap={8}>
-                        <Text strong>{t('share.links.latest')}</Text>
-                        <Text style={{ wordBreak: 'break-all' }}>{latestShareUrl}</Text>
-                        <Flexbox horizontal gap={8} wrap={'wrap'}>
-                          <Button onClick={handleCopyLink}>{t('share.links.copy')}</Button>
-                          {latestFileDownloadUrl && (
-                            <Button onClick={handleCopyDirectDownload}>
-                              {t('share.links.copyDirectDownload')}
-                            </Button>
-                          )}
-                        </Flexbox>
-                        {latestFileDownloadUrl && (
-                          <Flexbox gap={6}>
-                            <Text fontSize={12} type={'secondary'}>
-                              {t('share.links.directDownloadHint')}
-                            </Text>
-                            <Text style={{ wordBreak: 'break-all' }}>{latestFileDownloadUrl}</Text>
-                          </Flexbox>
-                        )}
-                      </Flexbox>
-                    </Block>
-                  )}
+                <Text fontSize={12} type={'secondary'}>
+                  {t('share.links.note')}
+                </Text>
+              </Flexbox>
+            </div>
 
-                  <Text fontSize={12} type={'secondary'}>
-                    {t('share.links.note')}
-                  </Text>
-
-                  <Text strong>{t('share.links.currentTitle')}</Text>
-
-                  {linksLoading ? (
-                    <Text type={'secondary'}>{t('share.loading')}</Text>
-                  ) : links?.length ? (
-                    <Flexbox gap={8}>
-                      {links.map((link) => (
-                        <Block
-                          horizontal
-                          align={'center'}
-                          gap={12}
-                          key={link.id}
-                          padding={12}
-                          variant={'outlined'}
-                        >
-                          <Flexbox flex={1} gap={6} style={{ minWidth: 0 }}>
-                            <Text strong>
-                              {link.createdAt
-                                ? t('share.links.createdAt', {
-                                    date: new Date(link.createdAt).toLocaleString(),
-                                  })
-                                : link.id}
-                            </Text>
-                            <Flexbox horizontal gap={8} wrap={'wrap'}>
-                              <Tag size={'small'}>
-                                {t('share.links.expiresAt', {
-                                  date: link.expiresAt.toLocaleString(),
-                                })}
-                              </Tag>
-                              {link.disabledAt && (
-                                <Tag color={'default'} size={'small'}>
-                                  {t('share.links.disabled')}
-                                </Tag>
-                              )}
-                            </Flexbox>
-                          </Flexbox>
-                          <Button
-                            danger
-                            disabled={!!link.disabledAt}
-                            loading={disablingLinkId === link.id}
-                            onClick={async () => {
-                              setDisablingLinkId(link.id);
-
-                              try {
-                                await lambdaClient.contentShare.disableContentShareLink.mutate({
-                                  shareLinkId: link.id,
-                                });
-                                await refresh();
-                                message.success(t('share.links.disabledSuccess'));
-                              } catch (error) {
-                                message.error(getErrorMessage(error));
-                              } finally {
-                                setDisablingLinkId(null);
-                              }
-                            }}
-                          >
-                            {link.disabledAt ? t('share.links.disabled') : t('share.links.disable')}
-                          </Button>
-                        </Block>
-                      ))}
+            {latestShareUrl && (
+              <Block padding={12} variant={'outlined'}>
+                <Flexbox gap={8}>
+                  <Text strong>{t('share.links.latest')}</Text>
+                  <Text style={{ wordBreak: 'break-all' }}>{latestShareUrl}</Text>
+                  <div className={styles.formRow}>
+                    <Button onClick={handleCopyLink}>{t('share.links.copy')}</Button>
+                    {latestFileDownloadUrl && (
+                      <Button onClick={handleCopyDirectDownload}>
+                        {t('share.links.copyDirectDownload')}
+                      </Button>
+                    )}
+                  </div>
+                  {latestFileDownloadUrl && (
+                    <Flexbox gap={6}>
+                      <Text fontSize={12} type={'secondary'}>
+                        {t('share.links.directDownloadHint')}
+                      </Text>
+                      <Text style={{ wordBreak: 'break-all' }}>{latestFileDownloadUrl}</Text>
                     </Flexbox>
-                  ) : (
-                    <Text type={'secondary'}>{t('share.links.empty')}</Text>
                   )}
                 </Flexbox>
-              ),
-              key: 'links',
-              label: `${t('share.links.title')} (${links?.length || 0})`,
-            },
-          ]}
-        />
+              </Block>
+            )}
+
+            <Flexbox gap={8}>
+              <Text strong>{`${t('share.links.currentTitle')} (${links?.length || 0})`}</Text>
+
+              {linksLoading ? (
+                <Text type={'secondary'}>{t('share.loading')}</Text>
+              ) : links?.length ? (
+                <div className={styles.resultsList}>
+                  {links.map((link) => (
+                    <Block
+                      horizontal
+                      align={'center'}
+                      gap={12}
+                      key={link.id}
+                      padding={12}
+                      variant={'outlined'}
+                    >
+                      <Flexbox flex={1} gap={6} style={{ minWidth: 0 }}>
+                        <Text strong>
+                          {link.createdAt
+                            ? t('share.links.createdAt', {
+                                date: new Date(link.createdAt).toLocaleString(),
+                              })
+                            : link.id}
+                        </Text>
+                        <Flexbox horizontal gap={8} wrap={'wrap'}>
+                          <Tag size={'small'}>
+                            {t('share.links.expiresAt', {
+                              date: link.expiresAt.toLocaleString(),
+                            })}
+                          </Tag>
+                          {link.disabledAt && (
+                            <Tag color={'default'} size={'small'}>
+                              {t('share.links.disabled')}
+                            </Tag>
+                          )}
+                        </Flexbox>
+                      </Flexbox>
+                      <Button
+                        danger
+                        disabled={!!link.disabledAt}
+                        loading={disablingLinkId === link.id}
+                        onClick={async () => {
+                          setDisablingLinkId(link.id);
+
+                          try {
+                            await lambdaClient.contentShare.disableContentShareLink.mutate({
+                              shareLinkId: link.id,
+                            });
+                            await refresh();
+                            message.success(t('share.links.disabledSuccess'));
+                          } catch (error) {
+                            message.error(getErrorMessage(error));
+                          } finally {
+                            setDisablingLinkId(null);
+                          }
+                        }}
+                      >
+                        {link.disabledAt ? t('share.links.disabled') : t('share.links.disable')}
+                      </Button>
+                    </Block>
+                  ))}
+                </div>
+              ) : (
+                <Text type={'secondary'}>{t('share.links.empty')}</Text>
+              )}
+            </Flexbox>
+          </div>
+        </Block>
       )}
     </Flexbox>
   );

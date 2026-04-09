@@ -11,6 +11,7 @@
   "channel.connectionConfig": "连接配置",
   "channel.copied": "已复制到剪贴板",
   "channel.copy": "复制",
+  "channel.copyFailed": "复制 Webhook 地址失败",
   "channel.deleteConfirm": "确定要移除此集成吗？",
   "channel.devWebhookProxyUrl": "HTTPS 隧道地址",
   "channel.disabled": "已禁用",

@@ -1,4 +1,4 @@
-import { isCanonicalDocumentResource } from '@lobechat/types';
+import { isCanonicalDocumentResource } from '@/types/content';
 
 interface CanonicalDocumentEntryParams {
   id: string;

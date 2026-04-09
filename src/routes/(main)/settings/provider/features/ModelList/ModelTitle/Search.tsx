@@ -1,5 +1,6 @@
 import { type InputProps } from '@lobehub/ui';
 import { SearchBar } from '@lobehub/ui';
+import { type ChangeEvent } from 'react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -15,11 +16,11 @@ const Search = memo<SearchProps>(({ value, onChange, variant }) => {
   return (
     <SearchBar
       allowClear
-      defaultValue={value}
       placeholder={t('providerModels.list.search')}
       size={'small'}
+      value={value}
       variant={variant}
-      onSearch={(keyword) => onChange(keyword)}
+      onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
     />
   );
 });

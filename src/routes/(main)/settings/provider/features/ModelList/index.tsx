@@ -1,5 +1,6 @@
 'use client';
 
+import { App } from 'antd';
 import { Flexbox, Icon, Tabs } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
 import isEqual from 'fast-deep-equal';
@@ -170,6 +171,8 @@ interface ModelListProps extends ProviderSettingsContextValue {
 
 const ModelList = memo<ModelListProps>(
   ({ id, showModelFetcher, sdkType, showAddNewModel, showDeployName, modelEditable = true }) => {
+    const { message } = App.useApp();
+    const { t } = useTranslation('modelProvider');
     const mobile = useIsMobile();
     const [fetchRemoteModelList] = useAiInfraStore((s) => [s.fetchRemoteModelList]);
     const [fetchRemoteModelsLoading, setFetchRemoteModelsLoading] = useState(false);
@@ -185,7 +188,8 @@ const ModelList = memo<ModelListProps>(
       try {
         await fetchRemoteModelList(id);
       } catch (error) {
-        console.error(error);
+        console.error('Failed to fetch remote models:', error);
+        message.error(t('providerModels.list.fetcher.fetchError'));
       } finally {
         fetchInFlightRef.current = false;
         setFetchRemoteModelsLoading(false);

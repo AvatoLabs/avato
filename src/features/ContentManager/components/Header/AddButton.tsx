@@ -156,33 +156,36 @@ const AddButton = ({ compact }: AddButtonProps) => {
   }, []);
 
   const items = useMemo<MenuProps['items']>(
-    () => [
-      ...(sourceSetId
-        ? [
-            {
-              icon: <Icon icon={RESOURCE_ENTRY_ICONS.folder} />,
-              key: 'create-folder',
-              label: t('header.actions.newFolder'),
-              onClick: handleCreateFolder,
-            },
-            {
-              type: 'divider',
-            },
-          ]
-        : []),
-      {
-        icon: <Icon icon={RESOURCE_ENTRY_ICONS.fileUpload} />,
-        key: 'upload-file',
-        label: t('header.actions.uploadFile'),
-        onClick: openFileUploadDialog,
-      },
-      {
-        icon: <Icon icon={RESOURCE_ENTRY_ICONS.folderUpload} />,
-        key: 'upload-folder',
-        label: t('header.actions.uploadFolder'),
-        onClick: openFolderUploadDialog,
-      },
-    ],
+    () => {
+      const nextItems: NonNullable<MenuProps['items']> = [];
+
+      if (sourceSetId) {
+        nextItems.push({
+          icon: <Icon icon={RESOURCE_ENTRY_ICONS.folder} />,
+          key: 'create-folder',
+          label: t('header.actions.newFolder'),
+          onClick: handleCreateFolder,
+        });
+        nextItems.push({ type: 'divider' });
+      }
+
+      nextItems.push(
+        {
+          icon: <Icon icon={RESOURCE_ENTRY_ICONS.fileUpload} />,
+          key: 'upload-file',
+          label: t('header.actions.uploadFile'),
+          onClick: openFileUploadDialog,
+        },
+        {
+          icon: <Icon icon={RESOURCE_ENTRY_ICONS.folderUpload} />,
+          key: 'upload-folder',
+          label: t('header.actions.uploadFolder'),
+          onClick: openFolderUploadDialog,
+        },
+      );
+
+      return nextItems;
+    },
     [handleCreateFolder, sourceSetId, openFileUploadDialog, openFolderUploadDialog, t],
   );
 

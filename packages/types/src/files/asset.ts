@@ -69,9 +69,35 @@ export interface FileAssetCapabilities {
   canEditGovernance: boolean;
 }
 
+export interface FileAssetGovernanceAuditSnapshot {
+  classification: FileAssetClassification;
+  metadata: FileAssetMetadata | null;
+  reviewStatus: FileAssetReviewStatus;
+  rightsOwner: string | null;
+  usagePolicy: FileAssetUsagePolicy;
+}
+
+export interface FileAssetGovernanceAuditItem {
+  action: string;
+  after?: Partial<FileAssetGovernanceAuditSnapshot> | null;
+  actorDisplayName?: string | null;
+  actorId?: string | null;
+  before?: Partial<FileAssetGovernanceAuditSnapshot> | null;
+  changedFields: string[];
+  createdAt: Date;
+}
+
+export interface FileAssetGovernanceAuditTrailResult {
+  hasMore: boolean;
+  items: FileAssetGovernanceAuditItem[];
+}
+
 export interface FileAssetState {
   capabilities: FileAssetCapabilities;
+  governanceAuditTrail?: FileAssetGovernanceAuditItem[];
+  governanceAuditTrailHasMore?: boolean;
   item: FileAssetItem | null;
+  latestGovernanceAudit?: FileAssetGovernanceAuditItem | null;
 }
 
 const FILE_ASSET_RENDITION_KIND_SET = new Set<string>(Object.values(FileAssetRenditionKind));

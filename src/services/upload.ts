@@ -115,11 +115,11 @@ class UploadService {
     const file = new File([blob], fileName, { type: mimeType });
 
     const { data: metadata } = await this.uploadFileToS3(file, options);
-    const hash = sha256(await file.arrayBuffer());
+    const sha256Hex = sha256(await file.arrayBuffer());
 
     return {
       fileType: mimeType,
-      hash,
+      sha256: sha256Hex,
       metadata,
       size: file.size,
     };

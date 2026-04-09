@@ -5,8 +5,9 @@ import {
   useWatchBroadcast,
 } from '@lobechat/electron-client-ipc';
 import { Block, Button, Flexbox, Tag } from '@lobehub/ui';
+import { App } from 'antd';
 import { createStaticStyles } from 'antd-style';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ProductLogo } from '@/components/Branding';
@@ -24,12 +25,13 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 
 const Version = memo<{ mobile?: boolean }>(({ mobile }) => {
   const hasNewVersion = useNewVersion();
+  const { message } = App.useApp();
   const [latestVersion, serverVersion, useCheckServerVersion] = useGlobalStore((s) => [
     s.latestVersion,
     s.serverVersion,
     s.useCheckServerVersion,
   ]);
-  const { t } = useTranslation(['common', 'setting']);
+  const { t } = useTranslation(['common', 'setting', 'electron']);
 
   useCheckServerVersion();
 
@@ -39,14 +41,26 @@ const Version = memo<{ mobile?: boolean }>(({ mobile }) => {
   const [updaterState, setUpdaterState] = useState<UpdaterState>({ stage: 'idle' });
   const [buildChannel, setBuildChannel] = useState<string | null>(null);
 
+  const handleUpdateActionError = useCallback(
+    (action: string, error: unknown) => {
+      console.error(`Failed to ${action}:`, error);
+      message.error(t('updater.updateError', { ns: 'electron' }));
+    },
+    [message, t],
+  );
+
   useEffect(() => {
     if (!isDesktop) return;
-    autoUpdateService.getUpdaterState().then(setUpdaterState);
+    void autoUpdateService.getUpdaterState().then(setUpdaterState).catch((error) => {
+      console.error('Failed to fetch updater state:', error);
+    });
   }, [isDesktop]);
 
   useEffect(() => {
     if (!isDesktop) return;
-    autoUpdateService.getBuildChannel().then(setBuildChannel);
+    void autoUpdateService.getBuildChannel().then(setBuildChannel).catch((error) => {
+      console.error('Failed to fetch build channel:', error);
+    });
   }, [isDesktop]);
 
   useWatchBroadcast('updaterStateChanged', (state: UpdaterState) => {
@@ -91,7 +105,15 @@ const Version = memo<{ mobile?: boolean }>(({ mobile }) => {
       }
       case 'downloaded': {
         return (
-          <Button block={mobile} type="primary" onClick={() => void autoUpdateService.installNow()}>
+          <Button
+            block={mobile}
+            type="primary"
+            onClick={() => {
+              void autoUpdateService.installNow().catch((error) => {
+                handleUpdateActionError('install update', error);
+              });
+            }}
+          >
             {t('restartToUpdate')}
           </Button>
         );
@@ -105,7 +127,14 @@ const Version = memo<{ mobile?: boolean }>(({ mobile }) => {
       }
       default: {
         return (
-          <Button block={mobile} onClick={() => void autoUpdateService.checkUpdate()}>
+          <Button
+            block={mobile}
+            onClick={() => {
+              void autoUpdateService.checkUpdate().catch((error) => {
+                handleUpdateActionError('check for updates', error);
+              });
+            }}
+          >
             {t('checkForUpdates')}
           </Button>
         );

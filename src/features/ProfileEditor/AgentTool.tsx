@@ -3,6 +3,7 @@
 import { KLAVIS_SERVER_TYPES, LOBEHUB_SKILL_PROVIDERS } from '@lobechat/const';
 import { type ItemType } from '@lobehub/ui';
 import { Avatar, Button, Flexbox, Icon } from '@lobehub/ui';
+import { App } from 'antd';
 import { cssVar } from 'antd-style';
 import isEqual from 'fast-deep-equal';
 import { PlusIcon, ToyBrick } from 'lucide-react';
@@ -67,6 +68,7 @@ export interface AgentToolProps {
 const AgentTool = memo<AgentToolProps>(
   ({ agentId, showWebBrowsing = false, filterAvailableInWeb = false, useAllMetaList = false }) => {
     const { t } = useTranslation('setting');
+    const { message } = App.useApp();
     const activeAgentId = useAgentStore((s) => s.activeAgentId);
     const effectiveAgentId = agentId || activeAgentId || '';
     const config = useAgentStore(agentSelectors.getAgentConfigById(effectiveAgentId), isEqual);
@@ -189,6 +191,21 @@ const AgentTool = memo<AgentToolProps>(
       [toggleWebBrowsing, togglePlugin, showWebBrowsing],
     );
 
+    const runUpdatingAction = useCallback(
+      async (action: () => Promise<void>) => {
+        setUpdating(true);
+        try {
+          await action();
+        } catch (error) {
+          console.error('[AgentTool] Failed to update tools:', error);
+          message.error(t('settingAgent.tools.updateError'));
+        } finally {
+          setUpdating(false);
+        }
+      },
+      [message, t],
+    );
+
     // Set default tab based on installed plugins (only on first load)
     // Only show 'installed' tab by default if more than 5 plugins are enabled
     useEffect(() => {
@@ -305,12 +322,14 @@ const AgentTool = memo<AgentToolProps>(
         e.preventDefault();
         e.stopPropagation();
         const identifier = typeof pluginId === 'string' ? pluginId : pluginId?.identifier;
-        if (showWebBrowsing && identifier === WEB_BROWSING_IDENTIFIER) {
-          if (!effectiveAgentId) return;
-          await updateAgentChatConfigById(effectiveAgentId, { searchMode: 'off' });
-        } else {
-          await togglePlugin(identifier, false);
-        }
+        await runUpdatingAction(async () => {
+          if (showWebBrowsing && identifier === WEB_BROWSING_IDENTIFIER) {
+            if (!effectiveAgentId) return;
+            await updateAgentChatConfigById(effectiveAgentId, { searchMode: 'off' });
+          } else {
+            await togglePlugin(identifier, false);
+          }
+        });
       };
 
     // Builtin Agent Skills 列表项（归入 LobeHub 分组）
@@ -330,15 +349,11 @@ const AgentTool = memo<AgentToolProps>(
               checked={isToolEnabled(skill.identifier)}
               id={skill.identifier}
               label={skill.name}
-              onUpdate={async () => {
-                setUpdating(true);
-                await handleToggleTool(skill.identifier);
-                setUpdating(false);
-              }}
+              onUpdate={() => runUpdatingAction(() => handleToggleTool(skill.identifier))}
             />
           ),
         })),
-      [installedBuiltinSkills, isToolEnabled, handleToggleTool],
+      [installedBuiltinSkills, isToolEnabled, handleToggleTool, runUpdatingAction],
     );
 
     // Market Agent Skills 列表项（归入 Community 分组）
@@ -352,15 +367,11 @@ const AgentTool = memo<AgentToolProps>(
               checked={isToolEnabled(skill.identifier)}
               id={skill.identifier}
               label={skill.name}
-              onUpdate={async () => {
-                setUpdating(true);
-                await handleToggleTool(skill.identifier);
-                setUpdating(false);
-              }}
+              onUpdate={() => runUpdatingAction(() => handleToggleTool(skill.identifier))}
             />
           ),
         })),
-      [marketAgentSkills, isToolEnabled, handleToggleTool],
+      [marketAgentSkills, isToolEnabled, handleToggleTool, runUpdatingAction],
     );
 
     // User Agent Skills 列表项（归入 Custom 分组）
@@ -374,15 +385,11 @@ const AgentTool = memo<AgentToolProps>(
               checked={isToolEnabled(skill.identifier)}
               id={skill.identifier}
               label={skill.name}
-              onUpdate={async () => {
-                setUpdating(true);
-                await handleToggleTool(skill.identifier);
-                setUpdating(false);
-              }}
+              onUpdate={() => runUpdatingAction(() => handleToggleTool(skill.identifier))}
             />
           ),
         })),
-      [userAgentSkills, isToolEnabled, handleToggleTool],
+      [userAgentSkills, isToolEnabled, handleToggleTool, runUpdatingAction],
     );
 
     // 合并 Builtin Agent Skills、builtin 工具、LobeHub Skill Providers 和 Klavis 服务器
@@ -405,11 +412,7 @@ const AgentTool = memo<AgentToolProps>(
               checked={isToolEnabled(item.identifier)}
               id={item.identifier}
               label={item.meta?.title}
-              onUpdate={async () => {
-                setUpdating(true);
-                await handleToggleTool(item.identifier);
-                setUpdating(false);
-              }}
+              onUpdate={() => runUpdatingAction(() => handleToggleTool(item.identifier))}
             />
           ),
         })),
@@ -425,6 +428,7 @@ const AgentTool = memo<AgentToolProps>(
         lobehubSkillItems,
         isToolEnabled,
         handleToggleTool,
+        runUpdatingAction,
       ],
     );
 
@@ -450,15 +454,11 @@ const AgentTool = memo<AgentToolProps>(
             checked={plugins.includes(item.identifier)}
             id={item.identifier}
             label={item.title}
-            onUpdate={async () => {
-              setUpdating(true);
-              await togglePlugin(item.identifier);
-              setUpdating(false);
-            }}
+            onUpdate={() => runUpdatingAction(() => togglePlugin(item.identifier))}
           />
         ),
       }),
-      [plugins, togglePlugin],
+      [plugins, runUpdatingAction, togglePlugin],
     );
 
     // Community 插件列表项
@@ -546,11 +546,7 @@ const AgentTool = memo<AgentToolProps>(
               checked={true}
               id={item.identifier}
               label={item.meta?.title}
-              onUpdate={async () => {
-                setUpdating(true);
-                await handleToggleTool(item.identifier);
-                setUpdating(false);
-              }}
+              onUpdate={() => runUpdatingAction(() => handleToggleTool(item.identifier))}
             />
           ),
         }));
@@ -582,11 +578,7 @@ const AgentTool = memo<AgentToolProps>(
               checked={true}
               id={skill.identifier}
               label={skill.name}
-              onUpdate={async () => {
-                setUpdating(true);
-                await handleToggleTool(skill.identifier);
-                setUpdating(false);
-              }}
+              onUpdate={() => runUpdatingAction(() => handleToggleTool(skill.identifier))}
             />
           ),
         }));
@@ -623,11 +615,7 @@ const AgentTool = memo<AgentToolProps>(
               checked={true}
               id={item.identifier}
               label={item.title}
-              onUpdate={async () => {
-                setUpdating(true);
-                await togglePlugin(item.identifier);
-                setUpdating(false);
-              }}
+              onUpdate={() => runUpdatingAction(() => togglePlugin(item.identifier))}
             />
           ),
         }));
@@ -643,11 +631,7 @@ const AgentTool = memo<AgentToolProps>(
               checked={true}
               id={skill.identifier}
               label={skill.name}
-              onUpdate={async () => {
-                setUpdating(true);
-                await handleToggleTool(skill.identifier);
-                setUpdating(false);
-              }}
+              onUpdate={() => runUpdatingAction(() => handleToggleTool(skill.identifier))}
             />
           ),
         }));
@@ -678,11 +662,7 @@ const AgentTool = memo<AgentToolProps>(
               checked={true}
               id={item.identifier}
               label={item.title}
-              onUpdate={async () => {
-                setUpdating(true);
-                await togglePlugin(item.identifier);
-                setUpdating(false);
-              }}
+              onUpdate={() => runUpdatingAction(() => togglePlugin(item.identifier))}
             />
           ),
         }));
@@ -698,11 +678,7 @@ const AgentTool = memo<AgentToolProps>(
               checked={true}
               id={skill.identifier}
               label={skill.name}
-              onUpdate={async () => {
-                setUpdating(true);
-                await handleToggleTool(skill.identifier);
-                setUpdating(false);
-              }}
+              onUpdate={() => runUpdatingAction(() => handleToggleTool(skill.identifier))}
             />
           ),
         }));
@@ -732,6 +708,7 @@ const AgentTool = memo<AgentToolProps>(
       isToolEnabled,
       handleToggleTool,
       togglePlugin,
+      runUpdatingAction,
       t,
     ]);
 

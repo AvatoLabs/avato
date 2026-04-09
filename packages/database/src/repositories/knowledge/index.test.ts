@@ -360,6 +360,7 @@ describe('KnowledgeRepo', () => {
         classification: FileAssetClassification.Brand,
         createdBy: userId,
         fileId: 'governance-file-1',
+        rightsOwner: 'Brand Team',
         reviewStatus: FileAssetReviewStatus.Approved,
         spaceId: 'spc_knowledge',
         usagePolicy: FileAssetUsagePolicy.Restricted,
@@ -383,6 +384,16 @@ describe('KnowledgeRepo', () => {
 
       expect(results.every((item) => item.sourceType === 'file')).toBe(true);
       expect(results.map((item) => item.id).sort()).toEqual(['governance-file-2']);
+    });
+
+    it('should filter file results by rights owner before pagination', async () => {
+      const results = await knowledgeRepo.query({
+        assetRightsOwner: 'Brand',
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0].id).toBe('governance-file-1');
+      expect(results[0].sourceType).toBe('file');
     });
   });
 

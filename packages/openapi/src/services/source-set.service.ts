@@ -1,10 +1,10 @@
+import type { SourceSetItem } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import { desc, inArray } from 'drizzle-orm';
 
 import { ContentModel } from '@/database/models/content';
 import { SourceSetModel } from '@/database/models/sourceSet';
 import { SpaceModel } from '@/database/models/space';
-import type { SourceSetItem } from '@/database/schemas';
 import { sourceSets } from '@/database/schemas';
 import type { LobeChatDatabase } from '@/database/type';
 import { ContentAuthorizer } from '@/server/services/content';
@@ -111,27 +111,33 @@ export class SourceSetService extends BaseService {
 
       const { limit, offset } = processPaginationConditions(request);
       const normalizedKeyword = request.keyword?.trim().toLowerCase();
+      const requestedSpaceId = request.spaceId;
 
-      let rawSourceSets: SourceSetItem[] = [];
+      const rawSourceSets = requestedSpaceId
+        ? await (async () => {
+          const space = await this.spaceModel.findAccessibleSpaceById(requestedSpaceId);
+          if (!space?.id) {
+            throw this.createAuthorizationError('SPACE_ACCESS_DENIED');
+          }
 
-      if (request.spaceId) {
-        const space = await this.spaceModel.findAccessibleSpaceById(request.spaceId);
-        if (!space?.id) {
-          throw this.createAuthorizationError('SPACE_ACCESS_DENIED');
-        }
-
-        rawSourceSets = await this.sourceSetModel.query(space.id);
-      } else {
-        const spaces = await this.spaceModel.listSpaces();
-        const accessibleSpaceIds = [...new Set(spaces.map((space) => space.id))];
-
-        if (accessibleSpaceIds.length > 0) {
-          rawSourceSets = await this.db.query.sourceSets.findMany({
+          return this.db.query.sourceSets.findMany({
             orderBy: [desc(sourceSets.updatedAt)],
-            where: inArray(sourceSets.spaceId, accessibleSpaceIds),
+            where: inArray(sourceSets.spaceId, [space.id]),
           });
-        }
-      }
+        })()
+        : await (async () => {
+            const spaces = await this.spaceModel.listSpaces();
+            const accessibleSpaceIds = [...new Set(spaces.map((space) => space.id))];
+
+            if (accessibleSpaceIds.length === 0) {
+              return [];
+            }
+
+            return this.db.query.sourceSets.findMany({
+              orderBy: [desc(sourceSets.updatedAt)],
+              where: inArray(sourceSets.spaceId, accessibleSpaceIds),
+            });
+          })();
 
       const visibleIds = new Set(
         await this.contentAuthorizer.filterVisibleSourceSetIdsForList(
@@ -155,10 +161,12 @@ export class SourceSetService extends BaseService {
           ? filteredSourceSets.slice(offset, offset + limit)
           : filteredSourceSets;
 
-      const sourceSetsWithAccessType = pagedSourceSets.map((item) => ({
-        ...item,
-        accessType: (item.userId === this.userId ? 'owner' : 'userGrant') as SourceSetAccessType,
-      })) satisfies SourceSetListItem[];
+      const sourceSetsWithAccessType: SourceSetListItem[] = pagedSourceSets.map(
+        ({ userId: ownerId, ...item }) => ({
+          ...item,
+          accessType: (ownerId === this.userId ? 'owner' : 'userGrant') as SourceSetAccessType,
+        }),
+      );
 
       return {
         sourceSets: sourceSetsWithAccessType,

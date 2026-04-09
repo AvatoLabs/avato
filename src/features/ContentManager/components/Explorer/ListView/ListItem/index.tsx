@@ -22,6 +22,7 @@ import FileIcon from '@/components/FileIcon';
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree/treeState';
 import { buildFileAssetBadges } from '@/features/ContentManager/utils/buildFileAssetBadges';
+import { buildFileGovernanceActivity } from '@/features/ContentManager/utils/buildFileGovernanceActivity';
 import { resolveResourceKind } from '@/features/ContentManager/utils/resolveResourceKind';
 import {
   getTransparentDragImage,
@@ -107,9 +108,6 @@ const styles = createStaticStyles(({ css }) => {
       overflow: hidden;
       flex: 1;
 
-      min-width: 0;
-      margin-inline-start: 12px;
-
       color: ${cssVar.colorText};
       white-space: nowrap;
     `,
@@ -117,6 +115,7 @@ const styles = createStaticStyles(({ css }) => {
       overflow: hidden;
       flex: 1;
       min-width: 0;
+      margin-inline-start: 12px;
     `,
     selected: css`
       background: ${cssVar.colorFillTertiary};
@@ -154,6 +153,12 @@ const FileListItem = memo<FileListItemProps>(
     finishEmbedding,
     chunkCount,
     assetClassification,
+    assetLatestGovernanceAuditAction,
+    assetLatestGovernanceAuditActorDisplayName,
+    assetLatestGovernanceAuditAt,
+    assetLatestGovernanceAuditAfter,
+    assetLatestGovernanceAuditBefore,
+    assetLatestGovernanceAuditChangedFields,
     assetPrimaryRenditionKind,
     assetPrimaryRenditionLabel,
     assetReviewStatus,
@@ -316,6 +321,27 @@ const FileListItem = memo<FileListItemProps>(
         t,
       ],
     );
+    const governanceActivity = useMemo(
+      () =>
+        buildFileGovernanceActivity({
+          action: assetLatestGovernanceAuditAction,
+          actorDisplayName: assetLatestGovernanceAuditActorDisplayName,
+          after: assetLatestGovernanceAuditAfter,
+          before: assetLatestGovernanceAuditBefore,
+          changedFields: assetLatestGovernanceAuditChangedFields,
+          createdAt: assetLatestGovernanceAuditAt,
+          t,
+        }),
+      [
+        assetLatestGovernanceAuditAction,
+        assetLatestGovernanceAuditActorDisplayName,
+        assetLatestGovernanceAuditAt,
+        assetLatestGovernanceAuditAfter,
+        assetLatestGovernanceAuditBefore,
+        assetLatestGovernanceAuditChangedFields,
+        t,
+      ],
+    );
 
     const handleRenameStart = useCallback(() => {
       setIsRenaming(true);
@@ -392,6 +418,7 @@ const FileListItem = memo<FileListItemProps>(
       isFolder,
       isPage,
       sourceSetId: contentManagerState.sourceSetId,
+      sourceType,
       slug,
     });
 
@@ -526,19 +553,26 @@ const FileListItem = memo<FileListItemProps>(
                   }}
                 />
               ) : (
-                <Flexbox horizontal align={'center'} className={styles.name} gap={8}>
-                  <TruncatedFileName name={name || t('file:pageList.untitled')} />
-                  {assetBadges.map((badge) => (
-                    <Tag
-                      color={badge.color}
-                      key={badge.key}
-                      size={'small'}
-                      title={badge.title}
-                      variant={badge.variant}
-                    >
-                      {badge.label}
-                    </Tag>
-                  ))}
+                <Flexbox className={styles.nameContainer} gap={4}>
+                  <Flexbox horizontal align={'center'} className={styles.name} gap={8}>
+                    <TruncatedFileName name={name || t('file:pageList.untitled')} />
+                    {assetBadges.map((badge) => (
+                      <Tag
+                        color={badge.color}
+                        key={badge.key}
+                        size={'small'}
+                        title={badge.title}
+                        variant={badge.variant}
+                      >
+                        {badge.label}
+                      </Tag>
+                    ))}
+                  </Flexbox>
+                  {governanceActivity && (
+                    <Text ellipsis fontSize={12} title={governanceActivity.title} type={'secondary'}>
+                      {governanceActivity.label}
+                    </Text>
+                  )}
                 </Flexbox>
               )}
             </Flexbox>
@@ -602,8 +636,12 @@ const FileListItem = memo<FileListItemProps>(
           </Flexbox>
           {!isDragging && (
             <>
-              <Flexbox className={styles.item} style={{ flexShrink: 0 }} width={columnWidths.date}>
-                {displayTime}
+              <Flexbox
+                className={styles.item}
+                style={{ flexShrink: 0 }}
+                width={columnWidths.date}
+              >
+                <Text>{displayTime}</Text>
               </Flexbox>
               <Flexbox className={styles.item} style={{ flexShrink: 0 }} width={columnWidths.size}>
                 {isFolder || isPage ? '-' : formatSize(size)}
@@ -624,6 +662,14 @@ const FileListItem = memo<FileListItemProps>(
       prevProps.embeddingStatus === nextProps.embeddingStatus &&
       prevProps.chunkCount === nextProps.chunkCount &&
       prevProps.assetClassification === nextProps.assetClassification &&
+      prevProps.assetLatestGovernanceAuditAction === nextProps.assetLatestGovernanceAuditAction &&
+      prevProps.assetLatestGovernanceAuditActorDisplayName ===
+        nextProps.assetLatestGovernanceAuditActorDisplayName &&
+      prevProps.assetLatestGovernanceAuditAt === nextProps.assetLatestGovernanceAuditAt &&
+      prevProps.assetLatestGovernanceAuditAfter === nextProps.assetLatestGovernanceAuditAfter &&
+      prevProps.assetLatestGovernanceAuditBefore === nextProps.assetLatestGovernanceAuditBefore &&
+      prevProps.assetLatestGovernanceAuditChangedFields ===
+        nextProps.assetLatestGovernanceAuditChangedFields &&
       prevProps.assetPrimaryRenditionKind === nextProps.assetPrimaryRenditionKind &&
       prevProps.assetPrimaryRenditionLabel === nextProps.assetPrimaryRenditionLabel &&
       prevProps.assetReviewStatus === nextProps.assetReviewStatus &&

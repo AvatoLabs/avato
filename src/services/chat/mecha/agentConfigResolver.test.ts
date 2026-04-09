@@ -530,7 +530,7 @@ describe('resolveAgentConfig', () => {
     it('should inject docs-agent tools for custom agent in page scope', () => {
       const result = resolveAgentConfig({
         agentId: 'custom-agent',
-        scope: 'page',
+        scope: 'doc',
       });
 
       expect(result.plugins).toContain(DocsAgentIdentifier);
@@ -543,7 +543,7 @@ describe('resolveAgentConfig', () => {
       const result = resolveAgentConfig({
         agentId: 'custom-agent',
         plugins: ['web-search', 'memory'],
-        scope: 'page',
+        scope: 'doc',
       });
 
       expect(result.plugins).toEqual([DocsAgentIdentifier, 'web-search', 'memory']);
@@ -552,7 +552,7 @@ describe('resolveAgentConfig', () => {
     it('should merge custom system role with docs-agent system role', () => {
       const result = resolveAgentConfig({
         agentId: 'custom-agent',
-        scope: 'page',
+        scope: 'doc',
       });
 
       expect(result.agentConfig.systemRole).toContain('You are a helpful assistant');
@@ -573,7 +573,7 @@ describe('resolveAgentConfig', () => {
 
       const result = resolveAgentConfig({
         agentId: 'custom-agent',
-        scope: 'page',
+        scope: 'doc',
       });
 
       expect(result.agentConfig.systemRole).toBe(
@@ -605,7 +605,7 @@ describe('resolveAgentConfig', () => {
       const result = resolveAgentConfig({
         agentId: 'custom-agent',
         plugins: [DocsAgentIdentifier, 'other-plugin'],
-        scope: 'page',
+        scope: 'doc',
       });
 
       expect(result.plugins.filter((p) => p === DocsAgentIdentifier)).toHaveLength(1);
@@ -624,7 +624,7 @@ describe('resolveAgentConfig', () => {
 
       const result = resolveAgentConfig({
         agentId: 'custom-agent',
-        scope: 'page',
+        scope: 'doc',
       });
 
       expect(result.chatConfig.enableHistoryCount).toBe(false);
@@ -656,7 +656,7 @@ describe('resolveAgentConfig', () => {
 
       const result = resolveAgentConfig({
         agentId: 'custom-agent',
-        scope: 'page',
+        scope: 'doc',
       });
 
       expect(result.agentConfig.params.max_tokens).toBeUndefined();
@@ -669,7 +669,7 @@ describe('resolveAgentConfig', () => {
 
       const result = resolveAgentConfig({
         agentId: 'custom-agent',
-        scope: 'page',
+        scope: 'doc',
       });
 
       // Should still inject DocsAgentIdentifier but with empty systemRole
@@ -686,7 +686,7 @@ describe('resolveAgentConfig', () => {
 
       const result = resolveAgentConfig({
         agentId: 'custom-agent',
-        scope: 'page',
+        scope: 'doc',
       });
 
       expect(result.plugins).toContain(DocsAgentIdentifier);
@@ -707,7 +707,7 @@ describe('resolveAgentConfig', () => {
 
       const result = resolveAgentConfig({
         agentId: 'docs-agent-id',
-        scope: 'page',
+        scope: 'doc',
       });
 
       // docs-agent should NOT have its tools/systemRole injected again
@@ -1023,7 +1023,7 @@ describe('resolveAgentConfig', () => {
 
       const result = resolveAgentConfig({
         agentId: 'test-agent',
-        scope: 'page',
+        scope: 'doc',
         isSubTask: true,
       });
 
@@ -1131,7 +1131,7 @@ describe('resolveAgentConfig', () => {
       const result = resolveAgentConfig({
         agentId: 'test-agent',
         disableTools: true,
-        scope: 'page',
+        scope: 'doc',
       });
 
       // disableTools should override page scope injection

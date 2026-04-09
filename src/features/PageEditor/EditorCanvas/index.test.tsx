@@ -8,7 +8,10 @@ import EditorCanvas from './index';
 
 const { performMetaSaveMock, sharedEditorCanvasMock, storeState } = vi.hoisted(() => {
   const performMetaSave = vi.fn().mockResolvedValue(undefined);
-  const sharedEditorCanvas = vi.fn(() => null);
+  const sharedEditorCanvas = vi.fn((props: any) => {
+    void props;
+    return null;
+  });
 
   return {
     performMetaSaveMock: performMetaSave,
@@ -57,11 +60,13 @@ describe('PageEditor EditorCanvas', () => {
   it('flushes page meta before route-leave autosave', async () => {
     render(<EditorCanvas />);
 
-    const props = sharedEditorCanvasMock.mock.calls.at(-1)?.[0];
+  const props = sharedEditorCanvasMock.mock.calls.at(-1)?.[0];
 
-    expect(props?.unsavedChangesGuard?.beforeAutoSave).toEqual(expect.any(Function));
+  expect(props?.unsavedChangesGuard?.beforeAutoSave).toEqual(expect.any(Function));
+  expect(props).toBeDefined();
+  if (!props) return;
 
-    await props.unsavedChangesGuard.beforeAutoSave();
+  await props.unsavedChangesGuard.beforeAutoSave();
 
     expect(performMetaSaveMock).toHaveBeenCalledTimes(1);
   });

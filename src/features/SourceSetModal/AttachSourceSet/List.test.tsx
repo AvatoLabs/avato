@@ -9,7 +9,20 @@ import { setActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import List from './List';
 
 const mockGetSourceItems = vi.hoisted(() => vi.fn());
-const mockUseFetchSourceSetList = vi.hoisted(() => vi.fn(() => ({ data: [] })));
+const mockUseFetchSourceSetList = vi.hoisted(
+  () =>
+    vi.fn(
+      () =>
+        ({
+          data: [] as Array<{
+            description?: string;
+            id: string;
+            name: string;
+            spaceId: string;
+          }>,
+        }) as const,
+    ),
+);
 
 vi.mock('@lobehub/ui', () => ({
   ActionIcon: ({ onClick }: any) => (

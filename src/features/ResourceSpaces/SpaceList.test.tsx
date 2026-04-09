@@ -126,10 +126,8 @@ vi.mock('./useTeamSpaceMemoryScopeSummaries', () => ({
     spaceId: string,
     target: { recallFilter: string; section: string },
   ) => `/spaces/${spaceId}/memory?section=${target.section}&recallFilter=${target.recallFilter}`,
-  canReviewSpaceMemorySummary: (summary?: {
-    contract?: { canManageRecall?: boolean };
-    surface?: string;
-  } | null) => summary?.contract?.canManageRecall ?? summary?.surface === 'reviewer',
+  canReviewSpaceMemorySummary: (summary?: { contract?: { canManageRecall?: boolean } } | null) =>
+    Boolean(summary?.contract?.canManageRecall),
   useTeamSpaceMemoryScopeSummaries: () => ({
     isLoading: false,
     pendingGovernanceCountBySpaceId: pendingCountsState.current,
@@ -155,8 +153,8 @@ describe('SpaceList', () => {
       ['spc_clean', null as any],
     ]);
     summaryMapState.current = new Map([
-      ['spc_ops', { canReview: true, surface: 'reviewer' }],
-      ['spc_clean', { canReview: true, surface: 'reviewer' }],
+      ['spc_ops', { contract: { canManageRecall: true } }],
+      ['spc_clean', { contract: { canManageRecall: true } }],
     ]);
   });
 
@@ -174,7 +172,9 @@ describe('SpaceList', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ops Space' }));
     expect(onSelectSpaceMock).toHaveBeenCalledWith('spc_ops');
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Space Settings' })[0]!);
+    expect(screen.getAllByRole('button', { name: 'Space Settings' })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Space Settings' }));
     expect(navigateMock).toHaveBeenCalledWith('/spaces/spc_ops/settings');
   });
 
@@ -199,8 +199,8 @@ describe('SpaceList', () => {
       ['spc_clean', null as any],
     ]);
     summaryMapState.current = new Map([
-      ['spc_ops', { canReview: false, surface: 'viewer' }],
-      ['spc_clean', { canReview: true, surface: 'reviewer' }],
+      ['spc_ops', { contract: { canManageRecall: false } }],
+      ['spc_clean', { contract: { canManageRecall: true } }],
     ]);
 
     render(<SpaceList currentSpaceId={'spc_ops'} onSelectSpace={onSelectSpaceMock} />);

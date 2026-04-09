@@ -116,6 +116,7 @@ export default {
   'aggregator.warnings.title': 'Some sources could not be refreshed',
   'assistants.addAgent': 'Add Agent',
   'assistants.addAgentAndConverse': 'Add Agent & Chat',
+  'assistants.addAgentError': 'Failed to add agent',
   'assistants.addAgentSuccess': 'Added',
   'assistants.conversation.l1':
     'Hi, I’m **{{name}}**. Share your goal or Context—we’ll collaborate from here.',
@@ -158,6 +159,7 @@ export default {
   'assistants.empty.title': 'No Agents found',
   'assistants.list': 'Agent List',
   'assistants.more': 'More',
+  'assistants.noConfig': 'Agent configuration is not available',
   'assistants.plugins': 'Integrated Skills',
   'assistants.recentSubmits': 'Recent Updates',
   'assistants.sorts.haveSkills': 'Skilled',
@@ -270,6 +272,15 @@ export default {
 
   'fork.viewAllForks': 'View all forks',
 
+  'groupAgents.addAndConverse': 'Add & Start Conversation',
+  'groupAgents.addError': 'Failed to add group agent',
+  'groupAgents.addGroup': 'Add Group',
+  'groupAgents.addSuccess': 'Group agent added successfully',
+  'groupAgents.duplicateAdd.content':
+    'This group agent has already been added. Do you want to add it again?',
+  'groupAgents.duplicateAdd.ok': 'Add Anyway',
+  'groupAgents.duplicateAdd.title': 'Group Already Added',
+  'groupAgents.noConfig': 'Group configuration not available',
   'groupAgents.tag': 'Group',
 
   'groupAgents.status.archived.reasons.official':
@@ -1248,6 +1259,8 @@ export default {
   'user.favoritePlugins': 'Saved Skills',
 
   'user.follow': 'Follow',
+  'user.followFailed': 'Failed to follow',
+  'user.followSuccess': 'Followed',
 
   'user.followers': 'Followers',
 
@@ -1299,5 +1312,7 @@ export default {
   'user.unfavoriteFailed': 'Failed to unsave',
   'user.unfavoriteSuccess': 'Unsaved',
   'user.unfollow': 'Unfollow',
+  'user.unfollowFailed': 'Failed to unfollow',
+  'user.unfollowSuccess': 'Unfollowed',
   'user.website': 'Website',
 };

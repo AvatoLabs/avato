@@ -57,6 +57,46 @@ const styles = createStaticStyles(({ css }) => ({
 
     min-height: 0;
   `,
+  stateHeader: css`
+    display: grid;
+    gap: 6px;
+    padding: 16px 18px 10px;
+    border-bottom: 1px solid ${cssVar.colorBorderSecondary};
+    background: color-mix(in srgb, ${cssVar.colorFillQuaternary} 72%, transparent);
+  `,
+  stateHeaderEyebrow: css`
+    color: ${cssVar.colorTextSecondary};
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  `,
+  stateHeaderSummary: css`
+    color: ${cssVar.colorTextDescription};
+    font-size: 13px;
+    line-height: 1.5;
+  `,
+  stateHeaderTitle: css`
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.25;
+  `,
+  stateShell: css`
+    overflow: hidden;
+
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+
+    min-height: 0;
+
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, ${cssVar.colorBgContainer} 97%, ${cssVar.colorBgElevated}) 0%,
+        color-mix(in srgb, ${cssVar.colorBgContainer} 93%, ${cssVar.colorBgLayout}) 100%
+      );
+  `,
 }));
 
 interface ListViewProps {
@@ -333,7 +373,21 @@ const ListView = memo<ListViewProps>(function ListView({ data, hasResolvedData, 
     return null;
   }, [columnWidths, dataLength, hasMore, isLoadingMore]);
 
-  if (showSkeleton) return <ListViewSkeleton columnWidths={columnWidths} />;
+  if (showSkeleton)
+    return (
+      <div className={styles.stateShell} data-testid={'resource-list-loading-state'}>
+        <div className={styles.stateHeader}>
+          <div className={styles.stateHeaderEyebrow}>
+            {t('loading', { defaultValue: 'Loading...' })}
+          </div>
+          <div className={styles.stateHeaderTitle}>{t('FileManager.title.title')}</div>
+          <div className={styles.stateHeaderSummary}>
+            {t('emptyState.files.description', { ns: 'file' })}
+          </div>
+        </div>
+        <ListViewSkeleton columnWidths={columnWidths} />
+      </div>
+    );
 
   // Show empty state when data is loaded but empty (and not in a folder)
   const showEmptyState = hasResolvedData && !effectiveIsLoading && dataLength === 0;

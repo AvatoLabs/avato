@@ -1,10 +1,15 @@
+import { agentSelectors, builtinAgentSelectors } from '@/store/agent/selectors';
+import { getAgentStoreState } from '@/store/agent/store';
 import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { documentService } from '@/services/document';
 import { useChatStore } from '@/store/chat';
 import { useGlobalStore } from '@/store/global';
 import { type SessionStore } from '@/store/session/store';
 import { type StoreSetter } from '@/store/types';
+import { settingsSelectors } from '@/store/user/selectors';
+import { useUserStore } from '@/store/user/store';
 import { getPageDetailPath } from '@/utils/docs';
+import { resolveModelProviderWithFallback } from '@/utils/docsAgentModel';
 import { setNamespace } from '@/utils/storeDebug';
 
 import { type StarterMode } from './initialState';
@@ -33,10 +38,18 @@ export class HomeInputActionImpl {
     this.#set({ homeInputLoading: true }, false, n('sendAsAgent/start'));
 
     try {
+      const agentState = getAgentStoreState();
+      const defaultAgentConfig = settingsSelectors.defaultAgentConfig(useUserStore.getState());
+      const inboxAgentId = builtinAgentSelectors.inboxAgentId(agentState);
+      const inboxConfig = inboxAgentId
+        ? agentSelectors.getAgentConfigById(inboxAgentId)(agentState)
+        : null;
+      const { model, provider } = resolveModelProviderWithFallback(inboxConfig, defaultAgentConfig);
+
       // 1. Create new Agent using existing createSession action
       const newAgentId = await this.#get().createSession(
         {
-          config: { systemRole: message },
+          config: { model: model ?? undefined, provider: provider ?? undefined, systemRole: message },
           meta: { title: message?.slice(0, 50) || 'New Agent' },
         },
         false, // Don't switch session, we'll navigate manually
@@ -49,11 +62,18 @@ export class HomeInputActionImpl {
       }
 
       // 3. Send initial message with agentId context
-      const { sendMessage } = useChatStore.getState();
-      await sendMessage({
-        context: { agentId: newAgentId, scope: 'agent_builder' },
-        message,
-      });
+      const agentBuilderId = builtinAgentSelectors.agentBuilderId(agentState);
+      if (agentBuilderId) {
+        if (model && provider) {
+          await agentState.updateAgentConfigById(agentBuilderId, { model, provider });
+        }
+
+        const { sendMessage } = useChatStore.getState();
+        await sendMessage({
+          context: { agentId: agentBuilderId, scope: 'agent_builder' },
+          message,
+        });
+      }
 
       // 4. Clear mode
       this.#set({ inputActiveMode: null }, false, n('sendAsAgent/clearMode'));
@@ -87,11 +107,20 @@ export class HomeInputActionImpl {
     this.#set({ homeInputLoading: true }, false, n('sendAsWrite/start'));
 
     try {
+      const agentState = getAgentStoreState();
+      const defaultAgentConfig = settingsSelectors.defaultAgentConfig(useUserStore.getState());
+      const inboxAgentId = builtinAgentSelectors.inboxAgentId(agentState);
+      const inboxConfig = inboxAgentId
+        ? agentSelectors.getAgentConfigById(inboxAgentId)(agentState)
+        : null;
+      const { model, provider } = resolveModelProviderWithFallback(inboxConfig, defaultAgentConfig);
       const resolvedSpaceId = resolveWorkspaceSpaceId();
+      const docsAgentId = builtinAgentSelectors.docsAgentId(agentState);
 
       // 1. Create new Document
       const newDoc = await documentService.createDocument({
-        editorData: '',
+        editorData: '{}',
+        fileType: 'custom/document',
         spaceId: resolvedSpaceId,
         title: message?.slice(0, 50) || 'Untitled',
       });
@@ -103,14 +132,20 @@ export class HomeInputActionImpl {
       }
 
       // 3. Send message with document scope context
-      const { sendMessage } = useChatStore.getState();
-      await sendMessage({
-        context: {
-          agentId: newDoc.id,
-          scope: 'doc',
-        },
-        message,
-      });
+      if (docsAgentId) {
+        if (model && provider) {
+          await agentState.updateAgentConfigById(docsAgentId, { model, provider });
+        }
+
+        const { sendMessage } = useChatStore.getState();
+        await sendMessage({
+          context: {
+            agentId: docsAgentId,
+            scope: 'doc',
+          },
+          message,
+        });
+      }
 
       // 4. Clear mode
       this.#set({ inputActiveMode: null }, false, n('sendAsWrite/clearMode'));

@@ -22,19 +22,29 @@
 - **Capability Policy 已抽离**：`preview_content` 的 OR 规则、viewer 的 share-link 读取边界、以及 `owner / editor + canReshare` 的继续分享规则，已经从 `ContentAuthorizer` 中抽成可单测的显式 policy。
 - **`file_assets` sidecar 已建立**：`Files` 与未来 `Assets` 之间已经补上第一层边界，新增 `file_assets` 表与 `FileAssetModel`，用来承载 classification、review status、usage policy、rights owner 等资产治理字段，而不再继续把这类元数据塞进 `files.metadata`。
 - **Files 资产治理入口已接进现有详情面**：`FileDetail` 已经开始消费 `getFileAssetById / upsertFileAsset`，在现有文件详情弹窗里提供首批 `classification / review status / usage policy / rights owner` 治理字段，而不是另起一套孤立的 `Assets` 页面。
+- **Files 资产治理详情面已开始具备完整编辑反馈**：`FileDetail` 不再只是“改完点保存”的薄表单；当前 `review status` 也已进入可编辑治理表单，并补上 `UnsavedChangesGuard`、`All changes saved / Unsaved changes / Saving changes` 状态、以及 `Reset` 回滚动作，开始具备真正可操作的治理编辑流。
 - **Files 资产治理能力已切到动作级 policy**：文件资产不再只靠一个模糊的 `canManage` 开关；当前已经拆成 `canEditGovernance / canApprove / canArchive` 三个显式能力，默认 `editor` 只能编辑治理元数据，`owner / admin` 才能做批准和归档。
 - **首版资产分类字段已落地**：`file_assets.classification` 已作为正式字段进入 schema /migration/list contract /detail UI；当前先以轻量枚举承载首版企业分类能力，后续再继续拆更细的 `asset_classifications` 模型。
 - **首版资产版本 / 衍生版本 surface 已落地**：`file_assets.metadata` 已开始承载正式 typed 的 `version / renditions` contract，而不再只是完全自由的 JSON；`FileDetail` 也已接入 `Current Version / Derived From / Renditions` 首版治理入口，作为未来拆 `asset_versions / asset_renditions` 独立实体前的过渡层。
 - **衍生版本 label 已进入可编辑 UI**：`FileDetail` 现已支持为每个 rendition 记录可选 `label`，不再把 typed contract 降级成只有 `kind`；只读视图也会直接展示 `Preview · Homepage` 这类带标签的衍生版本摘要。
 - **compact list/card 已开始消费版本 /rendition summary**：Files 列表、masonry 卡片与首页 Recent 资源现在已经通过轻量 badge 消费 `assetVersionLabel` 与首个 rendition summary，不再把 typed `renditions` 永远困在详情页；同时 badge 顺序仍优先保留 `restricted/public` 这类更强治理信号。
 - **compact list/card 已开始显式露出审核状态**：除 `archived` 外，`approved` 也开始进入 Files 列表、masonry 卡片与首页 Recent 资源的 compact governance badge；这样筛成 `review status=approved` 后，列表本身也能直接解释当前治理状态，而不会只剩版本 /rendition 徽标。
-- **Files header 已开始暴露正式治理筛选面**：当前 `CategoryMenu` 里的 governance popover 已不再只停留在 `classification / usage policy`，而是补上了 `review status` 维度，并且三类过滤都会通过 URL /store/list query 贯通到 `file_assets` 查询层，开始具备最小可用的资产治理筛选能力。
-- **Files header 已开始把治理筛选显式外露成状态条**：除了 popover 内的三维筛选外，当前已生效的 `classification / review status / usage policy` 也会在 header 里以可单独清除的 compact chips 显示，并显式带出 “维度 + 当前值”，不再只用一个 “Governance (3)” 总数按钮让用户猜测当前到底筛了什么。
+- **Files header 已开始暴露正式治理筛选面**：当前 `CategoryMenu` 里的 governance popover 已不再只停留在 `classification / usage policy`，而是补上了 `review status` 与 `rights owner` 维度；其中前三类受控维度会通过 URL /store/list query 贯通到 `file_assets` 查询层，`rights owner` 则以文本筛选形式补上最常见的治理检索路径，开始具备最小可用的资产治理筛选能力。
+- **Files header 已开始把治理筛选显式外露成状态条**：除了 popover 内的治理筛选外，当前已生效的 `classification / review status / usage policy / rights owner` 也会在 header 里以可单独清除的 compact chips 显示，并显式带出 “维度 + 当前值”，不再只用一个 “Governance (3)” 总数按钮让用户猜测当前到底筛了什么。
 - **治理筛选已真正作用到 Content 列表结果**：`getKnowledgeItems` 不再只是透传治理 query 参数；当前文件侧的 `classification / review status / usage policy` 已经会在列表结果里真正生效，并在筛选激活时自动排除不带资产治理语义的文档项，避免 UI 看起来在筛、结果却没变。
 - **治理筛选 summary contract 已进入 Header**：Files header 现在不再只能显示 “当前筛了几个条件”，而是会通过独立的 server-side summary query 为 `classification / review status / usage policy` 选项显示当前 scope 下的实时计数，开始具备真正可用的治理决策辅助，而不只是 query 参数壳层。
-- **治理筛选空态已开始具备恢复动作**：当 `classification / review status / usage policy` 把当前列表筛空时，Files 空态不再退回默认上传文案，而会明确提示 “当前治理筛选下没有匹配的文件”，展示当前生效的治理筛选，并提供一键或逐项清除筛选的恢复入口。
+- **治理筛选空态已开始具备恢复动作**：当 `classification / review status / usage policy / rights owner` 把当前列表筛空时，Files 空态不再退回默认上传文案，而会明确提示 “当前治理筛选下没有匹配的文件”，展示当前生效的治理筛选，并提供一键或逐项清除筛选的恢复入口。
 - **治理筛选状态条已开始带出结果规模**：当前 header 里生效的 `classification / review status / usage policy` 不再只显示 compact chips；同一条状态条现在还会补一个 “{{count}} matching files / {{count}} 个匹配文件” 的 summary，让用户在不展开 popover 的情况下也能快速判断筛选是否过窄。
-- **Files 多选已开始具备首批批量治理动作**：当前 Explorer 多选工具栏和 batch actions dropdown 已开始支持 `approve assets / archive assets`，并且 batch dropdown 还支持直接批量更新 `classification / usage policy`；reviewer 不再必须逐个点进 `FileDetail` 才能完成最常见的审核流转，这意味着 Files 资产治理已经从 “筛选 + 单条编辑” 进入 “最小批量操作闭环”。
+- **Files 多选已开始具备首批批量治理动作**：当前 Explorer 多选工具栏和 batch actions dropdown 已开始支持 `approve assets / archive assets`，并且 batch dropdown 还支持直接批量更新 `classification / review status / usage policy / rights owner`；reviewer 不再必须逐个点进 `FileDetail` 才能完成最常见的审核流转，这意味着 Files 资产治理已经从 “筛选 + 单条编辑” 进入 “最小批量操作闭环”。
+- **Files 批量治理入口已开始消费正式 capability contract**：列表查询现在会返回当前 scope 的 `governanceCapabilities`，Explorer header 和 batch actions dropdown 不再对所有成员无脑露出 `approve / archive`；没有相应能力的成员仍可做元数据治理，但不会再看到本就会被后端拒绝的高权限批量动作。
+- **Files 治理动作已开始落正式审计**：`updateFileAssetGovernance / approveFileAsset / archiveFileAsset` 现在会把 `classification / review status / usage policy / rights owner / metadata` 的变更写入 `content_audit_logs`，至少具备 “谁改了什么” 的服务端追踪基础，而不再只是把治理结果直接覆盖在 `file_assets` 上。
+- **FileDetail 已开始消费最近一次治理审计摘要**：`getFileAssetById` 现在会返回最近一次 `file_asset_*` 审计，`FileDetail` 会直接显示最近一次治理变更的动作、时间、操作者与变更字段；资产治理不再只有当前结果，没有最近变更上下文。
+- **FileDetail 已开始消费最近治理活动列表**：在最近一次摘要之外，`getFileAssetById` 现在还会返回最近几条 `file_asset_*` 审计；`FileDetail` 会把它们作为最小活动列表展示出来。Files 治理开始有真正可读的近端审计面，而不只是“最后一条是谁改的”。
+- **FileDetail 治理活动列表已开始支持按需展开**：最近治理活动不再固定截断在首批返回结果；详情面现在会在活动超过首批数量时显式露出 `Load More`，并通过独立 query 按需继续拉取后续 `file_asset_*` 审计，开始具备最小可用的治理活动流，而不只是静态摘要。
+- **FileDetail 治理活动已开始显示关键字段前后值**：对于 `classification / review status / usage policy / rights owner` 这类高频治理字段，活动列表不再只显示 “changedFields”；当前已经会直接展示 `before -> after` 的字段级变更内容，让 reviewer 在不展开原始审计 JSON 的情况下也能看懂具体改了什么。
+- **compact 列表 / 卡片已开始显式露出最近治理活动摘要**：`getKnowledgeItems / recentFiles` 现在会为文件返回最近一次 `file_asset_*` 审计的动作、时间与操作者摘要；当最近一次治理活动涉及 `classification / review status / usage policy / rights owner` 这类关键字段时，Explorer 列表、masonry 卡片和首页 Recent 资源还会直接带出首个关键字段的变更结果，而不再只剩 “何时被更新” 这一层薄摘要。
+- **List View 的治理摘要层级已与卡片面统一**：Files 列表行不再把最近治理活动挤进日期列；当前会把这类摘要放回主信息区的次信息层，与 recent / masonry 一致，避免更新时间和治理状态互相争抢同一列宽。
+- **React Native 资源面已开始消费 Files governance 最小 contract**：`apps/mobile` 的 `ResourceScreen` 不再只停留在旧 `FileListItem`；当前已经开始对齐 `assetClassification / review status / usage policy / version / rendition` 的 compact badge，并补上移动端治理筛选 sheet（`review status / usage policy / classification`），公开分享页的时间格式也已与 web 统一到 `YYYY-MM-DD HH:mm`。
 
 这说明：
 
@@ -45,6 +55,45 @@
 - 整体进度大致处于 **Phase 1 完成、Phase 2 部分完成、Phase 4 起步**。
 - `BlobProvider`、upload session、download/share/capability policy 与 `file_assets` sidecar 已经证明方案方向正确。
 - 但 “企业本地云” 的多 provider、加密元数据、保留策略，以及 `asset_versions / asset_renditions / asset_classifications` 的独立实体化仍未开始或只完成首版 surface。
+
+## 〇点五、收口口径（2026-04-06）
+
+这份方案后续按 **`Blob / Control Plane v1`** 收口，不以“把所有企业文件系统能力一次性实现完”为目标。
+
+本轮收口只要求以下能力稳定成立：
+
+- **Blob Provider 抽象成为唯一上传/下载/读写入口**
+  - 业务代码不再继续新增对 `PrivateBlobS3 / FileS3` 的散点直连
+- **`space_blobs + upload session + private object` 成为 canonical 文件落点**
+  - 新文件主链围绕 `space`、`storageKey`、`sha256` 与 `verified/quarantined` 工作
+- **`file_assets` 成为 Files 资产治理 sidecar**
+  - `classification / review status / usage policy / rights owner`
+  - 以及首版 `version / renditions` typed metadata
+- **Files 前台具备最小治理闭环**
+  - 列表治理筛选
+  - 详情治理编辑
+  - 批量治理动作
+  - 审计摘要与活动流
+
+以下内容明确不再阻塞本文收口，而是拆到后续演进：
+
+- **多 provider 正式产品化**
+  - 例如 MinIO / Ceph / 多租户 provider 切换
+- **企业保留 / 法务 / 加密治理**
+  - retention
+  - legal hold
+  - KMS / key hierarchy
+- **独立资产实体化**
+  - `asset_versions`
+  - `asset_renditions`
+  - `asset_classifications`
+- **完整异步处理平面**
+  - OCR / DLP / AV / transcoding 的正式流水线
+
+这份文档的收口含义应固定为：
+
+> **先把“对象存储不是业务模型，Control Plane 才是业务模型”这件事在代码里站稳。**\
+> **后续企业重能力继续拆专题文档推进。**
 
 ---
 

@@ -102,6 +102,7 @@ const FileEditorCanvas = memo<FileEditorProps>(({ onBack }) => {
                 )}
                 {resolvedFileDetail?.url && (
                   <ActionIcon
+                    aria-label={t('download', { ns: 'common' })}
                     icon={RESOURCE_ENTRY_ICONS.download}
                     title={t('download', { ns: 'common' })}
                     onClick={() => {
@@ -112,7 +113,9 @@ const FileEditorCanvas = memo<FileEditorProps>(({ onBack }) => {
                   />
                 )}
                 <ActionIcon
+                  aria-label={t('detail.basic.title', { ns: 'file' })}
                   icon={RESOURCE_ENTRY_ICONS.info}
+                  title={t('detail.basic.title', { ns: 'file' })}
                   onClick={() => setIsDetailModalOpen(true)}
                 />
               </Flexbox>

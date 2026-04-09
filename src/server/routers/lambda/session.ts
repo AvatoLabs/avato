@@ -202,10 +202,13 @@ export const sessionRouter = router({
 
       if (!sessionId) return [];
 
-      const [allFiles, assignedFiles] = await Promise.all([
+      const [allFiles, assignedFiles] = (await Promise.all([
         ctx.fileModel.getConversationAvailableFiles(),
         ctx.fileModel.getSessionAssignedFiles(sessionId),
-      ]);
+      ])) as [
+        Array<{ fileType: string; id: string; name: string }>,
+        Array<{ id: string }>,
+      ];
 
       const attachedFileIds = new Set(assignedFiles.map((file) => file.id));
 

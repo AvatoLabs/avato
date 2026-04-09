@@ -4,6 +4,7 @@ import {
   FileAssetRenditionKind,
   FileAssetReviewStatus,
   FileAssetUsagePolicy,
+  type FileAssetMetadata,
 } from '@lobechat/types';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -164,12 +165,12 @@ describe('FileAssetModel', () => {
           nestedLegacy: { keep: true },
           renditions: [
             { kind: FileAssetRenditionKind.Preview, label: ' Preview ' },
-            FileAssetRenditionKind.Web,
-            'invalid' as FileAssetRenditionKind,
+            { kind: FileAssetRenditionKind.Web },
+            'invalid' as unknown as NonNullable<FileAssetMetadata['renditions']>[number],
           ],
           tags: [' brand ', 'brand', 'approved'],
           version: { label: ' v2 ', variantOf: ' Brand System 2026 ' },
-        },
+        } as unknown as FileAssetMetadata,
         spaceId,
       });
 

@@ -185,18 +185,21 @@ describe('tableDocument', () => {
   });
 
   it('normalizes localized bugged auto-generated column names back to positional defaults', () => {
-    const translateSpy = vi.spyOn(i18n, 't').mockImplementation((key, options) => {
+    const translateSpy = vi.spyOn(i18n, 't').mockImplementation(((key: string, options?: any) => {
+      const normalizedOptions =
+        options && typeof options === 'object' ? (options as Record<string, any>) : undefined;
+
       if (key === 'docEditor.table.defaultColumnName') {
-        return `列 ${String(options?.index ?? '')}`.trim();
+        return `列 ${String(normalizedOptions?.index ?? '')}`.trim();
       }
       if (key === 'docEditor.table.primaryColumnName') return '名称';
       if (key === 'docEditor.table.sheetDefaultName') {
-        return `表 ${String(options?.index ?? '')}`.trim();
+        return `表 ${String(normalizedOptions?.index ?? '')}`.trim();
       }
       if (key === 'docEditor.table.untitledFieldName') return '未命名字段';
 
-      return String(options?.defaultValue ?? key);
-    });
+      return String(normalizedOptions?.defaultValue ?? key);
+    }) as any);
 
     try {
       const markdown = [

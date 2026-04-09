@@ -23,6 +23,10 @@ export const POST = async (req: Request) => {
   try {
     const json = await req.json();
     const payload = spaceMemoryHarnessIngestPayloadSchema.parse(json);
+    if (!payload.userId?.trim()) {
+      return NextResponse.json({ error: 'userId is required.' }, { status: 400 });
+    }
+
     const normalized = normalizeSpaceMemoryHarnessIngestPayload(payload);
 
     const intakeService = new SpaceMemoryIntakeService(await getServerDB(), payload.userId);

@@ -1,7 +1,6 @@
 import {
-  getSpaceMemorySurfaceContract,
-  getSpaceMemoryCapabilities,
-  getSpaceMemorySurface,
+  canManageSpaceMemoryFromContract,
+  resolveSpaceMemorySurfaceState,
   type SpaceMemoryAuditBatchBundle,
   spaceMemoryIngestOrigins,
   spaceMemorySections,
@@ -68,6 +67,25 @@ const requireAccessibleSpace = async (
   if (!space?.id) throw new TRPCError({ code: 'NOT_FOUND', message: 'SPACE_NOT_FOUND' });
 
   return space;
+};
+
+const requireReviewableSpaceState = async (
+  ctx: {
+    spaceModel: SpaceModel;
+  },
+  spaceId: string,
+) => {
+  const space = await requireAccessibleSpace(ctx, spaceId);
+  const state = resolveSpaceMemorySurfaceState(space);
+
+  if (!state.canReview) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_MEMORY_REVIEW_DENIED' });
+  }
+
+  return {
+    space,
+    state,
+  };
 };
 
 const emptyRecallSummary = {
@@ -151,14 +169,15 @@ const createAuditBundle = (params: {
 
 const sanitizeSummaryForViewer = <
   T extends {
-    canReview: boolean;
-    contract?: unknown;
+    contract?: Parameters<typeof canManageSpaceMemoryFromContract>[0];
     sections: Record<SpaceMemorySection, { count: number; recall: typeof emptyRecallSummary }>;
   },
 >(
   summary: T,
 ) => {
-  if (summary.canReview) return summary;
+  if (canManageSpaceMemoryFromContract(summary.contract)) return summary;
+
+  const visibleSections = new Set(summary.contract?.sections ?? spaceMemorySections);
 
   return {
     ...summary,
@@ -167,6 +186,7 @@ const sanitizeSummaryForViewer = <
         section,
         {
           ...summary.sections[section],
+          count: visibleSections.has(section) ? summary.sections[section].count : 0,
           recall: emptyRecallSummary,
         },
       ]),
@@ -175,7 +195,7 @@ const sanitizeSummaryForViewer = <
 };
 
 const sanitizeEntryForViewer = (entry: SpaceMemoryEntryPreview, canReview: boolean) => {
-  if (canReview || entry.kind === 'candidate') return entry;
+  if (canReview) return entry;
 
   return {
     ...entry,
@@ -290,15 +310,10 @@ export const spaceMemoryRouter = router({
     .input(z.object({ spaceId: z.string() }))
     .query(async ({ ctx, input }) => {
       const space = await requireAccessibleSpace(ctx, input.spaceId);
-      const { canCreate, canReview } = getSpaceMemoryCapabilities(space);
-      const surface = getSpaceMemorySurface(space);
-      const contract = getSpaceMemorySurfaceContract(surface);
+      const { contract, surface } = resolveSpaceMemorySurfaceState(space);
 
       return sanitizeSummaryForViewer({
         ...(await ctx.spaceMemoryModel.getSummary({
-          canCreate,
-          canPublish: canReview,
-          canReview,
           contract,
           id: space.id,
           kind: space.kind,
@@ -319,16 +334,14 @@ export const spaceMemoryRouter = router({
     )
     .query(async ({ ctx, input }) => {
       const space = await requireAccessibleSpace(ctx, input.spaceId);
-      const { canReview } = getSpaceMemoryCapabilities(space);
-      const surface = getSpaceMemorySurface(space);
-      const contract = getSpaceMemorySurfaceContract(surface);
+      const { canReview, contract, surface } = resolveSpaceMemorySurfaceState(space);
       const entry = await ctx.spaceMemoryModel.getEntry(input);
 
       if (!entry) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'SPACE_MEMORY_ENTRY_NOT_FOUND' });
       }
 
-      if (entry.kind === 'candidate' && !canReview) {
+      if (entry.kind === 'candidate' && !contract.canViewInbox) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_MEMORY_REVIEW_DENIED' });
       }
 
@@ -348,11 +361,10 @@ export const spaceMemoryRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const space = await requireAccessibleSpace(ctx, input.spaceId);
-      const { canReview } = getSpaceMemoryCapabilities(space);
-      if (!canReview) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_MEMORY_REVIEW_DENIED' });
-      }
+      const {
+        space,
+        state: { canReview },
+      } = await requireReviewableSpaceState(ctx, input.spaceId);
 
       const entry = requireExportableAuditEntry({
         canReview,
@@ -381,11 +393,10 @@ export const spaceMemoryRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const space = await requireAccessibleSpace(ctx, input.spaceId);
-      const { canReview } = getSpaceMemoryCapabilities(space);
-      if (!canReview) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_MEMORY_REVIEW_DENIED' });
-      }
+      const {
+        space,
+        state: { canReview },
+      } = await requireReviewableSpaceState(ctx, input.spaceId);
 
       const exportedAt = new Date().toISOString();
       const entries = await ctx.spaceMemoryModel.getEntriesByIds({
@@ -476,21 +487,23 @@ export const spaceMemoryRouter = router({
   listEntries: spaceMemoryProcedure
     .input(
       z.object({
+        recallFilter: recallFilterSchema.default('all'),
         section: spaceMemorySectionSchema,
         spaceId: z.string(),
       }),
     )
     .query(async ({ ctx, input }) => {
       const space = await requireAccessibleSpace(ctx, input.spaceId);
-      const { canReview } = getSpaceMemoryCapabilities(space);
-      const surface = getSpaceMemorySurface(space);
-      const contract = getSpaceMemorySurfaceContract(surface);
+      const { canReview, contract, surface } = resolveSpaceMemorySurfaceState(space);
 
-      if (input.section === 'inbox' && !canReview) {
+      if (input.section === 'inbox' && !contract.canViewInbox) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_MEMORY_REVIEW_DENIED' });
       }
 
-      const result = await ctx.spaceMemoryModel.listEntries(input);
+      const result = await ctx.spaceMemoryModel.listEntries({
+        ...input,
+        recallFilter: input.section === 'inbox' ? 'all' : input.recallFilter,
+      });
 
       if (canReview) {
         return {
@@ -518,12 +531,7 @@ export const spaceMemoryRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const space = await requireAccessibleSpace(ctx, input.spaceId);
-      const { canReview } = getSpaceMemoryCapabilities(space);
-
-      if (!canReview) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_MEMORY_REVIEW_DENIED' });
-      }
+      await requireReviewableSpaceState(ctx, input.spaceId);
 
       const archived = await ctx.spaceMemoryModel.archiveEntry({
         id: input.id,
@@ -556,12 +564,7 @@ export const spaceMemoryRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const space = await requireAccessibleSpace(ctx, input.spaceId);
-      const { canReview } = getSpaceMemoryCapabilities(space);
-
-      if (!canReview) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_MEMORY_REVIEW_DENIED' });
-      }
+      await requireReviewableSpaceState(ctx, input.spaceId);
 
       const archived = await ctx.spaceMemoryModel.archiveEntries({
         ids: input.ids,
@@ -606,12 +609,7 @@ export const spaceMemoryRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const space = await requireAccessibleSpace(ctx, input.spaceId);
-      const { canReview } = getSpaceMemoryCapabilities(space);
-
-      if (!canReview) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_MEMORY_REVIEW_DENIED' });
-      }
+      await requireReviewableSpaceState(ctx, input.spaceId);
 
       const merged = await ctx.spaceMemoryModel.mergeCandidateIntoPublishedEntry({
         candidateId: input.candidateId,
@@ -647,12 +645,7 @@ export const spaceMemoryRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const space = await requireAccessibleSpace(ctx, input.spaceId);
-      const { canReview } = getSpaceMemoryCapabilities(space);
-
-      if (!canReview) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_MEMORY_REVIEW_DENIED' });
-      }
+      await requireReviewableSpaceState(ctx, input.spaceId);
 
       const published = await ctx.spaceMemoryModel.publishEntry({
         id: input.id,
@@ -685,12 +678,7 @@ export const spaceMemoryRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const space = await requireAccessibleSpace(ctx, input.spaceId);
-      const { canReview } = getSpaceMemoryCapabilities(space);
-
-      if (!canReview) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_MEMORY_REVIEW_DENIED' });
-      }
+      await requireReviewableSpaceState(ctx, input.spaceId);
 
       const published = await ctx.spaceMemoryModel.publishEntries({
         ids: input.ids,
@@ -726,12 +714,7 @@ export const spaceMemoryRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const space = await requireAccessibleSpace(ctx, input.spaceId);
-      const { canReview } = getSpaceMemoryCapabilities(space);
-
-      if (!canReview) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_MEMORY_REVIEW_DENIED' });
-      }
+      await requireReviewableSpaceState(ctx, input.spaceId);
 
       const marked = await ctx.spaceMemoryModel.markPublishedEntriesStale({
         ids: input.ids,
@@ -767,12 +750,7 @@ export const spaceMemoryRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const space = await requireAccessibleSpace(ctx, input.spaceId);
-      const { canReview } = getSpaceMemoryCapabilities(space);
-
-      if (!canReview) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_MEMORY_REVIEW_DENIED' });
-      }
+      await requireReviewableSpaceState(ctx, input.spaceId);
 
       const revalidated = await ctx.spaceMemoryModel.revalidatePublishedEntries({
         ids: input.ids,
@@ -808,12 +786,7 @@ export const spaceMemoryRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const space = await requireAccessibleSpace(ctx, input.spaceId);
-      const { canReview } = getSpaceMemoryCapabilities(space);
-
-      if (!canReview) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_MEMORY_REVIEW_DENIED' });
-      }
+      await requireReviewableSpaceState(ctx, input.spaceId);
 
       const updated = await ctx.spaceMemoryModel.updatePublishedRecallPolicy({
         expiresAt: input.expiresAt,

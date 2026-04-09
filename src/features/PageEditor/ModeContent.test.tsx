@@ -25,7 +25,10 @@ const { documentStoreApi, markdownMock, tableSheetMock, useDocumentStoreMock } =
     syncExternalDocumentContent: vi.fn(),
   },
   markdownMock: vi.fn(({ children }: any) => <div data-testid="markdown-preview">{children}</div>),
-  tableSheetMock: vi.fn(() => <div data-testid="table-sheet" />),
+  tableSheetMock: vi.fn((props: any) => {
+    void props;
+    return <div data-testid="table-sheet" />;
+  }),
   useDocumentStoreMock: Object.assign(
     vi.fn((selector: (state: MockDocumentState) => unknown) => selector(mockDocumentState)),
     {
@@ -159,6 +162,7 @@ describe('ModeContent', () => {
       | ((value: string) => void)
       | undefined;
 
+    expect(onMarkdownCommit).toEqual(expect.any(Function));
     onMarkdownCommit?.('| Name |\n| --- |\n| RealBug |');
 
     expect(documentStoreApi.syncExternalDocumentContent).toHaveBeenCalledWith('doc-1', {

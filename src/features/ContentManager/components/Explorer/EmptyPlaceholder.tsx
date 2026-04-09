@@ -1,7 +1,7 @@
 import { Center, FileTypeIcon, Flexbox, Icon, Text } from '@lobehub/ui';
 import { Upload } from 'antd';
 import { createStaticStyles, cssVar, cx } from 'antd-style';
-import { BrainCircuitIcon, FilterXIcon, XIcon } from 'lucide-react';
+import { BrainCircuitIcon, FilterXIcon, SlidersHorizontal, XIcon } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -29,6 +29,16 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     font-size: 16px;
     color: ${cssVar.colorText};
   `,
+  actionGrid: css`
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    width: 100%;
+
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+    }
+  `,
   card: css`
     touch-action: manipulation;
     cursor: pointer;
@@ -37,11 +47,11 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 
     overflow: hidden;
 
-    width: 200px;
-    height: 140px;
+    width: 100%;
+    min-height: 148px;
     padding: 16px;
     border: 1px solid ${cssVar.colorBorderSecondary};
-    border-radius: ${cssVar.borderRadiusLG};
+    border-radius: calc(${cssVar.borderRadiusLG} + 4px);
 
     font: inherit;
     font-weight: 500;
@@ -91,6 +101,19 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     width: 100%;
     height: 100%;
   `,
+  intro: css`
+    display: grid;
+    gap: 10px;
+    width: min(640px, 100%);
+    text-align: center;
+  `,
+  introEyebrow: css`
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: ${cssVar.colorTextSecondary};
+  `,
   glow: css`
     position: absolute;
     inset-block-end: -12px;
@@ -116,10 +139,15 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     justify-content: center;
   `,
   governanceFiltersSummary: css`
-    gap: 8px;
+    gap: 10px;
     align-items: center;
     width: min(560px, 100%);
+    padding: 14px 16px;
+    border: 1px solid ${cssVar.colorBorderSecondary};
+    border-radius: calc(${cssVar.borderRadiusLG} + 4px);
     text-align: center;
+
+    background: color-mix(in srgb, ${cssVar.colorFillSecondary} 76%, ${cssVar.colorBgContainer});
   `,
   governanceFilterChip: css`
     display: inline-flex;
@@ -163,12 +191,52 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
       outline-offset: 2px;
     }
   `,
+  governanceFilterActions: css`
+    gap: 4px;
+    align-items: center;
+  `,
+  governanceFilterActionButton: css`
+    cursor: pointer;
+
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+
+    padding: 0;
+    border: 0;
+
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: ${cssVar.colorTextSecondary};
+
+    appearance: none;
+    background: transparent;
+
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: ${cssVar.colorText};
+    }
+
+    &:focus-visible {
+      outline: 2px solid ${cssVar.colorPrimary};
+      outline-offset: 2px;
+      border-radius: 999px;
+    }
+  `,
   governanceFilterMeta: css`
     font-size: 12px;
     color: ${cssVar.colorTextSecondary};
   `,
   governanceFilterValue: css`
     color: ${cssVar.colorTextSecondary};
+  `,
+  shell: css`
+    display: grid;
+    gap: 18px;
+    width: min(980px, 100%);
+    padding: clamp(20px, 4vw, 36px);
   `,
 }));
 
@@ -181,9 +249,17 @@ const EmptyPlaceholder = memo(() => {
 
   const pushDockFileList = useFileStore((s) => s.pushDockFileList);
 
-  const [assetClassification, assetReviewStatus, assetUsagePolicy, sourceSetId, spaceId] =
+  const [
+    assetClassification,
+    assetRightsOwner,
+    assetReviewStatus,
+    assetUsagePolicy,
+    sourceSetId,
+    spaceId,
+  ] =
     useContentManagerStore((s) => [
       s.assetClassification,
+      s.assetRightsOwner,
       s.assetReviewStatus,
       s.assetUsagePolicy,
       s.sourceSetId,
@@ -199,6 +275,8 @@ const EmptyPlaceholder = memo(() => {
   const currentSpace = spaces?.find((space) => space.id === spaceId);
   const { pendingGovernanceCountBySpaceId, pendingGovernanceTargetBySpaceId, spaceSummaryMap } =
     useTeamSpaceMemoryScopeSummaries(currentSpace ? [currentSpace] : undefined);
+  const translateText = (key: string, options?: Record<string, any>) =>
+    t(key as any, options as any) as string;
   const spaceMemorySummary = spaceId ? spaceSummaryMap.get(spaceId) : undefined;
   const canReviewSpaceMemory = canReviewSpaceMemorySummary(spaceMemorySummary);
   const pendingCount = spaceId ? (pendingGovernanceCountBySpaceId.get(spaceId) ?? 0) : 0;
@@ -206,37 +284,51 @@ const EmptyPlaceholder = memo(() => {
   const showOpenSpaceMemoryAction =
     currentSpace?.kind === 'team' && !!spaceMemorySummary && !canReviewSpaceMemory;
   const hasGovernanceFilters = Boolean(
-    assetClassification || assetReviewStatus || assetUsagePolicy,
+    assetClassification || assetRightsOwner || assetReviewStatus || assetUsagePolicy,
   );
   const governanceFilterItems = useMemo(() => {
-    const items = [];
+    const items: Array<{ label: string; queryKey: string; value: string }> = [];
 
     if (assetClassification) {
       items.push({
-        label: t('detail.asset.classification.label'),
+        label: translateText('detail.asset.classification.label'),
         queryKey: 'assetClassification',
-        value: t(`detail.asset.classification.${assetClassification}`),
+        value: translateText(`detail.asset.classification.${assetClassification}`),
+      });
+    }
+
+    if (assetRightsOwner) {
+      items.push({
+        label: translateText('detail.asset.rightsOwner.label'),
+        queryKey: 'assetRightsOwner',
+        value: assetRightsOwner,
       });
     }
 
     if (assetReviewStatus) {
       items.push({
-        label: t('detail.asset.reviewStatus.label'),
+        label: translateText('detail.asset.reviewStatus.label'),
         queryKey: 'assetReviewStatus',
-        value: t(`detail.asset.reviewStatus.${assetReviewStatus}`),
+        value: translateText(`detail.asset.reviewStatus.${assetReviewStatus}`),
       });
     }
 
     if (assetUsagePolicy) {
       items.push({
-        label: t('detail.asset.usagePolicy.label'),
+        label: translateText('detail.asset.usagePolicy.label'),
         queryKey: 'assetUsagePolicy',
-        value: t(`detail.asset.usagePolicy.${assetUsagePolicy}`),
+        value: translateText(`detail.asset.usagePolicy.${assetUsagePolicy}`),
       });
     }
 
     return items;
-  }, [assetClassification, assetReviewStatus, assetUsagePolicy, t]);
+  }, [
+    assetClassification,
+    assetRightsOwner,
+    assetReviewStatus,
+    assetUsagePolicy,
+    translateText,
+  ]);
 
   const { open } = useCreateSourceSetModal();
 
@@ -249,8 +341,22 @@ const EmptyPlaceholder = memo(() => {
   const clearGovernanceFilters = () => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('assetClassification');
+    nextParams.delete('assetRightsOwner');
     nextParams.delete('assetReviewStatus');
     nextParams.delete('assetUsagePolicy');
+
+    const query = nextParams.toString();
+    navigate(query ? `${location.pathname}?${query}` : location.pathname);
+  };
+
+  const openGovernanceFilters = (focusFilter?: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('openGovernance', '1');
+    if (focusFilter) {
+      nextParams.set('focusGovernance', focusFilter);
+    } else {
+      nextParams.delete('focusGovernance');
+    }
 
     const query = nextParams.toString();
     navigate(query ? `${location.pathname}?${query}` : location.pathname);
@@ -266,185 +372,234 @@ const EmptyPlaceholder = memo(() => {
 
   return (
     <Center gap={24} height={'100%'} style={{ paddingBottom: 100 }} width={'100%'}>
-      <Flexbox justify={'center'} style={{ textAlign: 'center' }}>
-        <Text as={'h4'}>
-          {hasGovernanceFilters ? t('filters.empty.title') : t('FileManager.emptyStatus.title')}
-        </Text>
-        <Text type={'secondary'}>
-          {hasGovernanceFilters ? t('filters.empty.description') : t('FileManager.emptyStatus.or')}
-        </Text>
-      </Flexbox>
-      {hasGovernanceFilters && (
-        <Flexbox className={styles.governanceFiltersSummary}>
-          <Text className={styles.governanceFilterMeta}>{t('filters.empty.activeTitle')}</Text>
-          <Flexbox horizontal className={styles.governanceFilters} wrap={'wrap'}>
-            {governanceFilterItems.map((item) => (
-              <button
-                className={styles.governanceFilterChip}
-                key={item.queryKey}
-                type="button"
-                aria-label={t('filters.clearGovernanceFilter', {
-                  label: `${item.label}: ${item.value}`,
-                })}
-                onClick={() => clearGovernanceFilter(item.queryKey)}
-              >
-                <span>{item.label}:</span>
-                <span className={styles.governanceFilterValue}>{item.value}</span>
-                <Icon icon={XIcon} size={{ fontSize: 12 }} />
-              </button>
-            ))}
-          </Flexbox>
+      <div className={styles.shell}>
+        <Flexbox className={styles.intro} justify={'center'}>
+          {!hasGovernanceFilters && (
+            <Text className={styles.introEyebrow}>{t('FileManager.emptyStatus.title')}</Text>
+          )}
+          <Text as={'h4'}>
+            {hasGovernanceFilters
+              ? translateText('filters.empty.title')
+              : t('FileManager.emptyStatus.title')}
+          </Text>
+          <Text type={'secondary'}>
+            {hasGovernanceFilters
+              ? translateText('filters.empty.description')
+              : t('FileManager.emptyStatus.or')}
+          </Text>
         </Flexbox>
-      )}
-      <Flexbox gap={12} horizontal={!isMobile}>
         {hasGovernanceFilters && (
-          <button
-            className={cx(styles.card, styles.cardButton)}
-            type="button"
-            onClick={clearGovernanceFilters}
-          >
-            <Flexbox className={styles.cardContent}>
-              <span className={styles.actionTitle}>{t('filters.clearGovernance')}</span>
-              <div className={styles.glow} style={{ background: accentColors[0] }} />
-              <FileTypeIcon
-                aria-hidden
-                className={styles.icon}
-                color={accentColors[0]}
-                icon={<Icon color={cssVar.colorTextLightSolid} icon={FilterXIcon} />}
-                size={ICON_SIZE}
-              />
+          <Flexbox className={styles.governanceFiltersSummary}>
+            <Text className={styles.governanceFilterMeta}>
+              {translateText('filters.empty.activeTitle')}
+            </Text>
+            <Flexbox horizontal className={styles.governanceFilters} wrap={'wrap'}>
+              {governanceFilterItems.map((item) => (
+                <div className={styles.governanceFilterChip} key={item.queryKey}>
+                  <span>{item.label}:</span>
+                  <span className={styles.governanceFilterValue}>{item.value}</span>
+                  <Flexbox className={styles.governanceFilterActions} horizontal>
+                    <button
+                      className={styles.governanceFilterActionButton}
+                      type="button"
+                      aria-label={translateText('filters.adjustGovernanceFilter', {
+                        label: `${item.label}: ${item.value}`,
+                      })}
+                      onClick={() => openGovernanceFilters(item.queryKey)}
+                    >
+                      <Icon icon={SlidersHorizontal} size={12} />
+                      <span>{translateText('filters.adjustGovernance')}</span>
+                    </button>
+                    <button
+                      className={styles.governanceFilterActionButton}
+                      type="button"
+                      aria-label={translateText('filters.clearGovernanceFilter', {
+                        label: `${item.label}: ${item.value}`,
+                      })}
+                      onClick={() => clearGovernanceFilter(item.queryKey)}
+                    >
+                      <Icon icon={XIcon} size={12} />
+                    </button>
+                  </Flexbox>
+                </div>
+              ))}
             </Flexbox>
-          </button>
+          </Flexbox>
         )}
-        {currentSpace?.kind === 'team' && pendingCount > 0 && pendingTarget && (
-          <button
-            className={cx(styles.card, styles.cardButton)}
-            type="button"
-            onClick={() => navigate(buildPendingGovernancePath(currentSpace.id, pendingTarget))}
-          >
-            <Flexbox className={styles.cardContent}>
-              <span className={styles.actionTitle}>
-                {t('space.home.recall.actions.review', { count: pendingCount, ns: 'file' })}
-              </span>
-              <div className={styles.glow} style={{ background: accentColors[0] }} />
-              <FileTypeIcon
-                aria-hidden
-                className={styles.icon}
-                color={accentColors[0]}
-                icon={<Icon color={cssVar.colorTextLightSolid} icon={BrainCircuitIcon} />}
-                size={ICON_SIZE}
-              />
-            </Flexbox>
-          </button>
-        )}
-        {showOpenSpaceMemoryAction && (
-          <button
-            className={cx(styles.card, styles.cardButton)}
-            type="button"
-            onClick={() => navigate(buildSpaceMemoryPath(currentSpace.id))}
-          >
-            <Flexbox className={styles.cardContent}>
-              <span className={styles.actionTitle}>
-                {t('space.home.recall.actions.open', { ns: 'file' })}
-              </span>
-              <div className={styles.glow} style={{ background: accentColors[0] }} />
-              <FileTypeIcon
-                aria-hidden
-                className={styles.icon}
-                color={accentColors[0]}
-                icon={<Icon color={cssVar.colorTextLightSolid} icon={BrainCircuitIcon} />}
-                size={ICON_SIZE}
-              />
-            </Flexbox>
-          </button>
-        )}
-        {!sourceSetId && (
-          <button
-            className={cx(styles.card, styles.cardButton)}
-            type="button"
-            onClick={() => {
-              open({ spaceId });
-            }}
-          >
-            <Flexbox className={styles.cardContent}>
-              <span className={styles.actionTitle}>
-                {t('FileManager.emptyStatus.actions.sourceSet')}
-              </span>
-              <div className={styles.glow} style={{ background: accentColors[0] }} />
-              <FileTypeIcon
-                aria-hidden
-                className={styles.icon}
-                color={accentColors[0]}
-                icon={<Icon color={cssVar.colorTextLightSolid} icon={RESOURCE_ENTRY_ICONS.plus} />}
-                size={ICON_SIZE}
-                type={'folder'}
-              />
-            </Flexbox>
-          </button>
-        )}
-        <Upload
-          multiple={true}
-          showUploadList={false}
-          beforeUpload={async (file) => {
-            await pushDockFileList([file], sourceSetId, undefined, spaceId);
-
-            return false;
-          }}
-        >
-          <button className={cx(styles.card, styles.cardButton)} type="button">
-            <Flexbox className={styles.cardContent}>
-              <span className={styles.actionTitle}>
-                {t('FileManager.emptyStatus.actions.file')}
-              </span>
-              <div className={styles.glow} style={{ background: accentColors[1] }} />
-              <FileTypeIcon
-                aria-hidden
-                className={styles.icon}
-                color={accentColors[1]}
-                size={ICON_SIZE}
-                icon={
-                  <Icon
-                    color={cssVar.colorTextLightSolid}
-                    icon={RESOURCE_ENTRY_ICONS.uploadArrow}
+        <div className={styles.actionGrid}>
+        {hasGovernanceFilters ? (
+          <>
+            <button
+              className={cx(styles.card, styles.cardButton)}
+              type="button"
+              onClick={() => openGovernanceFilters()}
+            >
+              <Flexbox className={styles.cardContent}>
+                <span className={styles.actionTitle}>
+                  {translateText('filters.adjustGovernance')}
+                </span>
+                <div className={styles.glow} style={{ background: accentColors[0] }} />
+                <FileTypeIcon
+                  aria-hidden
+                  className={styles.icon}
+                  color={accentColors[0]}
+                  icon={<Icon color={cssVar.colorTextLightSolid} icon={SlidersHorizontal} />}
+                  size={ICON_SIZE}
+                />
+              </Flexbox>
+            </button>
+            <button
+              className={cx(styles.card, styles.cardButton)}
+              type="button"
+              onClick={clearGovernanceFilters}
+            >
+              <Flexbox className={styles.cardContent}>
+                <span className={styles.actionTitle}>{translateText('filters.clearGovernance')}</span>
+                <div className={styles.glow} style={{ background: accentColors[1] }} />
+                <FileTypeIcon
+                  aria-hidden
+                  className={styles.icon}
+                  color={accentColors[1]}
+                  icon={<Icon color={cssVar.colorTextLightSolid} icon={FilterXIcon} />}
+                  size={ICON_SIZE}
+                />
+              </Flexbox>
+            </button>
+          </>
+        ) : (
+          <>
+            {currentSpace?.kind === 'team' && pendingCount > 0 && pendingTarget && (
+              <button
+                className={cx(styles.card, styles.cardButton)}
+                type="button"
+                onClick={() => navigate(buildPendingGovernancePath(currentSpace.id, pendingTarget))}
+              >
+                <Flexbox className={styles.cardContent}>
+                  <span className={styles.actionTitle}>
+                    {t('space.home.recall.actions.review', { count: pendingCount, ns: 'file' })}
+                  </span>
+                  <div className={styles.glow} style={{ background: accentColors[0] }} />
+                  <FileTypeIcon
+                    aria-hidden
+                    className={styles.icon}
+                    color={accentColors[0]}
+                    icon={<Icon color={cssVar.colorTextLightSolid} icon={BrainCircuitIcon} />}
+                    size={ICON_SIZE}
                   />
-                }
-              />
-            </Flexbox>
-          </button>
-        </Upload>
-        <Upload
-          directory
-          multiple={true}
-          showUploadList={false}
-          beforeUpload={async (file) => {
-            await pushDockFileList([file], sourceSetId, undefined, spaceId);
-
-            return false;
-          }}
-        >
-          <button className={cx(styles.card, styles.cardButton)} type="button">
-            <Flexbox className={styles.cardContent}>
-              <span className={styles.actionTitle}>
-                {t('FileManager.emptyStatus.actions.folder')}
-              </span>
-              <div className={styles.glow} style={{ background: accentColors[2] }} />
-              <FileTypeIcon
-                aria-hidden
-                className={styles.icon}
-                color={accentColors[2]}
-                size={ICON_SIZE}
-                type={'folder'}
-                icon={
-                  <Icon
-                    color={cssVar.colorTextLightSolid}
-                    icon={RESOURCE_ENTRY_ICONS.uploadArrow}
+                </Flexbox>
+              </button>
+            )}
+            {showOpenSpaceMemoryAction && (
+              <button
+                className={cx(styles.card, styles.cardButton)}
+                type="button"
+                onClick={() => navigate(buildSpaceMemoryPath(currentSpace.id))}
+              >
+                <Flexbox className={styles.cardContent}>
+                  <span className={styles.actionTitle}>
+                    {t('space.home.recall.actions.open', { ns: 'file' })}
+                  </span>
+                  <div className={styles.glow} style={{ background: accentColors[0] }} />
+                  <FileTypeIcon
+                    aria-hidden
+                    className={styles.icon}
+                    color={accentColors[0]}
+                    icon={<Icon color={cssVar.colorTextLightSolid} icon={BrainCircuitIcon} />}
+                    size={ICON_SIZE}
                   />
-                }
-              />
-            </Flexbox>
-          </button>
-        </Upload>
-      </Flexbox>
+                </Flexbox>
+              </button>
+            )}
+            {!sourceSetId && (
+              <button
+                className={cx(styles.card, styles.cardButton)}
+                type="button"
+                onClick={() => {
+                  open({ spaceId });
+                }}
+              >
+                <Flexbox className={styles.cardContent}>
+                  <span className={styles.actionTitle}>
+                    {t('FileManager.emptyStatus.actions.sourceSet')}
+                  </span>
+                  <div className={styles.glow} style={{ background: accentColors[0] }} />
+                  <FileTypeIcon
+                    aria-hidden
+                    className={styles.icon}
+                    color={accentColors[0]}
+                    icon={<Icon color={cssVar.colorTextLightSolid} icon={RESOURCE_ENTRY_ICONS.plus} />}
+                    size={ICON_SIZE}
+                    type={'folder'}
+                  />
+                </Flexbox>
+              </button>
+            )}
+            <Upload
+              multiple={true}
+              showUploadList={false}
+              beforeUpload={async (file) => {
+                await pushDockFileList([file], sourceSetId, undefined, spaceId);
+
+                return false;
+              }}
+            >
+              <button className={cx(styles.card, styles.cardButton)} type="button">
+                <Flexbox className={styles.cardContent}>
+                  <span className={styles.actionTitle}>
+                    {t('FileManager.emptyStatus.actions.file')}
+                  </span>
+                  <div className={styles.glow} style={{ background: accentColors[1] }} />
+                  <FileTypeIcon
+                    aria-hidden
+                    className={styles.icon}
+                    color={accentColors[1]}
+                    size={ICON_SIZE}
+                    icon={
+                      <Icon
+                        color={cssVar.colorTextLightSolid}
+                        icon={RESOURCE_ENTRY_ICONS.uploadArrow}
+                      />
+                    }
+                  />
+                </Flexbox>
+              </button>
+            </Upload>
+            <Upload
+              directory
+              multiple={true}
+              showUploadList={false}
+              beforeUpload={async (file) => {
+                await pushDockFileList([file], sourceSetId, undefined, spaceId);
+
+                return false;
+              }}
+            >
+              <button className={cx(styles.card, styles.cardButton)} type="button">
+                <Flexbox className={styles.cardContent}>
+                  <span className={styles.actionTitle}>
+                    {t('FileManager.emptyStatus.actions.folder')}
+                  </span>
+                  <div className={styles.glow} style={{ background: accentColors[2] }} />
+                  <FileTypeIcon
+                    aria-hidden
+                    className={styles.icon}
+                    color={accentColors[2]}
+                    size={ICON_SIZE}
+                    type={'folder'}
+                    icon={
+                      <Icon
+                        color={cssVar.colorTextLightSolid}
+                        icon={RESOURCE_ENTRY_ICONS.uploadArrow}
+                      />
+                    }
+                  />
+                </Flexbox>
+              </button>
+            </Upload>
+          </>
+        )}
+        </div>
+      </div>
     </Center>
   );
 });

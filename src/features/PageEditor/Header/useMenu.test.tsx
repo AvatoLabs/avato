@@ -20,7 +20,28 @@ const domMocks = vi.hoisted(() => ({
 const mockMessage = vi.hoisted(() => ({
   error: vi.fn(),
   success: vi.fn(),
+  warning: vi.fn(),
 }));
+const mockModalConfirm = vi.hoisted(() => vi.fn());
+const sourceSetState = vi.hoisted(() => ({
+  value: [] as Array<{ id: string; name: string; spaceId?: string }>,
+}));
+const pageDocumentsState = vi.hoisted(() => ({
+  value: [
+    {
+      id: 'doc_1',
+      sourceSetId: null as string | null,
+      spaceId: 'spc_team',
+      title: 'Audit Spec',
+    },
+  ],
+}));
+const addChatContextSelectionMock = vi.hoisted(() => vi.fn());
+const openShareModalMock = vi.hoisted(() => vi.fn());
+const revealChatContextPanelMock = vi.hoisted(() => vi.fn());
+const removeFilesFromSourceSetMock = vi.hoisted(() => vi.fn());
+const addFilesToSourceSetMock = vi.hoisted(() => vi.fn());
+const moveContentItemMock = vi.hoisted(() => vi.fn());
 
 let mockStoreApiState: any;
 
@@ -37,7 +58,7 @@ vi.mock('antd', () => ({
     useApp: () => ({
       message: mockMessage,
       modal: {
-        confirm: vi.fn(),
+        confirm: mockModalConfirm,
       },
     }),
   },
@@ -72,7 +93,20 @@ vi.mock('@/config/contentIcons', () => ({
 }));
 
 vi.mock('@/features/ResourceSpaces/spaceMemoryCapabilities', () => ({
-  canCreateSpaceMemory: () => false,
+  resolveSpaceMemorySurfaceState: () => ({
+    canCreate: false,
+    canReview: false,
+    contract: {
+      canAccessAudit: false,
+      canCreate: false,
+      canManageRecall: false,
+      canViewInbox: false,
+      detailViews: ['overview'],
+      recallFilters: ['all'],
+      sections: ['published', 'playbooks', 'policies'],
+    },
+    surface: 'viewer',
+  }),
 }));
 
 vi.mock('@/features/ResourceSpaces/useOpenCreateSpaceMemoryCandidateModal', () => ({
@@ -83,6 +117,16 @@ vi.mock('@/features/ResourceSpaces/useSpaceItem', () => ({
   useSpaceItem: () => ({
     space: undefined,
   }),
+}));
+
+vi.mock('@/features/ResourceSharing', () => ({
+  useResourceShareModal: () => ({
+    open: openShareModalMock,
+  }),
+}));
+
+vi.mock('@/features/ChatInput/utils/revealChatContextPanel', () => ({
+  revealChatContextPanel: revealChatContextPanelMock,
 }));
 
 vi.mock('@/libs/trpc/client', () => ({
@@ -102,14 +146,7 @@ vi.mock('@/store/docs', () => ({
   },
   usePageStore: (selector: any) =>
     selector({
-      documents: [
-        {
-          id: 'doc_1',
-          spaceId: 'spc_team',
-          sourceSetId: null,
-          title: 'Audit Spec',
-        },
-      ],
+      documents: pageDocumentsState.value,
       internal_dispatchDocuments: vi.fn(),
       refreshDocuments: vi.fn(),
     }),
@@ -131,8 +168,9 @@ vi.mock('@/store/document/slices/editor', () => ({
 vi.mock('@/store/file', () => ({
   useFileStore: (selector: any) =>
     selector({
+      addChatContextSelection: addChatContextSelectionMock,
       duplicateDocument: vi.fn(),
-      moveContentItem: vi.fn(),
+      moveContentItem: moveContentItemMock,
     }),
 }));
 
@@ -152,9 +190,9 @@ vi.mock('@/store/global/selectors', () => ({
 vi.mock('@/store/sourceSet', () => ({
   useSourceSetStore: (selector: any) =>
     selector({
-      addFilesToSourceSet: vi.fn(),
-      removeFilesFromSourceSet: vi.fn(),
-      useFetchSourceSetList: () => ({ data: [] }),
+      addFilesToSourceSet: addFilesToSourceSetMock,
+      removeFilesFromSourceSet: removeFilesFromSourceSetMock,
+      useFetchSourceSetList: () => ({ data: sourceSetState.value }),
     }),
 }));
 
@@ -183,6 +221,18 @@ vi.mock('../store', () => ({
 describe('useMenu', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sourceSetState.value = [];
+    pageDocumentsState.value = [
+      {
+        id: 'doc_1',
+        sourceSetId: null,
+        spaceId: 'spc_team',
+        title: 'Audit Spec',
+      },
+    ];
+    addFilesToSourceSetMock.mockResolvedValue(undefined);
+    moveContentItemMock.mockResolvedValue(undefined);
+    removeFilesFromSourceSetMock.mockResolvedValue(undefined);
 
     trpcMocks.recordContentExport.mockResolvedValue({ success: true });
     mockStoreApiState = {
@@ -263,5 +313,76 @@ describe('useMenu', () => {
     expect(trpcMocks.recordContentExport).toHaveBeenCalledTimes(1);
     expect(domMocks.linkClick).toHaveBeenCalledTimes(1);
     expect(mockMessage.success).toHaveBeenCalledWith('docEditor.exportSuccess');
+  });
+
+  it('shares the current document through the canonical document identity', () => {
+    const { result } = renderHook(() => useMenu());
+
+    const shareAction = result.current.menuItems.find((item: any) => item?.key === 'share');
+
+    expect(shareAction).toBeTruthy();
+    shareAction.onClick();
+
+    expect(openShareModalMock).toHaveBeenCalledWith({
+      id: 'doc_1',
+      kind: 'document',
+      name: 'Audit Spec',
+    });
+  });
+
+  it('adds the current document to chat context from the editor menu', async () => {
+    const { result } = renderHook(() => useMenu());
+
+    const action = result.current.menuItems.find((item: any) => item?.key === 'add-to-chat-context');
+
+    expect(action?.label).toBe('actions.addToChatContext');
+
+    await act(async () => {
+      await action.onClick();
+    });
+
+    expect(addChatContextSelectionMock).toHaveBeenCalledWith({
+      content: '# Audit Spec',
+      docId: 'doc_1',
+      format: 'markdown',
+      id: 'document-context-doc_1',
+      preview: 'Audit Spec',
+      title: 'Audit Spec',
+      type: 'text',
+    });
+    expect(revealChatContextPanelMock).toHaveBeenCalledTimes(1);
+    expect(mockMessage.success).toHaveBeenCalledWith('actions.addToChatContextSuccess');
+  });
+
+  it('warns when moving a page to a source set that already contains it', async () => {
+    pageDocumentsState.value = [
+      {
+        id: 'doc_1',
+        sourceSetId: 'source-set-1',
+        spaceId: 'spc_team',
+        title: 'Audit Spec',
+      },
+    ];
+    sourceSetState.value = [
+      { id: 'source-set-1', name: 'Current', spaceId: 'spc_team' },
+      { id: 'source-set-2', name: 'Target', spaceId: 'spc_team' },
+    ];
+    addFilesToSourceSetMock.mockRejectedValue({ data: { code: 'CONFLICT' } });
+
+    const { result } = renderHook(() => useMenu());
+
+    const moveActionGroup = result.current.menuItems.find(
+      (item: any) => item?.key === 'move-to-source-set',
+    );
+    const moveAction = moveActionGroup.children[0];
+
+    await act(async () => {
+      await moveAction.onClick();
+    });
+
+    expect(removeFilesFromSourceSetMock).toHaveBeenCalledWith('source-set-1', ['doc_1']);
+    expect(moveContentItemMock).toHaveBeenCalledWith('doc_1', null);
+    expect(addFilesToSourceSetMock).toHaveBeenCalledWith('source-set-2', ['doc_1']);
+    expect(mockMessage.warning).toHaveBeenCalledWith('addToSourceSet.alreadyExists');
   });
 });

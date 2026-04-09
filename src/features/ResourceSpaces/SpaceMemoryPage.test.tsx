@@ -5,8 +5,11 @@ import type {
   SpaceMemoryEntryResult,
   SpaceMemoryEntryPreview,
   SpaceMemorySectionResult,
+  SpaceMemorySectionSummary,
+  SpaceMemorySurfaceContract,
   SpaceMemorySummary,
 } from '@lobechat/types';
+import { getSpaceMemorySurfaceContract } from '@lobechat/types';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -17,6 +20,7 @@ const {
   exportJSONFileMock,
   exportAuditBundleQuery,
   exportAuditBundlesQuery,
+  memorySidebarPortalMock,
   mergeEntryMutate,
   messageApi,
   mutateMock,
@@ -35,6 +39,7 @@ const {
   exportJSONFileMock: vi.fn(),
   exportAuditBundleQuery: vi.fn(),
   exportAuditBundlesQuery: vi.fn(),
+  memorySidebarPortalMock: vi.fn(),
   mergeEntryMutate: vi.fn(),
   messageApi: {
     error: vi.fn(),
@@ -383,8 +388,15 @@ vi.mock('@/store/user/slices/auth/selectors', () => ({
   },
 }));
 
-vi.mock('./MemoryScopeSection', () => ({
-  default: () => <div>MemoryScopeSection</div>,
+vi.mock('./MemorySidebarPortal', () => ({
+  default: (props: any) => {
+    memorySidebarPortalMock(props);
+    return (
+      <div data-testid={'memory-sidebar-portal'}>
+        {props.currentScope}:{props.activeSpaceId ?? 'none'}
+      </div>
+    );
+  },
 }));
 
 vi.mock('./SurfaceBreadcrumb', () => ({
@@ -399,7 +411,24 @@ vi.mock('@/components/Loading/BrandTextLoading', () => ({
   default: () => <div>Loading</div>,
 }));
 
+const makeSectionSummary = (
+  count: number,
+  recall?: Partial<SpaceMemorySectionSummary['recall']>,
+): SpaceMemorySectionSummary => ({
+  count,
+  recall: {
+    active: 0,
+    disabled: 0,
+    expired: 0,
+    stale: 0,
+    ...recall,
+  },
+});
+
 const makeSummary = (options?: { canReview?: boolean }): SpaceMemorySummary => ({
+  contract: getSpaceMemorySurfaceContract(options?.canReview === false ? 'viewer' : 'reviewer', {
+    canCreate: true,
+  }),
   canCreate: true,
   canPublish: true,
   canReview: options?.canReview ?? true,
@@ -409,17 +438,27 @@ const makeSummary = (options?: { canReview?: boolean }): SpaceMemorySummary => (
   name: 'Ops Space',
   surface: options?.canReview === false ? 'viewer' : 'reviewer',
   sections: {
-    inbox: { count: 1, recall: { active: 0, disabled: 0, expired: 0, stale: 0 } },
-    playbooks: { count: 0, recall: { active: 0, disabled: 0, expired: 0, stale: 0 } },
-    policies: { count: 0, recall: { active: 0, disabled: 0, expired: 0, stale: 0 } },
-    published: { count: 1, recall: { active: 1, disabled: 0, expired: 0, stale: 0 } },
+    inbox: makeSectionSummary(1),
+    playbooks: makeSectionSummary(0),
+    policies: makeSectionSummary(0),
+    published: makeSectionSummary(1, { active: 1 }),
   },
 });
 
 const makeSectionResult = (
   items: SpaceMemoryEntryPreview[],
-  options?: { canReview?: boolean; section?: SpaceMemorySectionResult['section'] },
+  options?: {
+    canCreate?: boolean;
+    canReview?: boolean;
+    contract?: SpaceMemorySurfaceContract;
+    section?: SpaceMemorySectionResult['section'];
+  },
 ): SpaceMemorySectionResult => ({
+  contract:
+    options?.contract ??
+    getSpaceMemorySurfaceContract(options?.canReview === false ? 'viewer' : 'reviewer', {
+      canCreate: options?.canCreate ?? true,
+    }),
   items,
   section: options?.section ?? 'published',
   surface: options?.canReview === false ? 'viewer' : 'reviewer',
@@ -427,8 +466,17 @@ const makeSectionResult = (
 
 const makeEntryResult = (
   entry: SpaceMemoryEntryPreview,
-  options?: { canReview?: boolean },
+  options?: {
+    canCreate?: boolean;
+    canReview?: boolean;
+    contract?: SpaceMemorySurfaceContract;
+  },
 ): SpaceMemoryEntryResult => ({
+  contract:
+    options?.contract ??
+    getSpaceMemorySurfaceContract(options?.canReview === false ? 'viewer' : 'reviewer', {
+      canCreate: options?.canCreate ?? true,
+    }),
   entry,
   surface: options?.canReview === false ? 'viewer' : 'reviewer',
 });
@@ -705,7 +753,7 @@ describe('SpaceMemoryPage', () => {
     fireEvent.click(drawerQueries.getByRole('button', { name: 'Audit' }));
     expect(drawerQueries.getByText('Governance History')).toBeInTheDocument();
     expect(drawerQueries.getByText('by Arthur')).toBeInTheDocument();
-    expect(drawerQueries.getByText('Trace: trace-123')).toBeInTheDocument();
+    expect(drawerQueries.getAllByText('Trace: trace-123').length).toBeGreaterThan(0);
     expect(drawerQueries.getByText('Updated title')).toBeInTheDocument();
     expect(drawerQueries.getByText('Updated summary')).toBeInTheDocument();
     expect(drawerQueries.getByText('Updated content')).toBeInTheDocument();
@@ -713,12 +761,24 @@ describe('SpaceMemoryPage', () => {
     expect(drawerQueries.getByText('Before')).toBeInTheDocument();
     expect(drawerQueries.getByText('After')).toBeInTheDocument();
     expect(drawerQueries.getByText('Old title')).toBeInTheDocument();
-    expect(drawerQueries.getByText('Release policy')).toBeInTheDocument();
+    expect(drawerQueries.getAllByText('Release policy').length).toBeGreaterThan(0);
     expect(
       drawerQueries.getByText(/Just updated by merging candidate "Candidate draft"/),
     ).toBeInTheDocument();
     expect(drawerQueries.getByText(/Just published from Inbox/)).toBeInTheDocument();
     expect(setSearchParamsMock).toHaveBeenCalledWith(expect.any(URLSearchParams));
+  });
+
+  it('mounts the shared sidebar portal for team memory routes', () => {
+    render(<SpaceMemoryPage />);
+
+    expect(screen.getByTestId('memory-sidebar-portal')).toHaveTextContent('space:spc_team');
+    expect(memorySidebarPortalMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activeSpaceId: 'spc_team',
+        currentScope: 'space',
+      }),
+    );
   });
 
   it('saves recall policy changes for published memories', async () => {
@@ -880,10 +940,10 @@ describe('SpaceMemoryPage', () => {
     swrState.summary = {
       ...makeSummary(),
       sections: {
-        inbox: { count: 1 },
-        playbooks: { count: 0 },
-        policies: { count: 0 },
-        published: { count: 1 },
+        inbox: makeSectionSummary(1),
+        playbooks: makeSectionSummary(0),
+        policies: makeSectionSummary(0),
+        published: makeSectionSummary(1),
       },
     };
     swrState.sections.published = makeSectionResult([makeStalePublishedEntry()], {
@@ -934,10 +994,10 @@ describe('SpaceMemoryPage', () => {
     swrState.summary = {
       ...makeSummary(),
       sections: {
-        inbox: { count: 1 },
-        playbooks: { count: 0 },
-        policies: { count: 0 },
-        published: { count: 1 },
+        inbox: makeSectionSummary(1),
+        playbooks: makeSectionSummary(0),
+        policies: makeSectionSummary(0),
+        published: makeSectionSummary(1),
       },
     };
     swrState.sections.published = makeSectionResult([makeStalePublishedEntry()], {
@@ -982,10 +1042,10 @@ describe('SpaceMemoryPage', () => {
     swrState.summary = {
       ...makeSummary(),
       sections: {
-        inbox: { count: 1 },
-        playbooks: { count: 0 },
-        policies: { count: 0 },
-        published: { count: 1 },
+        inbox: makeSectionSummary(1),
+        playbooks: makeSectionSummary(0),
+        policies: makeSectionSummary(0),
+        published: makeSectionSummary(1),
       },
     };
     swrState.sections.published = makeSectionResult([makeDisabledPublishedEntry()], {
@@ -1025,10 +1085,10 @@ describe('SpaceMemoryPage', () => {
     swrState.summary = {
       ...makeSummary(),
       sections: {
-        inbox: { count: 1 },
-        playbooks: { count: 0 },
-        policies: { count: 0 },
-        published: { count: 2 },
+        inbox: makeSectionSummary(1),
+        playbooks: makeSectionSummary(0),
+        policies: makeSectionSummary(0),
+        published: makeSectionSummary(2),
       },
     };
     swrState.sections.published = makeSectionResult([makeStalePublishedEntry()], {
@@ -1079,10 +1139,10 @@ describe('SpaceMemoryPage', () => {
     swrState.summary = {
       ...makeSummary(),
       sections: {
-        inbox: { count: 2 },
-        playbooks: { count: 0 },
-        policies: { count: 0 },
-        published: { count: 1 },
+        inbox: makeSectionSummary(2),
+        playbooks: makeSectionSummary(0),
+        policies: makeSectionSummary(0),
+        published: makeSectionSummary(1),
       },
     };
     swrState.sections.inbox = makeSectionResult(
@@ -1124,10 +1184,10 @@ describe('SpaceMemoryPage', () => {
     swrState.summary = {
       ...makeSummary(),
       sections: {
-        inbox: { count: 1 },
-        playbooks: { count: 0 },
-        policies: { count: 0 },
-        published: { count: 2 },
+        inbox: makeSectionSummary(1),
+        playbooks: makeSectionSummary(0),
+        policies: makeSectionSummary(0),
+        published: makeSectionSummary(2),
       },
     };
     swrState.sections.published = makeSectionResult(
@@ -1159,10 +1219,10 @@ describe('SpaceMemoryPage', () => {
     swrState.summary = {
       ...makeSummary(),
       sections: {
-        inbox: { count: 1 },
-        playbooks: { count: 0 },
-        policies: { count: 0 },
-        published: { count: 3 },
+        inbox: makeSectionSummary(1),
+        playbooks: makeSectionSummary(0),
+        policies: makeSectionSummary(0),
+        published: makeSectionSummary(3),
       },
     };
     swrState.sections.published = makeSectionResult(
@@ -1360,10 +1420,10 @@ describe('SpaceMemoryPage', () => {
     swrState.summary = {
       ...makeSummary(),
       sections: {
-        inbox: { count: 1 },
-        playbooks: { count: 0 },
-        policies: { count: 0 },
-        published: { count: 1 },
+        inbox: makeSectionSummary(1),
+        playbooks: makeSectionSummary(0),
+        policies: makeSectionSummary(0),
+        published: makeSectionSummary(1),
       },
     };
     swrState.sections.published = makeSectionResult([makeStalePublishedEntry()], {
@@ -1391,10 +1451,10 @@ describe('SpaceMemoryPage', () => {
     swrState.summary = {
       ...makeSummary(),
       sections: {
-        inbox: { count: 1 },
-        playbooks: { count: 0 },
-        policies: { count: 0 },
-        published: { count: 2 },
+        inbox: makeSectionSummary(1),
+        playbooks: makeSectionSummary(0),
+        policies: makeSectionSummary(0),
+        published: makeSectionSummary(2),
       },
     };
     swrState.sections.published = makeSectionResult(

@@ -122,6 +122,17 @@ const MemoryScopeSection = memo<MemoryScopeSectionProps>(({ activeSpaceId, curre
     );
   });
 
+  const scopeItems = [
+    <NavItem
+      active={currentScope === 'personal'}
+      icon={BrainCircuitIcon}
+      key={'personal-memory'}
+      title={t('personalTitle', { ns: 'memory' })}
+      onClick={() => navigate('/memory')}
+    />,
+    ...teamSpaceItems,
+  ];
+
   return (
     <Flexbox gap={4} paddingInline={4}>
       <div className={styles.sectionTitle}>
@@ -136,27 +147,17 @@ const MemoryScopeSection = memo<MemoryScopeSectionProps>(({ activeSpaceId, curre
         />
       </div>
 
-      <NavItem
-        active={currentScope === 'personal'}
-        icon={BrainCircuitIcon}
-        title={t('personalTitle', { ns: 'memory' })}
-        onClick={() => navigate('/memory')}
-      />
-
-      <div className={styles.sectionTitle}>
-        <Text fontSize={12} type={'secondary'} weight={500}>
-          {t('scope.teamSpaces', { ns: 'memory' })}
-        </Text>
-      </div>
-
       {isLoading ? (
         <SkeletonList rows={3} />
-      ) : teamSpaces.length === 0 ? (
-        <Text fontSize={12} style={{ paddingInline: 8 }} type={'secondary'}>
-          {t('scope.empty', { ns: 'memory' })}
-        </Text>
       ) : (
-        teamSpaceItems
+        <>
+          {scopeItems}
+          {teamSpaces.length === 0 && (
+            <Text fontSize={12} style={{ paddingInline: 8 }} type={'secondary'}>
+              {t('scope.empty', { ns: 'memory' })}
+            </Text>
+          )}
+        </>
       )}
     </Flexbox>
   );

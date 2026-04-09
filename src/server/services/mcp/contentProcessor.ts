@@ -1,12 +1,11 @@
 import debug from 'debug';
 import pMap from 'p-map';
 
-import { fileEnv } from '@/envs/file';
 import { type AudioContent, type ImageContent, type ToolCallContent } from '@/libs/mcp';
 import { type FileService } from '@/server/services/file';
-import { nanoid } from '@/utils/uuid';
 
 const log = debug('lobe-mcp:content-processor');
+const MCP_CONTENT_STORAGE_SCOPE = 'mcp-content';
 
 export type ProcessContentBlocksFn = (blocks: ToolCallContent[]) => Promise<ToolCallContent[]>;
 
@@ -19,18 +18,16 @@ export const processContentBlocks = async (
   blocks: ToolCallContent[],
   fileService: FileService,
 ): Promise<ToolCallContent[]> => {
-  // Use date-based sharding for privacy compliance (GDPR, CCPA)
-  const today = new Date().toISOString().split('T')[0]; // e.g., "2025-11-08"
-
   return pMap(blocks, async (block) => {
     if (block.type === 'image') {
       const imageBlock = block as ImageContent;
 
       // Extract file extension from mimeType (e.g., "image/png" -> "png")
       const fileExtension = imageBlock.mimeType.split('/')[1] || 'png';
-
-      // Generate unique pathname with date-based sharding
-      const pathname = `${fileEnv.NEXT_PUBLIC_S3_FILE_PATH}/mcp/images/${today}/${nanoid()}.${fileExtension}`;
+      const { key: pathname } = await fileService.createOpaqueUserBlobPath(
+        `${MCP_CONTENT_STORAGE_SCOPE}/images`,
+        fileExtension,
+      );
 
       // Upload base64 image and get proxy URL
       const { url } = await fileService.uploadBase64(imageBlock.data, pathname);
@@ -45,9 +42,10 @@ export const processContentBlocks = async (
 
       // Extract file extension from mimeType (e.g., "audio/mp3" -> "mp3")
       const fileExtension = audioBlock.mimeType.split('/')[1] || 'mp3';
-
-      // Generate unique pathname with date-based sharding
-      const pathname = `${fileEnv.NEXT_PUBLIC_S3_FILE_PATH}/mcp/audio/${today}/${nanoid()}.${fileExtension}`;
+      const { key: pathname } = await fileService.createOpaqueUserBlobPath(
+        `${MCP_CONTENT_STORAGE_SCOPE}/audio`,
+        fileExtension,
+      );
 
       // Upload base64 audio and get proxy URL
       const { url } = await fileService.uploadBase64(audioBlock.data, pathname);

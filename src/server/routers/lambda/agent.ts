@@ -293,10 +293,15 @@ export const agentRouter = router({
         ),
       );
 
-      const files = await ctx.fileModel.query({
+      const files = (await ctx.fileModel.query({
         spaceId: input.spaceId ?? undefined,
         showFilesInSourceSet: false,
-      });
+      })) as Array<{
+        fileType: string;
+        id: string;
+        name: string;
+        spaceId?: string | null;
+      }>;
       const visibleFileIds = new Set(
         await ctx.contentAuthorizer.filterVisibleFileIdsForList(files.map((file) => file.id)),
       );

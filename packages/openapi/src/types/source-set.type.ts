@@ -1,6 +1,5 @@
+import type { SourceSetItem } from '@lobechat/types';
 import { z } from 'zod';
-
-import type { SourceSetItem } from '@/database/schemas';
 
 import type { IPaginationQuery, PaginationQueryResponse } from './common.type';
 import { PaginationQuerySchema } from './common.type';

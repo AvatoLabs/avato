@@ -15,9 +15,9 @@ const TestComponent = (props: Parameters<typeof useDocsAgentContextFallback>[0])
 
 describe('useDocsAgentContextFallback', () => {
   it('syncs file content into page agent runtime and clears on unmount', () => {
-    const setScopedFallbackPageContentContext = vi.spyOn(
+    const setScopedFallbackDocContentContext = vi.spyOn(
       docsAgentRuntime,
-      'setScopedFallbackPageContentContext',
+      'setScopedFallbackDocContentContext',
     );
 
     const { unmount } = render(
@@ -30,7 +30,7 @@ describe('useDocsAgentContextFallback', () => {
       />,
     );
 
-    expect(setScopedFallbackPageContentContext).toHaveBeenCalledWith({
+    expect(setScopedFallbackDocContentContext).toHaveBeenCalledWith({
       context: {
         markdown: '# Title\n\nBody copy',
         metadata: {
@@ -46,7 +46,7 @@ describe('useDocsAgentContextFallback', () => {
 
     unmount();
 
-    expect(setScopedFallbackPageContentContext).toHaveBeenLastCalledWith({
+    expect(setScopedFallbackDocContentContext).toHaveBeenLastCalledWith({
       contextKey: 'page_agent-1_topic-1',
     });
   });

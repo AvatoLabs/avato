@@ -8,7 +8,7 @@ import {
   filterFilesByGitignore,
   findGitignoreFile,
   readGitignoreContent,
-} from '@/utils/gitignore';
+} from '../../../../../utils/gitignore';
 
 interface UseUploadFolderOptions {
   currentFolderId?: string | null;
@@ -34,6 +34,11 @@ const useUploadFolder = ({
       const targetSourceSetId = sourceSetId ?? undefined;
       const upload = async (fileList: File[]) =>
         uploadFolderWithStructure(fileList, targetSourceSetId, targetFolderId, spaceId);
+      const startUpload = (fileList: File[]) => {
+        void upload(fileList).catch((error) => {
+          console.error('Failed to upload folder:', error);
+        });
+      };
 
       // Apply built-in block list first
       const originalCount = files.length;
@@ -66,8 +71,7 @@ const useUploadFolder = ({
             }),
             okText: t('header.actions.gitignore.apply'),
             onCancel: () => {
-              // Upload without awaiting - let it run in background
-              upload(files);
+              startUpload(files);
             },
             onOk: async () => {
               const filteredFiles = filterFilesByGitignore(files, gitignoreContent);
@@ -83,8 +87,7 @@ const useUploadFolder = ({
                 );
               }
 
-              // Upload without awaiting - let it run in background
-              upload(filteredFiles);
+              startUpload(filteredFiles);
             },
             title: t('header.actions.gitignore.title'),
           });

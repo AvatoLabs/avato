@@ -38,15 +38,15 @@ function makeUploadRequest(pathname: string, fileContent: BlobPart = 'hi') {
 }
 
 describe('getLegacyUploadPathnameValidationError', () => {
-  it('should accept legacy and space-scoped relative keys', () => {
-    expect(getLegacyUploadPathnameValidationError('files/bucket/u/f.bin')).toBeNull();
+  it('should accept only space-scoped relative keys', () => {
     expect(getLegacyUploadPathnameValidationError('v2/spaces/spc_1/blobs/ups_1/opq_1')).toBeNull();
   });
 
-  it('should reject empty, non-string, absolute, traversal, invalid prefix, NUL, and overlong', () => {
+  it('should reject empty, non-string, absolute, traversal, legacy prefix, invalid prefix, NUL, and overlong', () => {
     expect(getLegacyUploadPathnameValidationError('')).toBe('Invalid pathname.');
     expect(getLegacyUploadPathnameValidationError(null)).toBe('Invalid pathname.');
     expect(getLegacyUploadPathnameValidationError('/abs')).toBe('Invalid pathname.');
+    expect(getLegacyUploadPathnameValidationError('files/bucket/u/f.bin')).toBe('Invalid pathname.');
     expect(getLegacyUploadPathnameValidationError('a/../b')).toBe('Invalid pathname.');
     expect(getLegacyUploadPathnameValidationError('..')).toBe('Invalid pathname.');
     expect(getLegacyUploadPathnameValidationError('skills/source_files/zip123/README.md')).toBe(
@@ -75,13 +75,21 @@ describe('POST /api/file/upload', () => {
 
   it('should 401 when unauthenticated', async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
-    const res = await POST(makeUploadRequest('files/b/k/x.bin'));
+    const res = await POST(makeUploadRequest('v2/spaces/spc_1/blobs/ups_1/opq_1'));
     expect(res.status).toBe(401);
     expect(mockUploadBuffer).not.toHaveBeenCalled();
   });
 
+  it('should 400 on legacy pathname prefix', async () => {
+    const res = await POST(makeUploadRequest('files/bucket/u/key.bin'));
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toBe('Invalid pathname.');
+    expect(mockUploadBuffer).not.toHaveBeenCalled();
+  });
+
   it('should 400 on path traversal pathname', async () => {
-    const res = await POST(makeUploadRequest('files/../evil'));
+    const res = await POST(makeUploadRequest('v2/spaces/spc_1/blobs/../evil'));
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error?: string };
     expect(body.error).toBe('Invalid pathname.');
@@ -90,28 +98,13 @@ describe('POST /api/file/upload', () => {
 
   it('should 400 when file field is missing', async () => {
     const fd = new FormData();
-    fd.append('pathname', 'files/b/k/x.bin');
+    fd.append('pathname', 'v2/spaces/spc_1/blobs/ups_1/opq_1');
     const req = new NextRequest('http://localhost/api/file/upload', { method: 'POST', body: fd });
     const res = await POST(req);
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error?: string };
     expect(body.error).toBe('Invalid file payload.');
     expect(mockUploadBuffer).not.toHaveBeenCalled();
-  });
-
-  it('should upload with PrivateBlobS3 when pathname is valid', async () => {
-    const res = await POST(makeUploadRequest('files/bucket/u/key.bin', new Uint8Array([1, 2, 3])));
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { ok?: boolean };
-    expect(body.ok).toBe(true);
-    expect(mockUploadBuffer).toHaveBeenCalledTimes(1);
-    expect(mockUploadBuffer).toHaveBeenCalledWith(
-      'files/bucket/u/key.bin',
-      expect.any(Buffer),
-      'application/octet-stream',
-    );
-    const buf = mockUploadBuffer.mock.calls[0][1] as Buffer;
-    expect([...buf]).toEqual([1, 2, 3]);
   });
 
   it('should upload current space-scoped keys used by upload sessions', async () => {

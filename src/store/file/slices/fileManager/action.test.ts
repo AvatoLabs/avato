@@ -90,6 +90,12 @@ beforeEach(() => {
   );
 });
 
+const mockGovernanceCapabilities = {
+  canApprove: false,
+  canArchive: false,
+  canEditGovernance: false,
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -1290,6 +1296,7 @@ describe('FileManagerActions', () => {
       ];
 
       vi.mocked(lambdaClient.file.getKnowledgeItems.query).mockResolvedValue({
+        governanceCapabilities: mockGovernanceCapabilities,
         hasMore: false,
         items: mockFiles,
       });
@@ -1326,6 +1333,7 @@ describe('FileManagerActions', () => {
       ];
 
       vi.mocked(lambdaClient.file.getKnowledgeItems.query).mockResolvedValue({
+        governanceCapabilities: mockGovernanceCapabilities,
         hasMore: false,
         items: mockFiles,
       });

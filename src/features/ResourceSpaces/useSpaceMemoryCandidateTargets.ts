@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import { lambdaClient } from '@/libs/trpc/client';
 
 import { SPACE_LIST_KEY } from './SpaceList';
-import { canCreateSpaceMemory } from './spaceMemoryCapabilities';
+import { resolveSpaceMemorySurfaceState } from './spaceMemoryCapabilities';
 
 export const useSpaceMemoryCandidateTargets = (preferredSpaceId?: string) => {
   const { data, isLoading } = useSWR(SPACE_LIST_KEY, () => lambdaClient.space.listSpaces.query(), {
@@ -14,7 +14,7 @@ export const useSpaceMemoryCandidateTargets = (preferredSpaceId?: string) => {
   });
 
   const teamSpaces = useMemo(
-    () => (data ?? []).filter((space) => canCreateSpaceMemory(space)),
+    () => (data ?? []).filter((space) => resolveSpaceMemorySurfaceState(space).canCreate),
     [data],
   );
 

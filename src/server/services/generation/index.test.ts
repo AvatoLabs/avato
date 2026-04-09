@@ -656,6 +656,7 @@ describe('GenerationService', () => {
       hash: 'image-hash',
       height: 800,
       mime: 'image/png',
+      sha256: 'image-sha256',
       size: 1000,
       width: 600,
     };
@@ -666,6 +667,7 @@ describe('GenerationService', () => {
       hash: 'thumbnail-hash',
       height: 400,
       mime: 'image/png',
+      sha256: 'thumbnail-sha256',
       size: 500,
       width: 300,
     };

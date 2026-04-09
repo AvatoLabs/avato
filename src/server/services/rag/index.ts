@@ -2,7 +2,6 @@ import { DEFAULT_FILE_EMBEDDING_MODEL_ITEM } from '@lobechat/const';
 import {
   type ChatSemanticSearchChunk,
   type FileSearchResult,
-  isRawFileContentId,
   resolveSemanticSearchLimits,
   type SemanticSearchSchemaType,
 } from '@lobechat/types';
@@ -17,6 +16,7 @@ import { getServerDefaultFilesConfig } from '@/server/globalConfig';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 import { AuthorizedResourceResolver, ContentAuthorizer } from '@/server/services/content';
 import { DocumentService } from '@/server/services/document';
+import { isRawFileContentId } from '@/types/content';
 
 import { assertRagEmbeddingDimensions, RAG_EMBEDDING_DIMENSIONS } from './constants';
 
@@ -197,7 +197,7 @@ export class ServerRagService {
       ? await this.contentAuthorizer.filterReadableFileIds(rawFileIds)
       : undefined;
 
-    if (fileIds && readableFileIds.length === 0) return [];
+    if (fileIds && (!readableFileIds || readableFileIds.length === 0)) return [];
 
     const { embedding, model } = await this.createQueryEmbedding(query);
 

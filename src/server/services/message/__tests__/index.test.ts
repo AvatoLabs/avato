@@ -59,8 +59,12 @@ describe('MessageService', () => {
         }),
       );
       const queryOptions = vi.mocked(mockMessageModel.query).mock.calls[0][1];
+      expect(queryOptions?.postProcessUrl).toBeDefined();
       await expect(
-        queryOptions.postProcessUrl('internal://file', { fileType: 'text/plain', id: 'file-1' }),
+        queryOptions!.postProcessUrl!(
+          'internal://file',
+          { fileType: 'text/plain', id: 'file-1' },
+        ),
       ).resolves.toBe('/f/file-1');
       expect(result).toEqual({ messages: mockMessages, success: true });
     });

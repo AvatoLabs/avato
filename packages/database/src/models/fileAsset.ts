@@ -1,8 +1,8 @@
-import type {
+import {
   FileAssetClassification,
-  FileAssetMetadata,
   FileAssetReviewStatus,
   FileAssetUsagePolicy,
+  type FileAssetMetadata,
 } from '@lobechat/types';
 import { normalizeFileAssetMetadata } from '@lobechat/types';
 import { eq, inArray } from 'drizzle-orm';
@@ -94,16 +94,16 @@ export class FileAssetModel {
     const [item] = await this.db
       .insert(fileAssets)
       .values({
-        classification: params.classification ?? 'general',
+        classification: params.classification ?? FileAssetClassification.General,
         createdBy: params.createdBy,
         fileId: params.fileId,
         metadata: normalizedMetadata ?? undefined,
         reviewedAt: params.reviewedAt ?? null,
         reviewedBy: params.reviewedBy ?? null,
-        reviewStatus: params.reviewStatus ?? 'draft',
+        reviewStatus: params.reviewStatus ?? FileAssetReviewStatus.Draft,
         rightsOwner: params.rightsOwner ?? null,
         spaceId: params.spaceId,
-        usagePolicy: params.usagePolicy ?? 'internal',
+        usagePolicy: params.usagePolicy ?? FileAssetUsagePolicy.Internal,
       })
       .onConflictDoUpdate({
         set: updateSet,

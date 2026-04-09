@@ -62,10 +62,15 @@ const Actions = memo<ActionsProps>(
         const key = 'createNewAgentInGroup';
         message.loading({ content: t('sessionGroup.creatingAgent'), duration: 0, key });
 
-        await createSession({ group: id, pinned: isPinned });
-
-        message.destroy(key);
-        message.success({ content: t('sessionGroup.createAgentSuccess') });
+        try {
+          await createSession({ group: id, pinned: isPinned });
+          message.success({ content: t('sessionGroup.createAgentSuccess') });
+        } catch (error) {
+          console.error('Failed to create agent in mobile session group:', error);
+          message.error({ content: t('createAgentFailed') });
+        } finally {
+          message.destroy(key);
+        }
       },
     };
 
@@ -148,7 +153,12 @@ const Actions = memo<ActionsProps>(
               okButtonProps: { danger: true },
               onOk: async () => {
                 if (!id) return;
-                await removeSessionGroup(id);
+                try {
+                  await removeSessionGroup(id);
+                } catch (error) {
+                  console.error('Failed to delete mobile session group:', error);
+                  message.error({ content: t('confirmRemoveGroupError') });
+                }
               },
               title: t('sessionGroup.confirmRemoveGroupAlert'),
             });

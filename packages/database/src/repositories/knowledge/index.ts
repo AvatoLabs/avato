@@ -76,11 +76,13 @@ export class KnowledgeRepo {
   private buildFileAssetWhereConditions = ({
     alias,
     assetClassification,
+    assetRightsOwner,
     assetReviewStatus,
     assetUsagePolicy,
   }: {
     alias: string;
     assetClassification?: QueryFileListParams['assetClassification'];
+    assetRightsOwner?: QueryFileListParams['assetRightsOwner'];
     assetReviewStatus?: QueryFileListParams['assetReviewStatus'];
     assetUsagePolicy?: QueryFileListParams['assetUsagePolicy'];
   }) => {
@@ -110,6 +112,10 @@ export class KnowledgeRepo {
       );
     }
 
+    if (assetRightsOwner) {
+      assetConditions.push(sql`${sql.raw(`${alias}.rights_owner`)} ILIKE ${`%${assetRightsOwner}%`}`);
+    }
+
     return assetConditions;
   };
 
@@ -118,6 +124,7 @@ export class KnowledgeRepo {
    */
   async query({
     assetClassification,
+    assetRightsOwner,
     assetReviewStatus,
     assetUsagePolicy,
     category,
@@ -137,6 +144,7 @@ export class KnowledgeRepo {
     // Build file query
     const fileQuery = this.buildFileQuery({
       assetClassification,
+      assetRightsOwner,
       assetReviewStatus,
       assetUsagePolicy,
       category,
@@ -153,6 +161,7 @@ export class KnowledgeRepo {
     // Build document query (notes)
     const documentQuery = this.buildDocumentQuery({
       assetClassification,
+      assetRightsOwner,
       assetReviewStatus,
       assetUsagePolicy,
       category,
@@ -384,6 +393,7 @@ export class KnowledgeRepo {
 
   private buildFileQuery({
     assetClassification,
+    assetRightsOwner,
     assetReviewStatus,
     assetUsagePolicy,
     category,
@@ -401,6 +411,7 @@ export class KnowledgeRepo {
     const assetWhereConditions = this.buildFileAssetWhereConditions({
       alias: 'fa',
       assetClassification,
+      assetRightsOwner,
       assetReviewStatus,
       assetUsagePolicy,
     });
@@ -553,6 +564,7 @@ export class KnowledgeRepo {
 
   private buildDocumentQuery({
     assetClassification,
+    assetRightsOwner,
     assetReviewStatus,
     assetUsagePolicy,
     category,
@@ -562,7 +574,7 @@ export class KnowledgeRepo {
     spaceId,
     trash,
   }: QueryFileListParams = {}): ReturnType<typeof sql> {
-    if (assetClassification || assetReviewStatus || assetUsagePolicy) {
+    if (assetClassification || assetRightsOwner || assetReviewStatus || assetUsagePolicy) {
       return sql`
         SELECT
           NULL::varchar(30) as id,

@@ -6,12 +6,13 @@ import {
 import type { LobeChatDatabase } from '@lobechat/database';
 import { type CodeInterpreterToolName } from '@lobehub/market-sdk';
 import debug from 'debug';
-import { sha256 } from 'js-sha256';
 
-import { SpaceModel } from '@/database/models/space';
 import { getBlobProvider } from '@/server/modules/BlobProvider';
 import { type FileService } from '@/server/services/file';
-import { resolveSpaceIdForSandboxExport } from '@/server/services/file/resolveSpaceIdForSandboxExport';
+import {
+  generateSandboxExportStorageKey,
+  resolveTargetSpaceIdForSandboxExport,
+} from '@/server/services/file/sandboxExport';
 import { type MarketService } from '@/server/services/market';
 
 const log = debug('lobe-server:sandbox-service');
@@ -116,13 +117,15 @@ export class ServerSandboxService implements ISandboxService {
     log('Exporting file: %s from path: %s, topicId: %s', filename, path, this.topicId);
 
     try {
+      const exportSpaceId = await resolveTargetSpaceIdForSandboxExport({
+        db: this.serverDB,
+        ...(this.spaceId ? { spaceId: this.spaceId } : {}),
+        topicId: this.topicId,
+        userId: this.userId,
+      });
+
       const blobProvider = getBlobProvider();
-
-      // Use date-based sharding for privacy compliance (GDPR, CCPA)
-      const today = new Date().toISOString().split('T')[0];
-
-      // Generate a unique key for the exported file
-      const key = `code-interpreter-exports/${today}/${this.topicId}/${filename}`;
+      const key = generateSandboxExportStorageKey(exportSpaceId);
 
       // Step 1: Generate pre-signed upload URL
       const uploadUrl = await blobProvider.createUploadUrl(key);
@@ -157,37 +160,16 @@ export class ServerSandboxService implements ISandboxService {
         };
       }
 
-      // Step 3: Get file metadata from S3 to verify upload and get actual size
+      // Step 3: Resolve content type from storage metadata / sandbox response
       const metadata = await blobProvider.getObjectMetadata(key);
-      const fileSize = metadata.contentLength;
       const mimeType = metadata.contentType || result?.mimeType || 'application/octet-stream';
 
-      // Step 4: Create persistent file record using FileService
-      // Generate a simple hash from the key (since we don't have the actual file content)
-      const fileHash = sha256(key + Date.now().toString());
-
-      let exportSpaceId: string | undefined;
-      if (this.spaceId) {
-        const space = await new SpaceModel(this.serverDB, this.userId).findAccessibleSpaceById(
-          this.spaceId,
-        );
-        exportSpaceId = space?.id;
-      }
-      if (exportSpaceId === undefined) {
-        exportSpaceId = await resolveSpaceIdForSandboxExport(
-          this.serverDB,
-          this.userId,
-          this.topicId,
-        );
-      }
-
-      const { fileId, url } = await this.fileService.createFileRecord({
-        fileHash,
+      // Step 4: Create persistent file record using the real stored-object sha256
+      const { fileId, size: fileSize, url } = await this.fileService.createFileRecordFromStorageObject({
         fileType: mimeType,
         name: filename,
-        size: fileSize,
-        ...(exportSpaceId !== undefined ? { spaceId: exportSpaceId } : {}),
-        url: key, // Store S3 key
+        spaceId: exportSpaceId,
+        storageKey: key, // Store S3 key
       });
 
       log('Created file record: fileId=%s, url=%s', fileId, url);

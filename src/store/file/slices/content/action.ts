@@ -1,4 +1,3 @@
-import { getCanonicalContentKind } from '@lobechat/types';
 import debug from 'debug';
 import i18n from 'i18next';
 import { createElement } from 'react';
@@ -6,6 +5,7 @@ import { createElement } from 'react';
 import { notification } from '@/components/AntdStaticMethods';
 import { contentService } from '@/services/content';
 import { type StoreSetter } from '@/store/types';
+import { getCanonicalContentKind } from '@/types/content';
 import {
   type ContentItem,
   type CreateContentParams,

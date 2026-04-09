@@ -22,6 +22,9 @@ export enum GroupKey {
 
 const Sidebar = memo(() => {
   const { spaceId } = useParams<{ spaceId?: string }>();
+  const defaultExpandedKeys = spaceId
+    ? [GroupKey.Space, GroupKey.FileScope, GroupKey.SourceSet]
+    : [GroupKey.Space, GroupKey.QuickAccess];
 
   return (
     <NavPanelPortal navKey="resource">
@@ -29,19 +32,11 @@ const Sidebar = memo(() => {
         header={<Header />}
         body={
           <Flexbox paddingBlock={8} paddingInline={4}>
-            <Accordion
-              gap={8}
-              defaultExpandedKeys={[
-                GroupKey.QuickAccess,
-                GroupKey.Space,
-                GroupKey.FileScope,
-                GroupKey.SourceSet,
-              ]}
-            >
-              <QuickAccessSection itemKey={GroupKey.QuickAccess} />
+            <Accordion gap={8} defaultExpandedKeys={defaultExpandedKeys}>
               <SpaceSection itemKey={GroupKey.Space} />
               {spaceId && <FileScopeSection itemKey={GroupKey.FileScope} />}
               {spaceId && <SidebarBody itemKey={GroupKey.SourceSet} />}
+              <QuickAccessSection itemKey={GroupKey.QuickAccess} />
             </Accordion>
           </Flexbox>
         }

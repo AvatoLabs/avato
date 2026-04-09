@@ -1,8 +1,8 @@
-import type {
+import {
   FileAssetClassification,
-  FileAssetMetadata,
   FileAssetReviewStatus,
   FileAssetUsagePolicy,
+  type FileAssetMetadata,
 } from '@lobechat/types';
 import { index, jsonb, pgTable, text } from 'drizzle-orm/pg-core';
 
@@ -24,9 +24,15 @@ export const fileAssets = pgTable(
     classification: text('classification')
       .$type<FileAssetClassification>()
       .notNull()
-      .default('general'),
-    reviewStatus: text('review_status').$type<FileAssetReviewStatus>().notNull().default('draft'),
-    usagePolicy: text('usage_policy').$type<FileAssetUsagePolicy>().notNull().default('internal'),
+      .default(FileAssetClassification.General),
+    reviewStatus: text('review_status')
+      .$type<FileAssetReviewStatus>()
+      .notNull()
+      .default(FileAssetReviewStatus.Draft),
+    usagePolicy: text('usage_policy')
+      .$type<FileAssetUsagePolicy>()
+      .notNull()
+      .default(FileAssetUsagePolicy.Internal),
     rightsOwner: text('rights_owner'),
     reviewedBy: text('reviewed_by').references(() => users.id, { onDelete: 'set null' }),
     reviewedAt: timestamptz('reviewed_at'),

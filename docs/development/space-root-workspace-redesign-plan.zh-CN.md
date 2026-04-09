@@ -17,12 +17,38 @@
 - **首页与设置侧入口开始显式表达当前 Workspace**：Home 左侧导航、Quick Actions、Recent Docs / Recent Files、Agent Sources，以及移动端资源入口、会话来源标签这些过去更依赖隐式默认空间的入口，已经开始显示或优先使用 “当前在哪个 Workspace 打开 / 管理资源” 的 route-aware 语义，避免用户只看到全局动作名词却不知道会落到哪个空间。
 - **Source Set / 创建动作 / 消息动作 / 命令面板也开始变成 route-aware Workspace UX**：`Attach Source Set`、`Add Files to Source Set` 这类 modal 现在会显式提示 “当前优先浏览哪个 Workspace”，跨空间的 source set 也会在列表和详情入口上显示来源工作区；同时 `Add to Space Memory` 的消息动作、topic 下拉菜单、Agent Profile 里的 inline sources、首页 `new page` 创建动作，以及 command menu 里的 `Docs / Resources` 导航，也已优先采用当前 route 的 `spaceId`，不再默认为旧 workspace hint。
 - **legacy `shared / trash` 入口已进一步退成 redirect**：`/spaces/shared` 与 `/spaces/trash` 现在已成为新的 canonical 入口；旧 `/content/shared`、`/content/trash` 仅保留 redirect 职责，router 的 error reset path 也已切到 `/spaces/*`，`MainMenu` 和移动端资源路由判断则已开始通过共享 helper 统一消费 canonical `/spaces/*` 语义。
+- **桌面端最近访问也已开始承认 canonical `/spaces/*`**：Electron titlebar 的 `Recently Viewed` resource plugin 现在会把全局 shared / trash 入口统一解析并生成到 `/spaces/shared`、`/spaces/trash`，不再在无 `spaceId` 时回退到旧 `/content/*` 路径。
+- **文件预览 query contract 也已开始清掉 legacy helper 分叉**：旧的 window-history 版 `useFilesQueryParam`（只认 `?files=`）现已移除；资源页现在统一走 router-aware 的 `useFileQueryParam`，以 **`?file=`** 作为 canonical 写入格式，仅保留对 legacy `?files=` 的只读兼容与自动迁移。
 - **`activeWorkspaceSpaceId` 已进一步退化为 URL-first hint**：helper 现在会优先从当前 pathname 解析 `/spaces/:spaceId/...`，只有在拿不到 canonical route spaceId 时才回退到内存 hint；同时 Docs CRUD、FileStore 里的 document slice，`agent / aiAgent / agentRuntime / cloudSandbox` 这批高频 service 调用点，`agent sources / chat topic` 的容器 key，`SourceSetModal / command menu / create menu / page list / source tree` 这些 UI 与 tree surface，以及 `home input / recent topics` 这类首页入口，都已统一改成 `explicit spaceId -> current route -> store/query fallback -> hint` 的 shared resolver。当前 `src/` 里已基本只剩 helper 自己与测试仍直接引用 `activeWorkspaceSpaceId`。
 
 这意味着：
 
 > `Space` 作为工作区根已经被前台大面积承认，\
 > 但 “旧 `content` 兼容层完全退场” 和 “所有旧调用点都不再依赖 `activeWorkspaceSpaceId` hint” 这两件事还没完成。
+
+## 〇点五、收口口径（2026-04-06）
+
+这份方案后续不再继续扩成“大而全的信息架构母文档”，而是按 **`space-first` 路由与前台语义收口** 来验收。
+
+本轮收口以以下 4 条为完成标准：
+
+- **所有用户可见的资源主入口统一到 canonical `/spaces/*`**
+  - 包括 `shared / trash / :spaceId/docs / :spaceId/files / :spaceId/memory / :spaceId/settings / :spaceId/members`
+- **旧 `content` 前台入口退成兼容层**
+  - `'/content/shared'`、`'/content/trash'`、以及 `content/spaces/[spaceId]/*` 只保留 redirect / wrapper 职责
+- **Workspace 解析彻底变成 URL-first**
+  - 新业务代码不得再直接依赖 `activeWorkspaceSpaceId` 作为真相来源
+  - 允许 helper 自身与兼容测试暂时保留该变量
+- **不在本方案内继续扩写新的顶层 IA**
+  - `Chat / Agent` 的全面 space 化
+  - `Community / Global Search / Account` 的重构
+  - 新的工作面（如 OA/流程/档案）
+  - 都应单独立项，不阻塞本方案收口
+
+也就是说，本方案的收口目标是：
+
+> **把 `Space` 作为工作区根这件事在前台彻底说清楚、走通、收掉 legacy。**\
+> **不是继续把所有未来模块都并到这份文档里。**
 
 ---
 

@@ -1,5 +1,4 @@
 import { contentRegistry, files, messages, messagesFiles } from '@lobechat/database/schemas';
-import { isRawFileContentId } from '@lobechat/types';
 import debug from 'debug';
 import { and, eq } from 'drizzle-orm';
 
@@ -7,6 +6,7 @@ import { auth } from '@/auth';
 import { TopicShareModel } from '@/database/models/topicShare';
 import { getServerDB } from '@/database/server';
 import { serveAuthorizedFileDownload } from '@/server/modules/file-proxy/serveAuthorizedFileDownload';
+import { isRawFileContentId } from '@/types/content';
 
 const log = debug('lobe-file:share-topic-f');
 

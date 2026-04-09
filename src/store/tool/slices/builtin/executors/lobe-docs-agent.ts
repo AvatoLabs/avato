@@ -121,7 +121,7 @@ export class ReadyDocsAgentRuntime extends EditorRuntime {
     const fallback = this.getFallbackDocContentContext(contextKey);
 
     if (fallback && !this.isEditorReady()) {
-      const context = this.pickFallbackContext(fallback.context, args.format);
+      const context = this.pickFallbackContext(fallback.context, args.format ?? 'both');
 
       return {
         charCount: context.metadata.charCount,

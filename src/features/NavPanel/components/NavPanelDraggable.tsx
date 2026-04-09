@@ -104,18 +104,12 @@ const draggableStyles = createStaticStyles(({ css, cssVar }) => ({
     max-width: ${WORKSPACE_LEFT_PANEL_MINI_WIDTH_PX}px !important;
   `,
   panel: css`
-    user-select: none;
-
     height: 100%;
 
     color: ${cssVar.colorText};
 
     background: ${isDesktop && isMacOS() ? 'transparent' : cssVar.colorBgLayout};
     box-shadow: inset -1px 0 0 ${cssVar.colorBorderSecondary};
-
-    * {
-      user-select: none;
-    }
 
     #${TOGGLE_BUTTON_ID} {
       width: 32px !important;

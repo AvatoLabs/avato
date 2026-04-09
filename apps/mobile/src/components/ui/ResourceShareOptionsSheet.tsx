@@ -15,7 +15,7 @@ import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { ContentShareKind } from '../../lib/api';
-import { shareResourceWithLink } from '../../lib/contentShareFlow';
+import { shareResourceWithLink } from '../../lib/resourceShareFlow';
 import { useI18n } from '../../lib/i18n';
 import { useThemeColors } from '../../theme/colors';
 import { enteringModalContent } from '../../theme/motion';

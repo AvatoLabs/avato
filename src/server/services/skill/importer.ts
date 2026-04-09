@@ -19,6 +19,7 @@ import { FileService } from '@/server/services/file';
 import { SkillImportError, SkillManifestError } from './errors';
 import { SkillParser } from './parser';
 import { SkillResourceService } from './resource';
+import { buildSkillZipStorageKey, getSkillZipStorageDirname } from './storage';
 
 const log = debug('lobe-chat:service:skill-importer');
 
@@ -194,7 +195,7 @@ export class SkillImporter {
 
     // 5. Check for existing skill with same zipHash (deduplication)
     const existing = await this.skillModel.findByIdentifier(identifier);
-    if (existing && existing.zipFileHash === zipHash) {
+    if (existing && existing.zipSha256 === zipHash) {
       log(
         'importFromGitHub: skill unchanged (same zipHash=%s), skipping update id=%s',
         zipHash,
@@ -222,19 +223,19 @@ export class SkillImporter {
     let zipFileHash: string | undefined;
     const zipToUpload = skillZipBuffer ?? zipBuffer;
     if (zipHash && zipToUpload) {
-      const zipKey = `skills/zip/${zipHash}.zip`;
+      const zipKey = buildSkillZipStorageKey(zipHash);
       await this.fileService.uploadBuffer(zipKey, zipToUpload, 'application/zip');
       // Use createGlobalFile directly - no need to create then delete user file record
       await this.fileService.createGlobalFile({
-        fileHash: zipHash,
         fileType: 'application/zip',
         metadata: {
-          dirname: 'skills/zip',
-          filename: `${zipHash}.zip`,
+          dirname: getSkillZipStorageDirname(),
+          filename: zipKey.split('/').pop() || 'skill-package.zip',
           path: zipKey,
         },
+        sha256: zipHash,
         size: zipToUpload.length,
-        url: zipKey,
+        storageKey: zipKey,
       });
       zipFileHash = zipHash;
       log(
@@ -384,7 +385,7 @@ export class SkillImporter {
     };
 
     // 7. Handle ZIP resources if present
-    let resourceMap: Record<string, { fileHash: string; size: number }> | undefined;
+    let resourceMap: Record<string, { sha256: string; size: number }> | undefined;
     if (resources && resources.size > 0 && zipHash) {
       log('importFromUrl: storing %d resource files...', resources.size);
       resourceMap = await this.resourceService.storeResources(zipHash, resources);
@@ -394,19 +395,19 @@ export class SkillImporter {
     // 8. Upload ZIP file to S3 and create globalFiles record (for zipFileHash foreign key)
     let zipFileHash: string | undefined;
     if (zipHash && zipBuffer) {
-      const zipKey = `skills/zip/${zipHash}.zip`;
+      const zipKey = buildSkillZipStorageKey(zipHash);
       await this.fileService.uploadBuffer(zipKey, zipBuffer, 'application/zip');
       // Use createGlobalFile directly - no need to create then delete user file record
       await this.fileService.createGlobalFile({
-        fileHash: zipHash,
         fileType: 'application/zip',
         metadata: {
-          dirname: 'skills/zip',
-          filename: `${zipHash}.zip`,
+          dirname: getSkillZipStorageDirname(),
+          filename: zipKey.split('/').pop() || 'skill-package.zip',
           path: zipKey,
         },
+        sha256: zipHash,
         size: zipBuffer.length,
-        url: zipKey,
+        storageKey: zipKey,
       });
       zipFileHash = zipHash;
       log(
@@ -420,7 +421,7 @@ export class SkillImporter {
     if (existing) {
       // Check if content is the same (simple deduplication based on content and zipHash)
       // Use nullish coalescing to handle null/undefined comparison correctly
-      const existingHash = existing.zipFileHash ?? undefined;
+      const existingHash = existing.zipSha256 ?? undefined;
       const isSameContent = existing.content === skillContent && existingHash === zipFileHash;
       if (isSameContent) {
         log('importFromUrl: skill unchanged, skipping update id=%s', existing.id);

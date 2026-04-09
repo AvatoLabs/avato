@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { documentService } from '@/services/document';
+import { getPageDetailPath } from '@/utils/docs';
 
 import { createStore } from './index';
 
@@ -67,8 +68,15 @@ describe('PageEditor meta save', () => {
     documentStoreState.documents = {};
     documentStoreState.performSave.mockReset().mockResolvedValue(undefined);
     pageStoreState.documents = [];
+    vi.mocked(getPageDetailPath).mockReset().mockReturnValue('/pages/doc-1');
     vi.mocked(documentService.getDocumentById).mockReset().mockResolvedValue(undefined);
     vi.mocked(documentService.updateDocument).mockReset().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
+    });
   });
 
   it('falls back to direct document updates when the document store is not hydrated yet', async () => {
@@ -183,5 +191,69 @@ describe('PageEditor meta save', () => {
 
     await expect(store.getState().performMetaSave()).rejects.toThrow('meta save failed');
     expect(store.getState().metaSaveStatus).toBe('idle');
+  });
+
+  it('shows success only after the page link is copied', async () => {
+    pageStoreState.documents = [
+      {
+        id: 'doc-1',
+        spaceId: 'spc_1',
+      },
+    ];
+
+    const message = {
+      error: vi.fn(),
+      success: vi.fn(),
+    };
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    const store = createStore({
+      documentId: 'doc-1',
+    });
+
+    await store.getState().handleCopyLink((key) => key, message);
+
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/pages/doc-1`);
+    expect(message.success).toHaveBeenCalledWith('docEditor.linkCopied');
+    expect(message.error).not.toHaveBeenCalled();
+  });
+
+  it('shows an error when copying the page link fails', async () => {
+    pageStoreState.documents = [
+      {
+        id: 'doc-1',
+        spaceId: 'spc_1',
+      },
+    ];
+
+    const message = {
+      error: vi.fn(),
+      success: vi.fn(),
+    };
+    const copyError = new Error('clipboard blocked');
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const writeText = vi.fn().mockRejectedValue(copyError);
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    const store = createStore({
+      documentId: 'doc-1',
+    });
+
+    await store.getState().handleCopyLink((key) => key, message);
+
+    expect(message.success).not.toHaveBeenCalled();
+    expect(message.error).toHaveBeenCalledWith('docEditor.linkCopyError');
+    expect(consoleErrorSpy).toHaveBeenCalledWith('[PageEditor] Failed to copy link:', copyError);
+
+    consoleErrorSpy.mockRestore();
   });
 });

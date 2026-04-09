@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { isWorkspaceFilesSurfacePath, isWorkspaceResourcePath } from './paths';
+import {
+  buildSourceSetPath,
+  isWorkspaceFilesSurfacePath,
+  isWorkspaceResourcePath,
+} from './paths';
 
 describe('ResourceSpaces paths', () => {
   describe('isWorkspaceFilesSurfacePath', () => {
@@ -11,15 +15,9 @@ describe('ResourceSpaces paths', () => {
       expect(isWorkspaceFilesSurfacePath('/spaces/spc_team/files/item/file_1')).toBe(true);
     });
 
-    it('should only match legacy shared and trash paths when explicitly enabled', () => {
+    it('should reject legacy content routes', () => {
       expect(isWorkspaceFilesSurfacePath('/content/shared')).toBe(false);
       expect(isWorkspaceFilesSurfacePath('/content/trash')).toBe(false);
-      expect(
-        isWorkspaceFilesSurfacePath('/content/shared', { includeLegacySpecialRoutes: true }),
-      ).toBe(true);
-      expect(
-        isWorkspaceFilesSurfacePath('/content/trash', { includeLegacySpecialRoutes: true }),
-      ).toBe(true);
     });
   });
 
@@ -35,6 +33,13 @@ describe('ResourceSpaces paths', () => {
     it('should reject non-resource routes', () => {
       expect(isWorkspaceResourcePath('/community')).toBe(false);
       expect(isWorkspaceResourcePath('/agent/123')).toBe(false);
+    });
+  });
+
+  describe('buildSourceSetPath', () => {
+    it('should build canonical space files scope paths', () => {
+      expect(buildSourceSetPath('spc_team', 'ss_1')).toBe('/spaces/spc_team/files?scope=source-set%3Ass_1');
+      expect(buildSourceSetPath(null, 'ss_1')).toBe('/spaces?scope=source-set%3Ass_1');
     });
   });
 });

@@ -23,8 +23,9 @@ const MasonryItemWrapper = memo<MasonryItemWrapperProps>(({ data: item, context 
   return (
     <div style={{ padding: '8px 4px' }}>
       <MasonryFileItem
+        {...item}
         selected={context.selectFileIds.includes(item.id)}
-        sourceSetId={context.sourceSetId}
+        sourceSetId={item.sourceSetId ?? context.sourceSetId ?? undefined}
         onSelectedChange={(id, checked) => {
           if (checked) {
             context.setSelectedFileIds([...context.selectFileIds, id]);
@@ -32,7 +33,6 @@ const MasonryItemWrapper = memo<MasonryItemWrapperProps>(({ data: item, context 
             context.setSelectedFileIds(context.selectFileIds.filter((item) => item !== id));
           }
         }}
-        {...item}
       />
     </div>
   );

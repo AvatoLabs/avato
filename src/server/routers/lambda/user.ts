@@ -13,17 +13,23 @@ import {
 } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import { after } from 'next/server';
-import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 
 import { getReferralStatus, getSubscriptionPlan } from '@/business/server/user';
 import { MessageModel } from '@/database/models/message';
 import { SessionModel } from '@/database/models/session';
+import { SpaceModel } from '@/database/models/space';
 import { UserModel } from '@/database/models/user';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
 import { FileService } from '@/server/services/file';
+import {
+  buildLegacyUserAvatarStorageKey,
+  buildUserAvatarRoute,
+  buildUserAvatarStorageKey,
+  parseUserAvatarFileNameFromRoute,
+} from '@/server/services/user/avatar';
 
 const usernameSchema = z
   .string()
@@ -38,6 +44,7 @@ const userProcedure = authedProcedure.use(serverDatabase).use(async ({ ctx, next
       fileService: new FileService(ctx.serverDB, ctx.userId),
       messageModel: new MessageModel(ctx.serverDB, ctx.userId),
       sessionModel: new SessionModel(ctx.serverDB, ctx.userId),
+      spaceModel: new SpaceModel(ctx.serverDB, ctx.userId),
       userModel: new UserModel(ctx.serverDB, ctx.userId),
     },
   });
@@ -125,9 +132,26 @@ export const userRouter = router({
         return;
       }
 
-      const oldFilePath = oldAvatarUrl.replace('/webapi/', '');
+      const oldFilePaths = new Set<string>();
+      const oldAvatarFileName = parseUserAvatarFileNameFromRoute(oldAvatarUrl, ctx.userId);
+      if (oldAvatarFileName) {
+        const personalSpace = await ctx.spaceModel.getOrCreatePersonalSpace();
+        oldFilePaths.add(buildUserAvatarStorageKey(personalSpace.id, oldAvatarFileName));
+        oldFilePaths.add(buildLegacyUserAvatarStorageKey(ctx.userId, oldAvatarFileName));
+      } else {
+        oldFilePaths.add(oldAvatarUrl.replace('/webapi/', ''));
+      }
+
       try {
-        await ctx.fileService.deleteFile(oldFilePath);
+        await Promise.all(
+          [...oldFilePaths].map(async (oldFilePath) => {
+            try {
+              await ctx.fileService.deleteFile(oldFilePath);
+            } catch {
+              // best-effort cleanup; avatar update should not fail because deletion failed
+            }
+          }),
+        );
       } catch {
         // best-effort cleanup; avatar update should not fail because deletion failed
       }
@@ -151,15 +175,21 @@ export const userRouter = router({
         const base64Data = input.slice(commaIndex + 1);
 
         // Use UUID to generate unique filename to prevent caching issues
-        const fileName = `${uuidv4()}.${fileType}`;
-        const filePath = `user/avatar/${ctx.userId}/${fileName}`;
+        const { key: filePath } = await ctx.fileService.createOpaqueUserBlobPath(
+          'user-avatar',
+          fileType,
+        );
+        const fileName = filePath.split('/').pop();
+        if (!fileName) {
+          throw new Error('Invalid avatar storage key');
+        }
 
         // Convert Base64 data to Buffer and upload to S3
         const buffer = Buffer.from(base64Data, 'base64');
 
         await ctx.fileService.uploadBuffer(filePath, buffer, mimeType);
 
-        const avatarUrl = '/webapi/' + filePath;
+        const avatarUrl = buildUserAvatarRoute(ctx.userId, fileName);
         await removeOldAvatar(avatarUrl);
 
         return ctx.userModel.updateUser({ avatar: avatarUrl });

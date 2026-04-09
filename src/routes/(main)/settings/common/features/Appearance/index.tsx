@@ -2,7 +2,7 @@
 
 import { type FormGroupItemType, type NeutralColors, type PrimaryColors } from '@lobehub/ui';
 import { Form, Icon, Skeleton } from '@lobehub/ui';
-import { Segmented } from 'antd';
+import { App, Segmented } from 'antd';
 import isEqual from 'fast-deep-equal';
 import { Ban, Gauge, Loader2Icon, Mouse, Waves } from 'lucide-react';
 import { memo, useCallback, useEffect, useState } from 'react';
@@ -26,6 +26,8 @@ import { ThemeSwatchesNeutral, ThemeSwatchesPrimary } from './ThemeSwatches';
 
 const Appearance = memo(() => {
   const { t } = useTranslation('setting');
+  const [form] = Form.useForm();
+  const { message } = App.useApp();
   const { general } = useUserStore(settingsSelectors.currentSettings, isEqual);
   const [setSettings, isUserStateInit] = useUserStore((s) => [s.setSettings, s.isUserStateInit]);
   const [loading, setLoading] = useState(false);
@@ -38,15 +40,23 @@ const Appearance = memo(() => {
   const isCustomPreset = currentPreset === 'custom';
 
   const updateTheme = useCallback(
-    async (value: Pick<UserGeneralConfig, 'neutralColor' | 'primaryColor'>) => {
+    async (
+      value: Pick<UserGeneralConfig, 'neutralColor' | 'primaryColor'>,
+      options?: { showError?: boolean },
+    ) => {
       setLoading(true);
       try {
         await setSettings({ general: value });
+        return true;
+      } catch (error) {
+        console.error('Failed to save appearance settings:', error);
+        if (options?.showError !== false) message.error(t('settingAppearance.saveFailed'));
+        return false;
       } finally {
         setLoading(false);
       }
     },
-    [setSettings],
+    [message, setSettings, t],
   );
 
   const handlePresetChange = async (presetId: ThemePresetId) => {
@@ -68,19 +78,24 @@ const Appearance = memo(() => {
   useEffect(() => {
     const preset = getThemePreset(resolvedPreset);
 
-    if (!preset || preset.isCustom || preset.id === 'obsidian') return;
+    if (!preset || preset.id === 'custom' || preset.id === 'obsidian') return;
 
-    const usesLegacyPrimaryColor = !!preset.legacyPrimaryColors?.some(
-      (value) => normalizeThemeColor(value) === currentPrimaryColor,
+    const legacyPrimaryColors =
+      'legacyPrimaryColors' in preset ? preset.legacyPrimaryColors : undefined;
+    const usesLegacyPrimaryColor = !!legacyPrimaryColors?.some(
+      (value: string) => normalizeThemeColor(value) === currentPrimaryColor,
     );
     const usesPresetNeutralColor = normalizeThemeColor(preset.neutralColor) === currentNeutralColor;
 
     if (!usesLegacyPrimaryColor || !usesPresetNeutralColor) return;
 
-    void updateTheme({
-      neutralColor: serializeThemeColor(preset.neutralColor) as any,
-      primaryColor: serializeThemeColor(preset.primaryColor) as any,
-    });
+    void updateTheme(
+      {
+        neutralColor: serializeThemeColor(preset.neutralColor) as any,
+        primaryColor: serializeThemeColor(preset.primaryColor) as any,
+      },
+      { showError: false },
+    );
   }, [currentNeutralColor, currentPrimaryColor, resolvedPreset, updateTheme]);
 
   if (!isUserStateInit) return <Skeleton active paragraph={{ rows: 5 }} title={false} />;
@@ -109,8 +124,11 @@ const Appearance = memo(() => {
                 <ThemeSwatchesPrimary
                   value={currentPrimaryColor as PrimaryColors | undefined}
                   onChange={(value) => {
+                    const nextPresetOverride = currentPreset === 'custom' ? 'custom' : undefined;
                     setPresetOverride('custom');
-                    void updateTheme({ primaryColor: serializeThemeColor(value) });
+                    void updateTheme({ primaryColor: serializeThemeColor(value) }).then((success) => {
+                      if (!success) setPresetOverride(nextPresetOverride);
+                    });
                   }}
                 />
               ),
@@ -123,8 +141,11 @@ const Appearance = memo(() => {
                 <ThemeSwatchesNeutral
                   value={currentNeutralColor as NeutralColors | undefined}
                   onChange={(value) => {
+                    const nextPresetOverride = currentPreset === 'custom' ? 'custom' : undefined;
                     setPresetOverride('custom');
-                    void updateTheme({ neutralColor: serializeThemeColor(value) });
+                    void updateTheme({ neutralColor: serializeThemeColor(value) }).then((success) => {
+                      if (!success) setPresetOverride(nextPresetOverride);
+                    });
                   }}
                 />
               ),
@@ -196,6 +217,7 @@ const Appearance = memo(() => {
   return (
     <Form
       collapsible={false}
+      form={form}
       initialValues={general}
       items={[theme]}
       itemsType={'group'}
@@ -204,6 +226,10 @@ const Appearance = memo(() => {
         setLoading(true);
         try {
           await setSettings({ general: v });
+        } catch (error) {
+          console.error('Failed to save appearance settings:', error);
+          form.setFieldsValue(general);
+          message.error(t('settingAppearance.saveFailed'));
         } finally {
           setLoading(false);
         }

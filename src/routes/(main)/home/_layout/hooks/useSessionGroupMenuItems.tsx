@@ -95,7 +95,12 @@ export const useSessionGroupMenuItems = () => {
             },
             okButtonProps: { danger: true },
             onOk: async () => {
-              await removeGroup(groupId);
+              try {
+                await removeGroup(groupId);
+              } catch (error) {
+                console.error('Failed to delete session group:', error);
+                message.error({ content: t('confirmRemoveGroupError') });
+              }
             },
             title: t('sessionGroup.confirmRemoveGroupAlert'),
           });
@@ -130,8 +135,8 @@ export const useSessionGroupMenuItems = () => {
             message.success({ content: t('sessionGroup.createAgentSuccess') });
           } catch (error) {
             message.destroy(key);
-            message.error({ content: t('sessionGroup.createGroupFailed') });
-            throw error;
+            console.error('Failed to create agent in session group:', error);
+            message.error({ content: t('createAgentFailed') });
           } finally {
             setIsCreatingAgent(false);
           }

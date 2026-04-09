@@ -56,6 +56,48 @@ import type { ChatMessage, ChatToolPayload } from '../types';
 
 const THREAD_STREAM_THROTTLE_MS = 100;
 
+const findThreadMessageIndexFromEnd = (messages: ChatMessage[], messageId: string) => {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.id === messageId) return index;
+  }
+
+  return -1;
+};
+
+const getThreadMessageById = (messages: ChatMessage[], messageId: string) => {
+  if (messages.length === 0) return undefined;
+
+  const lastMessage = messages.at(-1);
+  if (lastMessage?.id === messageId) return lastMessage;
+
+  const messageIndex = findThreadMessageIndexFromEnd(messages, messageId);
+  return messageIndex >= 0 ? messages[messageIndex] : undefined;
+};
+
+const updateThreadMessageRecord = (
+  messages: ChatMessage[],
+  messageId: string,
+  updater: (message: ChatMessage) => ChatMessage,
+) => {
+  if (messages.length === 0) return messages;
+
+  const lastIndex = messages.length - 1;
+  const targetIndex =
+    messages.at(-1)?.id === messageId
+      ? lastIndex
+      : findThreadMessageIndexFromEnd(messages, messageId);
+
+  if (targetIndex < 0) return messages;
+
+  const currentMessage = messages[targetIndex];
+  const nextMessage = updater(currentMessage);
+  if (nextMessage === currentMessage) return messages;
+
+  const nextMessages = messages.slice();
+  nextMessages[targetIndex] = nextMessage;
+  return nextMessages;
+};
+
 export default function ThreadDetailScreen({
   navigation,
   route,
@@ -123,16 +165,7 @@ export default function ThreadDetailScreen({
 
   const updateThreadMessage = useCallback(
     (messageId: string, updater: (message: ChatMessage) => ChatMessage) => {
-      setThreadMessages((prev) => {
-        let didUpdate = false;
-        const nextMessages = prev.map((message) => {
-          if (message.id !== messageId) return message;
-          didUpdate = true;
-          return updater(message);
-        });
-
-        return didUpdate ? nextMessages : prev;
-      });
+      setThreadMessages((prev) => updateThreadMessageRecord(prev, messageId, updater));
     },
     [setThreadMessages],
   );
@@ -269,8 +302,7 @@ export default function ThreadDetailScreen({
 
     const scheduleAssistantUpdate = (updater: (message: ChatMessage) => ChatMessage) => {
       const currentAssistant =
-        pendingAssistantDraft ??
-        messagesRef.current.find((message) => message.id === assistantTempId);
+        pendingAssistantDraft ?? getThreadMessageById(messagesRef.current, assistantTempId);
 
       if (!currentAssistant) return;
 
@@ -407,7 +439,7 @@ export default function ThreadDetailScreen({
       );
 
       flushPendingAssistantNow();
-      const localAssistant = messagesRef.current.find((message) => message.id === assistantTempId);
+      const localAssistant = getThreadMessageById(messagesRef.current, assistantTempId);
       const resolvedTools = mergeResolvedToolPayloads(result.tools, result.toolExecutions);
 
       try {
@@ -505,7 +537,7 @@ export default function ThreadDetailScreen({
   const applyThreadToolExecutions = useCallback(
     (assistantMessageId: string, executions: ToolExecutionItem[], tools?: ChatToolPayload[]) => {
       const baseTools =
-        tools ?? messagesRef.current.find((message) => message.id === assistantMessageId)?.tools;
+        tools ?? getThreadMessageById(messagesRef.current, assistantMessageId)?.tools;
       const resolvedTools = mergeResolvedToolPayloads(baseTools ?? undefined, executions);
       if (!resolvedTools) return;
 

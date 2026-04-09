@@ -10,7 +10,7 @@ import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { type NavItemProps } from '@/features/NavPanel/components/NavItem';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { glassSidebarStyles } from '@/features/NavPanel/glassSidebar.styles';
-import { buildFilesRootPath, useSpaceName } from '@/features/ResourceSpaces';
+import { buildFilesRootPath } from '@/features/ResourceSpaces';
 import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useActiveTabKey } from '@/hooks/useActiveTabKey';
 import { useGlobalStore } from '@/store/global';
@@ -38,7 +38,6 @@ const Nav = memo(() => {
   const { t: tSetting } = useTranslation('setting');
   const { spaceId: routeSpaceId } = useParams<{ spaceId?: string }>();
   const resolvedSpaceId = resolveWorkspaceSpaceId({ spaceId: routeSpaceId });
-  const spaceName = useSpaceName(resolvedSpaceId);
   const toggleCommandMenu = useGlobalStore((s) => s.toggleCommandMenu);
   const { showMarket, showAiImage } = useServerConfigStore(featureFlagsSelectors);
 
@@ -176,11 +175,6 @@ const Nav = memo(() => {
         <span className={glassSidebarStyles.sectionLabel}>
           {tHome('workspace.sidebar.section.navigation')}
         </span>
-        {spaceName && (
-          <Tag bordered={false}>
-            {tHome('workspace.sidebar.currentWorkspace', { name: spaceName })}
-          </Tag>
-        )}
       </Flexbox>
       {mainNav.map(renderItem)}
     </Flexbox>

@@ -1,8 +1,17 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { SortType } from '@/types/files';
+
+const DEFAULT_SORTER = 'createdAt';
+const DEFAULT_VIEW_MODE = 'list';
+
+const getUrlSyncState = (searchParams: URLSearchParams) => ({
+  sorter: (searchParams.get('sorter') || DEFAULT_SORTER) as 'name' | 'createdAt' | 'size',
+  sortType: (searchParams.get('sortType') || SortType.Desc) as SortType,
+  viewMode: (searchParams.get('view') || DEFAULT_VIEW_MODE) as 'list' | 'masonry',
+});
 
 /**
  * Hook to sync ContentManager store state with URL query parameters.
@@ -10,6 +19,9 @@ import { SortType } from '@/types/files';
  */
 export const useContentManagerUrlSync = (enabled: boolean = true) => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { sorter: urlSorter, sortType: urlSortType, viewMode: urlViewMode } =
+    getUrlSyncState(searchParams);
+  const isHandlingUrlChangeRef = useRef(false);
 
   const [sorter, sortType, viewMode, setSorter, setSortType, setViewMode] = useContentManagerStore(
     (s) => [s.sorter, s.sortType, s.viewMode, s.setSorter, s.setSortType, s.setViewMode],
@@ -19,50 +31,49 @@ export const useContentManagerUrlSync = (enabled: boolean = true) => {
   useEffect(() => {
     if (!enabled) return;
 
-    const sorterParam = (searchParams.get('sorter') || 'createdAt') as
-      | 'name'
-      | 'createdAt'
-      | 'size';
-    const sortTypeParam = (searchParams.get('sortType') || SortType.Desc) as SortType;
-    const viewParam = (searchParams.get('view') || 'list') as 'list' | 'masonry';
+    isHandlingUrlChangeRef.current = true;
 
-    setSorter(sorterParam);
-    setSortType(sortTypeParam);
-    setViewMode(viewParam);
-  }, [enabled, searchParams, setSorter, setSortType, setViewMode]);
+    if (sorter !== urlSorter) setSorter(urlSorter);
+    if (sortType !== urlSortType) setSortType(urlSortType);
+    if (viewMode !== urlViewMode) setViewMode(urlViewMode);
+  }, [enabled, urlSorter, urlSortType, urlViewMode, setSorter, setSortType, setViewMode]);
 
   // Sync store changes to URL (Store → URL)
   useEffect(() => {
     if (!enabled) return;
 
-    setSearchParams(
-      (prev) => {
-        const newParams = new URLSearchParams(prev);
+    if (isHandlingUrlChangeRef.current) {
+      const isAlignedWithUrl =
+        sorter === urlSorter && sortType === urlSortType && viewMode === urlViewMode;
 
-        // Sorter (clear if default)
-        if (sorter === 'createdAt') {
-          newParams.delete('sorter');
-        } else {
-          newParams.set('sorter', sorter);
-        }
+      if (!isAlignedWithUrl) return;
 
-        // Sort type (clear if default)
-        if (sortType === SortType.Desc) {
-          newParams.delete('sortType');
-        } else {
-          newParams.set('sortType', sortType);
-        }
+      isHandlingUrlChangeRef.current = false;
+    }
 
-        // View mode (clear if default)
-        if (viewMode === 'list') {
-          newParams.delete('view');
-        } else {
-          newParams.set('view', viewMode);
-        }
+    const nextParams = new URLSearchParams(searchParams.toString());
 
-        return newParams;
-      },
-      { replace: true },
-    ); // Use replace to avoid polluting history
-  }, [enabled, sorter, sortType, viewMode, setSearchParams]);
+    if (sorter === DEFAULT_SORTER) nextParams.delete('sorter');
+    else nextParams.set('sorter', sorter);
+
+    if (sortType === SortType.Desc) nextParams.delete('sortType');
+    else nextParams.set('sortType', sortType);
+
+    if (viewMode === DEFAULT_VIEW_MODE) nextParams.delete('view');
+    else nextParams.set('view', viewMode);
+
+    if (nextParams.toString() === searchParams.toString()) return;
+
+    setSearchParams(nextParams, { replace: true });
+  }, [
+    enabled,
+    searchParams,
+    setSearchParams,
+    sorter,
+    sortType,
+    urlSorter,
+    urlSortType,
+    urlViewMode,
+    viewMode,
+  ]);
 };

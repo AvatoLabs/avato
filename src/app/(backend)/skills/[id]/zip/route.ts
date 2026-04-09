@@ -45,18 +45,18 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
 
     const skill = await skillModel.findById(id);
 
-    if (!skill?.zipFileHash) {
+    if (!skill?.zipSha256) {
       return new Response('Not found', { status: 404 });
     }
 
     if (!hasValidInternalToken) {
-      const canAccess = await fileModel.canAccessGlobalFileByHash(skill.zipFileHash);
+      const canAccess = await fileModel.canAccessGlobalFileBySha256(skill.zipSha256);
       if (!canAccess) {
         return new Response('Not found', { status: 404 });
       }
     }
 
-    const fileInfo = await fileModel.checkHash(skill.zipFileHash);
+    const fileInfo = await fileModel.checkHash(skill.zipSha256);
 
     if (!fileInfo.isExist || !fileInfo.url) {
       return new Response('Not found', { status: 404 });
@@ -72,7 +72,7 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
       await contentModel.createAccessEvent({
         accessType: 'file_url_issued',
         metadata: {
-          fileHash: skill.zipFileHash,
+          sha256: skill.zipSha256,
           skillId: skill.id,
           via: 'skill_zip_proxy',
         },

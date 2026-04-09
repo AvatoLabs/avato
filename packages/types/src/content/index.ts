@@ -1,4 +1,11 @@
-import type { FilesTabs, SortType } from '../files';
+import type {
+  FileAssetClassification,
+  FileAssetRenditionKind,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+  FilesTabs,
+  SortType,
+} from '../files';
 
 export type BlobStatus = 'staging' | 'ready' | 'quarantined' | 'deleted';
 
@@ -122,6 +129,16 @@ export interface ExplainAccessResult {
  * Used by the ContentManager optimistic layer.
  */
 export interface ContentItem {
+  assetClassification?: FileAssetClassification | null;
+  assetLatestGovernanceAuditAction?: string | null;
+  assetLatestGovernanceAuditActorDisplayName?: string | null;
+  assetLatestGovernanceAuditAt?: Date | null;
+  assetPrimaryRenditionKind?: FileAssetRenditionKind | null;
+  assetPrimaryRenditionLabel?: string | null;
+  assetRenditionCount?: number | null;
+  assetReviewStatus?: FileAssetReviewStatus | null;
+  assetUsagePolicy?: FileAssetUsagePolicy | null;
+  assetVersionLabel?: string | null;
   _optimistic?: {
     error?: Error;
     isPending: boolean;
@@ -167,6 +184,10 @@ export interface SyncOperation {
 }
 
 export interface ContentQueryParams {
+  assetClassification?: FileAssetClassification;
+  assetRightsOwner?: string;
+  assetReviewStatus?: FileAssetReviewStatus;
+  assetUsagePolicy?: FileAssetUsagePolicy;
   category?: FilesTabs;
   limit?: number;
   offset?: number;
@@ -185,11 +206,12 @@ export interface CreateFileResourceParams {
   metadata?: Record<string, any>;
   name: string;
   parentId?: string;
+  sha256: string;
   size: number;
+  storageKey: string;
   sourceSetId?: string;
   sourceType: 'file';
   spaceId?: string;
-  url: string;
 }
 
 export interface CreateDocumentResourceParams {

@@ -40,13 +40,19 @@ const CreateGroupModal = memo<CreateGroupModalProps>(
               return message.warning(t('sessionGroup.tooLong'));
 
             setLoading(true);
-            const groupId = await addGroup(input);
-            await updateAgentGroup(id, groupId);
-            toggleExpandSessionGroup(groupId, true);
-            setLoading(false);
+            try {
+              const groupId = await addGroup(input);
+              await updateAgentGroup(id, groupId);
+              toggleExpandSessionGroup(groupId, true);
 
-            message.success(t('sessionGroup.createSuccess'));
-            onCancel?.(e);
+              message.success(t('sessionGroup.createSuccess'));
+              onCancel?.(e);
+            } catch (error) {
+              console.error('Failed to create session group from modal:', error);
+              message.error(t('sessionGroup.createGroupFailed'));
+            } finally {
+              setLoading(false);
+            }
           }}
         >
           <Flexbox paddingBlock={16}>

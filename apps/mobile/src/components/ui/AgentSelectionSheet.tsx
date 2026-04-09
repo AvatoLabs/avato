@@ -2,7 +2,7 @@ import { ChevronRight } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  ScrollView,
+  FlatList,
   Text,
   TextInput,
   TouchableOpacity,
@@ -156,6 +156,142 @@ export default function AgentSelectionSheet({
     return agents.filter((agent) => !excluded.has(agent.id));
   }, [agents, excludedAgentIds]);
 
+  const renderListHeader = useMemo(
+    () => (
+      <>
+        {showTitleInput ? (
+          <View className="mb-4">
+            <Text
+              className="mb-1.5 px-1 text-[12px] font-medium"
+              style={{ color: colors.secondaryText }}
+            >
+              {titleInputLabel || t.agentConfigName}
+            </Text>
+            <TextInput
+              className="rounded-2xl px-4 py-3 text-[15px]"
+              placeholder={titleInputPlaceholder}
+              placeholderTextColor={colors.secondaryText}
+              style={{ backgroundColor: colors.fillTertiary, color: colors.foreground }}
+              value={draftTitle}
+              onChangeText={setDraftTitle}
+            />
+          </View>
+        ) : null}
+
+        {showSupervisorModelPicker ? (
+          <SelectionListItem
+            className="mb-4"
+            subtitle={supervisorModelLabel}
+            title={t.groupCreateSupervisorModel}
+            rightAccessory={
+              <ChevronRight
+                color={colors.secondaryText}
+                size={18}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            }
+            onPress={() => {
+              haptics.light();
+              setSupervisorModelDrawerVisible(true);
+            }}
+          />
+        ) : null}
+
+        <View className="mb-4">
+          <Text
+            className="mb-1.5 px-1 text-[12px] font-medium"
+            style={{ color: colors.secondaryText }}
+          >
+            {t.search}
+          </Text>
+          <SearchField
+            placeholder={t.search}
+            size="compact"
+            value={keyword}
+            onChangeText={setKeyword}
+          />
+        </View>
+      </>
+    ),
+    [
+      colors.fillTertiary,
+      colors.foreground,
+      colors.secondaryText,
+      draftTitle,
+      keyword,
+      showSupervisorModelPicker,
+      showTitleInput,
+      supervisorModelLabel,
+      t.agentConfigName,
+      t.groupCreateSupervisorModel,
+      t.search,
+      titleInputLabel,
+      titleInputPlaceholder,
+    ],
+  );
+
+  const renderListEmpty = useMemo(() => {
+    if (loading) {
+      return (
+        <View className="items-center justify-center py-8">
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      );
+    }
+
+    return (
+      <View className="rounded-2xl px-4 py-5" style={{ backgroundColor: colors.fillQuaternary }}>
+        <Text className="text-[14px] font-semibold" style={{ color: colors.foreground }}>
+          {t.agentsEmpty}
+        </Text>
+        <Text className="mt-1 text-[12px] leading-5" style={{ color: colors.secondaryText }}>
+          {t.agentsEmptyDesc}
+        </Text>
+      </View>
+    );
+  }, [
+    colors.fillQuaternary,
+    colors.foreground,
+    colors.primary,
+    colors.secondaryText,
+    loading,
+    t.agentsEmpty,
+    t.agentsEmptyDesc,
+  ]);
+
+  const renderAgentItem = useMemo(
+    () =>
+      ({ item, index }: { item: AgentQueryItem; index: number }) => {
+        const selected = selectedIds.has(item.id);
+
+        return (
+          <SelectionListItem
+            className={index === filteredAgents.length - 1 ? '' : 'mb-2'}
+            leading={<AgentAvatar agent={item} />}
+            selected={selected}
+            subtitle={item.description || t.agentNoDescription}
+            subtitleNumberOfLines={3}
+            title={item.title || t.settingsDefaultAgent}
+            onPress={() => {
+              haptics.selection();
+              setSelectedIds((current) => {
+                const next = new Set(current);
+
+                if (next.has(item.id)) {
+                  next.delete(item.id);
+                } else {
+                  next.add(item.id);
+                }
+
+                return next;
+              });
+            }}
+          />
+        );
+      },
+    [filteredAgents.length, selectedIds, t.agentNoDescription, t.settingsDefaultAgent],
+  );
+
   const submitDisabled = submitting || (!allowEmptySelection && selectedIds.size === 0);
   const submitAction = (
     <TouchableOpacity
@@ -202,112 +338,16 @@ export default function AgentSelectionSheet({
         visible={visible}
         onClose={onClose}
       >
-        <ScrollView
+        <FlatList
+          ListEmptyComponent={renderListEmpty}
+          ListHeaderComponent={renderListHeader}
           className="px-5"
           contentContainerStyle={{ paddingBottom: 24 }}
+          data={filteredAgents}
+          keyExtractor={(item) => item.id}
           keyboardShouldPersistTaps="handled"
-        >
-          {showTitleInput ? (
-            <View className="mb-4">
-              <Text
-                className="mb-1.5 px-1 text-[12px] font-medium"
-                style={{ color: colors.secondaryText }}
-              >
-                {titleInputLabel || t.agentConfigName}
-              </Text>
-              <TextInput
-                className="rounded-2xl px-4 py-3 text-[15px]"
-                placeholder={titleInputPlaceholder}
-                placeholderTextColor={colors.secondaryText}
-                style={{ backgroundColor: colors.fillTertiary, color: colors.foreground }}
-                value={draftTitle}
-                onChangeText={setDraftTitle}
-              />
-            </View>
-          ) : null}
-
-          {showSupervisorModelPicker ? (
-            <SelectionListItem
-              className="mb-4"
-              subtitle={supervisorModelLabel}
-              title={t.groupCreateSupervisorModel}
-              rightAccessory={
-                <ChevronRight
-                  color={colors.secondaryText}
-                  size={18}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-              }
-              onPress={() => {
-                haptics.light();
-                setSupervisorModelDrawerVisible(true);
-              }}
-            />
-          ) : null}
-
-          <View className="mb-4">
-            <Text
-              className="mb-1.5 px-1 text-[12px] font-medium"
-              style={{ color: colors.secondaryText }}
-            >
-              {t.search}
-            </Text>
-            <SearchField
-              placeholder={t.search}
-              size="compact"
-              value={keyword}
-              onChangeText={setKeyword}
-            />
-          </View>
-
-          {loading ? (
-            <View className="items-center justify-center py-8">
-              <ActivityIndicator color={colors.primary} />
-            </View>
-          ) : filteredAgents.length === 0 ? (
-            <View
-              className="rounded-2xl px-4 py-5"
-              style={{ backgroundColor: colors.fillQuaternary }}
-            >
-              <Text className="text-[14px] font-semibold" style={{ color: colors.foreground }}>
-                {t.agentsEmpty}
-              </Text>
-              <Text className="mt-1 text-[12px] leading-5" style={{ color: colors.secondaryText }}>
-                {t.agentsEmptyDesc}
-              </Text>
-            </View>
-          ) : (
-            filteredAgents.map((agent, index) => {
-              const selected = selectedIds.has(agent.id);
-
-              return (
-                <SelectionListItem
-                  className={index === filteredAgents.length - 1 ? '' : 'mb-2'}
-                  key={agent.id}
-                  leading={<AgentAvatar agent={agent} />}
-                  selected={selected}
-                  subtitle={agent.description || t.agentNoDescription}
-                  subtitleNumberOfLines={3}
-                  title={agent.title || t.settingsDefaultAgent}
-                  onPress={() => {
-                    haptics.selection();
-                    setSelectedIds((current) => {
-                      const next = new Set(current);
-
-                      if (next.has(agent.id)) {
-                        next.delete(agent.id);
-                      } else {
-                        next.add(agent.id);
-                      }
-
-                      return next;
-                    });
-                  }}
-                />
-              );
-            })
-          )}
-        </ScrollView>
+          renderItem={renderAgentItem}
+        />
       </BottomSheetScaffold>
       {showSupervisorModelPicker ? (
         <ModelDrawer

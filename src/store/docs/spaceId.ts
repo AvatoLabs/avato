@@ -13,9 +13,11 @@ export const resolvePageStoreSpaceId = ({
 }: ResolvePageStoreSpaceIdParams): string | undefined => {
   if (spaceId) return spaceId;
 
-  const routeSpaceId = getPageSpaceIdFromPathname(
-    pathname ?? (typeof window !== 'undefined' ? window.location.pathname : undefined),
-  );
+  const effectivePathname =
+    pathname ?? (typeof window !== 'undefined' ? window.location.pathname : undefined);
+  const routeSpaceId = effectivePathname
+    ? getPageSpaceIdFromPathname(effectivePathname)
+    : undefined;
   if (routeSpaceId) return routeSpaceId;
 
   return queryFilterSpaceId ?? undefined;

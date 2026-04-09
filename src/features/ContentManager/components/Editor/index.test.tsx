@@ -37,6 +37,7 @@ interface MockFileStoreState {
 
 const mockSetSearchParams = vi.hoisted(() => vi.fn());
 const mockEnsureFileDocument = vi.hoisted(() => vi.fn());
+const mockUseOpenFileDocument = vi.hoisted(() => vi.fn());
 
 let mockContentManagerState: MockContentManagerState = {
   currentViewItemId: 'file-1',
@@ -66,18 +67,54 @@ vi.mock('@lobehub/ui', () => ({
   Flexbox: vi.fn(({ children }) => <div>{children}</div>),
 }));
 
-vi.mock('antd', () => ({
-  Modal: vi.fn(({ children, open }) => (open ? <div>{children}</div> : null)),
-}));
+vi.mock('antd', async () => {
+  const actual = await vi.importActual<typeof import('antd')>('antd');
 
-vi.mock('antd-style', () => ({
-  cssVar: {
-    colorBorderSecondary: '#d9d9d9',
-  },
-  useTheme: () => ({
-    colorText: '#000',
-  }),
-}));
+  return {
+    ...actual,
+    Modal: vi.fn(({ children, open }) => (open ? <div>{children}</div> : null)),
+  };
+});
+
+vi.mock('antd-style', () => {
+  const tokenProxy = new Proxy(
+    {},
+    {
+      get: (_, prop) => String(prop),
+    },
+  );
+  const cssVarProxy = new Proxy(
+    {
+      colorBorderSecondary: '#d9d9d9',
+      colorFill: '#f5f5f5',
+      colorTextSecondary: '#666',
+    },
+    {
+      get: (target, prop) => target[prop as keyof typeof target] ?? String(prop),
+    },
+  );
+  const styleContext = {
+    css: () => 'mock-class',
+    cssVar: cssVarProxy,
+    cx: (...classNames: Array<string | false | null | undefined>) =>
+      classNames.filter(Boolean).join(' '),
+    token: tokenProxy,
+  };
+
+  return {
+    css: () => 'mock-class',
+    createGlobalStyle: vi.fn(() => () => null),
+    createStaticStyles: vi.fn((factory: any) => factory(styleContext)),
+    createStyles: vi.fn((factory: any) => () => factory(styleContext)),
+    cssVar: cssVarProxy,
+    cx: styleContext.cx,
+    keyframes: vi.fn(() => 'mock-keyframes'),
+    responsive: vi.fn((styles: any) => styles),
+    useTheme: () => ({
+      colorText: '#000',
+    }),
+  };
+});
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -154,6 +191,10 @@ vi.mock('@/utils/client/downloadFile', () => ({
   downloadFile: vi.fn(),
 }));
 
+vi.mock('../../hooks/useOpenFileDocument', () => ({
+  useOpenFileDocument: mockUseOpenFileDocument,
+}));
+
 vi.mock('./FileContent', () => ({
   default: vi.fn(({ fileId }: { fileId?: string }) => (
     <div data-testid="file-content">{fileId}</div>
@@ -178,6 +219,24 @@ describe('FileEditor', () => {
       fetchedFiles: {},
     };
     mockEnsureFileDocument.mockReset();
+    mockUseOpenFileDocument.mockImplementation(({ fileId, id }: { fileId?: string; id: string }) =>
+      async () => {
+        const documentId = (await mockEnsureFileDocument(fileId || id)).id;
+
+        mockContentManagerState.setCurrentViewItemId(documentId);
+        mockContentManagerState.setMode('doc');
+        mockSetSearchParams(
+          (prev: URLSearchParams) => {
+            const next = new URLSearchParams(prev);
+            next.set('file', documentId);
+            return next;
+          },
+          { replace: true },
+        );
+
+        return documentId;
+      },
+    );
     mockSetSearchParams.mockReset();
   });
 
@@ -263,4 +322,5 @@ describe('FileEditor', () => {
     expect(screen.getByText('Fetched.md')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'preview.editAsDocument' })).toBeVisible();
   });
+
 });

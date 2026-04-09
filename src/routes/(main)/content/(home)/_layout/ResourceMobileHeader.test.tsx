@@ -6,9 +6,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import ResourceMobileHeader from './ResourceMobileHeader';
 
-const { navigateMock, openCreateSpaceMock, spacesState, summariesState } = vi.hoisted(() => ({
+const { locationState, navigateMock, openCreateSpaceMock, spacesState, summariesState } =
+  vi.hoisted(() => ({
   navigateMock: vi.fn(),
   openCreateSpaceMock: vi.fn(),
+  locationState: {
+    pathname: '/spaces/spc_ops/files',
+  },
   spacesState: {
     current: [] as Array<{ id: string; kind: 'personal' | 'team'; name: string }>,
   },
@@ -23,11 +27,14 @@ vi.mock('@lobehub/ui', () => ({
       {children}
     </button>
   ),
-  Flexbox: ({ children, onClick }: any) => (
-    <div role={'button'} tabIndex={0} onClick={onClick}>
-      {children}
-    </div>
-  ),
+  Flexbox: ({ children, onClick }: any) =>
+    onClick ? (
+      <div role={'button'} tabIndex={0} onClick={onClick}>
+        {children}
+      </div>
+    ) : (
+      <div>{children}</div>
+    ),
   Icon: ({ icon: IconComponent }: any) =>
     IconComponent ? <span>{IconComponent.displayName ?? 'icon'}</span> : <span>icon</span>,
   Modal: ({ children, open, title }: any) =>
@@ -58,6 +65,7 @@ vi.mock('react-i18next', () => ({
           'Open published workspace memory. Review access requires editor or admin role.',
         'shared.title': 'Shared with me',
         'space.create.title': 'Create Space',
+        'space.quickAccessTitle': 'Quick Access',
         'space.sectionTitle': 'Spaces',
         'trash.title': 'Trash',
       };
@@ -72,7 +80,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('react-router-dom', () => ({
-  useLocation: () => ({ pathname: '/spaces/spc_ops/files' }),
+  useLocation: () => locationState,
   useNavigate: () => navigateMock,
   useParams: () => ({ spaceId: 'spc_ops' }),
 }));
@@ -110,7 +118,15 @@ vi.mock('@/features/ResourceSpaces', () => ({
     spaceId ? `/spaces/${spaceId}/files/trash` : '/spaces/trash',
   buildSharedFilesPath: () => '/spaces/shared',
   buildSpaceMemoryPath: (spaceId: string) => `/spaces/${spaceId}/memory`,
+  buildSourceSetTrashPath: (spaceId?: string | null, sourceSetId?: string | null) =>
+    `/spaces/${spaceId}/files/trash?scope=source-set:${sourceSetId}`,
   useSpaceName: () => 'Ops Space',
+}));
+
+vi.mock('@/features/ContentManager/useFileScope', () => ({
+  useFileScope: () => ({
+    sourceSetId: 'ss_ops',
+  }),
 }));
 
 vi.mock('@/features/ResourceSpaces/SpaceList', () => ({
@@ -140,6 +156,18 @@ vi.mock('@/routes/(main)/content/features/SourceSetTrashButton', () => ({
   SourceSetTrashButton: () => <div>SourceSetTrashButton</div>,
 }));
 
+vi.mock('@/store/sourceSet', () => ({
+  sourceSetSelectors: {
+    getSourceSetNameById: () => () => 'Operations Set',
+  },
+  useSourceSetStore: (selector: any) =>
+    selector({
+      activeSourceSetItems: {
+        ss_ops: { id: 'ss_ops', name: 'Operations Set' },
+      },
+    }),
+}));
+
 vi.mock('./Header/CategoryMenu', () => ({
   default: () => <div>CategoryMenu</div>,
 }));
@@ -155,6 +183,26 @@ const makeSummary = (
   canCreate: true,
   canPublish: true,
   canReview: options?.canReview ?? true,
+  contract:
+    options?.canReview === false
+      ? {
+          canAccessAudit: false,
+          canCreate: true,
+          canManageRecall: false,
+          canViewInbox: true,
+          detailViews: ['overview'],
+          recallFilters: ['all'],
+          sections: ['inbox', 'published', 'playbooks', 'policies'],
+        }
+      : {
+          canAccessAudit: true,
+          canCreate: true,
+          canManageRecall: true,
+          canViewInbox: true,
+          detailViews: ['audit', 'overview'],
+          recallFilters: ['active', 'all', 'disabled', 'expired', 'stale'],
+          sections: ['inbox', 'published', 'playbooks', 'policies'],
+        },
   id: 'spc_ops',
   kind: 'team',
   membershipRole: 'editor',
@@ -180,6 +228,7 @@ const makeSummary = (
 describe('ResourceMobileHeader', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    locationState.pathname = '/spaces/spc_ops/files';
     spacesState.current = [{ id: 'spc_ops', kind: 'team', name: 'Ops Space' }];
     summariesState.current = [
       [
@@ -207,7 +256,7 @@ describe('ResourceMobileHeader', () => {
   it('still opens the workspace switcher when tapping the current space title', () => {
     render(<ResourceMobileHeader />);
 
-    fireEvent.click(screen.getByText('Ops Space').closest('[role="button"]')!);
+    fireEvent.click(screen.getByTestId('mobile-header-left').querySelector('[role="button"]')!);
 
     expect(screen.getByTestId('workspace-modal')).toBeInTheDocument();
     expect(screen.getByText('SpaceList')).toBeInTheDocument();
@@ -240,5 +289,29 @@ describe('ResourceMobileHeader', () => {
 
     expect(navigateMock).toHaveBeenCalledWith('/spaces/spc_ops/memory');
     expect(screen.queryByTestId('workspace-modal')).not.toBeInTheDocument();
+  });
+
+  it('treats shared-with-me as an independent surface instead of a workspace switcher trigger', () => {
+    locationState.pathname = '/spaces/shared';
+
+    render(<ResourceMobileHeader />);
+
+    expect(screen.getByText('Quick Access / Shared with me')).toBeInTheDocument();
+    expect(screen.queryByText('SourceSetTrashButton')).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('mobile-header-left').querySelector('[role="button"]'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows trash as attached to the current source set and hides the workspace switcher affordance', () => {
+    locationState.pathname = '/spaces/spc_ops/files/trash';
+
+    render(<ResourceMobileHeader />);
+
+    expect(screen.getByText('Operations Set / Trash')).toBeInTheDocument();
+    expect(screen.queryByText('SourceSetTrashButton')).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('mobile-header-left').querySelector('[role="button"]'),
+    ).not.toBeInTheDocument();
   });
 });

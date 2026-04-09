@@ -1,7 +1,9 @@
 'use client';
 
 export {
-  canCreateSpaceMemory,
-  canReviewSpaceMemory,
+  canManageSpaceMemoryFromContract,
   getSpaceMemoryCapabilities,
+  getSpaceMemorySurface,
+  getSpaceMemorySurfaceContract,
+  resolveSpaceMemorySurfaceState,
 } from '@lobechat/types';

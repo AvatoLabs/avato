@@ -1,4 +1,3 @@
-import { getCanonicalContentKind } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
@@ -9,6 +8,7 @@ import { insertSourceSetsSchema } from '@/database/schemas';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { AuthorizedResourceResolver, ContentAuthorizer } from '@/server/services/content';
+import { getCanonicalContentKind } from '@/types/content';
 import { type SourceSetItem } from '@/types/sourceSet';
 
 const sourceSetProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {

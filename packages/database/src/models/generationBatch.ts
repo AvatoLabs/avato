@@ -6,9 +6,11 @@ import type {
   VideoGenerationAsset,
 } from '@lobechat/types';
 import debug from 'debug';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
+import { serverDBEnv } from '@/config/db';
 import { FileService } from '@/server/services/file';
+import { resolveRemovableStorageUrls } from '@/server/services/file/removableStorageUrls';
 
 import type {
   GenerationBatchItem,
@@ -16,8 +18,11 @@ import type {
   NewGenerationBatch,
 } from '../schemas/generation';
 import { generationBatches } from '../schemas/generation';
+import { files } from '../schemas/file';
 import type { LobeChatDatabase } from '../type';
+import { FileModel } from './file';
 import { GenerationModel } from './generation';
+import { resolveStableAppFileProxyUrl } from './utils/stableAppFileProxy';
 
 const log = debug('lobe-image:generation-batch-model');
 
@@ -25,14 +30,30 @@ export class GenerationBatchModel {
   private db: LobeChatDatabase;
   private userId: string;
   private fileService: FileService;
+  private fileModel: FileModel;
   private generationModel: GenerationModel;
 
   constructor(db: LobeChatDatabase, userId: string) {
     this.db = db;
     this.userId = userId;
     this.fileService = new FileService(db, userId);
+    this.fileModel = new FileModel(db, userId);
     this.generationModel = new GenerationModel(db, userId);
   }
+
+  private buildStableReadableUrlMap = async (urls: string[]) => {
+    const files = await this.fileModel.findByUrls(urls);
+
+    return new Map(files.map((file) => [file.url, `/f/${file.id}`]));
+  };
+
+  private resolveConfigFileUrl = async (
+    url: string,
+    stableReadableUrlMap: Map<string, string>,
+  ) =>
+    resolveStableAppFileProxyUrl(url) ??
+    stableReadableUrlMap.get(url) ??
+    this.fileService.getFullFileUrl(url);
 
   async create(value: NewGenerationBatch): Promise<GenerationBatchItem> {
     log('Creating generation batch: %O', {
@@ -116,6 +137,18 @@ export class GenerationBatchModel {
       return [];
     }
 
+    const configUrls = batchesWithGenerations.flatMap((batch) => {
+      const config = batch.config as GenerationConfig;
+
+      return [
+        config.imageUrl,
+        config.endImageUrl,
+        ...(Array.isArray(config.imageUrls) ? config.imageUrls : []),
+      ].filter((url): url is string => Boolean(url));
+    });
+
+    const stableReadableUrlMap = await this.buildStableReadableUrlMap(configUrls);
+
     // Transform the database result to match our frontend types
     const result: GenerationBatch[] = await Promise.all(
       batchesWithGenerations.map(async (batch) => {
@@ -130,18 +163,26 @@ export class GenerationBatchModel {
 
             // Handle single imageUrl
             if (config.imageUrl) {
-              config.imageUrl = await this.fileService.getFullFileUrl(config.imageUrl);
+              config.imageUrl = await this.resolveConfigFileUrl(
+                config.imageUrl,
+                stableReadableUrlMap,
+              );
             }
 
             // Handle endImageUrl (video start/end frame)
             if (config.endImageUrl) {
-              config.endImageUrl = await this.fileService.getFullFileUrl(config.endImageUrl);
+              config.endImageUrl = await this.resolveConfigFileUrl(
+                config.endImageUrl,
+                stableReadableUrlMap,
+              );
             }
 
             // Handle imageUrls array
             if (Array.isArray(config.imageUrls)) {
               config.imageUrls = await Promise.all(
-                config.imageUrls.map((url) => this.fileService.getFullFileUrl(url)),
+                config.imageUrls.map((url) =>
+                  this.resolveConfigFileUrl(url, stableReadableUrlMap),
+                ),
               );
             }
             return config;
@@ -189,6 +230,7 @@ export class GenerationBatchModel {
         generations: {
           columns: {
             asset: true,
+            fileId: true,
           },
         },
       },
@@ -199,15 +241,43 @@ export class GenerationBatchModel {
       return undefined;
     }
 
-    // 2. Collect asset file URLs that need to be deleted (video, cover, thumbnail)
-    const filesToDelete: string[] = [];
+    const fileIds = Array.from(
+      new Set(
+        batchWithGenerations.generations
+          ?.map((generation) => generation.fileId)
+          .filter((fileId): fileId is string => Boolean(fileId)) ?? [],
+      ),
+    );
+    const generatedFileRows =
+      fileIds.length > 0
+        ? await this.db.query.files.findMany({
+            columns: { blobId: true, fileHash: true, url: true },
+            where: and(eq(files.userId, this.userId), inArray(files.id, fileIds)),
+          })
+        : [];
+
+    // 2. Collect auxiliary asset URLs that do not have dedicated file rows
+    const filesToDelete = new Set<string>();
     if (batchWithGenerations.generations) {
       for (const gen of batchWithGenerations.generations) {
         const asset = gen.asset as ImageGenerationAsset | VideoGenerationAsset | null;
-        if (asset?.url) filesToDelete.push(asset.url);
-        if (asset?.thumbnailUrl) filesToDelete.push(asset.thumbnailUrl);
-        if (asset && 'coverUrl' in asset && asset.coverUrl) {
-          filesToDelete.push(asset.coverUrl);
+        if (!asset) continue;
+
+        if (!gen.fileId && asset.url) {
+          filesToDelete.add(asset.url);
+        }
+
+        if (asset.thumbnailUrl && asset.thumbnailUrl !== asset.url) {
+          filesToDelete.add(asset.thumbnailUrl);
+        }
+
+        if (
+          'coverUrl' in asset &&
+          asset.coverUrl &&
+          asset.coverUrl !== asset.url &&
+          asset.coverUrl !== asset.thumbnailUrl
+        ) {
+          filesToDelete.add(asset.coverUrl);
         }
       }
     }
@@ -218,15 +288,34 @@ export class GenerationBatchModel {
       .where(and(eq(generationBatches.id, id), eq(generationBatches.userId, this.userId)))
       .returning();
 
+    if (fileIds.length > 0) {
+      const removeGlobalFile = serverDBEnv.REMOVE_GLOBAL_FILE ?? true;
+
+      try {
+        await this.fileModel.deleteManyAny(fileIds, removeGlobalFile);
+
+        const removableFileUrls = await resolveRemovableStorageUrls(
+          this.fileModel,
+          generatedFileRows,
+          removeGlobalFile,
+        );
+        for (const url of removableFileUrls) {
+          filesToDelete.add(url);
+        }
+      } catch (error) {
+        log('Failed to delete generation files for batch %s: %O', id, error);
+      }
+    }
+
     log(
       'Generation batch %s deleted successfully with %d files to clean',
       id,
-      filesToDelete.length,
+      filesToDelete.size,
     );
 
     return {
       deletedBatch,
-      filesToDelete,
+      filesToDelete: [...filesToDelete],
     };
   }
 }

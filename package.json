@@ -516,6 +516,7 @@
       "drizzle-orm": "^0.45.1"
     },
     "patchedDependencies": {
+      "@react-navigation/native-stack": "patches/@react-navigation__native-stack.patch",
       "@lobehub/editor": "patches/@lobehub__editor.patch",
       "@lobehub/ui": "patches/@lobehub__ui.patch",
       "@swagger-api/apidom-reference": "patches/@swagger-api__apidom-reference.patch"

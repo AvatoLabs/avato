@@ -18,7 +18,6 @@ export const createBuiltinAgentSkillDetailModal = ({
 }: CreateBuiltinAgentSkillDetailModalOptions) =>
   createModal({
     children: <BuiltinAgentSkillDetailContent identifier={identifier} />,
-    destroyOnHidden: true,
     footer: null,
     title: t('dev.title.skillDetails', { ns: 'plugin' }),
     width: 800,
@@ -33,7 +32,6 @@ export const createBuiltinSkillDetailModal = ({
 }: CreateBuiltinSkillDetailModalOptions) =>
   createModal({
     children: <BuiltinSkillDetailContent identifier={identifier} />,
-    destroyOnHidden: true,
     footer: null,
     title: t('dev.title.skillDetails', { ns: 'plugin' }),
     width: 800,
@@ -50,7 +48,6 @@ export const createKlavisSkillDetailModal = ({
 }: CreateKlavisSkillDetailModalOptions) =>
   createModal({
     children: <KlavisSkillDetailContent identifier={identifier} serverName={serverName} />,
-    destroyOnHidden: true,
     footer: null,
     title: t('dev.title.skillDetails', { ns: 'plugin' }),
     width: 800,
@@ -65,7 +62,6 @@ export const createLobehubSkillDetailModal = ({
 }: CreateLobehubSkillDetailModalOptions) =>
   createModal({
     children: <LobehubSkillDetailContent identifier={identifier} />,
-    destroyOnHidden: true,
     footer: null,
     title: t('dev.title.skillDetails', { ns: 'plugin' }),
     width: 800,

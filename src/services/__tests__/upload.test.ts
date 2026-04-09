@@ -139,7 +139,7 @@ describe('UploadService', () => {
 
       expect(result).toMatchObject({
         fileType: 'image/png',
-        hash: expect.any(String),
+        sha256: expect.any(String),
         metadata: expect.objectContaining({
           path: mockStorageKey,
         }),

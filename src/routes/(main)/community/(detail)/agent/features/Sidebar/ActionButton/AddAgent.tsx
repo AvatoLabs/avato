@@ -66,7 +66,10 @@ const AddAgent = memo<{ mobile?: boolean }>(({ mobile }) => {
   };
 
   const createAgentWithMarketIdentifier = async (shouldNavigate = true) => {
-    if (!config) return;
+    if (!config) {
+      message.error(t('assistants.noConfig'));
+      return;
+    }
 
     // Note: agentService.createAgent automatically normalizes market config (handles model as object)
     const agentData = {
@@ -99,8 +102,12 @@ const AddAgent = memo<{ mobile?: boolean }>(({ mobile }) => {
     setIsLoading(true);
     try {
       const result = await createAgentWithMarketIdentifier(true);
+      if (!result) return;
       message.success(t('assistants.addAgentSuccess'));
       navigate(SESSION_CHAT_URL(result!.agentId || result!.sessionId, mobile));
+    } catch (error) {
+      console.error('Failed to add agent from market:', error);
+      message.error(t('assistants.addAgentError'));
     } finally {
       setIsLoading(false);
     }
@@ -109,15 +116,22 @@ const AddAgent = memo<{ mobile?: boolean }>(({ mobile }) => {
   const handleCreate = async () => {
     setIsLoading(true);
     try {
-      await createAgentWithMarketIdentifier(false);
+      const result = await createAgentWithMarketIdentifier(false);
+      if (!result) return;
       message.success(t('assistants.addAgentSuccess'));
+    } catch (error) {
+      console.error('Failed to add agent from market:', error);
+      message.error(t('assistants.addAgentError'));
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleAddAgentAndConverse = async () => {
-    if (!config) return;
+    if (!config) {
+      message.error(t('assistants.noConfig'));
+      return;
+    }
 
     const isDuplicate = await checkDuplicateAgent();
     if (isDuplicate) {
@@ -128,7 +142,10 @@ const AddAgent = memo<{ mobile?: boolean }>(({ mobile }) => {
   };
 
   const handleAddAgent = async () => {
-    if (!config) return;
+    if (!config) {
+      message.error(t('assistants.noConfig'));
+      return;
+    }
 
     const isDuplicate = await checkDuplicateAgent();
     if (isDuplicate) {

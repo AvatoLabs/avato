@@ -47,7 +47,6 @@ vi.mock('react-i18next', () => ({
         'tab.memory': 'Memory',
         'tab.video': 'Video',
         'new': 'New',
-        'workspace.sidebar.currentWorkspace': `In ${options?.name}`,
         'workspace.sidebar.section.navigation': 'Navigation',
       })[key] || (ns === 'setting' && key === 'tab.beta' ? 'Beta' : key),
   }),
@@ -56,8 +55,6 @@ vi.mock('react-i18next', () => ({
 vi.mock('@/features/ResourceSpaces', () => ({
   buildFilesRootPath: (spaceId?: string | null) =>
     spaceId ? `/spaces/${spaceId}/files` : '/spaces',
-  useSpaceName: (spaceId?: string | null) =>
-    ({ 'space-route': 'Ops Workspace', 'space-hint': 'Hint Workspace' })[spaceId || ''],
 }));
 
 vi.mock('@/features/NavPanel/components/NavItem', () => ({
@@ -121,11 +118,11 @@ describe('Home Nav', () => {
     setActiveWorkspaceSpaceId('space-hint');
   });
 
-  it('shows the current workspace label and route-aware docs/files links', () => {
+  it('shows navigation links scoped to the route workspace', () => {
     render(<Nav />);
 
     expect(screen.getByText('Navigation')).toBeInTheDocument();
-    expect(screen.getByText('In Ops Workspace')).toBeInTheDocument();
+    expect(screen.queryByText('In Ops Workspace')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Pages' })).toHaveAttribute(
       'href',
       '/spaces/space-route/docs',

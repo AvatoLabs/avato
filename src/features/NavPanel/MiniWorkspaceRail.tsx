@@ -1,6 +1,7 @@
 'use client';
 
 import { Flexbox, Icon } from '@lobehub/ui';
+import { App } from 'antd';
 import { createStaticStyles, cssVar } from 'antd-style';
 import { MessageSquarePlus, Search } from 'lucide-react';
 import { memo, useCallback } from 'react';
@@ -78,14 +79,18 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
  * Qwen 式收起态：与主导航同一套动作（收展、新会话、搜索、首页、账户），仅保留图标列。
  */
 const MiniWorkspaceRail = memo(() => {
-  const { t } = useTranslation('common');
+  const { t } = useTranslation(['common', 'chat']);
+  const { message } = App.useApp();
   const labelColor = cssVar.colorText;
   const toggleCommandMenu = useGlobalStore((s) => s.toggleCommandMenu);
   const createSession = useSessionStore((s) => s.createSession);
 
   const handleNewSession = useCallback(() => {
-    void createSession();
-  }, [createSession]);
+    void createSession().catch((error) => {
+      console.error('Failed to create session from mini workspace rail:', error);
+      message.error({ content: t('createAgentFailed', { ns: 'chat' }) });
+    });
+  }, [createSession, message, t]);
 
   return (
     <Flexbox

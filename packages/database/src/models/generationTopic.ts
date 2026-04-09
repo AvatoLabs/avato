@@ -3,24 +3,34 @@ import type {
   ImageGenerationTopic,
   VideoGenerationAsset,
 } from '@lobechat/types';
-import { and, desc, eq } from 'drizzle-orm';
+import debug from 'debug';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 
+import { serverDBEnv } from '@/config/db';
 import { FileService } from '@/server/services/file';
+import { resolveRemovableStorageUrls } from '@/server/services/file/removableStorageUrls';
 
 import type { GenerationTopicItem } from '../schemas/generation';
 import { generationTopics } from '../schemas/generation';
+import { files } from '../schemas/file';
 import type { LobeChatDatabase } from '../type';
 import type { GenerationTopicType } from '../types/generation';
+import { FileModel } from './file';
+import { resolveStableAppFileProxyUrl } from './utils/stableAppFileProxy';
+
+const log = debug('lobe-image:generation-topic-model');
 
 export class GenerationTopicModel {
   private userId: string;
   private db: LobeChatDatabase;
   private fileService: FileService;
+  private fileModel: FileModel;
 
   constructor(db: LobeChatDatabase, userId: string) {
     this.userId = userId;
     this.db = db;
     this.fileService = new FileService(db, userId);
+    this.fileModel = new FileModel(db, userId);
   }
 
   queryAll = async (type?: GenerationTopicType) => {
@@ -35,12 +45,26 @@ export class GenerationTopicModel {
       .orderBy(desc(generationTopics.updatedAt))
       .where(and(...conditions));
 
+    const stableReadableUrlMap = new Map(
+      (await this.fileModel.findByUrls(
+        topics
+          .map((topic) => topic.coverUrl)
+          .filter((coverUrl): coverUrl is string => Boolean(coverUrl)),
+      ))
+        .map((file) => [file.url, `/f/${file.id}`]),
+    );
+
     return Promise.all(
       topics.map(async (topic) => {
         if (topic.coverUrl) {
+          const stableProxyUrl = resolveStableAppFileProxyUrl(topic.coverUrl);
+
           return {
             ...topic,
-            coverUrl: await this.fileService.getFullFileUrl(topic.coverUrl),
+            coverUrl:
+              stableProxyUrl ??
+              stableReadableUrlMap.get(topic.coverUrl) ??
+              (await this.fileService.getFullFileUrl(topic.coverUrl)),
           };
         }
         return topic;
@@ -59,6 +83,12 @@ export class GenerationTopicModel {
       .returning();
 
     return newGenerationTopic;
+  };
+
+  findById = async (id: string): Promise<GenerationTopicItem | undefined> => {
+    return this.db.query.generationTopics.findFirst({
+      where: and(eq(generationTopics.id, id), eq(generationTopics.userId, this.userId)),
+    });
   };
 
   update = async (
@@ -97,6 +127,7 @@ export class GenerationTopicModel {
             generations: {
               columns: {
                 asset: true,
+                fileId: true,
               },
             },
           },
@@ -109,23 +140,50 @@ export class GenerationTopicModel {
       return undefined;
     }
 
-    // 2. Collect all file URLs that need to be deleted
-    const filesToDelete: string[] = [];
+    const fileIds = Array.from(
+      new Set(
+        topicWithBatches.batches
+          ?.flatMap((batch) =>
+            batch.generations.map((generation: { fileId: string | null }) => generation.fileId),
+          )
+          .filter((fileId): fileId is string => Boolean(fileId)) ?? [],
+      ),
+    );
+    const generatedFileRows =
+      fileIds.length > 0
+        ? await this.db.query.files.findMany({
+            columns: { blobId: true, fileHash: true, url: true },
+            where: and(eq(files.userId, this.userId), inArray(files.id, fileIds)),
+          })
+        : [];
 
-    // Add cover image URL if exists
+    // 2. Collect auxiliary file URLs that need to be deleted
+    const filesToDelete = new Set<string>();
     if (topicWithBatches.coverUrl) {
-      filesToDelete.push(topicWithBatches.coverUrl);
+      filesToDelete.add(topicWithBatches.coverUrl);
     }
 
-    // Add asset file URLs from all generations (video, cover, thumbnail)
     if (topicWithBatches.batches) {
       for (const batch of topicWithBatches.batches) {
         for (const gen of batch.generations) {
           const asset = gen.asset as ImageGenerationAsset | VideoGenerationAsset | null;
-          if (asset?.url) filesToDelete.push(asset.url);
-          if (asset?.thumbnailUrl) filesToDelete.push(asset.thumbnailUrl);
-          if (asset && 'coverUrl' in asset && asset.coverUrl) {
-            filesToDelete.push(asset.coverUrl);
+          if (!asset) continue;
+
+          if (!gen.fileId && asset.url) {
+            filesToDelete.add(asset.url);
+          }
+
+          if (asset.thumbnailUrl && asset.thumbnailUrl !== asset.url) {
+            filesToDelete.add(asset.thumbnailUrl);
+          }
+
+          if (
+            'coverUrl' in asset &&
+            asset.coverUrl &&
+            asset.coverUrl !== asset.url &&
+            asset.coverUrl !== asset.thumbnailUrl
+          ) {
+            filesToDelete.add(asset.coverUrl);
           }
         }
       }
@@ -137,9 +195,28 @@ export class GenerationTopicModel {
       .where(and(eq(generationTopics.id, id), eq(generationTopics.userId, this.userId)))
       .returning();
 
+    if (fileIds.length > 0) {
+      const removeGlobalFile = serverDBEnv.REMOVE_GLOBAL_FILE ?? true;
+
+      try {
+        await this.fileModel.deleteManyAny(fileIds, removeGlobalFile);
+
+        const removableFileUrls = await resolveRemovableStorageUrls(
+          this.fileModel,
+          generatedFileRows,
+          removeGlobalFile,
+        );
+        for (const url of removableFileUrls) {
+          filesToDelete.add(url);
+        }
+      } catch (error) {
+        log('Failed to delete generation files for topic %s: %O', id, error);
+      }
+    }
+
     return {
       deletedTopic,
-      filesToDelete,
+      filesToDelete: [...filesToDelete],
     };
   };
 }

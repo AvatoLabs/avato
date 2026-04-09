@@ -1,4 +1,3 @@
-import { isRawFileContentId } from '@lobechat/types';
 import debug from 'debug';
 
 import { auth } from '@/auth';
@@ -6,6 +5,7 @@ import { FileModel } from '@/database/models/file';
 import { getServerDB } from '@/database/server';
 import { appEnv } from '@/envs/app';
 import { serveAuthorizedFileDownload } from '@/server/modules/file-proxy/serveAuthorizedFileDownload';
+import { isRawFileContentId } from '@/types/content';
 
 const log = debug('lobe-file:proxy');
 

@@ -135,8 +135,13 @@ export const useAgentDropdownMenu = ({
               centered: true,
               okButtonProps: { danger: true },
               onOk: async () => {
-                await removeAgent(id);
-                message.success(t('confirmRemoveSessionSuccess'));
+                try {
+                  await removeAgent(id);
+                  message.success(t('confirmRemoveSessionSuccess'));
+                } catch (error) {
+                  console.error('Failed to delete agent:', error);
+                  message.error(t('confirmRemoveSessionError'));
+                }
               },
               title: t('confirmRemoveSessionItemAlert'),
             });

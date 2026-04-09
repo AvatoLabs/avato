@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 import { oneLineEllipsis, shinyTextStyles } from '@/styles';
 
-import type { InitDocumentState } from '../../../types';
+import type { InitDocState } from '../../../types';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
@@ -20,7 +20,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
 }));
 
-export const InitDocInspector = memo<BuiltinInspectorProps<InitDocumentArgs, InitDocumentState>>(
+export const InitDocInspector = memo<BuiltinInspectorProps<InitDocumentArgs, InitDocState>>(
   ({ args, partialArgs, isArgumentsStreaming, pluginState }) => {
     const { t } = useTranslation('plugin');
 

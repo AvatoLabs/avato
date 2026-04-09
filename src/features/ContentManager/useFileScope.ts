@@ -31,7 +31,6 @@ export const buildFileScopeSearch = (
   const nextParams = new URLSearchParams(searchParams);
 
   nextParams.delete('file');
-  nextParams.delete('files');
 
   if (scope === 'all') {
     nextParams.delete(FILE_SCOPE_QUERY_KEY);

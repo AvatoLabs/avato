@@ -120,10 +120,10 @@ export const documents = pgTable(
     index('documents_content_uid_idx').on(table.contentUid),
     uniqueIndex('documents_client_id_space_id_unique')
       .on(table.clientId, table.spaceId)
-      .where(and(isNotNull(table.clientId), isNull(table.deletedAt))),
+      .where(and(isNotNull(table.clientId), isNull(table.deletedAt))!),
     uniqueIndex('documents_slug_space_id_unique')
       .on(table.slug, table.spaceId)
-      .where(and(isNotNull(table.slug), isNull(table.deletedAt))),
+      .where(and(isNotNull(table.slug), isNull(table.deletedAt))!),
   ],
 );
 

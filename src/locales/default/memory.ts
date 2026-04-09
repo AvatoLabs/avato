@@ -4,6 +4,7 @@ export default {
   'activity.defaultType': 'Activity',
   'activity.deleteConfirm':
     'Are you sure you want to delete this activity memory? This action cannot be undone.',
+  'activity.deleteError': 'Failed to delete activity memory. Please try again.',
   'activity.deleteTitle': 'Delete Activity Memory',
   'activity.empty': 'No activity memories available',
   'activity.feedback': 'Feedback',
@@ -42,6 +43,7 @@ export default {
   'context.defaultType': 'Context',
   'context.deleteConfirm':
     'Are you sure you want to delete this contextual memory? This action cannot be undone.',
+  'context.deleteError': 'Failed to delete contextual memory. Please try again.',
   'context.deleteTitle': 'Delete Contextual Memory',
   'context.description': 'Description',
   'context.empty': 'No context memories available',
@@ -55,6 +57,7 @@ export default {
   'experience.defaultType': 'Experience',
   'experience.deleteConfirm':
     'Are you sure you want to delete this experiential memory? This action cannot be undone.',
+  'experience.deleteError': 'Failed to delete experiential memory. Please try again.',
   'experience.deleteTitle': 'Delete Experiential Memory',
   'experience.empty': 'No experience memories available',
   'experience.keyLearning': 'Key Learning',
@@ -81,6 +84,7 @@ export default {
   'identity.list.deleteCancel': 'Cancel',
   'identity.list.deleteContent':
     'Are you sure you want to delete this identity memory? This action cannot be undone.',
+  'identity.list.deleteError': 'Failed to delete identity memory. Please try again.',
   'identity.list.deleteOk': 'Delete',
   'identity.list.noResults': 'No matching identity memories found',
   'identity.list.updated': 'Updated',
@@ -95,6 +99,7 @@ export default {
   'preference.defaultType': 'Preference',
   'preference.deleteConfirm':
     'Are you sure you want to delete this preference memory? This action cannot be undone.',
+  'preference.deleteError': 'Failed to delete preference memory. Please try again.',
   'preference.deleteTitle': 'Delete Preference Memory',
   'preference.empty': 'No preference memories available',
   'preference.source': 'Source',

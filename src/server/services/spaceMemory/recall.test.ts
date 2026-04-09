@@ -40,7 +40,7 @@ describe('spaceMemory recall packaging', () => {
       'Rollback ownership is mandatory before deployment approval.',
     );
     expect(data.contexts[0]?.description).not.toContain('GENERAL_TAIL');
-    expect(calculateWeightedLength(data.contexts[0]!.description)).toBeLessThanOrEqual(360);
+    expect(calculateWeightedLength(data.contexts[0]!.description ?? '')).toBeLessThanOrEqual(360);
   });
 
   it('compresses playbook and policy recall payloads within category-specific budgets', () => {
@@ -65,12 +65,14 @@ describe('spaceMemory recall packaging', () => {
     expect(data.experiences[0]?.action).not.toContain('PLAYBOOK_ACTION_TAIL');
     expect(data.experiences[0]?.keyLearning).not.toContain('PLAYBOOK_TAIL');
     expect(data.experiences[0]?.situation).not.toContain('PLAYBOOK_TITLE_TAIL');
-    expect(calculateWeightedLength(data.experiences[0]!.keyLearning)).toBeLessThanOrEqual(280);
-    expect(calculateWeightedLength(data.experiences[0]!.situation)).toBeLessThanOrEqual(120);
+    expect(calculateWeightedLength(data.experiences[0]!.keyLearning ?? '')).toBeLessThanOrEqual(
+      280,
+    );
+    expect(calculateWeightedLength(data.experiences[0]!.situation ?? '')).toBeLessThanOrEqual(120);
     expect(data.preferences[0]?.conclusionDirectives).toContain('Customer communications');
     expect(data.preferences[0]?.conclusionDirectives).not.toContain('POLICY_TAIL');
     expect(data.preferences[0]?.suggestions).toContain('External ETA commitments require approval.');
-    expect(calculateWeightedLength(data.preferences[0]!.conclusionDirectives)).toBeLessThanOrEqual(
+    expect(calculateWeightedLength(data.preferences[0]!.conclusionDirectives ?? '')).toBeLessThanOrEqual(
       320,
     );
   });
@@ -125,10 +127,10 @@ describe('spaceMemory recall packaging', () => {
     expect(neutral.preferences).toHaveLength(1);
     expect(policyFocused.preferences).toHaveLength(1);
     expect(
-      calculateWeightedLength(policyFocused.preferences[0]!.conclusionDirectives),
-    ).toBeGreaterThan(calculateWeightedLength(neutral.preferences[0]!.conclusionDirectives));
+      calculateWeightedLength(policyFocused.preferences[0]!.conclusionDirectives ?? ''),
+    ).toBeGreaterThan(calculateWeightedLength(neutral.preferences[0]!.conclusionDirectives ?? ''));
     expect(
-      calculateWeightedLength(policyFocused.preferences[0]!.conclusionDirectives),
+      calculateWeightedLength(policyFocused.preferences[0]!.conclusionDirectives ?? ''),
     ).toBeLessThanOrEqual(432);
   });
 
@@ -154,9 +156,9 @@ describe('spaceMemory recall packaging', () => {
     expect(neutral.experiences).toHaveLength(1);
     expect(playbookFocused.experiences).toHaveLength(1);
     expect(
-      calculateWeightedLength(playbookFocused.experiences[0]!.keyLearning),
-    ).toBeGreaterThan(calculateWeightedLength(neutral.experiences[0]!.keyLearning));
-    expect(calculateWeightedLength(playbookFocused.experiences[0]!.keyLearning)).toBeLessThanOrEqual(
+      calculateWeightedLength(playbookFocused.experiences[0]!.keyLearning ?? ''),
+    ).toBeGreaterThan(calculateWeightedLength(neutral.experiences[0]!.keyLearning ?? ''));
+    expect(calculateWeightedLength(playbookFocused.experiences[0]!.keyLearning ?? '')).toBeLessThanOrEqual(
       378,
     );
   });
@@ -252,7 +254,7 @@ describe('spaceMemory recall packaging', () => {
     expect(result.preferences[0]?.conclusionDirectives).not.toContain('POLICY_SEARCH_TAIL');
     expect(result.preferences[0]?.suggestions).toContain('Customer communications require approval.');
     expect(
-      calculateWeightedLength(result.preferences[0]!.conclusionDirectives),
+      calculateWeightedLength(result.preferences[0]!.conclusionDirectives ?? ''),
     ).toBeLessThanOrEqual(320);
   });
 });

@@ -1,10 +1,10 @@
-import { getCanonicalContentKind } from '@lobechat/types';
 import { useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { buildFilesItemPath } from '@/features/ResourceSpaces';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { documentService } from '@/services/document';
+import { getCanonicalContentKind } from '@/types/content';
 
 interface UseOpenFileDocumentOptions {
   fileId?: string | null;

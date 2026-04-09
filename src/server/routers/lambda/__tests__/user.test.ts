@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MessageModel } from '@/database/models/message';
 import { SessionModel } from '@/database/models/session';
+import { SpaceModel } from '@/database/models/space';
 import { UserModel } from '@/database/models/user';
 import { serverDB } from '@/database/server';
 import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
+import { FileService } from '@/server/services/file';
 
 import { userRouter } from '../user';
 
@@ -16,9 +18,11 @@ vi.mock('@/database/server', () => ({
 
 vi.mock('@/database/models/message');
 vi.mock('@/database/models/session');
+vi.mock('@/database/models/space');
 vi.mock('@/database/models/user');
 vi.mock('@/server/modules/KeyVaultsEncrypt');
 vi.mock('@/server/modules/S3');
+vi.mock('@/server/services/file');
 vi.mock('@/server/services/user');
 
 describe('userRouter', () => {
@@ -26,9 +30,32 @@ describe('userRouter', () => {
   const mockCtx = {
     userId: mockUserId,
   };
+  const mockUploadBuffer = vi.fn();
+  const mockDeleteFile = vi.fn();
+  const mockCreateOpaqueUserBlobPath = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(FileService).mockImplementation(
+      () =>
+        ({
+          createOpaqueUserBlobPath: mockCreateOpaqueUserBlobPath,
+          deleteFile: mockDeleteFile,
+          uploadBuffer: mockUploadBuffer,
+        }) as any,
+    );
+    vi.mocked(SpaceModel).mockImplementation(
+      () =>
+        ({
+          getOrCreatePersonalSpace: vi.fn().mockResolvedValue({ id: 'spc_personal' }),
+        }) as any,
+    );
+    mockUploadBuffer.mockResolvedValue(undefined);
+    mockDeleteFile.mockResolvedValue(undefined);
+    mockCreateOpaqueUserBlobPath.mockResolvedValue({
+      key: 'v2/spaces/spc_personal/blobs/user-avatar/avatar-1.webp',
+      spaceId: 'spc_personal',
+    });
   });
 
   describe('getUserRegistrationDuration', () => {
@@ -171,6 +198,40 @@ describe('userRouter', () => {
       await userRouter.createCaller({ ...mockCtx }).updateSettings(mockSettings);
 
       expect(UserModel).toHaveBeenCalledWith(serverDB, mockUserId);
+    });
+  });
+
+  describe('updateAvatar', () => {
+    it('should upload base64 avatars under the opaque user-avatar scope and update route url', async () => {
+      const mockGetUserState = vi.fn().mockResolvedValue({
+        avatar: '/webapi/user/avatar/test-user-id/old-avatar.webp',
+      });
+      const mockUpdateUser = vi.fn().mockResolvedValue({ rowCount: 1 });
+      vi.mocked(UserModel).mockImplementation(
+        () =>
+          ({
+            getUserState: mockGetUserState,
+            updateUser: mockUpdateUser,
+          }) as any,
+      );
+
+      const base64 =
+        'data:image/webp;base64,UklGRiQAAABXRUJQVlA4IBYAAAAwAQCdASoQABAAPm0skkqkIyIhKAgAgA2JaQB2APwA';
+      await userRouter.createCaller({ ...mockCtx }).updateAvatar(base64);
+
+      expect(mockCreateOpaqueUserBlobPath).toHaveBeenCalledWith('user-avatar', 'webp');
+      expect(mockUploadBuffer).toHaveBeenCalledWith(
+        'v2/spaces/spc_personal/blobs/user-avatar/avatar-1.webp',
+        expect.any(Buffer),
+        'image/webp',
+      );
+      expect(mockDeleteFile).toHaveBeenCalledWith(
+        'v2/spaces/spc_personal/blobs/user-avatar/old-avatar.webp',
+      );
+      expect(mockDeleteFile).toHaveBeenCalledWith('user/avatar/test-user-id/old-avatar.webp');
+      expect(mockUpdateUser).toHaveBeenCalledWith({
+        avatar: '/webapi/user/avatar/test-user-id/avatar-1.webp',
+      });
     });
   });
 });

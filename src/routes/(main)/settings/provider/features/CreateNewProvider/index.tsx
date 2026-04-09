@@ -44,12 +44,13 @@ const CreateNewProvider = memo<CreateNewProviderProps>(({ onClose, open }) => {
       }
 
       await createNewAiProvider(finalValues);
-      setLoading(false);
       navigate(`/settings/provider/${values.id}`);
       message.success(t('createNewAiProvider.createSuccess'));
       onClose?.();
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error('Failed to create AI provider:', error);
+      message.error(t('createNewAiProvider.createError'));
+    } finally {
       setLoading(false);
     }
   };

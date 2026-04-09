@@ -42,7 +42,7 @@ const Actions = memo<ActionsProps>(({ identifier, type, isMCP }) => {
     s.togglePlugin,
     agentSelectors.currentAgentPlugins(s).includes(identifier),
   ]);
-  const { modal } = App.useApp();
+  const { modal, message } = App.useApp();
   const hasSettings = pluginHelpers.isSettingSchemaNonEmpty(plugin?.settings);
 
   const [showModal, setModal] = useState(false);
@@ -94,11 +94,15 @@ const Actions = memo<ActionsProps>(({ identifier, type, isMCP }) => {
                       centered: true,
                       okButtonProps: { danger: true },
                       onOk: async () => {
-                        // If plugin is enabled in current agent, disable it first
-                        if (isPluginEnabledInAgent) {
-                          await togglePlugin(identifier, false);
+                        try {
+                          if (isPluginEnabledInAgent) {
+                            await togglePlugin(identifier, false);
+                          }
+                          await unInstallPlugin(identifier);
+                        } catch (error) {
+                          console.error('Failed to uninstall plugin:', error);
+                          message.error(t('store.actions.uninstallFailed'));
                         }
-                        await unInstallPlugin(identifier);
                       },
                       title: t('store.actions.confirmUninstall'),
                       type: 'error',
@@ -115,12 +119,17 @@ const Actions = memo<ActionsProps>(({ identifier, type, isMCP }) => {
             loading={installing}
             size={mobile ? 'small' : undefined}
             onClick={async () => {
-              if (isMCP) {
-                await installMCPPlugin(identifier);
-                await togglePlugin(identifier);
-              } else {
-                await installPlugin(identifier);
-                await togglePlugin(identifier);
+              try {
+                if (isMCP) {
+                  await installMCPPlugin(identifier);
+                  await togglePlugin(identifier);
+                } else {
+                  await installPlugin(identifier);
+                  await togglePlugin(identifier);
+                }
+              } catch (error) {
+                console.error('Failed to install plugin:', error);
+                message.error(t('store.actions.installFailed'));
               }
             }}
           >

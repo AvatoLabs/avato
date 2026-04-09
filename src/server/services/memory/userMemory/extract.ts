@@ -47,7 +47,6 @@ import {
 } from '@lobechat/types';
 import debug from 'debug';
 import { and, asc, eq, inArray } from 'drizzle-orm';
-import { join } from 'pathe';
 import { z } from 'zod';
 
 import { AsyncTaskModel } from '@/database/models/asyncTask';
@@ -73,6 +72,8 @@ import { type MergeStrategyEnum } from '@/types/userMemory';
 import { LayersEnum, MemorySourceType, TypesEnum } from '@/types/userMemory';
 import { trimBasedOnBatchProbe } from '@/utils/chunkers';
 import { encodeAsync } from '@/utils/tokenizer';
+
+import { buildMemoryExtractionTraceBasePath, buildMemoryExtractionTracePath } from './extractionTracePath';
 
 const SOURCE_ALIAS_MAP: Record<string, MemorySourceType> = {
   benchmark_locomo: MemorySourceType.BenchmarkLocomo,
@@ -1509,23 +1510,16 @@ export class MemoryExtractionExecutor {
   }
 
   private getOnExtractHooksPath(
-    userId: string,
     source: string,
-    sourceId: string,
   ): string | undefined {
     if (!this.modelConfig.observabilityS3?.enabled) {
       return undefined;
     }
 
-    const withoutBase = `memory-extraction/${userId}/${source}/${sourceId}/`;
-    const base = this.modelConfig.observabilityS3?.pathPrefix
-      ? this.modelConfig.observabilityS3?.pathPrefix.startsWith('/')
-        ? this.modelConfig.observabilityS3?.pathPrefix.slice(1)
-        : this.modelConfig.observabilityS3?.pathPrefix
-      : '';
-
-    const key = join(`${base}`, withoutBase);
-    return key;
+    return buildMemoryExtractionTraceBasePath({
+      pathPrefix: this.modelConfig.observabilityS3?.pathPrefix,
+      source,
+    });
   }
 
   private async uploadExtractionTrace(
@@ -1541,11 +1535,10 @@ export class MemoryExtractionExecutor {
   ) {
     if (!this.modelConfig.observabilityS3?.enabled) return;
 
-    const key = join(
-      this.getOnExtractHooksPath(userId, source, sourceId)!,
-      'trace',
-      `${new Date().toISOString()}.json`,
-    );
+    const key = buildMemoryExtractionTracePath({
+      pathPrefix: this.modelConfig.observabilityS3?.pathPrefix,
+      source,
+    });
 
     await s3.uploadContent(key, JSON.stringify(payload, null, 2));
   }

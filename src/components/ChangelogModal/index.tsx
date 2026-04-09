@@ -1,7 +1,6 @@
 'use client';
 
-import { Button, Flexbox } from '@lobehub/ui';
-import { Modal } from '@lobehub/ui/base-ui';
+import { Button, Flexbox, Modal } from '@lobehub/ui';
 import { ArrowUpRightIcon } from 'lucide-react';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -42,7 +41,7 @@ const ChangelogModal = memo<ChangelogModalProps>(({ open, onClose, shouldLoad })
   return open ? (
     <Modal
       footer={null}
-      mask={{ closable: true }}
+      maskClosable
       open={true}
       width={800}
       styles={{

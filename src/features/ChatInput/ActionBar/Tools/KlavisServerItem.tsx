@@ -1,4 +1,5 @@
 import { Checkbox, Flexbox, Icon, stopPropagation } from '@lobehub/ui';
+import { App } from 'antd';
 import { Loader2, SquareArrowOutUpRight } from 'lucide-react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +37,7 @@ interface KlavisServerItemProps {
 const KlavisServerItem = memo<KlavisServerItemProps>(
   ({ identifier, label, server, serverName, agentId }) => {
     const { t } = useTranslation('setting');
+    const { message } = App.useApp();
     const [isConnecting, setIsConnecting] = useState(false);
     const [isToggling, setIsToggling] = useState(false);
     const [isWaitingAuth, setIsWaitingAuth] = useState(false);
@@ -208,21 +210,27 @@ const KlavisServerItem = memo<KlavisServerItemProps>(
           userId,
         });
 
-        if (newServer) {
-          // Auto-enable plugin after installation (using identifier)
-          const newPluginId = newServer.identifier;
-          await togglePlugin(newPluginId);
+        if (!newServer) {
+          message.error(t('tools.klavis.connectFailed'));
+          return;
+        }
 
-          // If already authenticated, refresh tool list directly, skip OAuth
-          if (newServer.isAuthenticated) {
-            await refreshKlavisServerTools(newServer.identifier);
-          } else if (newServer.oauthUrl) {
-            // Need OAuth, open OAuth window and monitor close
-            openOAuthWindow(newServer.oauthUrl, newServer.identifier);
-          }
+        // Auto-enable plugin after installation (using identifier)
+        const newPluginId = newServer.identifier;
+        await togglePlugin(newPluginId);
+
+        // If already authenticated, refresh tool list directly, skip OAuth
+        if (newServer.isAuthenticated) {
+          await refreshKlavisServerTools(newServer.identifier);
+        } else if (newServer.oauthUrl) {
+          // Need OAuth, open OAuth window and monitor close
+          openOAuthWindow(newServer.oauthUrl, newServer.identifier);
+        } else {
+          message.error(t('tools.klavis.connectFailed'));
         }
       } catch (error) {
         console.error('[Klavis] Failed to connect server:', error);
+        message.error(t('tools.klavis.connectFailed'));
       } finally {
         setIsConnecting(false);
       }
@@ -231,8 +239,14 @@ const KlavisServerItem = memo<KlavisServerItemProps>(
     const handleToggle = async () => {
       if (!server) return;
       setIsToggling(true);
-      await togglePlugin(pluginId);
-      setIsToggling(false);
+      try {
+        await togglePlugin(pluginId);
+      } catch (error) {
+        console.error('[Klavis] Failed to toggle plugin:', error);
+        message.error(t('tools.klavis.togglePluginFailed'));
+      } finally {
+        setIsToggling(false);
+      }
     };
 
     // Render right-side controls

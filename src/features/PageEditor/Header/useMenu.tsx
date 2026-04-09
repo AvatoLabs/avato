@@ -9,9 +9,11 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
-import { canCreateSpaceMemory } from '@/features/ResourceSpaces/spaceMemoryCapabilities';
+import { revealChatContextPanel } from '@/features/ChatInput/utils/revealChatContextPanel';
+import { resolveSpaceMemorySurfaceState } from '@/features/ResourceSpaces/spaceMemoryCapabilities';
 import { useOpenCreateSpaceMemoryCandidateModal } from '@/features/ResourceSpaces/useOpenCreateSpaceMemoryCandidateModal';
 import { useSpaceItem } from '@/features/ResourceSpaces/useSpaceItem';
+import { useResourceShareModal } from '@/features/ResourceSharing';
 import { lambdaClient } from '@/libs/trpc/client';
 import { pageSelectors, usePageStore } from '@/store/docs';
 import { revalidatePageDocuments } from '@/store/docs/slices/list/action';
@@ -28,6 +30,7 @@ import {
   normalizeExportFileName,
   XLSX_MIME_TYPE,
 } from '@/utils/documentExport';
+import { documentService } from '@/services/document';
 
 import { usePageEditorStore, useStoreApi } from '../store';
 
@@ -50,15 +53,17 @@ export const useMenu = (): { menuItems: any[] } => {
   const sourceSetId = pageDocument?.sourceSetId ?? undefined;
   const spaceId = pageDocument?.spaceId ?? undefined;
   const { space } = useSpaceItem(spaceId);
-  const canAddToSpaceMemory = canCreateSpaceMemory(space);
+  const canAddToSpaceMemory = resolveSpaceMemorySurfaceState(space).canCreate;
   const openCreateSpaceMemoryCandidateModal = useOpenCreateSpaceMemoryCandidateModal();
+  const { open: openShareModal } = useResourceShareModal();
 
   // Get lastUpdatedTime from DocumentStore
   const lastUpdatedTime = useDocumentStore((s) =>
     documentId ? editorSelectors.lastUpdatedTime(documentId)(s) : null,
   );
 
-  const [duplicateDocument, moveContentItem] = useFileStore((s) => [
+  const [addChatContextSelection, duplicateDocument, moveContentItem] = useFileStore((s) => [
+    s.addChatContextSelection,
     s.duplicateDocument,
     s.moveContentItem,
   ]);
@@ -93,6 +98,40 @@ export const useMenu = (): { menuItems: any[] } => {
       message.error(t('docEditor.duplicateError'));
     }
   }, [documentId, duplicateDocument, message, t]);
+
+  const handleAddToChatContext = useCallback(async () => {
+    if (!documentId) return;
+
+    try {
+      const state = storeApi.getState();
+      const title = state.title || pageDocument?.title || t('pageList.untitled', { ns: 'file' });
+      const liveMarkdown = ((state.editor?.getDocument('markdown') as unknown as string) || '').trim();
+      const persistedMarkdown = liveMarkdown
+        ? ''
+        : ((await documentService.getDocumentById(documentId))?.content || '').trim();
+      const content = liveMarkdown || persistedMarkdown;
+
+      if (!content) {
+        message.error(t('actions.addToChatContextError', { ns: 'file' }));
+        return;
+      }
+
+      addChatContextSelection({
+        content,
+        docId: documentId,
+        format: 'markdown',
+        id: `document-context-${documentId}`,
+        preview: title,
+        title,
+        type: 'text',
+      });
+      revealChatContextPanel();
+      message.success(t('actions.addToChatContextSuccess', { ns: 'file' }));
+    } catch (error) {
+      console.error('Failed to add document to chat context:', error);
+      message.error(t('actions.addToChatContextError', { ns: 'file' }));
+    }
+  }, [addChatContextSelection, documentId, message, pageDocument?.title, storeApi, t]);
 
   const syncSourceAssignments = useCallback(
     async (nextSourceSetId?: string) => {
@@ -147,9 +186,16 @@ export const useMenu = (): { menuItems: any[] } => {
         await addFilesToSourceSet(targetSourceSetId, [documentId]);
         await syncSourceAssignments(targetSourceSetId);
         message.success(t('moveToSourceSet.success', { ns: 'sourceSet' }));
-      } catch (error) {
+      } catch (error: any) {
         console.error(error);
-        message.error(t('moveToSourceSet.error', { ns: 'sourceSet' }));
+        const isDuplicateError =
+          error?.data?.code === 'CONFLICT' || error?.message === 'FILE_ALREADY_IN_KNOWLEDGE_BASE';
+
+        if (isDuplicateError) {
+          message.warning(t('addToSourceSet.alreadyExists', { ns: 'sourceSet' }));
+        } else {
+          message.error(t('moveToSourceSet.error', { ns: 'sourceSet' }));
+        }
       }
     },
     [
@@ -170,9 +216,16 @@ export const useMenu = (): { menuItems: any[] } => {
     modal.confirm({
       okButtonProps: { danger: true },
       onOk: async () => {
-        await removeFilesFromSourceSet(sourceSetId, [documentId]);
-        await syncSourceAssignments(undefined);
-        message.success(t('FileManager.actions.removeFromSourceSetSuccess', { ns: 'components' }));
+        try {
+          await removeFilesFromSourceSet(sourceSetId, [documentId]);
+          await syncSourceAssignments(undefined);
+          message.success(
+            t('FileManager.actions.removeFromSourceSetSuccess', { ns: 'components' }),
+          );
+        } catch (error) {
+          console.error('Failed to remove page from source set:', error);
+          message.error(t('FileManager.actions.removeFromSourceSetError', { ns: 'components' }));
+        }
       },
       title: t('FileManager.actions.confirmRemoveFromSourceSet', { count: 1, ns: 'components' }),
     });
@@ -451,19 +504,44 @@ export const useMenu = (): { menuItems: any[] } => {
             },
           ]
         : []),
+      ...(documentId
+        ? [
+            {
+              icon: <Icon icon={RESOURCE_ENTRY_ICONS.documents} />,
+              key: 'add-to-chat-context',
+              label: t('actions.addToChatContext', { ns: 'file' }),
+              onClick: handleAddToChatContext,
+            },
+          ]
+        : []),
       {
         icon: <Icon icon={CopyPlus} />,
         key: 'duplicate',
         label: t('pageList.duplicate'),
         onClick: handleDuplicate,
       },
+      ...(documentId
+        ? [
+            {
+              icon: <Icon icon={RESOURCE_ENTRY_ICONS.share} />,
+              key: 'share',
+              label: t('share.title', { ns: 'file' }),
+              onClick: () =>
+                openShareModal({
+                  id: documentId,
+                  kind: 'document',
+                  name: pageDocument?.title || t('pageList.untitled', { ns: 'file' }),
+                }),
+            },
+          ]
+        : []),
       {
         icon: <Icon icon={Link2} />,
         key: 'copy-link',
         label: t('docEditor.menu.copyLink'),
         onClick: () => {
           const state = storeApi.getState();
-          state.handleCopyLink(t as any, message);
+          void state.handleCopyLink(t as any, message);
         },
       },
       ...(sourceSetId
@@ -539,6 +617,7 @@ export const useMenu = (): { menuItems: any[] } => {
     handleRemoveFromSourceSet,
     isTablePage,
     openCreateSpaceMemoryCandidateModal,
+    openShareModal,
     pageDocument?.title,
     spaceId,
   ]);

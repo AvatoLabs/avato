@@ -26,8 +26,7 @@ const MOBILE_NAV_ROUTES = new Set([
   '/me',
 ]);
 
-const isResourceRoute = (pathname: string) =>
-  isWorkspaceResourcePath(pathname, { includeLegacySpecialRoutes: true });
+const isResourceRoute = (pathname: string) => isWorkspaceResourcePath(pathname);
 
 const MobileMainLayout: FC = () => {
   const { showCloudPromotion } = useServerConfigStore(featureFlagsSelectors);

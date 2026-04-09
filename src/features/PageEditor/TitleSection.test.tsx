@@ -272,4 +272,18 @@ describe('TitleSection', () => {
 
     expect(navigateMock).toHaveBeenCalledWith('/spaces/space-1/docs');
   });
+
+  it('stops title keyboard events from bubbling into the editor surface', () => {
+    const parentKeyDown = vi.fn();
+
+    render(
+      <div onKeyDown={parentKeyDown}>
+        <TitleSection />
+      </div>,
+    );
+
+    fireEvent.keyDown(screen.getByTestId('title-input'), { key: 'A' });
+
+    expect(parentKeyDown).not.toHaveBeenCalled();
+  });
 });

@@ -29,7 +29,7 @@ interface ModalContentProps extends CreateSpaceMemoryCandidateParams {}
 
 const renderSourceLabel = (
   source: SpaceMemorySourceRefPreview,
-  t: (key: string, options?: any) => string,
+  t: (...args: any[]) => string,
 ) => {
   if (source.title?.trim()) return source.title;
 
@@ -161,7 +161,7 @@ const ModalContent = memo<ModalContentProps>(
 
         {!hasFixedSpace && (
           <Flexbox gap={8}>
-            <Text size={'small'} type={'secondary'}>
+            <Text type={'secondary'}>
               {t('space.memory.composer.spaceLabel')}
             </Text>
             <Select
@@ -174,19 +174,19 @@ const ModalContent = memo<ModalContentProps>(
         )}
 
         <Flexbox gap={8}>
-          <Text size={'small'} type={'secondary'}>
+          <Text type={'secondary'}>
             {t('space.memory.composer.sourceLabel')}
           </Text>
           <Flexbox horizontal gap={8} wrap={'wrap'}>
             {sourceTags}
           </Flexbox>
-          <Text size={'small'} type={'secondary'}>
+          <Text type={'secondary'}>
             {t('space.memory.composer.sourceHint')}
           </Text>
         </Flexbox>
 
         <Flexbox gap={8}>
-          <Text size={'small'} type={'secondary'}>
+          <Text type={'secondary'}>
             {t('space.memory.composer.titleLabel')}
           </Text>
           <Input
@@ -199,7 +199,7 @@ const ModalContent = memo<ModalContentProps>(
         </Flexbox>
 
         <Flexbox gap={8}>
-          <Text size={'small'} type={'secondary'}>
+          <Text type={'secondary'}>
             {t('space.memory.composer.summaryLabel')}
           </Text>
           <Input.TextArea
@@ -213,7 +213,7 @@ const ModalContent = memo<ModalContentProps>(
         </Flexbox>
 
         <Flexbox gap={8}>
-          <Text size={'small'} type={'secondary'}>
+          <Text type={'secondary'}>
             {t('space.memory.composer.categoryLabel')}
           </Text>
           <Segmented

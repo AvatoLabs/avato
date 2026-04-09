@@ -21,9 +21,9 @@ export const useProjectItemDropdownMenu = ({
   name,
   toggleEditing,
 }: ProjectItemDropdownMenuProps): (() => MenuProps['items']) => {
-  const { t } = useTranslation(['home', 'common', 'sourceSet']);
+  const { t } = useTranslation(['home', 'common', 'sourceSet', 'file']);
   const [removeSourceSet] = useSourceSetStore((s) => [s.removeSourceSet]);
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
   const { open } = useCreateSourceSetModal();
 
   const handleEditDetails = useCallback(() => {
@@ -65,13 +65,18 @@ export const useProjectItemDropdownMenu = ({
             centered: true,
             okButtonProps: { danger: true },
             onOk: async () => {
-              await removeSourceSet(id);
+              try {
+                await removeSourceSet(id);
+              } catch (error) {
+                console.error('Failed to delete project source set:', error);
+                message.error(t('sourceSet.list.removeError', { ns: 'file' }));
+              }
             },
             title: t('project.deleteConfirm'),
           });
         },
       },
     ],
-    [t, id, modal, removeSourceSet, toggleEditing, handleEditDetails],
+    [t, id, modal, removeSourceSet, toggleEditing, handleEditDetails, message],
   );
 };

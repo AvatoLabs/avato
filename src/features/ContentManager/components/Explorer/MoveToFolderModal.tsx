@@ -62,10 +62,11 @@ const MoveToFolderModal = memo<MoveToFolderModalProps>(({ open, onClose, fileId,
     } catch (error) {
       console.error('Failed to load folders:', error);
       setFolders([]);
+      message.error(t('FileManager.loadFoldersError'));
     } finally {
       setLoading(false);
     }
-  }, [sourceSetId, sortItems, spaceId]);
+  }, [message, sourceSetId, sortItems, spaceId, t]);
 
   useEffect(() => {
     if (open) {
@@ -115,9 +116,10 @@ const MoveToFolderModal = memo<MoveToFolderModalProps>(({ open, onClose, fileId,
         setLoadedFolders((prev) => new Set([...prev, folderId]));
       } catch (error) {
         console.error('Failed to load folder contents:', error);
+        message.error(t('FileManager.loadFoldersError'));
       }
     },
-    [sourceSetId, loadedFolders, sortItems, spaceId],
+    [message, sourceSetId, loadedFolders, sortItems, spaceId, t],
   );
 
   // Reload folder children (bypass the loadedFolders guard)
@@ -159,9 +161,10 @@ const MoveToFolderModal = memo<MoveToFolderModalProps>(({ open, onClose, fileId,
         });
       } catch (error) {
         console.error('Failed to reload folder contents:', error);
+        message.error(t('FileManager.loadFoldersError'));
       }
     },
-    [sourceSetId, sortItems, spaceId],
+    [message, sourceSetId, sortItems, spaceId, t],
   );
 
   const handleToggleFolder = useCallback((folderId: string) => {
@@ -190,6 +193,7 @@ const MoveToFolderModal = memo<MoveToFolderModalProps>(({ open, onClose, fileId,
         t('pageList.untitled', { ns: 'file' }),
         selectedFolderId ?? undefined, // Parent ID (root if none selected)
         sourceSetId,
+        spaceId,
       );
 
       // Refresh tree to show the new folder
@@ -206,7 +210,7 @@ const MoveToFolderModal = memo<MoveToFolderModalProps>(({ open, onClose, fileId,
       setSelectedFolderId(newFolderId);
     } catch (error) {
       console.error('Failed to create folder:', error);
-      message.error(t('FileManager.actions.renameError'));
+      message.error(t('header.actions.createFolderError', { ns: 'file' }));
     } finally {
       setIsCreatingFolder(false);
     }
@@ -218,6 +222,7 @@ const MoveToFolderModal = memo<MoveToFolderModalProps>(({ open, onClose, fileId,
     fetchRootFolders,
     t,
     message,
+    spaceId,
   ]);
 
   const handleMove = async () => {

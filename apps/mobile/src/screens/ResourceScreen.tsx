@@ -169,6 +169,17 @@ type ResourceListRow = FileListItem | ResourceTreeRow;
 const isResourceTreeRow = (value: ResourceListRow): value is ResourceTreeRow =>
   'depth' in value && 'item' in value;
 
+const areStringSetsEqual = (left: Set<string>, right: Set<string>) => {
+  if (left === right) return true;
+  if (left.size !== right.size) return false;
+
+  for (const value of left) {
+    if (!right.has(value)) return false;
+  }
+
+  return true;
+};
+
 function ResourceListRowSeparator() {
   return <View className="mx-4 h-px bg-foreground/5" />;
 }
@@ -1873,7 +1884,7 @@ interface FileRowProps {
   showFolderActions?: boolean;
 }
 
-function FileRow({
+const FileRow = memo(function FileRow({
   item,
   isCached,
   cachedLocalUri,
@@ -1991,7 +2002,9 @@ function FileRow({
       ) : null}
     </TouchableOpacity>
   );
-}
+});
+
+FileRow.displayName = 'FileRow';
 
 function fileListItemFromShared(params: {
   fileType?: string;
@@ -2178,14 +2191,14 @@ function ResourceScreenImpl({ navigation, route }: ResourceScreenImplProps) {
   );
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<ViewToken<ResourceListRow>> }) => {
-      setVisibleIds((prev) => {
-        const next = new Set(prev);
-        for (const token of viewableItems) {
-          if (!token.item || isResourceTreeRow(token.item)) continue;
-          next.add(token.item.id);
-        }
-        return next;
-      });
+      const nextVisibleIds = new Set<string>();
+
+      for (const token of viewableItems) {
+        if (!token.item || isResourceTreeRow(token.item)) continue;
+        nextVisibleIds.add(token.item.id);
+      }
+
+      setVisibleIds((prev) => (areStringSetsEqual(prev, nextVisibleIds) ? prev : nextVisibleIds));
     },
     [],
   );
@@ -3790,11 +3803,15 @@ function ResourceScreenImpl({ navigation, route }: ResourceScreenImplProps) {
     return rows;
   }, [category, locale, sortOrder, sorter, treeChildrenByParent, treeExpandedIds, treeMode]);
 
-  const filtered = sortFileList(
-    files.filter((f) => matchesCategory(f, category)),
-    sorter,
-    sortOrder,
-    locale,
+  const filtered = useMemo(
+    () =>
+      sortFileList(
+        files.filter((file) => matchesCategory(file, category)),
+        sorter,
+        sortOrder,
+        locale,
+      ),
+    [category, files, locale, sortOrder, sorter],
   );
   const hasResolvedTreeRoot =
     treeMode && Object.prototype.hasOwnProperty.call(treeChildrenByParent, ROOT_TREE_KEY);
@@ -5424,8 +5441,8 @@ function ResourceScreenImpl({ navigation, route }: ResourceScreenImplProps) {
         defaultValue={sourceSetNameDraft}
         placeholder={t.resourceCreateSourceSetPlaceholder}
         submitLabel={t.confirm}
-        visible={sourceSetNameModalVisible}
         title={sourceSetNameMode === 'create' ? t.resourceCreateSourceSet : t.actionRename}
+        visible={sourceSetNameModalVisible}
         onCancel={() => setSourceSetNameModalVisible(false)}
         onSubmit={handleSubmitSourceSetName}
       />

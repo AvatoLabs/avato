@@ -1,5 +1,5 @@
 import type { LobeChatDatabase } from '@lobechat/database';
-import { canCreateSpaceMemory } from '@lobechat/types';
+import { resolveSpaceMemorySurfaceState } from '@lobechat/types';
 
 import { ContentModel } from '@/database/models/content';
 import { MessageModel } from '@/database/models/message';
@@ -63,7 +63,7 @@ export class SpaceMemoryTopicIngestionService {
     const space = await this.spaceModel.findAccessibleSpaceById(topic.spaceId);
     if (!space?.kind || space.kind !== 'team')
       return { reason: 'not_team_space' as const, status: 'skipped' as const };
-    if (!canCreateSpaceMemory(space)) {
+    if (!resolveSpaceMemorySurfaceState(space).canCreate) {
       return { reason: 'forbidden' as const, status: 'skipped' as const };
     }
 

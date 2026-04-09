@@ -13,6 +13,12 @@ const mockPushDockFileList = vi.hoisted(() => vi.fn());
 const searchParamsState = vi.hoisted(() => ({
   value: 'assetClassification=brand&category=images',
 }));
+const contentManagerState = vi.hoisted(() => ({
+  assetClassification: 'brand' as string | undefined,
+  assetRightsOwner: undefined as string | undefined,
+  assetReviewStatus: undefined as string | undefined,
+  assetUsagePolicy: undefined as string | undefined,
+}));
 const memoryCapabilityState = vi.hoisted(() => ({
   canReview: true,
 }));
@@ -67,8 +73,13 @@ vi.mock('antd-style', () => {
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { count?: number; defaultValue?: string }) => {
+    t: (
+      key: string,
+      options?: { count?: number; defaultValue?: string; label?: string },
+    ) => {
       if (key === 'filters.clearGovernance') return 'Clear governance filters';
+      if (key === 'filters.adjustGovernance') return 'Adjust governance filters';
+      if (key === 'filters.adjustGovernanceFilter') return `Adjust ${options?.label} filter`;
       if (key === 'filters.clearGovernanceFilter') return `Clear ${options?.label} filter`;
       if (key === 'filters.empty.activeTitle') return 'Active governance filters';
       if (key === 'filters.empty.description')
@@ -76,6 +87,7 @@ vi.mock('react-i18next', () => ({
       if (key === 'filters.empty.title') return 'No files match the current governance filters';
       if (key === 'detail.asset.classification.label') return 'Classification';
       if (key === 'detail.asset.classification.brand') return 'Brand';
+      if (key === 'detail.asset.rightsOwner.label') return 'Rights Owner';
       if (key === 'detail.asset.reviewStatus.label') return 'Review Status';
       if (key === 'detail.asset.reviewStatus.approved') return 'Approved';
       if (key === 'detail.asset.usagePolicy.label') return 'Usage Policy';
@@ -132,12 +144,8 @@ vi.mock('@/features/ResourceSpaces/useTeamSpaceMemoryScopeSummaries', () => ({
     spaceId: string,
     target: { recallFilter: string; section: string },
   ) => `/spaces/${spaceId}/memory?section=${target.section}&recallFilter=${target.recallFilter}`,
-  canReviewSpaceMemorySummary: (
-    summary?: {
-      contract?: { canManageRecall?: boolean };
-      surface?: string;
-    } | null,
-  ) => summary?.contract?.canManageRecall ?? summary?.surface === 'reviewer',
+  canReviewSpaceMemorySummary: (summary?: { contract?: { canManageRecall?: boolean } } | null) =>
+    Boolean(summary?.contract?.canManageRecall),
   useTeamSpaceMemoryScopeSummaries: () => ({
     pendingGovernanceCountBySpaceId: new Map([
       ['space-1', memoryCapabilityState.canReview ? 2 : 0],
@@ -152,8 +160,7 @@ vi.mock('@/features/ResourceSpaces/useTeamSpaceMemoryScopeSummaries', () => ({
       [
         'space-1',
         {
-          canReview: memoryCapabilityState.canReview,
-          surface: memoryCapabilityState.canReview ? 'reviewer' : 'viewer',
+          contract: { canManageRecall: memoryCapabilityState.canReview },
         },
       ],
     ]),
@@ -163,9 +170,10 @@ vi.mock('@/features/ResourceSpaces/useTeamSpaceMemoryScopeSummaries', () => ({
 vi.mock('@/routes/(main)/content/features/store', () => ({
   useContentManagerStore: (selector: any) =>
     selector({
-      assetClassification: 'brand',
-      assetReviewStatus: undefined,
-      assetUsagePolicy: undefined,
+      assetClassification: contentManagerState.assetClassification,
+      assetRightsOwner: contentManagerState.assetRightsOwner,
+      assetReviewStatus: contentManagerState.assetReviewStatus,
+      assetUsagePolicy: contentManagerState.assetUsagePolicy,
       sourceSetId: undefined,
       spaceId: 'space-1',
     }),
@@ -210,9 +218,13 @@ describe('EmptyPlaceholder', () => {
     vi.clearAllMocks();
     memoryCapabilityState.canReview = true;
     searchParamsState.value = 'assetClassification=brand&category=images';
+    contentManagerState.assetClassification = 'brand';
+    contentManagerState.assetRightsOwner = undefined;
+    contentManagerState.assetReviewStatus = undefined;
+    contentManagerState.assetUsagePolicy = undefined;
   });
 
-  it('renders keyboard-accessible buttons for all empty-state actions', () => {
+  it('prioritizes clearing governance filters when filtered results are empty', () => {
     render(
       <MemoryRouter>
         <EmptyPlaceholder />
@@ -222,12 +234,17 @@ describe('EmptyPlaceholder', () => {
     expect(screen.getByText('No files match the current governance filters')).toBeInTheDocument();
     expect(screen.getByText('Active governance filters')).toBeInTheDocument();
     expect(
+      screen.getByRole('button', { name: 'Adjust Classification: Brand filter' }),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole('button', { name: 'Clear Classification: Brand filter' }),
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Adjust governance filters' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Clear governance filters' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /actions\.sourceSet/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /actions\.file/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /actions\.folder/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /actions\.sourceSet/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /actions\.file/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /actions\.folder/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Review 2 Pending' })).not.toBeInTheDocument();
   });
 
   it('clears governance filters without dropping unrelated query params', () => {
@@ -240,6 +257,34 @@ describe('EmptyPlaceholder', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear governance filters' }));
 
     expect(mockNavigate).toHaveBeenCalledWith('/spaces/space-1/files?category=images');
+  });
+
+  it('opens the governance panel with current filters intact', () => {
+    render(
+      <MemoryRouter>
+        <EmptyPlaceholder />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Adjust governance filters' }));
+
+    expect(mockNavigate).toHaveBeenCalledWith(
+      '/spaces/space-1/files?assetClassification=brand&category=images&openGovernance=1',
+    );
+  });
+
+  it('opens the governance panel focused on a single governance filter', () => {
+    render(
+      <MemoryRouter>
+        <EmptyPlaceholder />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Adjust Classification: Brand filter' }));
+
+    expect(mockNavigate).toHaveBeenCalledWith(
+      '/spaces/space-1/files?assetClassification=brand&category=images&openGovernance=1&focusGovernance=assetClassification',
+    );
   });
 
   it('clears a single governance filter without dropping the others', () => {
@@ -259,7 +304,31 @@ describe('EmptyPlaceholder', () => {
     );
   });
 
+  it('shows and clears a rights owner governance filter', () => {
+    searchParamsState.value = 'assetRightsOwner=Brand%20Team&category=images';
+    contentManagerState.assetClassification = undefined;
+    contentManagerState.assetRightsOwner = 'Brand Team';
+
+    render(
+      <MemoryRouter>
+        <EmptyPlaceholder />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Clear Rights Owner: Brand Team filter' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Brand Team')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Rights Owner: Brand Team filter' }));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/spaces/space-1/files?category=images');
+  });
+
   it('keeps create source-set action wired after switching to button semantics', () => {
+    searchParamsState.value = 'category=images';
+    contentManagerState.assetClassification = undefined;
+
     render(
       <MemoryRouter>
         <EmptyPlaceholder />
@@ -272,6 +341,9 @@ describe('EmptyPlaceholder', () => {
   });
 
   it('shows a pending memory review action and deep links to the first governance target', () => {
+    searchParamsState.value = '';
+    contentManagerState.assetClassification = undefined;
+
     render(
       <MemoryRouter>
         <EmptyPlaceholder />
@@ -287,6 +359,8 @@ describe('EmptyPlaceholder', () => {
 
   it('shows an open memory action for viewers without review capability', () => {
     memoryCapabilityState.canReview = false;
+    searchParamsState.value = '';
+    contentManagerState.assetClassification = undefined;
 
     render(
       <MemoryRouter>

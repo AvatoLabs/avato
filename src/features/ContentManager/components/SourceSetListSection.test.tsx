@@ -103,10 +103,8 @@ vi.mock('@/features/ResourceSpaces/useTeamSpaceMemoryScopeSummaries', () => ({
     spaceId: string,
     target: { recallFilter: string; section: string },
   ) => `/spaces/${spaceId}/memory?section=${target.section}&recallFilter=${target.recallFilter}`,
-  canReviewSpaceMemorySummary: (summary?: {
-    contract?: { canManageRecall?: boolean };
-    surface?: string;
-  } | null) => summary?.contract?.canManageRecall ?? summary?.surface === 'reviewer',
+  canReviewSpaceMemorySummary: (summary?: { contract?: { canManageRecall?: boolean } } | null) =>
+    Boolean(summary?.contract?.canManageRecall),
   useTeamSpaceMemoryScopeSummaries: () => ({
     pendingGovernanceCountBySpaceId: new Map([['space-1', memoryCapabilityState.canReview ? 2 : 0]]),
     pendingGovernanceTargetBySpaceId: new Map([
@@ -119,8 +117,7 @@ vi.mock('@/features/ResourceSpaces/useTeamSpaceMemoryScopeSummaries', () => ({
       [
         'space-1',
         {
-          canReview: memoryCapabilityState.canReview,
-          surface: memoryCapabilityState.canReview ? 'reviewer' : 'viewer',
+          contract: { canManageRecall: memoryCapabilityState.canReview },
         },
       ],
     ]),

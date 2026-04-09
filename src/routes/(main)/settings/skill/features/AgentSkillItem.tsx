@@ -62,7 +62,7 @@ const AgentSkillItem = memo<AgentSkillItemProps>(({ skill }) => {
   // ===== Handlers =====
 
   const handleDownload = async () => {
-    if (isBuiltin || !skill.zipFileHash) return;
+    if (isBuiltin || !skill.zipSha256) return;
     setLoading(true);
     try {
       const result = await agentSkillService.getZipUrl(skill.id);
@@ -140,7 +140,7 @@ const AgentSkillItem = memo<AgentSkillItemProps>(({ skill }) => {
           nativeButton
           placement="bottomRight"
           items={[
-            ...(skill.zipFileHash
+            ...(skill.zipSha256
               ? [
                   {
                     icon: <DownloadIcon size={16} />,

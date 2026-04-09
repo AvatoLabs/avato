@@ -4,6 +4,7 @@
   "actions.confirmRemoveAll": "您即将删除所有话题，此操作无法撤销。",
   "actions.confirmRemoveTopic": "您即将删除此话题，此操作无法撤销。",
   "actions.confirmRemoveUnstarred": "您即将删除未加星标的话题，此操作无法撤销。",
+  "actions.removeError": "删除话题失败",
   "actions.duplicate": "复制",
   "actions.export": "导出话题",
   "actions.favorite": "收藏",

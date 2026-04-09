@@ -1,17 +1,9 @@
-import React, { memo } from 'react';
+import { memo } from 'react';
 
-import { NavPanelPortal } from '@/features/NavPanel';
-import SideBarLayout from '@/features/NavPanel/SideBarLayout';
-import MemoryScopeSection from '@/features/ResourceSpaces/MemoryScopeSection';
-
-import Header from './Header';
+import MemorySidebarPortal from '@/features/ResourceSpaces/MemorySidebarPortal';
 
 const Sidebar = memo(() => {
-  return (
-    <NavPanelPortal navKey="memory">
-      <SideBarLayout body={<MemoryScopeSection currentScope="personal" />} header={<Header />} />
-    </NavPanelPortal>
-  );
+  return <MemorySidebarPortal currentScope="personal" />;
 });
 
 Sidebar.displayName = 'MemorySidebar';

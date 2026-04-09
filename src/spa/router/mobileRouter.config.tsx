@@ -30,6 +30,22 @@ export const mobileRoutes: RouteObject[] = [
         path: 'spaces/trash',
       },
       {
+        element: dynamicElement(
+          () => import('@/features/ResourceSpaces/LegacySharedFilesRedirectPage'),
+          'Mobile > Files > Shared > Legacy Redirect',
+        ),
+        errorElement: <ErrorBoundary resetPath="/spaces/shared" />,
+        path: 'content/shared',
+      },
+      {
+        element: dynamicElement(
+          () => import('@/features/ResourceSpaces/LegacyTrashRedirectPage'),
+          'Mobile > Files > Trash > Legacy Redirect',
+        ),
+        errorElement: <ErrorBoundary resetPath="/spaces/trash" />,
+        path: 'content/trash',
+      },
+      {
         children: [
           {
             element: redirectElement('/'),
@@ -347,7 +363,7 @@ export const mobileRoutes: RouteObject[] = [
                   },
                   {
                     element: dynamicElement(
-                      () => import('@/routes/(main)/content/spaces/[spaceId]/trash'),
+                      () => import('@/routes/(main)/spaces/[spaceId]/trash'),
                       'Mobile > Space > Files > Trash',
                     ),
                     path: 'trash',
@@ -375,14 +391,14 @@ export const mobileRoutes: RouteObject[] = [
               },
               {
                 element: dynamicElement(
-                  () => import('@/routes/(main)/content/spaces/[spaceId]/settings'),
+                  () => import('@/routes/(main)/spaces/[spaceId]/settings'),
                   'Mobile > Space > Settings',
                 ),
                 path: 'settings',
               },
               {
                 element: dynamicElement(
-                  () => import('@/routes/(main)/content/spaces/[spaceId]/members'),
+                  () => import('@/routes/(main)/spaces/[spaceId]/members'),
                   'Mobile > Space > Members',
                 ),
                 path: 'members',
@@ -395,23 +411,6 @@ export const mobileRoutes: RouteObject[] = [
           },
         ],
         path: 'spaces/:spaceId',
-      },
-
-      {
-        element: dynamicElement(
-          () => import('@/routes/(main)/content/shared'),
-          'Mobile > Files > Shared > Legacy Redirect',
-        ),
-        errorElement: <ErrorBoundary resetPath="/spaces/shared" />,
-        path: 'content/shared',
-      },
-      {
-        element: dynamicElement(
-          () => import('@/routes/(main)/content/trash'),
-          'Mobile > Files > Trash > Legacy Redirect',
-        ),
-        errorElement: <ErrorBoundary resetPath="/spaces/trash" />,
-        path: 'content/trash',
       },
 
       ...BusinessMobileRoutesWithMainLayout,

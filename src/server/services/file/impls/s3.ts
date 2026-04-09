@@ -1,7 +1,10 @@
 import { type LobeChatDatabase } from '@lobechat/database';
 
 import { FileModel } from '@/database/models/file';
+import { fileEnv } from '@/envs/file';
 import { getBlobProvider } from '@/server/modules/BlobProvider';
+import { isCanonicalSpaceBlobKey } from '@/server/services/file/canonicalSpaceBlobKey';
+import { isStableAppFileProxyUrl, toAbsoluteStableAppFileProxyUrl } from '@/server/services/file/stableAppFileProxy';
 
 import { type FileServiceImpl } from './type';
 
@@ -51,10 +54,14 @@ export class S3StaticFileImpl implements FileServiceImpl {
   async getFullFileUrl(url?: string | null, expiresIn?: number): Promise<string> {
     if (!url) return '';
 
+    if (isStableAppFileProxyUrl(url)) {
+      return toAbsoluteStableAppFileProxyUrl(url);
+    }
+
     // Handle legacy data compatibility - extract key from full URL if needed
     // Related issue: https://github.com/lobehub/lobe-chat/issues/8994
     let key = url;
-    if (url.startsWith('http://') || url.startsWith('https://')) {
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/')) {
       const extractedKey = await this.getKeyFromFullUrl(url);
       if (!extractedKey) {
         throw new Error('Key not found from url: ' + url);
@@ -67,16 +74,34 @@ export class S3StaticFileImpl implements FileServiceImpl {
   }
 
   async getKeyFromFullUrl(url: string): Promise<string | null> {
+    if (isCanonicalSpaceBlobKey(url)) {
+      return url.trim();
+    }
+
+    const fileProxyMatch = url.match(/(?:^|https?:\/\/[^/]+)\/f\/([^/?#]+)/);
+    if (fileProxyMatch) {
+      const file = await FileModel.getFileById(this.db, fileProxyMatch[1]!);
+      return file?.url ?? null;
+    }
+
+    const topicShareMatch = url.match(/(?:^|https?:\/\/[^/]+)\/share\/t\/[^/?#]+\/f\/([^/?#]+)/);
+    if (topicShareMatch) {
+      const file = await FileModel.getFileById(this.db, topicShareMatch[1]!);
+      return file?.url ?? null;
+    }
+
     try {
       const urlObject = new URL(url);
       const { pathname } = urlObject;
+      const trustedStorageOrigin = (() => {
+        try {
+          return fileEnv?.S3_PUBLIC_DOMAIN ? new URL(fileEnv.S3_PUBLIC_DOMAIN).origin : null;
+        } catch {
+          return null;
+        }
+      })();
 
-      // Case 1: File proxy URL pattern /f/{fileId} - query database for S3 key
-      if (pathname.startsWith('/f/')) {
-        const fileId = pathname.slice(3); // Remove '/f/' prefix
-        const file = await FileModel.getFileById(this.db, fileId);
-        return file?.url ?? null;
-      }
+      if (!trustedStorageOrigin || urlObject.origin !== trustedStorageOrigin) return null;
 
       // Legacy S3 URLs are reduced to the object key regardless of public/private mode.
       return pathname.slice(1);

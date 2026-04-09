@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useLayoutEffect } from 'react';
-import { useLocation, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 
 import ContentManager from '@/features/ContentManager';
 import { getFileScope, getSourceSetScopeId } from '@/features/ContentManager/useFileScope';
@@ -17,16 +17,17 @@ import { useContentManagerStore } from '../features/store';
 
 const ContentHomePage = memo(() => {
   const [searchParams] = useSearchParams();
-  const location = useLocation();
   const { spaceId } = useParams<{ spaceId?: string }>();
   const [
     assetClassification,
+    assetRightsOwner,
     assetReviewStatus,
     assetUsagePolicy,
     category,
     currentSourceSetId,
     currentSpaceId,
     setAssetClassification,
+    setAssetRightsOwner,
     setAssetReviewStatus,
     setAssetUsagePolicy,
     setCategory,
@@ -34,12 +35,14 @@ const ContentHomePage = memo(() => {
     setSpaceId,
   ] = useContentManagerStore((s) => [
     s.assetClassification,
+    s.assetRightsOwner,
     s.assetReviewStatus,
     s.assetUsagePolicy,
     s.category,
     s.sourceSetId,
     s.spaceId,
     s.setAssetClassification,
+    s.setAssetRightsOwner,
     s.setAssetReviewStatus,
     s.setAssetUsagePolicy,
     s.setCategory,
@@ -49,46 +52,41 @@ const ContentHomePage = memo(() => {
 
   const assetClassificationParam =
     (searchParams.get('assetClassification') as FileAssetClassification | null) || undefined;
+  const assetRightsOwnerParam = searchParams.get('assetRightsOwner')?.trim() || undefined;
   const assetReviewStatusParam =
     (searchParams.get('assetReviewStatus') as FileAssetReviewStatus | null) || undefined;
   const assetUsagePolicyParam =
     (searchParams.get('assetUsagePolicy') as FileAssetUsagePolicy | null) || undefined;
   const categoryParam = (searchParams.get('category') as FilesTabs) || FilesTabs.Home;
-  const isOnHomeRoute = !location.pathname.includes('/source-sets/');
   const scopedSourceSetId = getSourceSetScopeId(getFileScope(searchParams)) ?? undefined;
   const isRouteStateReady =
-    !isOnHomeRoute ||
-    (currentSpaceId === spaceId &&
-      currentSourceSetId === scopedSourceSetId &&
-      assetClassification === assetClassificationParam &&
-      assetReviewStatus === assetReviewStatusParam &&
-      assetUsagePolicy === assetUsagePolicyParam &&
-      category === categoryParam);
+    currentSpaceId === spaceId &&
+    currentSourceSetId === scopedSourceSetId &&
+    assetClassification === assetClassificationParam &&
+    assetRightsOwner === assetRightsOwnerParam &&
+    assetReviewStatus === assetReviewStatusParam &&
+    assetUsagePolicy === assetUsagePolicyParam &&
+    category === categoryParam;
 
-  // Clear the active source set when on the home route.
   useLayoutEffect(() => {
-    if (isOnHomeRoute) {
-      setActiveSourceSetId(scopedSourceSetId);
-      setSpaceId(spaceId);
-    }
-  }, [isOnHomeRoute, scopedSourceSetId, setActiveSourceSetId, setSpaceId, spaceId]);
+    setActiveSourceSetId(scopedSourceSetId);
+    setSpaceId(spaceId);
+  }, [scopedSourceSetId, setActiveSourceSetId, setSpaceId, spaceId]);
 
-  // Sync category from URL using useLayoutEffect
-  // IMPORTANT: Only sync if we're actually on the home route (not transitioning to a source set)
   useLayoutEffect(() => {
-    if (isOnHomeRoute) {
-      setAssetClassification(assetClassificationParam);
-      setAssetReviewStatus(assetReviewStatusParam);
-      setAssetUsagePolicy(assetUsagePolicyParam);
-      setCategory(categoryParam);
-    }
+    setAssetClassification(assetClassificationParam);
+    setAssetRightsOwner(assetRightsOwnerParam);
+    setAssetReviewStatus(assetReviewStatusParam);
+    setAssetUsagePolicy(assetUsagePolicyParam);
+    setCategory(categoryParam);
   }, [
     assetClassificationParam,
+    assetRightsOwnerParam,
     assetReviewStatusParam,
     assetUsagePolicyParam,
     categoryParam,
-    isOnHomeRoute,
     setAssetClassification,
+    setAssetRightsOwner,
     setAssetReviewStatus,
     setAssetUsagePolicy,
     setCategory,

@@ -4,8 +4,36 @@ import formidable from 'formidable';
 import type { Context } from 'hono';
 import urlJoin from 'url-join';
 
-import { appEnv } from '@/envs/app';
 import { fileEnv } from '@/envs/file';
+import {
+  isSameOriginAppUrl,
+  isStableAppFileProxyUrl,
+  toAbsoluteStableAppFileProxyUrl,
+} from '@/server/services/file/stableAppFileProxy';
+
+export { isSameOriginAppUrl, isStableAppFileProxyUrl, toAbsoluteStableAppFileProxyUrl };
+
+export async function ensureFileResponseUrl(params: {
+  expiresIn?: number;
+  getFullFileUrl: (url: string, expiresIn?: number) => Promise<string>;
+  url?: string;
+}): Promise<string> {
+  const { expiresIn, getFullFileUrl, url } = params;
+
+  if (!url) {
+    return '';
+  }
+
+  if ((url.startsWith('http://') || url.startsWith('https://')) && !isSameOriginAppUrl(url)) {
+    return url;
+  }
+
+  if (isStableAppFileProxyUrl(url)) {
+    return toAbsoluteStableAppFileProxyUrl(url);
+  }
+
+  return getFullFileUrl(url, expiresIn);
+}
 
 const DEFAULT_S3_USER_FILES_PREFIX = 'files';
 
@@ -16,62 +44,6 @@ function isPrivateUserUploadObjectKey(url: string): boolean {
   const normalized = url.trim().replace(/^\/+/, '');
 
   return normalized === prefix || normalized.startsWith(`${prefix}/`);
-}
-
-const STABLE_APP_FILE_PROXY_PATTERNS = [
-  /^\/f\/[^/?#]+$/,
-  /^\/share\/f\/[^/?#]+$/,
-  /^\/share\/t\/[^/?#]+\/f\/[^/?#]+$/,
-  /^\/skills\/[^/?#]+\/zip$/,
-  /^\/eval\/records\/[^/?#]+$/,
-];
-
-export function isSameOriginAppUrl(url: string): boolean {
-  try {
-    const target = new URL(url);
-    const trustedOrigins = [appEnv.APP_URL, appEnv.INTERNAL_APP_URL]
-      .filter(Boolean)
-      .map((value) => {
-        try {
-          return new URL(value).origin;
-        } catch {
-          return null;
-        }
-      })
-      .filter(Boolean);
-
-    return trustedOrigins.includes(target.origin);
-  } catch {
-    return false;
-  }
-}
-
-export function isStableAppFileProxyUrl(url: string): boolean {
-  const pathname = (() => {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      if (!isSameOriginAppUrl(url)) return null;
-
-      try {
-        return new URL(url).pathname;
-      } catch {
-        return null;
-      }
-    }
-
-    return url.split(/[?#]/, 1)[0];
-  })();
-
-  if (!pathname) return false;
-
-  return STABLE_APP_FILE_PROXY_PATTERNS.some((pattern) => pattern.test(pathname));
-}
-
-export function toAbsoluteStableAppFileProxyUrl(url: string): string {
-  if (url.startsWith('http://') || url.startsWith('https://') || !appEnv.APP_URL) {
-    return url;
-  }
-
-  return new URL(url, appEnv.APP_URL).toString();
 }
 
 /**

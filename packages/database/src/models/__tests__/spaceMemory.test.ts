@@ -162,6 +162,60 @@ describe('SpaceMemoryModel', () => {
       expect(result.items[0]?.recall?.recallBlockedReason).toBe('stale');
       expect(result.items[1]?.recall?.recallBlockedReason).toBeUndefined();
     });
+
+    it('filters published entries by recall state when requested', async () => {
+      await serverDB.insert(spaceMemoryEntries).values([
+        {
+          category: 'general',
+          createdBy: userId,
+          publishedAt: new Date('2026-04-04T11:00:00.000Z'),
+          reviewedBy: reviewerId,
+          spaceId,
+          status: 'published',
+          summary: 'Still current guidance.',
+          title: 'Active guidance',
+          updatedBy: reviewerId,
+        },
+        {
+          category: 'general',
+          createdBy: userId,
+          publishedAt: new Date('2026-04-04T10:00:00.000Z'),
+          recallEnabled: false,
+          reviewedBy: reviewerId,
+          spaceId,
+          status: 'published',
+          summary: 'Paused guidance.',
+          title: 'Disabled guidance',
+          updatedBy: reviewerId,
+        },
+        {
+          category: 'general',
+          createdBy: userId,
+          publishedAt: new Date('2026-04-04T09:00:00.000Z'),
+          reviewedBy: reviewerId,
+          spaceId,
+          staleAt: new Date('2026-04-04T12:00:00.000Z'),
+          status: 'published',
+          summary: 'Needs review.',
+          title: 'Stale guidance',
+          updatedBy: reviewerId,
+        },
+      ]);
+
+      const staleResult = await spaceMemoryModel.listEntries({
+        recallFilter: 'stale',
+        section: 'published',
+        spaceId,
+      });
+      expect(staleResult.items.map((item) => item.title)).toEqual(['Stale guidance']);
+
+      const disabledResult = await spaceMemoryModel.listEntries({
+        recallFilter: 'disabled',
+        section: 'published',
+        spaceId,
+      });
+      expect(disabledResult.items.map((item) => item.title)).toEqual(['Disabled guidance']);
+    });
   });
 
   describe('getSummary', () => {
@@ -227,9 +281,15 @@ describe('SpaceMemoryModel', () => {
       ]);
 
       const result = await spaceMemoryModel.getSummary({
-        canCreate: true,
-        canPublish: true,
-        canReview: true,
+        contract: {
+          canAccessAudit: true,
+          canCreate: true,
+          canManageRecall: true,
+          canViewInbox: true,
+          detailViews: ['audit', 'overview'],
+          recallFilters: ['active', 'all', 'disabled', 'expired', 'stale'],
+          sections: ['inbox', 'published', 'playbooks', 'policies'],
+        },
         id: spaceId,
         kind: 'team',
         membershipRole: 'editor',

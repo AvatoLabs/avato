@@ -1,7 +1,6 @@
 import { type CodeInterpreterToolName } from '@lobehub/market-sdk';
 import { TRPCError } from '@trpc/server';
 import debug from 'debug';
-import { sha256 } from 'js-sha256';
 import { z } from 'zod';
 
 import { AgentSkillModel } from '@/database/models/agentSkill';
@@ -15,7 +14,10 @@ import { isTrustedClientEnabled } from '@/libs/trusted-client';
 import { getBlobProvider } from '@/server/modules/BlobProvider';
 import { DiscoverService } from '@/server/services/discover';
 import { FileService } from '@/server/services/file';
-import { resolveSpaceIdForSandboxExport } from '@/server/services/file/resolveSpaceIdForSandboxExport';
+import {
+  generateSandboxExportStorageKey,
+  resolveTargetSpaceIdForSandboxExport,
+} from '@/server/services/file/sandboxExport';
 import { MarketService } from '@/server/services/market';
 import {
   contentBlocksToString,
@@ -279,14 +281,14 @@ export const marketRouter = router({
             }
           }
 
-          // If skill exists and has zipFileHash, pass the stable proxy URL.
-          if (skill?.zipFileHash) {
+          // If skill exists and has a ZIP digest, pass the stable proxy URL.
+          if (skill?.zipSha256) {
             const fileModel = new FileModel(ctx.serverDB, userId);
             const zipUrl = await resolveAccessibleSkillZipProxyUrl({
               fileModel,
               internal: true,
               skillId: skill.id,
-              zipFileHash: skill.zipFileHash,
+              zipSha256: skill.zipSha256,
             });
             if (zipUrl) {
               enhancedParams = {
@@ -615,17 +617,18 @@ export const marketRouter = router({
             } as ExportAndUploadFileResult;
           }
           exportSpaceId = space.id;
-        } else {
-          exportSpaceId = await resolveSpaceIdForSandboxExport(ctx.serverDB, ctx.userId, topicId);
         }
 
+        const targetSpaceId =
+          exportSpaceId ??
+          (await resolveTargetSpaceIdForSandboxExport({
+            db: ctx.serverDB,
+            topicId,
+            userId: ctx.userId,
+          }));
+
         const blobProvider = getBlobProvider();
-
-        // Use date-based sharding for privacy compliance (GDPR, CCPA)
-        const today = new Date().toISOString().split('T')[0];
-
-        // Generate a unique key for the exported file
-        const key = `code-interpreter-exports/${today}/${topicId}/${filename}`;
+        const key = generateSandboxExportStorageKey(targetSpaceId);
 
         // Step 1: Generate pre-signed upload URL
         const uploadUrl = await blobProvider.createUploadUrl(key);
@@ -662,22 +665,17 @@ export const marketRouter = router({
           } as ExportAndUploadFileResult;
         }
 
-        // Step 4: Get file metadata from S3 to verify upload and get actual size
+        // Step 4: Resolve content type from storage metadata / sandbox response
         const metadata = await blobProvider.getObjectMetadata(key);
-        const fileSize = metadata.contentLength;
         const mimeType = metadata.contentType || result?.mimeType || 'application/octet-stream';
 
-        // Step 5: Create persistent file record using FileService
-        // Generate a simple hash from the key (since we don't have the actual file content)
-        const fileHash = sha256(key + Date.now().toString());
-
-        const { fileId, url } = await ctx.fileService.createFileRecord({
-          fileHash,
+        // Step 5: Create a persistent file record using the real stored-object sha256
+        const { fileId, size: fileSize, url } =
+          await ctx.fileService.createFileRecordFromStorageObject({
           fileType: mimeType,
           name: filename,
-          size: fileSize,
-          ...(exportSpaceId !== undefined ? { spaceId: exportSpaceId } : {}),
-          url: key, // Store S3 key
+          spaceId: targetSpaceId,
+          storageKey: key, // Store S3 key
         });
 
         log('Created file record: fileId=%s, url=%s', fileId, url);

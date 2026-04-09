@@ -4,6 +4,13 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  FileAssetClassification,
+  FileAssetRenditionKind,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+} from '@/types/files';
+
 import MasonryFileItem from './index';
 
 vi.mock('antd', () => ({
@@ -36,7 +43,7 @@ vi.mock('antd-style', () => ({
 vi.mock('@lobehub/ui', () => ({
   Checkbox: ({ checked }: any) => <input readOnly checked={checked} type="checkbox" />,
   Tag: ({ children, ...props }: any) => <span {...props}>{children}</span>,
-  Text: ({ children }: any) => <span>{children}</span>,
+  Text: ({ children, ...props }: any) => <span {...props}>{children}</span>,
   showContextMenu: vi.fn(),
   stopPropagation: vi.fn(),
 }));
@@ -46,9 +53,12 @@ vi.mock('react-i18next', () => ({
     t: (key: string) =>
       ({
         'detail.asset.reviewStatus.archived': 'Archived',
+        'detail.asset.usagePolicy.internal': 'Internal',
+        'detail.asset.usagePolicy.label': 'Usage policy',
         'detail.asset.usagePolicy.restricted': 'Restricted',
         'detail.asset.rendition.preview': 'Preview',
         'detail.asset.classification.brand': 'Brand',
+        'detail.asset.audit.file_asset_governance_updated': 'Governance updated',
       })[key] || key,
   }),
 }));
@@ -145,14 +155,20 @@ describe('MasonryFileItem', () => {
   it('renders compact governance badges for masonry cards', () => {
     render(
       <MasonryFileItem
-        assetClassification="brand"
-        assetReviewStatus="archived"
-        assetUsagePolicy="restricted"
+        assetClassification={FileAssetClassification.Brand}
+        assetLatestGovernanceAuditAction="file_asset_governance_updated"
+        assetLatestGovernanceAuditActorDisplayName="Legal Team"
+        assetLatestGovernanceAuditAfter={{ usagePolicy: FileAssetUsagePolicy.Restricted }}
+        assetLatestGovernanceAuditAt={new Date('2026-04-05T10:00:00.000Z')}
+        assetLatestGovernanceAuditBefore={{ usagePolicy: FileAssetUsagePolicy.Internal }}
+        assetLatestGovernanceAuditChangedFields={['usagePolicy']}
+        assetReviewStatus={FileAssetReviewStatus.Archived}
+        assetUsagePolicy={FileAssetUsagePolicy.Restricted}
         assetVersionLabel="v2"
         chunkCount={3}
         chunkingError={null}
         chunkingStatus={null}
-        createdAt="2026-04-05T00:00:00.000Z"
+        createdAt={new Date('2026-04-05T00:00:00.000Z')}
         embeddingError={null}
         embeddingStatus={null}
         fileType="application/pdf"
@@ -163,7 +179,7 @@ describe('MasonryFileItem', () => {
         selected={false}
         size={1024}
         sourceType="file"
-        updatedAt="2026-04-05T00:00:00.000Z"
+        updatedAt={new Date('2026-04-05T00:00:00.000Z')}
         url="/f/file-1"
         onSelectedChange={vi.fn()}
       />,
@@ -172,22 +188,26 @@ describe('MasonryFileItem', () => {
     expect(screen.getByText('Brand Guide.pdf')).toBeInTheDocument();
     expect(screen.getByText('Archived')).toBeInTheDocument();
     expect(screen.getByText('Restricted')).toBeInTheDocument();
-    expect(screen.queryByText('v2')).not.toBeInTheDocument();
+    expect(screen.getByText('+2')).toHaveAttribute('title', 'v2 · Brand');
+    expect(screen.getByText('Governance updated · Usage policy: Restricted')).toHaveAttribute(
+      'title',
+      'Governance updated · Legal Team · 2026-04-05 18:00 · Usage policy: Internal -> Restricted',
+    );
   });
 
   it('renders rendition summaries when governance badges do not crowd the card', () => {
     render(
       <MasonryFileItem
-        assetClassification="general"
-        assetPrimaryRenditionKind="preview"
+        assetClassification={FileAssetClassification.General}
+        assetPrimaryRenditionKind={FileAssetRenditionKind.Preview}
         assetPrimaryRenditionLabel="Homepage"
         assetRenditionCount={2}
-        assetReviewStatus="approved"
-        assetUsagePolicy="internal"
+        assetReviewStatus={FileAssetReviewStatus.Approved}
+        assetUsagePolicy={FileAssetUsagePolicy.Internal}
         chunkCount={3}
         chunkingError={null}
         chunkingStatus={null}
-        createdAt="2026-04-05T00:00:00.000Z"
+        createdAt={new Date('2026-04-05T00:00:00.000Z')}
         embeddingError={null}
         embeddingStatus={null}
         fileType="application/pdf"
@@ -198,7 +218,7 @@ describe('MasonryFileItem', () => {
         selected={false}
         size={1024}
         sourceType="file"
-        updatedAt="2026-04-05T00:00:00.000Z"
+        updatedAt={new Date('2026-04-05T00:00:00.000Z')}
         url="/f/file-2"
         onSelectedChange={vi.fn()}
       />,

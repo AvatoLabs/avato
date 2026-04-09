@@ -765,7 +765,7 @@ export class AiAgentService {
 
       if (files && files.length > 0) {
         const uploadSpaceId = await this.resolveTargetSpaceIdForAgentInput({
-          spaceId: appContext?.spaceId,
+          spaceId: appContext?.spaceId ?? undefined,
           topicId,
         });
 

@@ -209,8 +209,10 @@ describe('userMemoriesRouter.retrieveMemoryForTopic', () => {
     const result = await caller.retrieveMemoryForTopic({ topicId: 'topic-3' });
 
     expect(result.preferences).toHaveLength(1);
-    expect(calculateWeightedLength(result.preferences[0]!.conclusionDirectives)).toBeGreaterThan(320);
-    expect(calculateWeightedLength(result.preferences[0]!.conclusionDirectives)).toBeLessThanOrEqual(
+    expect(calculateWeightedLength(result.preferences[0]!.conclusionDirectives ?? '')).toBeGreaterThan(
+      320,
+    );
+    expect(calculateWeightedLength(result.preferences[0]!.conclusionDirectives ?? '')).toBeLessThanOrEqual(
       432,
     );
   });

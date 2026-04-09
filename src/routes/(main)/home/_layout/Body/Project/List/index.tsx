@@ -5,7 +5,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { SOURCE_SET_URL } from '@/const/url';
+import { buildSourceSetPath } from '@/features/ResourceSpaces';
 import EmptyNavItem from '@/features/NavPanel/components/EmptyNavItem';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import { useSourceSetStore } from '@/store/sourceSet';
@@ -34,10 +34,10 @@ const ProjectList = memo(() => {
         <Link
           aria-label={item.id}
           key={item.id}
-          to={SOURCE_SET_URL(item.id)}
+          to={buildSourceSetPath(item.spaceId, item.id)}
           onClick={(e) => {
             e.preventDefault();
-            navigate(SOURCE_SET_URL(item.id));
+            navigate(buildSourceSetPath(item.spaceId, item.id));
           }}
         >
           <Item {...item} key={item.id} />

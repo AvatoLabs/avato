@@ -1,23 +1,24 @@
 import { type FilesStoreState } from '@/store/file/initialState';
+import { type FileListItem } from '@/types/files';
 import { type FileUploadStatus } from '@/types/files/upload';
 
 const uploadStatusArray = new Set(['uploading', 'pending', 'processing']);
 
 const dockFileList = (s: FilesStoreState) => s.dockUploadFileList;
 const dockRawFileList = (s: FilesStoreState) => s.dockUploadFileList.map((item) => item.file);
-const getFileById = (id?: string | null) => (s: FilesStoreState) => {
+const getFileById = (id?: string | null) => (s: FilesStoreState): FileListItem | undefined => {
   if (!id) return;
 
   // Prefer resourceMap (Explorer's data) when fileList may be empty or stale
   const fromResourceMap = s.resourceMap?.get(id);
   if (fromResourceMap) {
-    return {
+    const mappedResource: FileListItem = {
       chunkCount: fromResourceMap.chunkCount ?? null,
       chunkingError: fromResourceMap.chunkingError ?? null,
-      chunkingStatus: fromResourceMap.chunkingStatus ?? null,
+      chunkingStatus: (fromResourceMap.chunkingStatus ?? null) as FileListItem['chunkingStatus'],
       createdAt: fromResourceMap.createdAt,
       embeddingError: fromResourceMap.embeddingError ?? null,
-      embeddingStatus: fromResourceMap.embeddingStatus ?? null,
+      embeddingStatus: (fromResourceMap.embeddingStatus ?? null) as FileListItem['embeddingStatus'],
       fileId: fromResourceMap.fileId ?? null,
       fileType: fromResourceMap.fileType,
       finishEmbedding: fromResourceMap.finishEmbedding ?? false,
@@ -28,6 +29,8 @@ const getFileById = (id?: string | null) => (s: FilesStoreState) => {
       updatedAt: fromResourceMap.updatedAt,
       url: fromResourceMap.url ?? '',
     };
+
+    return mappedResource;
   }
 
   return s.fileList.find((item) => item.id === id);

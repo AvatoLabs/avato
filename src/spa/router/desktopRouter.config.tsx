@@ -289,6 +289,22 @@ export const desktopRoutes: RouteObject[] = [
         path: 'spaces/trash',
       },
       {
+        element: dynamicElement(
+          () => import('@/features/ResourceSpaces/LegacySharedFilesRedirectPage'),
+          'Desktop > Files > Shared > Legacy Redirect',
+        ),
+        errorElement: <ErrorBoundary resetPath="/spaces/shared" />,
+        path: 'content/shared',
+      },
+      {
+        element: dynamicElement(
+          () => import('@/features/ResourceSpaces/LegacyTrashRedirectPage'),
+          'Desktop > Files > Trash > Legacy Redirect',
+        ),
+        errorElement: <ErrorBoundary resetPath="/spaces/trash" />,
+        path: 'content/trash',
+      },
+      {
         children: [
           {
             element: dynamicElement(
@@ -386,7 +402,7 @@ export const desktopRoutes: RouteObject[] = [
                   },
                   {
                     element: dynamicElement(
-                      () => import('@/routes/(main)/content/spaces/[spaceId]/trash'),
+                      () => import('@/routes/(main)/spaces/[spaceId]/trash'),
                       'Desktop > Space > Files > Trash',
                     ),
                     path: 'trash',
@@ -414,14 +430,14 @@ export const desktopRoutes: RouteObject[] = [
               },
               {
                 element: dynamicElement(
-                  () => import('@/routes/(main)/content/spaces/[spaceId]/settings'),
+                  () => import('@/routes/(main)/spaces/[spaceId]/settings'),
                   'Desktop > Space > Settings',
                 ),
                 path: 'settings',
               },
               {
                 element: dynamicElement(
-                  () => import('@/routes/(main)/content/spaces/[spaceId]/members'),
+                  () => import('@/routes/(main)/spaces/[spaceId]/members'),
                   'Desktop > Space > Members',
                 ),
                 path: 'members',
@@ -434,23 +450,6 @@ export const desktopRoutes: RouteObject[] = [
           },
         ],
         path: 'spaces/:spaceId',
-      },
-
-      {
-        element: dynamicElement(
-          () => import('@/routes/(main)/content/shared'),
-          'Desktop > Files > Shared > Legacy Redirect',
-        ),
-        errorElement: <ErrorBoundary resetPath="/spaces/shared" />,
-        path: 'content/shared',
-      },
-      {
-        element: dynamicElement(
-          () => import('@/routes/(main)/content/trash'),
-          'Desktop > Files > Trash > Legacy Redirect',
-        ),
-        errorElement: <ErrorBoundary resetPath="/spaces/trash" />,
-        path: 'content/trash',
       },
 
       // Settings routes

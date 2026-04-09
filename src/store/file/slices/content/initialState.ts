@@ -1,9 +1,11 @@
 import { type ContentItem, type ContentQueryParams, type SyncOperation } from '@/types/content';
+import { type FileAssetCapabilities } from '@/types/files';
 
 /**
  * Resource slice state
  */
 export interface ResourceState {
+  governanceCapabilities?: FileAssetCapabilities;
   /**
    * Pagination state
    */
@@ -55,6 +57,7 @@ export interface ResourceState {
  * Initial state for resource slice
  */
 export const initialResourceState: ResourceState = {
+  governanceCapabilities: undefined,
   hasMore: false,
   isLoadingMore: false,
   isSyncing: false,

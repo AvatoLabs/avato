@@ -3,8 +3,8 @@
  * Replaces QuickActionRow. Shows "All" + agents with avatar.
  */
 import { Image } from 'expo-image';
-import React from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { FlatList, Text, TouchableOpacity, View } from 'react-native';
 
 import { haptics } from '../../lib/haptics';
 import { useThemeColors } from '../../theme/colors';
@@ -12,9 +12,14 @@ import type { AgentTemplate } from '../../types';
 
 interface AgentPillTabsProps {
   agents: AgentTemplate[];
-  selectedAgentId: string | null;
-  onSelect: (agentId: string | null) => void;
   emptyLabel?: string;
+  onSelect: (agentId: string | null) => void;
+  selectedAgentId: string | null;
+}
+
+interface AgentPillTabItem {
+  agent?: AgentTemplate;
+  id: string;
 }
 
 function AgentAvatar({ agent, size = 24 }: { agent: AgentTemplate; size?: number }) {
@@ -61,60 +66,84 @@ export function AgentPillTabs({
 }: AgentPillTabsProps) {
   const colors = useThemeColors();
   const isAllSelected = selectedAgentId === null;
+  const items = useMemo<AgentPillTabItem[]>(
+    () => [{ id: '__all__' }, ...agents.map((agent) => ({ agent, id: agent.id }))],
+    [agents],
+  );
+  const renderItem = useCallback(
+    ({ item }: { item: AgentPillTabItem }) => {
+      if (!item.agent) {
+        return (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            className="flex-row items-center rounded-full px-4 py-2.5"
+            style={{
+              backgroundColor: isAllSelected ? colors.primary : colors.fillTertiary,
+            }}
+            onPress={() => {
+              haptics.light();
+              onSelect(null);
+            }}
+          >
+            <Text
+              className="text-[13px] font-semibold"
+              style={{ color: isAllSelected ? colors.iconOnPrimary : colors.foreground }}
+            >
+              {emptyLabel}
+            </Text>
+          </TouchableOpacity>
+        );
+      }
 
-  return (
-    <View className="px-5 mb-4">
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
-      >
+      const agent = item.agent;
+      const isSelected = selectedAgentId === agent.id;
+
+      return (
         <TouchableOpacity
           activeOpacity={0.7}
-          className="flex-row items-center rounded-full px-4 py-2.5"
+          className="flex-row items-center rounded-full px-3 py-2.5 gap-2"
           style={{
-            backgroundColor: isAllSelected ? colors.primary : colors.fillTertiary,
+            backgroundColor: isSelected ? colors.primary : colors.fillTertiary,
           }}
           onPress={() => {
             haptics.light();
-            onSelect(null);
+            onSelect(agent.id);
           }}
         >
+          <AgentAvatar agent={agent} size={22} />
           <Text
-            className="text-[13px] font-semibold"
-            style={{ color: isAllSelected ? colors.iconOnPrimary : colors.foreground }}
+            className="text-[13px] font-semibold max-w-[80px]"
+            numberOfLines={1}
+            style={{ color: isSelected ? colors.iconOnPrimary : colors.foreground }}
           >
-            {emptyLabel}
+            {agent.title || 'Agent'}
           </Text>
         </TouchableOpacity>
+      );
+    },
+    [
+      colors.fillTertiary,
+      colors.foreground,
+      colors.iconOnPrimary,
+      colors.primary,
+      emptyLabel,
+      isAllSelected,
+      onSelect,
+      selectedAgentId,
+    ],
+  );
 
-        {agents.map((agent) => {
-          const isSelected = selectedAgentId === agent.id;
-          return (
-            <TouchableOpacity
-              key={agent.id}
-              activeOpacity={0.7}
-              className="flex-row items-center rounded-full px-3 py-2.5 gap-2"
-              style={{
-                backgroundColor: isSelected ? colors.primary : colors.fillTertiary,
-              }}
-              onPress={() => {
-                haptics.light();
-                onSelect(agent.id);
-              }}
-            >
-              <AgentAvatar agent={agent} size={22} />
-              <Text
-                className="text-[13px] font-semibold max-w-[80px]"
-                numberOfLines={1}
-                style={{ color: isSelected ? colors.iconOnPrimary : colors.foreground }}
-              >
-                {agent.title || 'Agent'}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+  return (
+    <View className="px-5 mb-4">
+      <FlatList
+        horizontal
+        contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+        data={items}
+        keyExtractor={(item) => item.id}
+        keyboardShouldPersistTaps="handled"
+        renderItem={renderItem}
+        showsHorizontalScrollIndicator={false}
+      />
     </View>
   );
 }

@@ -1,7 +1,7 @@
 import { BUILTIN_AGENT_SLUGS } from '@lobechat/builtin-agents';
 import { isChatGroupSessionId } from '@lobechat/types';
 import { type ReactNode } from 'react';
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 
 import Loading from '@/components/Loading/BrandTextLoading';
 import { type ConversationContext, ConversationProvider } from '@/features/Conversation';
@@ -42,21 +42,46 @@ export const DocsAgentProvider = memo<DocsAgentProviderProps>(({ children, fallb
   const pageKind = usePageEditorStore((s) => s.pageKind);
   const isTablePage = pageKind === TABLE_PAGE_KIND;
   const shouldSyncDocsAgent = shouldSyncDocsAgentToUserDefault(docsAgentConfig, defaultAgentConfig);
+  const syncKey =
+    docsAgentId && defaultAgentConfig.model && defaultAgentConfig.provider
+      ? `${docsAgentId}:${defaultAgentConfig.provider}:${defaultAgentConfig.model}`
+      : null;
+  const [failedSyncKey, setFailedSyncKey] = useState<string | null>(null);
+  const hasSyncFailed = syncKey !== null && failedSyncKey === syncKey;
 
   useInitBuiltinAgent(BUILTIN_AGENT_SLUGS.docsAgent);
 
   useEffect(() => {
-    if (!docsAgentId || !shouldSyncDocsAgent) return;
-    if (!defaultAgentConfig.model || !defaultAgentConfig.provider) return;
+    if (!docsAgentId || !shouldSyncDocsAgent) {
+      setFailedSyncKey(null);
+      return;
+    }
+    if (!defaultAgentConfig.model || !defaultAgentConfig.provider || !syncKey) return;
+
+    let isActive = true;
 
     void updateAgentConfigById(docsAgentId, {
       model: defaultAgentConfig.model,
       provider: defaultAgentConfig.provider,
-    });
+    })
+      .then(() => {
+        if (!isActive) return;
+        setFailedSyncKey(null);
+      })
+      .catch((error) => {
+        console.error('Failed to sync docs agent config:', error);
+        if (!isActive) return;
+        setFailedSyncKey(syncKey);
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, [
     defaultAgentConfig.model,
     defaultAgentConfig.provider,
     docsAgentId,
+    syncKey,
     shouldSyncDocsAgent,
     updateAgentConfigById,
   ]);
@@ -87,7 +112,7 @@ export const DocsAgentProvider = memo<DocsAgentProviderProps>(({ children, fallb
   // Get operation state for reactive updates
   const operationState = useOperationState(context);
 
-  if (!docsAgentId || shouldSyncDocsAgent) {
+  if (!docsAgentId || (shouldSyncDocsAgent && !hasSyncFailed)) {
     return fallback || <Loading debugId="DocsAgentProvider" />;
   }
 

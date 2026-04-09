@@ -311,4 +311,9 @@ export class SpaceModel {
         ),
       );
   };
+
+  static findPersonalSpaceByOwnerId = async (db: LobeChatDatabase, userId: string) =>
+    db.query.spaces.findFirst({
+      where: and(eq(spaces.personalOwnerId, userId), isNull(spaces.deletedAt)),
+    });
 }

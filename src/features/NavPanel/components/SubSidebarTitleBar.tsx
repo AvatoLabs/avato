@@ -24,6 +24,8 @@ export interface SubSidebarTitleBarProps {
   backUseHistory?: boolean;
   /** 右侧区域（如回收站、操作按钮） */
   right?: ReactNode;
+  /** 是否显示返回按钮；独立 surface 可以关闭 */
+  showBackButton?: boolean;
   /** 当前子侧栏标题（与主导航 tab 文案一致） */
   title: ReactNode;
   /** 点击标题跳转至该分区根路径；不传则仅展示文字 */
@@ -32,10 +34,12 @@ export interface SubSidebarTitleBarProps {
 
 /** 子侧栏顶栏：返回首页 + 分区标题，避免子路由无法回到主导航 */
 const SubSidebarTitleBar = memo<SubSidebarTitleBarProps>(
-  ({ backUseHistory = false, backTo = '/', right, title, titleTo }) => {
+  ({ backUseHistory = false, backTo = '/', right, showBackButton = true, title, titleTo }) => {
     const { t } = useTranslation('common');
     const glass = useGlassNavVisual();
-    const titleMarginStart = getWorkspaceSubSidebarTitleMarginInlineStartPx(glass);
+    const titleMarginStart = showBackButton
+      ? getWorkspaceSubSidebarTitleMarginInlineStartPx(glass)
+      : 0;
     const titleText =
       typeof title === 'number' || typeof title === 'string' ? String(title) : undefined;
 
@@ -82,15 +86,17 @@ const SubSidebarTitleBar = memo<SubSidebarTitleBarProps>(
           gap={WORKSPACE_SUB_SIDEBAR_BACK_TITLE_GAP_PX}
           style={{ minWidth: 0 }}
         >
-          <BackButton
-            title={t('back')}
-            to={backTo}
-            useHistory={backUseHistory}
-            size={{
-              blockSize: WORKSPACE_SUB_SIDEBAR_BACK_BUTTON_BLOCK_PX,
-              size: 18,
-            }}
-          />
+          {showBackButton && (
+            <BackButton
+              title={t('back')}
+              to={backTo}
+              useHistory={backUseHistory}
+              size={{
+                blockSize: WORKSPACE_SUB_SIDEBAR_BACK_BUTTON_BLOCK_PX,
+                size: 18,
+              }}
+            />
+          )}
           {titleTo ? (
             <Link style={titleStyles} to={titleTo}>
               {titleNode}

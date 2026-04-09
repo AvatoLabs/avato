@@ -36,11 +36,8 @@ import CommunityListProviderPage from '@/routes/(main)/community/(list)/provider
 import ResourceLayout from '@/routes/(main)/content/_layout';
 import ResourceHomePage from '@/routes/(main)/content/(home)';
 import ResourceHomeLayout from '@/routes/(main)/content/(home)/_layout';
-import LegacySharedFilesRedirectPage from '@/routes/(main)/content/shared';
-import ResourceSpaceMembersPage from '@/routes/(main)/content/spaces/[spaceId]/members';
-import ResourceSpaceSettingsPage from '@/routes/(main)/content/spaces/[spaceId]/settings';
-import ResourceSpaceTrashPage from '@/routes/(main)/content/spaces/[spaceId]/trash';
-import LegacyTrashRedirectPage from '@/routes/(main)/content/trash';
+import LegacySharedFilesRedirectPage from '@/features/ResourceSpaces/LegacySharedFilesRedirectPage';
+import LegacyTrashRedirectPage from '@/features/ResourceSpaces/LegacyTrashRedirectPage';
 import DesktopPageLayout from '@/routes/(main)/docs/_layout';
 import GroupPage from '@/routes/(main)/group';
 import DesktopGroupLayout from '@/routes/(main)/group/_layout';
@@ -63,7 +60,10 @@ import SpaceDocsPage from '@/routes/(main)/spaces/[spaceId]/docs';
 import SpaceDocDetailPage from '@/routes/(main)/spaces/[spaceId]/docs/[id]';
 import SpaceTablePage from '@/routes/(main)/spaces/[spaceId]/docs/table';
 import SpaceTableDetailPage from '@/routes/(main)/spaces/[spaceId]/docs/table/[id]';
+import SpaceMembersPage from '@/routes/(main)/spaces/[spaceId]/members';
 import SpaceMemoryPage from '@/routes/(main)/spaces/[spaceId]/memory';
+import SpaceSettingsPage from '@/routes/(main)/spaces/[spaceId]/settings';
+import SpaceScopedTrashPage from '@/routes/(main)/spaces/[spaceId]/trash';
 import SharedWithMePage from '@/routes/(main)/spaces/shared';
 import SpaceTrashRedirectPage from '@/routes/(main)/spaces/trash';
 import StudioPage from '@/routes/(main)/studio';
@@ -88,6 +88,16 @@ export const desktopRoutes: RouteObject[] = [
         element: <SpaceTrashRedirectPage />,
         errorElement: <ErrorBoundary resetPath="/spaces/trash" />,
         path: 'spaces/trash',
+      },
+      {
+        element: <LegacySharedFilesRedirectPage />,
+        errorElement: <ErrorBoundary resetPath="/spaces/shared" />,
+        path: 'content/shared',
+      },
+      {
+        element: <LegacyTrashRedirectPage />,
+        errorElement: <ErrorBoundary resetPath="/spaces/trash" />,
+        path: 'content/trash',
       },
       {
         children: [
@@ -300,7 +310,7 @@ export const desktopRoutes: RouteObject[] = [
                     path: ':slug/item/:fileId',
                   },
                   {
-                    element: <ResourceSpaceTrashPage />,
+                    element: <SpaceScopedTrashPage />,
                     path: 'trash',
                   },
                 ],
@@ -316,11 +326,11 @@ export const desktopRoutes: RouteObject[] = [
                 path: 'memory/audit/:entryId',
               },
               {
-                element: <ResourceSpaceSettingsPage />,
+                element: <SpaceSettingsPage />,
                 path: 'settings',
               },
               {
-                element: <ResourceSpaceMembersPage />,
+                element: <SpaceMembersPage />,
                 path: 'members',
               },
             ],
@@ -328,17 +338,6 @@ export const desktopRoutes: RouteObject[] = [
           },
         ],
         path: 'spaces/:spaceId',
-      },
-
-      {
-        element: <LegacySharedFilesRedirectPage />,
-        errorElement: <ErrorBoundary resetPath="/spaces/shared" />,
-        path: 'content/shared',
-      },
-      {
-        element: <LegacyTrashRedirectPage />,
-        errorElement: <ErrorBoundary resetPath="/spaces/trash" />,
-        path: 'content/trash',
       },
 
       // Settings routes

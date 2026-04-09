@@ -15,7 +15,7 @@ import {
 import SkeletonList from '@/features/Conversation/components/SkeletonList';
 import { useOperationState } from '@/hooks/useOperationState';
 import { useChatStore } from '@/store/chat';
-import { threadSelectors } from '@/store/chat/selectors';
+import { portalThreadSelectors, threadSelectors } from '@/store/chat/selectors';
 import { type MessageMapKeyInput } from '@/store/chat/utils/messageMapKey';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
 
@@ -113,9 +113,9 @@ const ThreadChat = memo(() => {
     useChatStore((s) => [
       s.activeAgentId,
       s.activeTopicId,
-      s.portalThreadId,
-      s.threadStartMessageId,
-      s.newThreadMode,
+      portalThreadSelectors.portalThreadId(s),
+      portalThreadSelectors.threadStartMessageId(s),
+      portalThreadSelectors.newThreadMode(s),
     ]);
 
   // Get thread-specific actionsBar config

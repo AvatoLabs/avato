@@ -1,6 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
+import type { ItemType, MenuItemType } from 'antd/es/menu/interface';
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,6 +9,9 @@ import { useFileItemDropdown } from './useFileItemDropdown';
 
 const mockCopyToClipboard = vi.hoisted(() => vi.fn());
 const mockAddChatContextSelection = vi.hoisted(() => vi.fn());
+const mockAddFilesToSourceSet = vi.hoisted(() => vi.fn());
+const mockClearTreeFolderCache = vi.hoisted(() => vi.fn());
+const mockDeleteContentItem = vi.hoisted(() => vi.fn());
 const mockEnsureFileDocument = vi.hoisted(() => vi.fn());
 const mockNavigate = vi.hoisted(() => vi.fn());
 const mockOpenCreateSpaceMemoryCandidateModal = vi.hoisted(() => vi.fn());
@@ -15,6 +19,10 @@ const mockOpenShareModal = vi.hoisted(() => vi.fn());
 const mockPreviewFileContent = vi.hoisted(() => vi.fn());
 const mockRevealChatContextPanel = vi.hoisted(() => vi.fn());
 const mockGetDocumentById = vi.hoisted(() => vi.fn());
+const mockModalConfirm = vi.hoisted(() => vi.fn());
+const mockMoveContentItem = vi.hoisted(() => vi.fn());
+const mockRefreshFileList = vi.hoisted(() => vi.fn());
+const mockRemoveFilesFromSourceSet = vi.hoisted(() => vi.fn());
 let mockSpace = {
   id: 'spc_1',
   kind: 'team',
@@ -51,7 +59,7 @@ vi.mock('antd', () => ({
     useApp: () => ({
       message: mockMessage,
       modal: {
-        confirm: vi.fn(),
+        confirm: mockModalConfirm,
       },
     }),
   },
@@ -85,7 +93,7 @@ vi.mock('@/config/contentIcons', () => ({
 }));
 
 vi.mock('@/features/ContentManager/components/SourceSetTree/treeState', () => ({
-  clearTreeFolderCache: vi.fn(),
+  clearTreeFolderCache: mockClearTreeFolderCache,
 }));
 
 vi.mock('@/features/ResourceSharing', () => ({
@@ -135,9 +143,9 @@ vi.mock('@/store/file', () => ({
   useFileStore: vi.fn((selector: any) =>
     selector({
       addChatContextSelection: mockAddChatContextSelection,
-      deleteContentItem: vi.fn(),
-      moveContentItem: vi.fn(),
-      refreshFileList: vi.fn(),
+      deleteContentItem: mockDeleteContentItem,
+      moveContentItem: mockMoveContentItem,
+      refreshFileList: mockRefreshFileList,
     }),
   ),
 }));
@@ -145,8 +153,8 @@ vi.mock('@/store/file', () => ({
 vi.mock('@/store/sourceSet', () => ({
   useSourceSetStore: vi.fn((selector: any) =>
     selector({
-      addFilesToSourceSet: vi.fn(),
-      removeFilesFromSourceSet: vi.fn(),
+      addFilesToSourceSet: mockAddFilesToSourceSet,
+      removeFilesFromSourceSet: mockRemoveFilesFromSourceSet,
       useFetchSourceSetList: () => ({ data: [] }),
     }),
   ),
@@ -156,17 +164,45 @@ vi.mock('@/utils/client/downloadFile', () => ({
   downloadFile: vi.fn(),
 }));
 
+const findAction = (
+  items: ItemType[],
+  key: string,
+): MenuItemType & { onClick: NonNullable<MenuItemType['onClick']> } => {
+  const action = items.find(
+    (item): item is MenuItemType & { onClick: NonNullable<MenuItemType['onClick']> } =>
+      Boolean(
+        item &&
+          typeof item === 'object' &&
+          'key' in item &&
+          item.key === key &&
+          'onClick' in item &&
+          typeof item.onClick === 'function',
+      ),
+  );
+
+  expect(action).toBeDefined();
+
+  return action!;
+};
+
 describe('useFileItemDropdown', () => {
   beforeEach(() => {
     mockCopyToClipboard.mockReset();
     mockAddChatContextSelection.mockReset();
+    mockAddFilesToSourceSet.mockReset();
+    mockClearTreeFolderCache.mockReset();
+    mockDeleteContentItem.mockReset();
     mockEnsureFileDocument.mockReset();
     mockGetDocumentById.mockReset();
+    mockModalConfirm.mockReset();
+    mockMoveContentItem.mockReset();
     mockNavigate.mockReset();
     mockOpenCreateSpaceMemoryCandidateModal.mockReset();
     mockOpenShareModal.mockReset();
     mockPreviewFileContent.mockReset();
+    mockRefreshFileList.mockReset();
     mockRevealChatContextPanel.mockReset();
+    mockRemoveFilesFromSourceSet.mockReset();
     mockMessage.error.mockReset();
     mockMessage.success.mockReset();
     mockMessage.warning.mockReset();
@@ -198,14 +234,12 @@ describe('useFileItemDropdown', () => {
       }),
     );
 
-    const action = result.current
-      .menuItems()
-      .find((item: any) => item?.key === 'openInDocumentEditor');
+    const action = findAction(result.current.menuItems(), 'openInDocumentEditor');
 
     expect(action?.label).toBe('preview.editAsDocument');
 
     await act(async () => {
-      await action.onClick({ domEvent: { stopPropagation: vi.fn() } });
+      await action.onClick({ domEvent: { stopPropagation: vi.fn() } } as any);
     });
 
     expect(mockEnsureFileDocument).toHaveBeenCalledWith('file_1');
@@ -229,12 +263,10 @@ describe('useFileItemDropdown', () => {
       }),
     );
 
-    const action = result.current
-      .menuItems()
-      .find((item: any) => item?.key === 'openInDocumentEditor');
+    const action = findAction(result.current.menuItems(), 'openInDocumentEditor');
 
     await act(async () => {
-      await action.onClick({ domEvent: { stopPropagation: vi.fn() } });
+      await action.onClick({ domEvent: { stopPropagation: vi.fn() } } as any);
     });
 
     expect(mockEnsureFileDocument).not.toHaveBeenCalled();
@@ -258,10 +290,10 @@ describe('useFileItemDropdown', () => {
       }),
     );
 
-    const action = result.current.menuItems().find((item: any) => item?.key === 'share');
+    const action = findAction(result.current.menuItems(), 'share');
 
     await act(async () => {
-      await action.onClick({ domEvent: { stopPropagation: vi.fn() } });
+      await action.onClick({ domEvent: { stopPropagation: vi.fn() } } as any);
     });
 
     expect(mockOpenShareModal).toHaveBeenCalledWith({
@@ -283,10 +315,10 @@ describe('useFileItemDropdown', () => {
       }),
     );
 
-    const action = result.current.menuItems().find((item: any) => item?.key === 'share');
+    const action = findAction(result.current.menuItems(), 'share');
 
     await act(async () => {
-      await action.onClick({ domEvent: { stopPropagation: vi.fn() } });
+      await action.onClick({ domEvent: { stopPropagation: vi.fn() } } as any);
     });
 
     expect(mockOpenShareModal).toHaveBeenCalledWith({
@@ -309,10 +341,10 @@ describe('useFileItemDropdown', () => {
       }),
     );
 
-    const action = result.current.menuItems().find((item: any) => item?.key === 'copyUrl');
+    const action = findAction(result.current.menuItems(), 'copyUrl');
 
     await act(async () => {
-      await action.onClick({ domEvent: { stopPropagation: vi.fn() } });
+      await action.onClick({ domEvent: { stopPropagation: vi.fn() } } as any);
     });
 
     expect(mockCopyToClipboard).toHaveBeenCalledWith('https://app.local/spaces/preview');
@@ -331,12 +363,12 @@ describe('useFileItemDropdown', () => {
       }),
     );
 
-    const action = result.current.menuItems().find((item: any) => item?.key === 'addToSpaceMemory');
+    const action = findAction(result.current.menuItems(), 'addToSpaceMemory');
 
     expect(action?.label).toBe('space.memory.actions.addFromSource');
 
     await act(async () => {
-      await action.onClick({ domEvent: { stopPropagation: vi.fn() } });
+      await action.onClick({ domEvent: { stopPropagation: vi.fn() } } as any);
     });
 
     expect(mockOpenCreateSpaceMemoryCandidateModal).toHaveBeenCalledWith({
@@ -368,7 +400,9 @@ describe('useFileItemDropdown', () => {
       }),
     );
 
-    const action = result.current.menuItems().find((item: any) => item?.key === 'addToSpaceMemory');
+    const action = result.current
+      .menuItems()
+      .find((item): item is MenuItemType => Boolean(item && item.key === 'addToSpaceMemory'));
 
     expect(action).toBeUndefined();
   });
@@ -391,12 +425,12 @@ describe('useFileItemDropdown', () => {
       }),
     );
 
-    const action = result.current.menuItems().find((item: any) => item?.key === 'addToChatContext');
+    const action = findAction(result.current.menuItems(), 'addToChatContext');
 
     expect(action?.label).toBe('actions.addToChatContext');
 
     await act(async () => {
-      await action.onClick({ domEvent: { stopPropagation: vi.fn() } });
+      await action.onClick({ domEvent: { stopPropagation: vi.fn() } } as any);
     });
 
     expect(mockAddChatContextSelection).toHaveBeenCalledWith({
@@ -410,5 +444,69 @@ describe('useFileItemDropdown', () => {
     });
     expect(mockRevealChatContextPanel).toHaveBeenCalledTimes(1);
     expect(mockMessage.success).toHaveBeenCalledWith('actions.addToChatContextSuccess');
+  });
+
+  it('shows an error when removing an item from a source set fails', async () => {
+    mockRemoveFilesFromSourceSet.mockRejectedValue(new Error('remove failed'));
+
+    const { result } = renderHook(() =>
+      useFileItemDropdown({
+        fileId: 'file_1',
+        fileType: 'text/plain',
+        filename: 'Spec.txt',
+        id: 'file_1',
+        sourceSetId: 'sst_1',
+        url: '/spec.txt',
+      }),
+    );
+
+    const action = findAction(result.current.menuItems(), 'removeFromSourceSet');
+
+    await act(async () => {
+      await action.onClick({ domEvent: { stopPropagation: vi.fn() } } as any);
+    });
+
+    const confirmConfig = mockModalConfirm.mock.calls.at(-1)?.[0];
+    expect(confirmConfig).toBeDefined();
+
+    await act(async () => {
+      await confirmConfig.onOk();
+    });
+
+    expect(mockRemoveFilesFromSourceSet).toHaveBeenCalledWith('sst_1', ['file_1']);
+    expect(mockMessage.error).toHaveBeenCalledWith('FileManager.actions.removeFromSourceSetError');
+  });
+
+  it('shows an error when deleting an item fails', async () => {
+    mockDeleteContentItem.mockRejectedValue(new Error('delete failed'));
+
+    const { result } = renderHook(() =>
+      useFileItemDropdown({
+        fileId: 'file_1',
+        fileType: 'text/plain',
+        filename: 'Spec.txt',
+        id: 'file_1',
+        sourceSetId: 'sst_1',
+        url: '/spec.txt',
+      }),
+    );
+
+    const action = findAction(result.current.menuItems(), 'delete');
+
+    await act(async () => {
+      await action.onClick({ domEvent: { stopPropagation: vi.fn() } } as any);
+    });
+
+    const confirmConfig = mockModalConfirm.mock.calls.at(-1)?.[0];
+    expect(confirmConfig).toBeDefined();
+
+    await act(async () => {
+      await confirmConfig.onOk();
+    });
+
+    expect(mockDeleteContentItem).toHaveBeenCalledWith('file_1');
+    expect(mockClearTreeFolderCache).not.toHaveBeenCalled();
+    expect(mockRefreshFileList).not.toHaveBeenCalled();
+    expect(mockMessage.error).toHaveBeenCalledWith('FileManager.actions.deleteError');
   });
 });

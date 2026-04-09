@@ -72,10 +72,16 @@ const ConfigGroupModal = memo<ConfigGroupModalProps>(({ open, onCancel, defaultI
               sort: index,
             }));
             setLoading(true);
-            await updateAiProviderSort(sortMap);
-            setLoading(false);
-            message.success(t('sortModal.success'));
-            onCancel();
+            try {
+              await updateAiProviderSort(sortMap);
+              message.success(t('sortModal.success'));
+              onCancel();
+            } catch (error) {
+              console.error('Failed to sort providers:', error);
+              message.error(t('sortModal.error'));
+            } finally {
+              setLoading(false);
+            }
           }}
         >
           {t('sortModal.update')}

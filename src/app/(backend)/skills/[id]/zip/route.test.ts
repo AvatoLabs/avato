@@ -48,7 +48,7 @@ vi.mock('@/server/services/file', () => ({
 describe('GET /skills/[id]/zip', () => {
   const mockDb = {};
   const mockFindSkillById = vi.fn();
-  const mockCanAccessGlobalFileByHash = vi.fn();
+  const mockCanAccessGlobalFileBySha256 = vi.fn();
   const mockCheckHash = vi.fn();
   const mockCreateAccessEvent = vi.fn();
   const mockGetFullFileUrl = vi.fn();
@@ -74,7 +74,7 @@ describe('GET /skills/[id]/zip', () => {
     vi.mocked(FileModel).mockImplementation(
       () =>
         ({
-          canAccessGlobalFileByHash: mockCanAccessGlobalFileByHash,
+          canAccessGlobalFileBySha256: mockCanAccessGlobalFileBySha256,
           checkHash: mockCheckHash,
         }) as any,
     );
@@ -85,7 +85,7 @@ describe('GET /skills/[id]/zip', () => {
         }) as any,
     );
     mockFindSkillById.mockReset();
-    mockCanAccessGlobalFileByHash.mockReset();
+    mockCanAccessGlobalFileBySha256.mockReset();
     mockCheckHash.mockReset();
     mockCreateAccessEvent.mockReset();
     mockGetFullFileUrl.mockReset();
@@ -97,19 +97,19 @@ describe('GET /skills/[id]/zip', () => {
   });
 
   it('returns 404 when the skill has no downloadable zip', async () => {
-    mockFindSkillById.mockResolvedValue({ id: 'skill-1', zipFileHash: null });
+    mockFindSkillById.mockResolvedValue({ id: 'skill-1', zipSha256: null });
 
     const res = await GET(new Request('https://app.example.com/skills/skill-1/zip'), {
       params: Promise.resolve({ id: 'skill-1' }),
     });
 
     expect(res.status).toBe(404);
-    expect(mockCanAccessGlobalFileByHash).not.toHaveBeenCalled();
+    expect(mockCanAccessGlobalFileBySha256).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the requester cannot access the zip hash', async () => {
-    mockFindSkillById.mockResolvedValue({ id: 'skill-1', zipFileHash: 'hash-1' });
-    mockCanAccessGlobalFileByHash.mockResolvedValue(false);
+    mockFindSkillById.mockResolvedValue({ id: 'skill-1', zipSha256: 'hash-1' });
+    mockCanAccessGlobalFileBySha256.mockResolvedValue(false);
 
     const res = await GET(new Request('https://app.example.com/skills/skill-1/zip'), {
       params: Promise.resolve({ id: 'skill-1' }),
@@ -120,8 +120,8 @@ describe('GET /skills/[id]/zip', () => {
   });
 
   it('redirects through a freshly issued zip URL', async () => {
-    mockFindSkillById.mockResolvedValue({ id: 'skill-1', zipFileHash: 'hash-1' });
-    mockCanAccessGlobalFileByHash.mockResolvedValue(true);
+    mockFindSkillById.mockResolvedValue({ id: 'skill-1', zipSha256: 'hash-1' });
+    mockCanAccessGlobalFileBySha256.mockResolvedValue(true);
     mockCheckHash.mockResolvedValue({ isExist: true, url: 'skills/skill-1.zip' });
     mockGetFullFileUrl.mockResolvedValue('https://blob.example.com/skill-1.zip?sig=1');
 
@@ -131,13 +131,13 @@ describe('GET /skills/[id]/zip', () => {
 
     expect(res.status).toBe(307);
     expect(res.headers.get('Location')).toBe('https://blob.example.com/skill-1.zip?sig=1');
-    expect(mockCanAccessGlobalFileByHash).toHaveBeenCalledWith('hash-1');
+    expect(mockCanAccessGlobalFileBySha256).toHaveBeenCalledWith('hash-1');
     expect(mockCheckHash).toHaveBeenCalledWith('hash-1');
     expect(mockCreateAccessEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         accessType: 'file_url_issued',
         metadata: expect.objectContaining({
-          fileHash: 'hash-1',
+          sha256: 'hash-1',
           skillId: 'skill-1',
           via: 'skill_zip_proxy',
         }),
@@ -147,7 +147,7 @@ describe('GET /skills/[id]/zip', () => {
 
   it('accepts a valid internal token without requiring a session', async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
-    mockFindSkillById.mockResolvedValue({ id: 'skill-1', zipFileHash: 'hash-1' });
+    mockFindSkillById.mockResolvedValue({ id: 'skill-1', zipSha256: 'hash-1' });
     mockCheckHash.mockResolvedValue({ isExist: true, url: 'skills/skill-1.zip' });
     mockGetFullFileUrl.mockResolvedValue('https://blob.example.com/skill-1.zip?sig=1');
 
@@ -161,7 +161,7 @@ describe('GET /skills/[id]/zip', () => {
     );
 
     expect(res.status).toBe(307);
-    expect(mockCanAccessGlobalFileByHash).not.toHaveBeenCalled();
+    expect(mockCanAccessGlobalFileBySha256).not.toHaveBeenCalled();
     expect(mockCheckHash).toHaveBeenCalledWith('hash-1');
   });
 });

@@ -22,9 +22,6 @@ export const ResourceTrashModal = memo<{
       title={t('trash.title')}
       width={560}
       onCancel={onClose}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) onClose();
-      }}
     >
       <TrashContent enabled={open} sourceSetId={sourceSetId} spaceId={spaceId} variant="modal" />
     </Modal>

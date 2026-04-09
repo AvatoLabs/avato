@@ -55,10 +55,9 @@ export const useCreateSourceSetModal = () => {
             />
           </Suspense>
         ),
-        width: 420,
-        focusable: { focusTriggerAfterClose: true },
         footer: null,
         title: isEditMode ? t('createNew.edit.title') : t('createNew.title'),
+        width: 420,
       });
     },
     [t],

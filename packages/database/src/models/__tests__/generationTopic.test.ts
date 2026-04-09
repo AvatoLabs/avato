@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getTestDB } from '../../core/getTestDB';
-import { generationBatches, generations, generationTopics, users } from '../../schemas';
+import { files, generationBatches, generations, generationTopics, users } from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
 import { GenerationTopicModel } from '../generationTopic';
 
@@ -133,6 +133,43 @@ describe('GenerationTopicModel', () => {
       // Verify FileService was called for the topic with coverUrl
       expect(mockGetFullFileUrl).toHaveBeenCalledWith('cover-image-key');
       expect(mockGetFullFileUrl).toHaveBeenCalledTimes(1);
+    });
+
+    it('should prefer stable file proxies for cover URLs with file records', async () => {
+      await serverDB.insert(files).values({
+        id: 'cover-file',
+        userId,
+        fileType: 'image/png',
+        name: 'cover',
+        size: 1,
+        url: 'cover-image-key',
+      });
+
+      await serverDB.insert(generationTopics).values({
+        id: 'topic1',
+        userId,
+        title: 'Topic with cover',
+        coverUrl: 'cover-image-key',
+      });
+
+      const result = await generationTopicModel.queryAll();
+
+      expect(result[0].coverUrl).toBe('/f/cover-file');
+      expect(mockGetFullFileUrl).not.toHaveBeenCalled();
+    });
+
+    it('should preserve stable share proxy cover urls without re-signing them', async () => {
+      await serverDB.insert(generationTopics).values({
+        id: 'topic-share-cover',
+        userId,
+        title: 'Topic with shared cover',
+        coverUrl: '/share/f/share-token-1?password=secret',
+      });
+
+      const result = await generationTopicModel.queryAll();
+
+      expect(result[0].coverUrl).toBe('/share/f/share-token-1?password=secret');
+      expect(mockGetFullFileUrl).not.toHaveBeenCalled();
     });
 
     it('should filter topics by type when type parameter is provided', async () => {
@@ -363,6 +400,59 @@ describe('GenerationTopicModel', () => {
       expect(deleteResult.filesToDelete).toContain('video-thumb.jpg');
       expect(deleteResult.filesToDelete).toContain('video-cover.jpg');
       expect(deleteResult.filesToDelete).toHaveLength(3);
+    });
+
+    it('should delete generated file rows and return removable asset URLs for file-backed generations', async () => {
+      const { id: topicId } = await generationTopicModel.create('Topic with file-backed generations');
+
+      const [batch] = await serverDB
+        .insert(generationBatches)
+        .values({
+          userId,
+          generationTopicId: topicId,
+          provider: 'test-provider',
+          model: 'test-model',
+          prompt: 'Test image generation',
+          width: 1024,
+          height: 1024,
+        })
+        .returning();
+
+      await serverDB.insert(files).values({
+        id: 'generated-file-1',
+        userId,
+        fileType: 'image/jpeg',
+        name: 'generated-image',
+        size: 1024,
+        url: 'asset-file.jpg',
+      });
+
+      await serverDB.insert(generations).values({
+        userId,
+        generationBatchId: batch.id,
+        asyncTaskId: null,
+        fileId: 'generated-file-1',
+        seed: 54321,
+        asset: {
+          type: 'image',
+          url: 'asset-file.jpg',
+          thumbnailUrl: 'thumbnail-file.jpg',
+          width: 1024,
+          height: 1024,
+        },
+      });
+
+      const result = await generationTopicModel.delete(topicId);
+
+      expect(result).toBeDefined();
+      expect(result!.filesToDelete).toHaveLength(2);
+      expect(result!.filesToDelete).toContain('thumbnail-file.jpg');
+      expect(result!.filesToDelete).toContain('asset-file.jpg');
+
+      const deletedFile = await serverDB.query.files.findFirst({
+        where: eq(files.id, 'generated-file-1'),
+      });
+      expect(deletedFile).toBeUndefined();
     });
 
     it('should collect file URLs from batches and generations when deleting topic with data', async () => {

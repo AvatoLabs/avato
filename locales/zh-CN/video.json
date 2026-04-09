@@ -12,6 +12,8 @@
   "config.seed.label": "种子",
   "config.seed.random": "随机",
   "generation.actions.copyError": "复制错误信息",
+  "generation.actions.deleteFailed": "删除视频失败，请重试。",
+  "generation.actions.downloadFailed": "下载视频失败，请重试。",
   "generation.actions.errorCopied": "错误信息已复制到剪贴板",
   "generation.actions.errorCopyFailed": "复制错误信息失败",
   "generation.actions.generate": "生成",

@@ -357,31 +357,6 @@ const syncTopicsForSession = (
 };
 
 /** 占位话题标题（对话=Topic）。 */
-const DEFAULT_TOPIC_TITLES = [
-  '',
-  'New Chat',
-  'New Conversation',
-  'New conversation',
-  '新对话',
-  '新對話',
-  'Topics',
-  '话题',
-  '話題',
-  'Untitled',
-];
-
-const isDefaultTopicTitle = (title?: string | null) => {
-  const trimmedTitle = title?.trim() ?? '';
-  if (!trimmedTitle) return true;
-
-  const { t } = useI18n.getState();
-  return (
-    DEFAULT_TOPIC_TITLES.includes(trimmedTitle) ||
-    trimmedTitle === t.topicTitle ||
-    trimmedTitle === t.chatListNewConversation
-  );
-};
-
 const extractPersistedMessageIds = (messages: ChatMessage[]) =>
   messages
     .map((message) => message.id)
@@ -403,11 +378,6 @@ const buildMessageContainerParams = (sessionId: string, sessionType: 'agent' | '
 
 const triggerTopicTitleGeneration = (sessionId: string, topicId?: string | null) => {
   if (!topicId) return;
-  const topic = (useTopicStore.getState().topicsBySession[sessionId] ?? []).find(
-    (item) => item.id === topicId,
-  );
-
-  if (!isDefaultTopicTitle(topic?.title)) return;
 
   void generateBestTitle({ force: false, sessionId, topicId })
     .then(() => undefined)
@@ -872,6 +842,49 @@ const mergePersistedMessagesWithLocal = (
   return persistedMessages.map((message) =>
     mergePersistedMessageWithLocal(message, localById.get(message.id)),
   );
+};
+
+const findMessageIndexFromEnd = (messages: ChatMessage[], messageId: string) => {
+  const lastIndex = messages.length - 1;
+  if (lastIndex >= 0 && messages[lastIndex]?.id === messageId) return lastIndex;
+
+  for (let index = lastIndex - 1; index >= 0; index -= 1) {
+    if (messages[index]?.id === messageId) return index;
+  }
+
+  return -1;
+};
+
+const getSessionMessageById = (
+  messagesBySession: Record<string, ChatMessage[]>,
+  sessionId: string,
+  messageId: string,
+) => {
+  const messages = messagesBySession[sessionId] || [];
+  const index = findMessageIndexFromEnd(messages, messageId);
+  return index >= 0 ? messages[index] : undefined;
+};
+
+const updateSessionMessageRecord = (
+  messagesBySession: Record<string, ChatMessage[]>,
+  sessionId: string,
+  messageId: string,
+  updater: (message: ChatMessage) => ChatMessage,
+) => {
+  const messages = messagesBySession[sessionId] || [];
+  const index = findMessageIndexFromEnd(messages, messageId);
+
+  if (index < 0) return messagesBySession;
+
+  const current = messages[index]!;
+  const next = updater(current);
+
+  if (next === current) return messagesBySession;
+
+  const nextMessages = messages.slice();
+  nextMessages[index] = next;
+
+  return { ...messagesBySession, [sessionId]: nextMessages };
 };
 
 interface ChatState {
@@ -1845,12 +1858,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       // Set model/provider on the assistant message for immediate UI display
       set((s) => ({
-        messagesBySession: {
-          ...s.messagesBySession,
-          [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-            m.id === assistantMsgId ? { ...m, model: chatOptions.model, provider } : m,
-          ),
-        },
+        messagesBySession: updateSessionMessageRecord(
+          s.messagesBySession,
+          sessionId,
+          assistantMsgId,
+          (message) => ({ ...message, model: chatOptions.model, provider }),
+        ),
       }));
 
       // Memory: prefer explicit options, else use session/agent chatConfig (for regenerateMessage etc.)
@@ -1883,12 +1896,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         if (reasoning !== null && contentState === null) {
           set((s) => ({
-            messagesBySession: {
-              ...s.messagesBySession,
-              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMsgId ? { ...m, reasoning: buildReasoningState(reasoning) } : m,
-              ),
-            },
+            messagesBySession: updateSessionMessageRecord(
+              s.messagesBySession,
+              sessionId,
+              assistantMsgId,
+              (message) => ({ ...message, reasoning: buildReasoningState(reasoning) }),
+            ),
           }));
         } else if (contentState !== null) {
           const wasReasoning = get().isReasoning;
@@ -1899,47 +1912,47 @@ export const useChatStore = create<ChatState>((set, get) => ({
             set((s) => ({
               isReasoning: false,
               streamBuffer: contentState.content,
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? {
-                        ...m,
-                        content: contentState.content,
-                        ...(mergeMessageMetadata(m.metadata, contentState)
-                          ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
-                          : {}),
-                        reasoning: finalReasoning
-                          ? {
-                              ...buildReasoningState(finalReasoning),
-                              ...(duration !== undefined ? { duration } : {}),
-                            }
-                          : m.reasoning
-                            ? { ...m.reasoning, ...(duration !== undefined ? { duration } : {}) }
-                            : m.reasoning,
-                      }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => {
+                  const nextMetadata = mergeMessageMetadata(message.metadata, contentState);
+
+                  return {
+                    ...message,
+                    content: contentState.content,
+                    ...(nextMetadata ? { metadata: nextMetadata } : {}),
+                    reasoning: finalReasoning
+                      ? {
+                          ...buildReasoningState(finalReasoning),
+                          ...(duration !== undefined ? { duration } : {}),
+                        }
+                      : message.reasoning
+                        ? { ...message.reasoning, ...(duration !== undefined ? { duration } : {}) }
+                        : message.reasoning,
+                  };
+                },
+              ),
             }));
           } else {
             set((s) => ({
               streamBuffer: contentState.content,
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? {
-                        ...m,
-                        content: contentState.content,
-                        ...(mergeMessageMetadata(m.metadata, contentState)
-                          ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
-                          : {}),
-                        ...(reasoning ? { reasoning: buildReasoningState(reasoning) } : {}),
-                      }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => {
+                  const nextMetadata = mergeMessageMetadata(message.metadata, contentState);
+
+                  return {
+                    ...message,
+                    content: contentState.content,
+                    ...(nextMetadata ? { metadata: nextMetadata } : {}),
+                    ...(reasoning ? { reasoning: buildReasoningState(reasoning) } : {}),
+                  };
+                },
+              ),
             }));
           }
         }
@@ -1958,12 +1971,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         {
           onImages: (images) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId ? { ...m, imageList: images } : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({ ...message, imageList: images }),
+              ),
             }));
           },
           onReasoning: (accReasoning) => {
@@ -1979,37 +1992,39 @@ export const useChatStore = create<ChatState>((set, get) => ({
           },
           onSearch: (search) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId ? { ...m, search } : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({ ...message, search }),
+              ),
             }));
           },
           onToolExecutions: (executions) => {
             const toolPayloads = toolExecutionsToPayloads(executions);
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, tools: mergeToolPayloads(m.tools ?? undefined, toolPayloads) }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({
+                  ...message,
+                  tools: mergeToolPayloads(message.tools ?? undefined, toolPayloads),
+                }),
+              ),
             }));
           },
           onTools: (tools) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, tools: mergeToolPayloads(m.tools ?? undefined, tools) }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({
+                  ...message,
+                  tools: mergeToolPayloads(message.tools ?? undefined, tools),
+                }),
+              ),
             }));
           },
         },
@@ -2033,21 +2048,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const duration = startedAt ? Date.now() - startedAt : undefined;
         set((s) => ({
           isReasoning: false,
-          messagesBySession: {
-            ...s.messagesBySession,
-            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-              m.id === assistantMsgId && m.reasoning
+          messagesBySession: updateSessionMessageRecord(
+            s.messagesBySession,
+            sessionId,
+            assistantMsgId,
+            (message) =>
+              message.reasoning
                 ? {
-                    ...m,
+                    ...message,
                     content: result.text,
                     reasoning: {
-                      ...m.reasoning,
+                      ...message.reasoning,
                       ...(duration !== undefined ? { duration } : {}),
                     },
                   }
-                : m,
-            ),
-          },
+                : message,
+          ),
         }));
       }
 
@@ -2055,25 +2071,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       if (result.images || result.search || resolvedTools || result.usage || result.performance) {
         set((s) => ({
-          messagesBySession: {
-            ...s.messagesBySession,
-            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-              m.id === assistantMsgId
-                ? {
-                    ...m,
-                    ...(result.images ? { imageList: result.images } : {}),
-                    ...(result.search ? { search: result.search } : {}),
-                    ...(resolvedTools ? { tools: resolvedTools } : {}),
-                    ...(result.usage ? { usage: result.usage as any } : {}),
-                    ...(result.performance ? { performance: result.performance as any } : {}),
-                    ...(mergeMessageMetadata(m.metadata, result.contentMetadata)
-                      ? { metadata: mergeMessageMetadata(m.metadata, result.contentMetadata) }
-                      : {}),
-                    provider,
-                  }
-                : m,
-            ),
-          },
+          messagesBySession: updateSessionMessageRecord(
+            s.messagesBySession,
+            sessionId,
+            assistantMsgId,
+            (message) => {
+              const nextMetadata = mergeMessageMetadata(message.metadata, result.contentMetadata);
+
+              return {
+                ...message,
+                ...(result.images ? { imageList: result.images } : {}),
+                ...(result.search ? { search: result.search } : {}),
+                ...(resolvedTools ? { tools: resolvedTools } : {}),
+                ...(result.usage ? { usage: result.usage as any } : {}),
+                ...(result.performance ? { performance: result.performance as any } : {}),
+                ...(nextMetadata ? { metadata: nextMetadata } : {}),
+                provider,
+              };
+            },
+          ),
         }));
       }
 
@@ -2603,12 +2619,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       // Set model/provider on the assistant message for immediate display
       set((s) => ({
-        messagesBySession: {
-          ...s.messagesBySession,
-          [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-            m.id === assistantMsgId ? { ...m, model: chatOptions.model, provider } : m,
-          ),
-        },
+        messagesBySession: updateSessionMessageRecord(
+          s.messagesBySession,
+          sessionId,
+          assistantMsgId,
+          (message) => ({ ...message, model: chatOptions.model, provider }),
+        ),
       }));
 
       const THROTTLE_MS = 100;
@@ -2625,12 +2641,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         if (reasoning !== null && contentState === null) {
           set((s) => ({
-            messagesBySession: {
-              ...s.messagesBySession,
-              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMsgId ? { ...m, reasoning: buildReasoningState(reasoning) } : m,
-              ),
-            },
+            messagesBySession: updateSessionMessageRecord(
+              s.messagesBySession,
+              sessionId,
+              assistantMsgId,
+              (message) => ({ ...message, reasoning: buildReasoningState(reasoning) }),
+            ),
           }));
         } else if (contentState !== null) {
           const wasReasoning = get().isReasoning;
@@ -2641,47 +2657,47 @@ export const useChatStore = create<ChatState>((set, get) => ({
             set((s) => ({
               isReasoning: false,
               streamBuffer: contentState.content,
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? {
-                        ...m,
-                        content: contentState.content,
-                        ...(mergeMessageMetadata(m.metadata, contentState)
-                          ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
-                          : {}),
-                        reasoning: finalReasoning
-                          ? {
-                              ...buildReasoningState(finalReasoning),
-                              ...(duration !== undefined ? { duration } : {}),
-                            }
-                          : m.reasoning
-                            ? { ...m.reasoning, ...(duration !== undefined ? { duration } : {}) }
-                            : m.reasoning,
-                      }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => {
+                  const nextMetadata = mergeMessageMetadata(message.metadata, contentState);
+
+                  return {
+                    ...message,
+                    content: contentState.content,
+                    ...(nextMetadata ? { metadata: nextMetadata } : {}),
+                    reasoning: finalReasoning
+                      ? {
+                          ...buildReasoningState(finalReasoning),
+                          ...(duration !== undefined ? { duration } : {}),
+                        }
+                      : message.reasoning
+                        ? { ...message.reasoning, ...(duration !== undefined ? { duration } : {}) }
+                        : message.reasoning,
+                  };
+                },
+              ),
             }));
           } else {
             set((s) => ({
               streamBuffer: contentState.content,
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? {
-                        ...m,
-                        content: contentState.content,
-                        ...(mergeMessageMetadata(m.metadata, contentState)
-                          ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
-                          : {}),
-                        ...(reasoning ? { reasoning: buildReasoningState(reasoning) } : {}),
-                      }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => {
+                  const nextMetadata = mergeMessageMetadata(message.metadata, contentState);
+
+                  return {
+                    ...message,
+                    content: contentState.content,
+                    ...(nextMetadata ? { metadata: nextMetadata } : {}),
+                    ...(reasoning ? { reasoning: buildReasoningState(reasoning) } : {}),
+                  };
+                },
+              ),
             }));
           }
         }
@@ -2700,12 +2716,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         {
           onImages: (images) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId ? { ...m, imageList: images } : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({ ...message, imageList: images }),
+              ),
             }));
           },
           onReasoning: (accReasoning) => {
@@ -2721,37 +2737,39 @@ export const useChatStore = create<ChatState>((set, get) => ({
           },
           onSearch: (search) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId ? { ...m, search } : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({ ...message, search }),
+              ),
             }));
           },
           onToolExecutions: (executions) => {
             const toolPayloads = toolExecutionsToPayloads(executions);
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, tools: mergeToolPayloads(m.tools ?? undefined, toolPayloads) }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({
+                  ...message,
+                  tools: mergeToolPayloads(message.tools ?? undefined, toolPayloads),
+                }),
+              ),
             }));
           },
           onTools: (tools) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, tools: mergeToolPayloads(m.tools ?? undefined, tools) }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({
+                  ...message,
+                  tools: mergeToolPayloads(message.tools ?? undefined, tools),
+                }),
+              ),
             }));
           },
         },
@@ -2773,21 +2791,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const duration = startedAt ? Date.now() - startedAt : undefined;
         set((s) => ({
           isReasoning: false,
-          messagesBySession: {
-            ...s.messagesBySession,
-            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-              m.id === assistantMsgId && m.reasoning
+          messagesBySession: updateSessionMessageRecord(
+            s.messagesBySession,
+            sessionId,
+            assistantMsgId,
+            (message) =>
+              message.reasoning
                 ? {
-                    ...m,
+                    ...message,
                     content: result.text,
                     reasoning: {
-                      ...m.reasoning,
+                      ...message.reasoning,
                       ...(duration !== undefined ? { duration } : {}),
                     },
                   }
-                : m,
-            ),
-          },
+                : message,
+          ),
         }));
       }
 
@@ -2801,25 +2820,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
         result.performance
       ) {
         set((s) => ({
-          messagesBySession: {
-            ...s.messagesBySession,
-            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-              m.id === assistantMsgId
-                ? {
-                    ...m,
-                    ...(result.images ? { imageList: result.images } : {}),
-                    ...(result.search ? { search: result.search } : {}),
-                    ...(resolvedToolsRegen ? { tools: resolvedToolsRegen } : {}),
-                    ...(result.usage ? { usage: result.usage as any } : {}),
-                    ...(result.performance ? { performance: result.performance as any } : {}),
-                    ...(mergeMessageMetadata(m.metadata, result.contentMetadata)
-                      ? { metadata: mergeMessageMetadata(m.metadata, result.contentMetadata) }
-                      : {}),
-                    provider,
-                  }
-                : m,
-            ),
-          },
+          messagesBySession: updateSessionMessageRecord(
+            s.messagesBySession,
+            sessionId,
+            assistantMsgId,
+            (message) => {
+              const nextMetadata = mergeMessageMetadata(message.metadata, result.contentMetadata);
+
+              return {
+                ...message,
+                ...(result.images ? { imageList: result.images } : {}),
+                ...(result.search ? { search: result.search } : {}),
+                ...(resolvedToolsRegen ? { tools: resolvedToolsRegen } : {}),
+                ...(result.usage ? { usage: result.usage as any } : {}),
+                ...(result.performance ? { performance: result.performance as any } : {}),
+                ...(nextMetadata ? { metadata: nextMetadata } : {}),
+                provider,
+              };
+            },
+          ),
         }));
       }
 
@@ -2945,38 +2964,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
         {
           onContent: (state) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMessageId ? { ...m, content: state.content } : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMessageId,
+                (message) => ({ ...message, content: state.content }),
+              ),
             }));
           },
           onTools: (tools) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMessageId ? { ...m, tools } : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMessageId,
+                (message) => ({ ...message, tools }),
+              ),
             }));
           },
           onToolExecutions: (executions) => {
             const resolved = mergeResolvedToolPayloads(
-              (get().messagesBySession[sessionId] || []).find((m) => m.id === assistantMessageId)
-                ?.tools ?? undefined,
+              getSessionMessageById(get().messagesBySession, sessionId, assistantMessageId)?.tools ??
+                undefined,
               executions,
             );
             if (resolved) {
               set((s) => ({
-                messagesBySession: {
-                  ...s.messagesBySession,
-                  [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                    m.id === assistantMessageId ? { ...m, tools: resolved } : m,
-                  ),
-                },
+                messagesBySession: updateSessionMessageRecord(
+                  s.messagesBySession,
+                  sessionId,
+                  assistantMessageId,
+                  (message) => ({ ...message, tools: resolved }),
+                ),
               }));
             }
           },
@@ -2987,23 +3006,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const resolved = mergeResolvedToolPayloads(result.tools, result.toolExecutions);
         if (resolved) {
           set((s) => ({
-            messagesBySession: {
-              ...s.messagesBySession,
-              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMessageId ? { ...m, tools: resolved } : m,
-              ),
-            },
+            messagesBySession: updateSessionMessageRecord(
+              s.messagesBySession,
+              sessionId,
+              assistantMessageId,
+              (message) => ({ ...message, tools: resolved }),
+            ),
           }));
         }
       }
       if (result.text) {
         set((s) => ({
-          messagesBySession: {
-            ...s.messagesBySession,
-            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-              m.id === assistantMessageId ? { ...m, content: result.text } : m,
-            ),
-          },
+          messagesBySession: updateSessionMessageRecord(
+            s.messagesBySession,
+            sessionId,
+            assistantMessageId,
+            (message) => ({ ...message, content: result.text }),
+          ),
         }));
       }
     } catch (err) {
@@ -3028,38 +3047,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const streamCallbacks = {
         onContent: (state: { content: string }) => {
           set((s) => ({
-            messagesBySession: {
-              ...s.messagesBySession,
-              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMessageId ? { ...m, content: state.content } : m,
-              ),
-            },
+            messagesBySession: updateSessionMessageRecord(
+              s.messagesBySession,
+              sessionId,
+              assistantMessageId,
+              (message) => ({ ...message, content: state.content }),
+            ),
           }));
         },
         onTools: (tools: ChatToolPayload[]) => {
           set((s) => ({
-            messagesBySession: {
-              ...s.messagesBySession,
-              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMessageId ? { ...m, tools } : m,
-              ),
-            },
+            messagesBySession: updateSessionMessageRecord(
+              s.messagesBySession,
+              sessionId,
+              assistantMessageId,
+              (message) => ({ ...message, tools }),
+            ),
           }));
         },
         onToolExecutions: (executions: ToolExecutionItem[]) => {
           const resolved = mergeResolvedToolPayloads(
-            (get().messagesBySession[sessionId] || []).find((m) => m.id === assistantMessageId)
-              ?.tools ?? undefined,
+            getSessionMessageById(get().messagesBySession, sessionId, assistantMessageId)?.tools ??
+              undefined,
             executions,
           );
           if (resolved) {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMessageId ? { ...m, tools: resolved } : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMessageId,
+                (message) => ({ ...message, tools: resolved }),
+              ),
             }));
           }
         },
@@ -3075,23 +3094,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const resolved = mergeResolvedToolPayloads(result.tools, result.toolExecutions);
         if (resolved) {
           set((s) => ({
-            messagesBySession: {
-              ...s.messagesBySession,
-              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMessageId ? { ...m, tools: resolved } : m,
-              ),
-            },
+            messagesBySession: updateSessionMessageRecord(
+              s.messagesBySession,
+              sessionId,
+              assistantMessageId,
+              (message) => ({ ...message, tools: resolved }),
+            ),
           }));
         }
       }
       if (result.text) {
         set((s) => ({
-          messagesBySession: {
-            ...s.messagesBySession,
-            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-              m.id === assistantMessageId ? { ...m, content: result.text } : m,
-            ),
-          },
+          messagesBySession: updateSessionMessageRecord(
+            s.messagesBySession,
+            sessionId,
+            assistantMessageId,
+            (message) => ({ ...message, content: result.text }),
+          ),
         }));
       }
     } catch (err) {

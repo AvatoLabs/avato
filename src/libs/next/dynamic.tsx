@@ -7,7 +7,7 @@
 
 import { type ComponentType, lazy, type ReactNode, Suspense } from 'react';
 
-import { tryHardReloadForChunkError } from '@/utils/chunkError';
+import { tryHardReloadForChunkError } from '../../utils/chunkError';
 
 export interface DynamicOptions<P = NonNullable<unknown>> {
   loading?: ((...args: any[]) => ReactNode) | undefined;

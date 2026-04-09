@@ -463,7 +463,7 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
   );
 
   const lastCommittedTableRef = useRef(table);
-  const normalizedMetadataSyncKeyRef = useRef<string>();
+  const normalizedMetadataSyncKeyRef = useRef<string | undefined>(undefined);
   const lastDocumentIdRef = useRef(documentId);
   const metadataSaveRef = useRef<ReturnType<typeof debounce> | undefined>(undefined);
 
@@ -1276,7 +1276,6 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
 
               <Flexbox horizontal align={'center'} gap={8} style={{ flex: 'none' }}>
                 <Popover
-                  nativeButton
                   content={filterPanel}
                   placement={'bottomRight'}
                   trigger={'click'}
@@ -1292,7 +1291,6 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
                 </Popover>
 
                 <Popover
-                  nativeButton
                   content={sortPanel}
                   placement={'bottomRight'}
                   trigger={'click'}
@@ -1308,7 +1306,6 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
                 </Popover>
 
                 <Popover
-                  nativeButton
                   content={fieldPanel}
                   placement={'bottomRight'}
                   trigger={'click'}

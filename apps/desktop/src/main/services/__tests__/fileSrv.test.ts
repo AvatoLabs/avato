@@ -109,7 +109,7 @@ describe('FileService', () => {
       const params = {
         content,
         filename: 'test.png',
-        hash: 'abc123',
+        sha256: 'abc123',
         path: 'user_uploads/images/test.png',
         type: 'image/png',
       };
@@ -131,7 +131,7 @@ describe('FileService', () => {
       const params = {
         content: base64Content,
         filename: 'test.txt',
-        hash: 'def456',
+        sha256: 'def456',
         path: 'documents/test.txt',
         type: 'text/plain',
       };
@@ -150,7 +150,7 @@ describe('FileService', () => {
       const params = {
         content,
         filename: 'image.jpg',
-        hash: 'xyz789',
+        sha256: 'xyz789',
         path: 'photos/image.jpg',
         type: 'image/jpeg',
       };
@@ -167,7 +167,7 @@ describe('FileService', () => {
       expect(metadataContent).toBeTruthy();
       const metadata = JSON.parse(metadataContent);
       expect(metadata.filename).toBe('image.jpg');
-      expect(metadata.hash).toBe('xyz789');
+      expect(metadata.sha256).toBe('xyz789');
       expect(metadata.type).toBe('image/jpeg');
       expect(metadata.size).toBe(100);
       expect(metadata.createdAt).toBeDefined();
@@ -177,7 +177,7 @@ describe('FileService', () => {
       const params = {
         content: new ArrayBuffer(10),
         filename: 'test.png',
-        hash: 'abc123',
+        sha256: 'abc123',
         path: 'uploads/test.png',
         type: 'image/png',
       };
@@ -191,7 +191,7 @@ describe('FileService', () => {
       const params = {
         content: new ArrayBuffer(10),
         filename: 'test.txt',
-        hash: 'abc',
+        sha256: 'abc',
         path: 'test.txt',
         type: 'text/plain',
       };

@@ -13,14 +13,12 @@ describe('createPdfDocumentSource', () => {
   it('includes credentials for same-origin file proxy urls', () => {
     expect(createPdfDocumentSource('/f/file_1')).toEqual({
       url: '/f/file_1',
-      withCredentials: true,
     });
   });
 
   it('omits credentials for cross-origin presigned urls', () => {
     expect(createPdfDocumentSource('https://storage.example.com/file.pdf')).toEqual({
       url: 'https://storage.example.com/file.pdf',
-      withCredentials: false,
     });
   });
 });

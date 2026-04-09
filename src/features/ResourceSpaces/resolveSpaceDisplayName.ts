@@ -1,7 +1,5 @@
 'use client';
 
-import { type TFunction } from 'i18next';
-
 interface ResolvableSpace {
   kind?: 'personal' | 'team' | string | null;
   name?: string | null;
@@ -16,7 +14,7 @@ const normalize = (value?: string | null) => value?.trim().toLowerCase();
 
 export const resolveSpaceDisplayName = (
   space: ResolvableSpace | null | undefined,
-  t: TFunction,
+  t: (...args: any[]) => string,
   options: ResolveSpaceDisplayNameOptions = {},
 ) => {
   const rawName = space?.name?.trim();

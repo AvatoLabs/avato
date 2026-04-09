@@ -5,7 +5,6 @@ import {
   type FileAssetState,
   type FileAssetUsagePolicy,
   type FileGovernanceSummary,
-  isRawFileContentId,
 } from '@lobechat/types';
 import {
   buildFolderTree,
@@ -26,6 +25,7 @@ import { ragService } from '@/services/rag';
 import { type UploadFileListDispatch } from '@/store/file/reducers/uploadFileList';
 import { uploadFileListReducer } from '@/store/file/reducers/uploadFileList';
 import { type StoreSetter } from '@/store/types';
+import { isRawFileContentId } from '@/types/content';
 import { type FileListItem, type QueryFileListParams } from '@/types/files';
 import { type UploadFileItem } from '@/types/files/upload';
 import { isChunkingUnsupported } from '@/utils/isChunkingUnsupported';
@@ -264,7 +264,7 @@ export class FileManageActionImpl {
             id: uploadFileItem.id,
             type: 'updateFile',
             value: {
-              status: uploadFileItem.abortController.signal.aborted ? 'cancelled' : 'error',
+              status: uploadFileItem.abortController?.signal.aborted ? 'cancelled' : 'error',
             },
           });
           console.error('Failed to upload file:', error);
@@ -532,7 +532,7 @@ export class FileManageActionImpl {
       const validUploads = allUploads
         .filter(({ file }) => !FILE_UPLOAD_BLACKLIST.includes(file.name))
         .map(({ file, parentId }) => ({
-          ...createPendingUploadItem(file, { parentId: targetFolderId, sourceSetId, spaceId }),
+          ...createPendingUploadItem(file, { parentId, sourceSetId, spaceId }),
           parentId,
         }));
 
@@ -566,7 +566,7 @@ export class FileManageActionImpl {
             dispatchDockFileList({
               id,
               type: 'updateFile',
-              value: { status: abortController.signal.aborted ? 'cancelled' : 'error' },
+              value: { status: abortController?.signal.aborted ? 'cancelled' : 'error' },
             });
             console.error('Failed to upload file:', error);
             return { file, fileId: undefined, fileType: file.type };

@@ -29,10 +29,7 @@ export const useExplorerItems = ({
   const dockUploadFileList = useFileStore(fileManagerSelectors.dockFileList);
 
   const data = useMemo<ExplorerItem[]>(() => {
-    const visibleItems =
-      resources.items?.filter(
-        (item) => !(item.sourceType === 'document' && item.fileType === 'custom/document'),
-      ) ?? [];
+    const visibleItems = resources.items ?? [];
     const pendingItems = buildPendingUploadExplorerItems(dockUploadFileList, params, visibleItems);
     const mergedItems = [...pendingItems, ...mapContentItemsToExplorerItems(visibleItems)];
 
@@ -42,5 +39,6 @@ export const useExplorerItems = ({
   return {
     ...resources,
     data,
+    governanceCapabilities: resources.governanceCapabilities,
   };
 };

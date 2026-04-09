@@ -270,9 +270,9 @@ export class ConversationLifecycleActionImpl {
       );
       const docTopicMetadata = getDocTopicMetadata(operationContext);
 
-      if (data.topicId && docTopicMetadata) {
+      if (data?.topicId && docTopicMetadata) {
         const currentTopicId = data.topicId;
-        const matchedTopic = data.topics?.items.find((topic) => topic.id === data.topicId);
+        const matchedTopic = data.topics?.items.find((topic) => topic.id === currentTopicId);
         const nextMetadata = { ...matchedTopic?.metadata, ...docTopicMetadata };
 
         if (data.topics) {

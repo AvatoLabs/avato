@@ -33,7 +33,15 @@
 - **candidate create 入口也开始做 fail-closed capability gating**：当前消息、话题、文件、文档等“Add to Space Memory”入口只会在存在可写 team space 时显示；topic list 这类入口也已经改成依赖真实 `default target`，而不是只看 team space 数量。即便有漏网调用进入 candidate composer，modal 也会在本地校验 `canCreate` 目标并阻止提交，而不是让成员填完表单后才从后端收到 `FORBIDDEN`。
 - **create / review capability 已开始共享成统一 contract**：`canCreateSpaceMemory / canReviewSpaceMemory` 不再只散落在某个页面或单个 router 里；当前 client 入口、candidate composer、lambda router，以及 topic / user-memory ingestion service 已开始复用同一份共享 helper，减少前后端 capability 漂移，向正式 RBAC contract 靠近了一步。
 - **surface contract 已开始从 summary 扩到 list / detail**：`Space Memory` 现在不再只在 summary 里暴露 `canCreate / canReview` 这类能力布尔值，`summary / list / detail` 都开始显式带出 `surface`（`personal / viewer / reviewer`）。`SpaceMemoryPage`、`SpaceHomePage`、scope rail、space list、docs/files 空态、mobile header 等入口也开始优先消费这层 surface contract，而不是各自从 capability 组合里猜当前应该展示哪一层界面。
-- **surface contract 已开始补出显式 UI schema**：除了 `surface` 之外，server-side summary / list / detail 现在也开始返回与当前 surface 对应的 `sections / recallFilters / detailViews` contract，并进一步补出 `canViewInbox / canManageRecall / canAccessAudit` 这类 capability-level schema。`SpaceMemoryPage` 与外围入口不再完全依赖本地 `viewer / reviewer` 推断可见 section、recall filter、audit 视图与治理入口，而是开始消费 router 直接给出的 surface schema。
+- **surface contract 已开始补出显式 UI schema**：除了 `surface` 之外，server-side summary / list / detail 现在也开始返回与当前 surface 对应的 `sections / recallFilters / detailViews` contract，并进一步补出 `canCreate / canViewInbox / canManageRecall / canAccessAudit` 这类 capability-level schema。`SpaceMemoryPage` 与外围入口不再完全依赖本地 `viewer / reviewer` 推断可见 section、recall filter、audit 视图与治理入口，而是开始消费 router 直接给出的 surface schema。
+- **surface contract 已开始具备 create-only 扩展能力**：共享 `Space Memory` contract 不再硬编码 “viewer 一定不能 create / inbox”；当前 contract helper 已支持在 `viewer` surface 下显式覆写 `canCreate`，并把 `Inbox` 与 `canViewInbox` 一并带出，为后续 `create-only` 与 `review-only` 正式 RBAC 拆分预留了兼容形态，而不必再假设“能创建就一定能 review”。
+- **surface / capability / contract 已开始共享成单一 resolved helper**：除了零散的 `canCreateSpaceMemory / canReviewSpaceMemory` 判断外，当前 types 层还新增了统一的 `resolveSpaceMemorySurfaceState`，把 `canCreate / canReview / surface / contract` 一次性解析出来；lambda router 已开始直接复用这份 helper，而不再在 server 内部保留临时拼装逻辑。
+- **review-only mutation 也已切回同一份 resolved helper**：`exportAudit* / reject* / publish* / merge / stale / revalidate / recall policy` 这批 review-only 路由，当前也已统一通过 `resolveSpaceMemorySurfaceState` 判定 `canReview`，不再与 summary / list / detail 分别依赖两套 capability 解析逻辑，为后续正式 RBAC 拆分 `create / review` 留出同一条 contract 落点。
+- **create-side service 也已切回同一份 resolved helper**：`SpaceMemoryIntakeService`、`SpaceMemoryTopicIngestionService` 与 `SpaceMemoryUserMemoryIngestionService` 当前也已统一通过 `resolveSpaceMemorySurfaceState(space).canCreate` 判定 create 权限，而不再继续依赖单独的 `canCreateSpaceMemory(space)` 直判；这样 create / review capability 终于从 router 一直贯到 automation / user-memory ingestion service，同样为后续正式 RBAC 拆分保留了同一条 contract。
+- **前台 create-side 入口也已开始切回同一份 resolved helper**：`PageEditor` 的 “Add to Space Memory”、Files Explorer item dropdown，以及 candidate target 选择器当前也统一通过 `resolveSpaceMemorySurfaceState(space).canCreate` 做可创建判断，不再继续让前台入口依赖旧的 `canCreateSpaceMemory(space)` 布尔 helper。
+- **surface contract 已开始从“可选返回”收成“必填 truth”**：`Space Memory` 的 `summary / list / detail` contract 当前已在 types 层改成 required，`SpaceMemoryPage` 与 scope summary helper 也不再本地 fallback `getSpaceMemorySurfaceContract(summary.surface)`；如果 server 漏掉 contract，前台现在会直接暴露测试失败，而不是静默退回本地猜测。
+- **高频前台入口也开始把 contract 当成唯一真值**：`SpaceMemoryPage` 当前已经去掉剩余的 `summary.surface` 影子 fallback，`PageEmpty`、`SpaceList`、`SourceSetListSection`、以及资源空态这类高频入口对应的 contract fixture 也已切成显式 `summary.contract`；这意味着前台不会再因为某处测试或 mock 继续沿用 `surface === reviewer` 心智而悄悄掩盖 contract 漂移。
+- **summary 顶层 capability flags 已开始由 contract 派生**：`spaceMemoryModel.getSummary` 当前不再依赖 router 手工传入 `canCreate / canPublish / canReview`，而是统一从 `summary.contract` 派生这些兼容字段；同一轮也修正了 `personal` surface contract 过去误落 reviewer 分支的问题，确保 personal space 不会再通过 contract 暗中暴露 `recall / audit` 能力。
 - **space switcher / scope rail 的治理 microcopy 已开始区分 reviewer 与 viewer**：当前 `MemoryScopeSection`、`SpaceList` 和移动端 `ResourceMobileHeader` 已不再把所有 team member 都暴露成 reviewer 视角；reviewer 仍看到 `pending` 治理入口，而没有 review 能力的成员会回落为更明确的 `Open Memory`，并通过 tooltip 解释这只是已发布团队记忆的查看入口。
 - **`SpaceMemoryPage` 本体也开始按 viewer / reviewer 分层**：当前没有 review 能力的成员在 `Space Memory` 页面里只会看到 `Published / Playbooks / Policies` 的内容列表与详情概览；reviewer 才会看到 recall filter、workspace/section recall status、audit/export 和批量治理动作。共享 truth 的浏览面与治理面开始在主页面里分层，而不是只在外围入口做 capability gating。
 - **router contract 也开始显式区分 viewer / reviewer**：`spaceMemory.getSummary` 对 viewer 已不再返回 reviewed recall breakdown，`getEntry / listEntries` 也会剥离治理历史、intake、recall policy、review hint 等 reviewer-only 字段，并且不再保留 `stale-first` 这类治理排序；`exportAuditBundle / exportAuditBundles` 现在也明确拒绝没有 review 能力的成员。分层已经不再只是前端显隐，而开始进入服务端返回契约。
@@ -49,6 +57,44 @@
 
 > `Space Memory` 已经从提案进入可用壳层，  
 > 但目前仍更接近 “候选与治理台 + 首版 recall 主链”，还不是“团队长期真相已全面接入 AI 主链”的完成态。
+
+## 0.1 收口口径（2026-04-06）
+
+这份文档从现在开始按 **`Space Memory v1 产品闭环`** 收口，而不是继续承担整个企业长期记忆内核的总蓝图。
+
+本轮收口明确只覆盖以下内容：
+
+- **团队空间内的 `Space Memory` 产品壳层**
+  - `/spaces/:spaceId/memory`
+  - `Inbox / Published / Playbooks / Policies`
+  - viewer / reviewer 分层与 surface contract
+- **candidate -> review -> published 的治理链**
+  - 手工创建
+  - 来自 topic / user-memory 的自动候选 intake
+  - publish / reject / merge / stale / revalidate / audit export
+- **首版 team recall 主链**
+  - team-space topic / agent 执行链能消费已发布 `Space Memory`
+  - recall policy / expiry / stale gating 生效
+  - query-aware lexical ranking 与 packaging 生效
+
+以下内容不再作为本方案的收口前置条件，而是明确下沉到后续文档或后续阶段：
+
+- **`Memory V2` canonical kernel**
+  - `memory_v2_entries / candidates / history / recall logs`
+- **真正可替换的 harness 编排层**
+  - adapter registry
+  - active harness 切换
+  - merge decision engine
+- **更细粒度 RBAC**
+  - 正式拆分 `create-only / review-only`
+- **语义 recall 精排**
+  - embedding / policy-aware rerank
+  - 更细的压缩预算与召回治理
+
+一句话说清当前收口边界：
+
+> **这份文档收的是 `Space Memory` 作为团队产品能力的第一版闭环。**\
+> **不负责把整个 Memory 内核一次性做完。**
 
 ---
 

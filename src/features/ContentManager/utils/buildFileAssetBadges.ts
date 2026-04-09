@@ -4,7 +4,8 @@ import type {
   FileAssetReviewStatus,
   FileAssetUsagePolicy,
 } from '@lobechat/types';
-import type { TFunction } from 'i18next';
+
+type AssetBadgeTranslator = (...args: any[]) => string;
 
 interface BuildFileAssetBadgesParams {
   assetClassification?: FileAssetClassification | null;
@@ -15,7 +16,8 @@ interface BuildFileAssetBadgesParams {
   assetUsagePolicy?: FileAssetUsagePolicy | null;
   assetVersionLabel?: string | null;
   compact?: boolean;
-  t: TFunction;
+  maxVisible?: number;
+  t: AssetBadgeTranslator;
 }
 
 export interface FileAssetBadgeDescriptor {
@@ -36,6 +38,7 @@ export const buildFileAssetBadges = ({
   assetUsagePolicy,
   assetVersionLabel,
   t,
+  maxVisible,
 }: BuildFileAssetBadgesParams): FileAssetBadgeDescriptor[] => {
   const badges: FileAssetBadgeDescriptor[] = [];
   const normalizeCompactLabel = (value: string, maxLength = 14) =>
@@ -45,7 +48,10 @@ export const buildFileAssetBadges = ({
     badges.push({
       color: assetUsagePolicy === 'restricted' ? 'gold' : 'processing',
       key: `usage:${assetUsagePolicy}`,
-      label: t(`detail.asset.usagePolicy.${assetUsagePolicy}`, { ns: 'file' }),
+      label: t(`detail.asset.usagePolicy.${assetUsagePolicy}`, {
+        defaultValue: String(assetUsagePolicy),
+        ns: 'file',
+      }),
       variant: 'outlined',
     });
   }
@@ -54,7 +60,10 @@ export const buildFileAssetBadges = ({
     badges.push({
       color: assetReviewStatus === 'archived' ? 'gold' : 'success',
       key: `review:${assetReviewStatus}`,
-      label: t(`detail.asset.reviewStatus.${assetReviewStatus}`, { ns: 'file' }),
+      label: t(`detail.asset.reviewStatus.${assetReviewStatus}`, {
+        defaultValue: String(assetReviewStatus),
+        ns: 'file',
+      }),
       variant: 'filled',
     });
   }
@@ -72,7 +81,10 @@ export const buildFileAssetBadges = ({
   }
 
   if (assetPrimaryRenditionKind) {
-    const baseLabel = t(`detail.asset.rendition.${assetPrimaryRenditionKind}`, { ns: 'file' });
+    const baseLabel = t(`detail.asset.rendition.${assetPrimaryRenditionKind}`, {
+      defaultValue: String(assetPrimaryRenditionKind),
+      ns: 'file',
+    });
     const renditionLabel = assetPrimaryRenditionLabel?.trim();
     const extraCount = Math.max((assetRenditionCount ?? 0) - 1, 0);
     const fullLabelParts = [
@@ -100,9 +112,26 @@ export const buildFileAssetBadges = ({
   if (assetClassification && assetClassification !== 'general') {
     badges.push({
       key: `classification:${assetClassification}`,
-      label: t(`detail.asset.classification.${assetClassification}`, { ns: 'file' }),
+      label: t(`detail.asset.classification.${assetClassification}`, {
+        defaultValue: String(assetClassification),
+        ns: 'file',
+      }),
       variant: 'outlined',
     });
+  }
+
+  if (compact && maxVisible && badges.length > maxVisible) {
+    const visibleBadges = badges.slice(0, maxVisible - 1);
+    const hiddenBadges = badges.slice(maxVisible - 1);
+
+    visibleBadges.push({
+      key: `overflow:${hiddenBadges.map((badge) => badge.key).join('|')}`,
+      label: `+${hiddenBadges.length}`,
+      title: hiddenBadges.map((badge) => badge.title ?? badge.label).join(' · '),
+      variant: 'outlined',
+    });
+
+    return visibleBadges;
   }
 
   return badges;

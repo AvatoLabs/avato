@@ -47,12 +47,14 @@ class S3CompatibleBlobProvider implements BlobProvider {
     return getPrivateBlobS3().uploadMedia(key, buffer);
   }
 
-  uploadBody(key: string, body: Buffer | Readable, options?: BlobUploadBodyOptions) {
-    return getPrivateBlobS3().uploadBody(key, body, options);
+  async uploadBody(key: string, body: Buffer | Readable, options?: BlobUploadBodyOptions) {
+    await getPrivateBlobS3().uploadBody(key, body, options);
+    return { key };
   }
 
-  uploadBuffer(key: string, buffer: Buffer, contentType?: string, cacheControl?: string) {
-    return getPrivateBlobS3().uploadBuffer(key, buffer, contentType, cacheControl);
+  async uploadBuffer(key: string, buffer: Buffer, contentType?: string, cacheControl?: string) {
+    await getPrivateBlobS3().uploadBuffer(key, buffer, contentType, cacheControl);
+    return { key };
   }
 }
 

@@ -308,7 +308,11 @@ describe('StreamingExecutor actions', () => {
         topicId: contextTopicId,
       } as UIChatMessage;
 
-      const streamSpy = vi.spyOn(chatService, 'createAssistantMessageStream');
+      const streamSpy = vi
+        .spyOn(chatService, 'createAssistantMessageStream')
+        .mockImplementation(async ({ onFinish }) => {
+          await onFinish?.(TEST_CONTENT.AI_RESPONSE, {} as any);
+        });
 
       await act(async () => {
         await result.current.internal_execAgentRuntime({
@@ -327,6 +331,8 @@ describe('StreamingExecutor actions', () => {
           }),
         }),
       );
+
+      streamSpy.mockRestore();
     });
 
     // Note: RAG metadata functionality has been removed
@@ -673,7 +679,7 @@ describe('StreamingExecutor actions', () => {
 
       // Mock internal_createAgentState to include initialContext
       const mockInitialContext = {
-        pageEditor: {
+        docEditor: {
           markdown: '# Test Document',
           xml: '<root><h1>Test</h1></root>',
           metadata: { title: 'Test Doc', charCount: 15, lineCount: 1 },
@@ -754,7 +760,7 @@ describe('StreamingExecutor actions', () => {
         });
 
       const mockInitialContext = {
-        pageEditor: {
+        docEditor: {
           markdown: '# Preserved Context',
           xml: '<doc>preserved</doc>',
           metadata: { title: 'Preserved', charCount: 20, lineCount: 1 },
@@ -827,16 +833,16 @@ describe('StreamingExecutor actions', () => {
 
       const topicAKey = messageMapKey({
         agentId: TEST_IDS.SESSION_ID,
-        scope: 'page',
+        scope: 'doc',
         topicId: 'topic-a',
       });
       const topicBKey = messageMapKey({
         agentId: TEST_IDS.SESSION_ID,
-        scope: 'page',
+        scope: 'doc',
         topicId: TEST_IDS.TOPIC_ID,
       });
 
-      docsAgentRuntime.setScopedFallbackPageContentContext({
+      docsAgentRuntime.setScopedFallbackDocContentContext({
         context: {
           markdown: 'Only for topic A',
           metadata: { title: 'Topic A file' },
@@ -845,7 +851,7 @@ describe('StreamingExecutor actions', () => {
         contextKey: topicAKey,
         docId: 'file-a',
       });
-      docsAgentRuntime.setScopedFallbackPageContentContext({
+      docsAgentRuntime.setScopedFallbackDocContentContext({
         context: {
           markdown: 'Only for topic B',
           metadata: { title: 'Topic B file' },
@@ -859,7 +865,7 @@ describe('StreamingExecutor actions', () => {
         let operationId = '';
         act(() => {
           ({ operationId } = result.current.startOperation({
-            context: { agentId: TEST_IDS.SESSION_ID, scope: 'page', topicId: TEST_IDS.TOPIC_ID },
+            context: { agentId: TEST_IDS.SESSION_ID, scope: 'doc', topicId: TEST_IDS.TOPIC_ID },
             type: 'execAgentRuntime',
           }));
         });
@@ -872,7 +878,7 @@ describe('StreamingExecutor actions', () => {
           topicId: TEST_IDS.TOPIC_ID,
         });
 
-        expect(context.initialContext?.pageEditor).toEqual({
+        expect(context.initialContext?.docEditor).toEqual({
           markdown: 'Only for topic B',
           metadata: {
             charCount: 16,
@@ -882,8 +888,8 @@ describe('StreamingExecutor actions', () => {
           xml: '',
         });
       } finally {
-        docsAgentRuntime.setScopedFallbackPageContentContext({ contextKey: topicAKey });
-        docsAgentRuntime.setScopedFallbackPageContentContext({ contextKey: topicBKey });
+        docsAgentRuntime.setScopedFallbackDocContentContext({ contextKey: topicAKey });
+        docsAgentRuntime.setScopedFallbackDocContentContext({ contextKey: topicBKey });
       }
     });
 

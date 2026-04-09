@@ -90,8 +90,14 @@ const ModelTitle = memo<ModelFetcherProps>(
                     title={t('providerModels.list.fetcher.clear')}
                     onClick={async () => {
                       setClearRemoteModelsLoading(true);
-                      await clearObtainedModels(provider);
-                      setClearRemoteModelsLoading(false);
+                      try {
+                        await clearObtainedModels(provider);
+                      } catch (error) {
+                        console.error('Failed to clear fetched models:', error);
+                        message.error(t('providerModels.list.fetcher.clearError'));
+                      } finally {
+                        setClearRemoteModelsLoading(false);
+                      }
                     }}
                   />
                 )}
@@ -148,8 +154,13 @@ const ModelTitle = memo<ModelFetcherProps>(
                         modal.confirm({
                           content: t('providerModels.list.resetAll.conform'),
                           onOk: async () => {
-                            await clearModelsByProvider(provider);
-                            message.success(t('providerModels.list.resetAll.success'));
+                            try {
+                              await clearModelsByProvider(provider);
+                              message.success(t('providerModels.list.resetAll.success'));
+                            } catch (error) {
+                              console.error('Failed to reset provider models:', error);
+                              message.error(t('providerModels.list.resetAll.error'));
+                            }
                           },
                           title: t('providerModels.list.resetAll.title'),
                         });

@@ -1,13 +1,16 @@
 /**
  * @vitest-environment happy-dom
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import CategoryMenu from './CategoryMenu';
 
 const mockSetMode = vi.hoisted(() => vi.fn());
+const serverConfigState = vi.hoisted(() => ({
+  isMobile: false,
+}));
 
 vi.mock('@lobehub/ui', () => ({
   Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
@@ -29,11 +32,30 @@ vi.mock('@lobehub/ui', () => ({
 }));
 
 vi.mock('antd', () => ({
+  Drawer: ({ children, open, title }: any) =>
+    open ? (
+      <div data-testid="governance-drawer">
+        <div>{title}</div>
+        {children}
+      </div>
+    ) : null,
   Popover: ({ children, content }: any) => (
     <div>
       {children}
       <div data-testid="governance-popover">{content}</div>
     </div>
+  ),
+  Input: ({ onBlur, onChange, onPressEnter, value, ...rest }: any) => (
+    <input
+      data-testid="rights-owner-input"
+      value={value}
+      onBlur={onBlur}
+      onChange={onChange}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') onPressEnter?.(event);
+      }}
+      {...rest}
+    />
   ),
   Select: ({ onChange, options, value, ...rest }: any) => {
     const testId =
@@ -70,7 +92,10 @@ vi.mock('antd-style', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { defaultValue?: string }) =>
+    t: (
+      key: string,
+      options?: { count?: number; defaultValue?: string; label?: string },
+    ) =>
       options?.defaultValue ||
       (
         {
@@ -86,6 +111,8 @@ vi.mock('react-i18next', () => ({
           'detail.asset.classification.finance': 'Finance',
           'detail.asset.classification.hr': 'HR',
           'detail.asset.classification.label': 'Classification',
+          'detail.asset.rightsOwner.label': 'Rights Owner',
+          'detail.asset.rightsOwner.placeholder': 'Enter rights owner',
           'detail.asset.reviewStatus.all': 'All review statuses',
           'detail.asset.reviewStatus.approved': 'Approved',
           'detail.asset.reviewStatus.archived': 'Archived',
@@ -98,6 +125,9 @@ vi.mock('react-i18next', () => ({
           'detail.asset.usagePolicy.label': 'Usage Policy',
           'filters.governance': 'Governance',
           'filters.governanceActive': `Governance (${options?.count})`,
+          'filters.apply': 'Apply',
+          'filters.adjustGovernance': 'Adjust governance filters',
+          'filters.adjustGovernanceFilter': `Adjust ${options?.label} filter`,
           'filters.matchingFiles': `${options?.count} matching files`,
           'filters.clearGovernance': 'Clear governance filters',
           'filters.clearGovernanceFilter': `Clear ${options?.label} filter`,
@@ -173,7 +203,7 @@ vi.mock('@/store/file', () => ({
 vi.mock('@/store/serverConfig', () => ({
   useServerConfigStore: (selector: any) =>
     selector({
-      isMobile: false,
+      isMobile: serverConfigState.isMobile,
     }),
 }));
 
@@ -210,6 +240,10 @@ const renderCategoryMenu = (initialEntry: string) =>
   );
 
 describe('CategoryMenu', () => {
+  beforeEach(() => {
+    serverConfigState.isMobile = false;
+  });
+
   it('preserves current sort and view params when switching filters', () => {
     renderCategoryMenu('/spaces/spc_1/files?view=masonry&sorter=name');
 
@@ -284,6 +318,37 @@ describe('CategoryMenu', () => {
     expect(params.get('assetReviewStatus')).toBe('approved');
   });
 
+  it('preserves current governance params when applying a rights owner filter', () => {
+    renderCategoryMenu('/spaces/spc_1/files?assetClassification=brand&assetUsagePolicy=restricted');
+
+    fireEvent.change(screen.getByTestId('rights-owner-input'), {
+      target: { value: 'Brand Team' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    const location = screen.getByTestId('location').textContent || '';
+    const params = new URLSearchParams(location.split('?')[1]);
+
+    expect(params.get('assetClassification')).toBe('brand');
+    expect(params.get('assetUsagePolicy')).toBe('restricted');
+    expect(params.get('assetRightsOwner')).toBe('Brand Team');
+  });
+
+  it('does not apply rights owner filters on blur', () => {
+    renderCategoryMenu('/spaces/spc_1/files?assetClassification=brand');
+
+    fireEvent.change(screen.getByTestId('rights-owner-input'), {
+      target: { value: 'Brand Team' },
+    });
+    fireEvent.blur(screen.getByTestId('rights-owner-input'));
+
+    const location = screen.getByTestId('location').textContent || '';
+    const params = new URLSearchParams(location.split('?')[1]);
+
+    expect(params.get('assetClassification')).toBe('brand');
+    expect(params.has('assetRightsOwner')).toBe(false);
+  });
+
   it('preserves the current folder path when changing governance filters', () => {
     renderCategoryMenu('/spaces/spc_1/files/folder-a?view=masonry&scope=source-set:sst_1');
 
@@ -324,7 +389,7 @@ describe('CategoryMenu', () => {
       '/spaces/spc_1/files/folder-a?scope=source-set:sst_1&view=masonry&assetClassification=brand&assetReviewStatus=approved&assetUsagePolicy=restricted',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear governance filters' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Clear governance filters' }).at(-1)!);
 
     const location = screen.getByTestId('location').textContent || '';
     const params = new URLSearchParams(location.split('?')[1]);
@@ -337,33 +402,46 @@ describe('CategoryMenu', () => {
     expect(params.has('assetUsagePolicy')).toBe(false);
   });
 
-  it('shows active governance chips and clears one filter at a time', () => {
+  it('shows a compact governance summary row and clears all governance filters together', () => {
     renderCategoryMenu(
-      '/spaces/spc_1/files?assetClassification=brand&assetReviewStatus=approved&assetUsagePolicy=restricted',
+      '/spaces/spc_1/files?assetClassification=brand&assetRightsOwner=Brand%20Team&assetReviewStatus=approved&assetUsagePolicy=restricted',
     );
 
-    expect(
-      screen.getByRole('button', { name: 'Clear Classification: Brand filter' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Clear Review Status: Approved filter' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Clear Usage Policy: Restricted filter' }),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Classification: Brand')).toBeInTheDocument();
-    expect(screen.getByText('Review Status: Approved')).toBeInTheDocument();
-    expect(screen.getByText('Usage Policy: Restricted')).toBeInTheDocument();
-    expect(screen.getByText('3 matching files')).toBeInTheDocument();
+    const summaryRow = screen.getByTestId('governance-summary-bar');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear Review Status: Approved filter' }));
+    expect(within(summaryRow).getByText('3 matching files')).toBeInTheDocument();
+    expect(within(summaryRow).getByText('Governance (4)')).toBeInTheDocument();
+    expect(within(summaryRow).getByText(/Classification: Brand/)).toBeInTheDocument();
+    expect(
+      within(summaryRow).getByRole('button', { name: 'Adjust governance filters' }),
+    ).toBeInTheDocument();
+    expect(
+      within(summaryRow).getByRole('button', { name: 'Clear governance filters' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(within(summaryRow).getByRole('button', { name: 'Clear governance filters' }));
 
     const location = screen.getByTestId('location').textContent || '';
     const params = new URLSearchParams(location.split('?')[1]);
 
-    expect(params.get('assetClassification')).toBe('brand');
-    expect(params.get('assetUsagePolicy')).toBe('restricted');
+    expect(params.has('assetClassification')).toBe(false);
+    expect(params.has('assetRightsOwner')).toBe(false);
+    expect(params.has('assetUsagePolicy')).toBe(false);
     expect(params.has('assetReviewStatus')).toBe(false);
+  });
+
+  it('opens the governance panel focused on the first active governance filter from the summary row', () => {
+    renderCategoryMenu('/spaces/spc_1/files?assetRightsOwner=Brand%20Team&category=images');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Adjust governance filters' }));
+
+    const location = screen.getByTestId('location').textContent || '';
+    const params = new URLSearchParams(location.split('?')[1]);
+
+    expect(params.get('assetRightsOwner')).toBe('Brand Team');
+    expect(params.get('category')).toBe('images');
+    expect(params.get('openGovernance')).toBe('1');
+    expect(params.get('focusGovernance')).toBe('assetRightsOwner');
   });
 
   it('shows governance summary counts inside filter options', () => {
@@ -373,5 +451,48 @@ describe('CategoryMenu', () => {
     expect(screen.getByRole('option', { name: 'Brand (2)' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Approved (3)' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Restricted (3)' })).toBeInTheDocument();
+  });
+
+  it('uses a drawer-based governance filter flow on mobile', () => {
+    serverConfigState.isMobile = true;
+
+    renderCategoryMenu('/spaces/spc_1/files');
+
+    expect(screen.queryByTestId('governance-drawer')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Governance' }));
+
+    expect(screen.getByTestId('governance-drawer')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('review-status-select'), {
+      target: { value: 'approved' },
+    });
+
+    const location = screen.getByTestId('location').textContent || '';
+    const params = new URLSearchParams(location.split('?')[1]);
+
+    expect(params.get('assetReviewStatus')).toBe('approved');
+  });
+
+  it('opens the governance panel from the query flag and strips helper params after applying a filter', () => {
+    renderCategoryMenu(
+      '/spaces/spc_1/files?assetClassification=brand&openGovernance=1&focusGovernance=assetClassification',
+    );
+
+    expect(screen.getByTestId('governance-section-assetClassification')).toHaveAttribute(
+      'data-focused',
+      'true',
+    );
+
+    fireEvent.change(screen.getByTestId('classification-select'), {
+      target: { value: 'general' },
+    });
+
+    const location = screen.getByTestId('location').textContent || '';
+    const params = new URLSearchParams(location.split('?')[1]);
+
+    expect(params.get('assetClassification')).toBe('general');
+    expect(params.has('openGovernance')).toBe(false);
+    expect(params.has('focusGovernance')).toBe(false);
   });
 });

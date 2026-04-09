@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import EditorCanvas from '../EditorCanvas';
 
 const PromptSection = memo(() => {
-    const { t } = useTranslation('setting');
+    const { t } = useTranslation(['setting', 'file']);
     const theme = useTheme();
 
     return (
@@ -71,7 +71,7 @@ const PromptSection = memo(() => {
                             color: theme.colorPrimary,
                         }}
                     >
-                        {t('settingAgent.markdown.support')}
+                        {t('docEditor.mode.markdown', { ns: 'file' })}
                     </span>
                 </Flexbox>
             </Flexbox>

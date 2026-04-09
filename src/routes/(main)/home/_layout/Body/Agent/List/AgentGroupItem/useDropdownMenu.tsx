@@ -96,8 +96,13 @@ export const useGroupDropdownMenu = ({
               centered: true,
               okButtonProps: { danger: true },
               onOk: async () => {
-                await removeAgentGroup(id);
-                message.success(t('confirmRemoveGroupSuccess'));
+                try {
+                  await removeAgentGroup(id);
+                  message.success(t('confirmRemoveGroupSuccess'));
+                } catch (error) {
+                  console.error('Failed to delete agent group:', error);
+                  message.error(t('confirmRemoveGroupError'));
+                }
               },
               title: t('confirmRemoveChatGroupItemAlert'),
             });

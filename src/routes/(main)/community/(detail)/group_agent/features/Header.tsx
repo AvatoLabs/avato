@@ -69,7 +69,12 @@ const Header = memo<{ mobile?: boolean }>(({ mobile: isMobile }) => {
 
   const handleFavoriteClick = async () => {
     if (!isAuthenticated) {
-      await signIn();
+      try {
+        await signIn();
+      } catch (error) {
+        console.error('Favorite sign-in failed:', error);
+        message.error(t('assistant.favoriteFailed'));
+      }
       return;
     }
 

@@ -1,6 +1,5 @@
 'use client';
 
-import { getCanonicalContentKind } from '@lobechat/types';
 import { Block, Button, Flexbox, Text } from '@lobehub/ui';
 import { App } from 'antd';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
@@ -11,6 +10,7 @@ import { useSpaceName } from '@/features/ResourceSpaces';
 import { contentService } from '@/services/content';
 import { revalidateResources } from '@/store/file/slices/content/hooks';
 import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
+import { getCanonicalContentKind } from '@/types/content';
 import { type ContentItem } from '@/types/content';
 
 interface TrashContentProps {

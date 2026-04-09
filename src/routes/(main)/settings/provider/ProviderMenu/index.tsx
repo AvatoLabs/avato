@@ -3,6 +3,7 @@
 import { Flexbox, Icon, SearchBar } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
 import { SearchIcon } from 'lucide-react';
+import { type ChangeEvent } from 'react';
 import { type ReactNode } from 'react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -58,10 +59,10 @@ const Layout = memo(({ children, mobile }: ProviderMenuProps) => {
       >
         <SearchBar
           allowClear
-          defaultValue={providerSearchKeyword}
           placeholder={t('menu.searchProviders')}
           style={{ width: '100%' }}
           variant={'borderless'}
+          value={providerSearchKeyword}
           prefix={
             <Icon
               color={cssVar.colorTextDescription}
@@ -77,9 +78,8 @@ const Layout = memo(({ children, mobile }: ProviderMenuProps) => {
               paddingLeft: 6,
             },
           }}
-          onSearch={(v) => useAiInfraStore.setState({ providerSearchKeyword: v })}
-          onInputChange={(v) => {
-            if (!v) useAiInfraStore.setState({ providerSearchKeyword: '' });
+          onChange={(e: ChangeEvent<HTMLInputElement>) => {
+            useAiInfraStore.setState({ providerSearchKeyword: e.target.value });
           }}
         />
         <AddNew />

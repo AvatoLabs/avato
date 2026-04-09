@@ -133,7 +133,7 @@ export class ContentModel {
 
   /**
    * After upload verification fails, persist `space_blobs.status = 'quarantined'` so the same
-   * `(spaceId, sha256)` is not returned by `findSpaceBlobByHash` (ready-only). Never downgrades
+   * `(spaceId, sha256)` is not returned by `findReadySpaceBlobBySha256` (ready-only). Never downgrades
    * an existing `ready` row.
    */
   quarantineSpaceBlobAfterFailedVerify = async (params: {
@@ -175,14 +175,14 @@ export class ContentModel {
     });
   };
 
-  findSpaceBlobByHash = async (spaceId: string, hash: string) => {
+  findReadySpaceBlobBySha256 = async (spaceId: string, sha256: string) => {
     const [blob] = await this.db
       .select()
       .from(spaceBlobs)
       .where(
         and(
           eq(spaceBlobs.spaceId, spaceId),
-          eq(spaceBlobs.sha256, hash),
+          eq(spaceBlobs.sha256, sha256),
           eq(spaceBlobs.status, 'ready'),
         ),
       )

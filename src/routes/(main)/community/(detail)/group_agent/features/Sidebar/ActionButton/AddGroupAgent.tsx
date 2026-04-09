@@ -57,16 +57,18 @@ const AddGroupAgent = memo<{ mobile?: boolean }>(() => {
 
   // Check if a group with the same title already exists
   const checkDuplicateGroup = async () => {
-    if (!title) return false;
+    if (!title && !identifier) return false;
     try {
       const groups = await chatGroupService.getGroups();
-      return groups.some((g) => g.title === title);
+      return groups.some(
+        (g) => (identifier && g.marketIdentifier === identifier) || (title && g.title === title),
+      );
     } catch {
       return false;
     }
   };
 
-  const showDuplicateConfirmation = (callback: () => void) => {
+  const showDuplicateConfirmation = (callback: () => void | Promise<void>) => {
     modal.confirm({
       cancelText: t('cancel', { ns: 'common' }),
       content: t('groupAgents.duplicateAdd.content', {
@@ -134,6 +136,7 @@ const AddGroupAgent = memo<{ mobile?: boolean }>(() => {
       // Group content is the supervisor's systemRole (for backward compatibility)
       content: supervisorConfig?.systemRole || config.systemRole,
       ...meta,
+      marketIdentifier: identifier,
     };
 
     // Prepare member agents from market data
@@ -164,72 +167,100 @@ const AddGroupAgent = memo<{ mobile?: boolean }>(() => {
         };
       });
 
+    // Create group with all members in one request
+    const result = await chatGroupService.createGroupWithMembers(
+      groupConfig,
+      members,
+      supervisorConfig,
+    );
+
+    // Refresh group list
+    await loadGroups();
+
+    // Report installation to marketplace
+    if (identifier) {
+      discoverService.reportAgentInstall(identifier);
+      discoverService.reportAgentEvent({
+        event: 'add',
+        identifier,
+        source: location.pathname,
+      });
+    }
+
+    message.success(
+      t('groupAgents.addSuccess', { defaultValue: 'Group agent added successfully!' }),
+    );
+
+    if (shouldNavigate) {
+      navigate(urlJoin('/group', result.groupId));
+    }
+
+    return result;
+  };
+
+  const handleCreateAndConverse = async () => {
+    setIsLoading(true);
     try {
-      // Create group with all members in one request
-      const result = await chatGroupService.createGroupWithMembers(
-        groupConfig,
-        members,
-        supervisorConfig,
-      );
-
-      // Refresh group list
-      await loadGroups();
-
-      // Report installation to marketplace
-      if (identifier) {
-        discoverService.reportAgentInstall(identifier);
-        discoverService.reportAgentEvent({
-          event: 'add',
-          identifier,
-          source: location.pathname,
-        });
-      }
-
-      message.success(
-        t('groupAgents.addSuccess', { defaultValue: 'Group agent added successfully!' }),
-      );
-
-      if (shouldNavigate) {
-        navigate(urlJoin('/group', result.groupId));
-      }
-
-      return result;
+      const result = await createGroupFromMarket(true);
+      if (!result) return;
     } catch (error) {
-      console.error('Failed to create group from market:', error);
+      console.error('Failed to add group agent from market:', error);
       message.error(
         t('groupAgents.addError', {
           defaultValue: 'Failed to add group agent. Please try again.',
         }),
       );
-      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreate = async () => {
+    setIsLoading(true);
+    try {
+      const result = await createGroupFromMarket(false);
+      if (!result) return;
+    } catch (error) {
+      console.error('Failed to add group agent from market:', error);
+      message.error(
+        t('groupAgents.addError', {
+          defaultValue: 'Failed to add group agent. Please try again.',
+        }),
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleAddAndConverse = async () => {
-    setIsLoading(true);
-    try {
-      const isDuplicate = await checkDuplicateGroup();
-      if (isDuplicate) {
-        showDuplicateConfirmation(() => createGroupFromMarket(true));
-      } else {
-        await createGroupFromMarket(true);
-      }
-    } finally {
-      setIsLoading(false);
+    if (!config) {
+      message.error(
+        t('groupAgents.noConfig', { defaultValue: 'Group configuration not available' }),
+      );
+      return;
+    }
+
+    const isDuplicate = await checkDuplicateGroup();
+    if (isDuplicate) {
+      showDuplicateConfirmation(handleCreateAndConverse);
+    } else {
+      await handleCreateAndConverse();
     }
   };
 
   const handleAdd = async () => {
-    setIsLoading(true);
-    try {
-      const isDuplicate = await checkDuplicateGroup();
-      if (isDuplicate) {
-        showDuplicateConfirmation(() => createGroupFromMarket(false));
-      } else {
-        await createGroupFromMarket(false);
-      }
-    } finally {
-      setIsLoading(false);
+    if (!config) {
+      message.error(
+        t('groupAgents.noConfig', { defaultValue: 'Group configuration not available' }),
+      );
+      return;
+    }
+
+    const isDuplicate = await checkDuplicateGroup();
+    if (isDuplicate) {
+      showDuplicateConfirmation(handleCreate);
+    } else {
+      await handleCreate();
     }
   };
 

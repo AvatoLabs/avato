@@ -329,6 +329,10 @@ const TitleSection = memo(() => {
     headingTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, []);
 
+  const stopTitleEventPropagation = useCallback((event: { stopPropagation: () => void }) => {
+    event.stopPropagation();
+  }, []);
+
   return (
     <Flexbox
       className={styles.root}
@@ -383,16 +387,26 @@ const TitleSection = memo(() => {
         style={{ resize: 'none' }}
         value={title}
         variant={'borderless'}
+        onBeforeInput={stopTitleEventPropagation as any}
         onChange={(e) => {
           const truncated = truncateByWeightedLength(e.target.value, 100);
           setTitle(truncated);
         }}
+        onClick={stopTitleEventPropagation as any}
+        onCompositionEnd={stopTitleEventPropagation as any}
+        onCompositionStart={stopTitleEventPropagation as any}
+        onFocus={stopTitleEventPropagation as any}
+        onInput={stopTitleEventPropagation as any}
         onKeyDown={(e) => {
+          e.stopPropagation();
           if (e.key === 'Enter') {
             e.preventDefault();
             void handleTitleSubmit();
           }
         }}
+        onKeyUp={stopTitleEventPropagation as any}
+        onMouseDown={stopTitleEventPropagation as any}
+        onPaste={stopTitleEventPropagation as any}
       />
 
       <Flexbox gap={8}>

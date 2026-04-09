@@ -73,16 +73,12 @@ vi.mock('@/features/ResourceSpaces/useTeamSpaceMemoryScopeSummaries', () => ({
     spaceId: string,
     target: { recallFilter: string; section: string },
   ) => `/spaces/${spaceId}/memory?section=${target.section}&recallFilter=${target.recallFilter}`,
-  canReviewSpaceMemorySummary: (summary?: {
-    contract?: { canManageRecall?: boolean };
-    surface?: string;
-  } | null) => summary?.contract?.canManageRecall ?? summary?.surface === 'reviewer',
+  canReviewSpaceMemorySummary: (summary?: { contract?: { canManageRecall?: boolean } } | null) =>
+    Boolean(summary?.contract?.canManageRecall),
   useTeamSpaceMemoryScopeSummaries: (spaces?: Array<{ id: string; kind?: string | null }>) => {
     const firstSpace = spaces?.[0];
     const summary = summariesState.current[0]?.[1];
-    const canReview =
-      summary?.contract?.canManageRecall ??
-      (summary?.surface ? summary.surface === 'reviewer' : firstSpace?.kind === 'team');
+    const canReview = Boolean(summary?.contract?.canManageRecall);
 
     return {
       pendingGovernanceCountBySpaceId: new Map([
@@ -98,7 +94,7 @@ vi.mock('@/features/ResourceSpaces/useTeamSpaceMemoryScopeSummaries', () => ({
       ]),
       spaceSummaryMap: firstSpace?.id
         ? new Map([
-            [firstSpace.id, { canReview, surface: canReview ? 'reviewer' : 'viewer' }],
+            [firstSpace.id, { contract: { canManageRecall: canReview } }],
           ])
         : new Map(),
     };
@@ -141,7 +137,7 @@ describe('PageEmpty', () => {
 
   it('shows a pending review action for team space docs empty states', () => {
     spacesState.current = [{ id: 'spc_ops', kind: 'team', name: 'Ops Space' }];
-    summariesState.current = [['spc_ops', { canReview: true, surface: 'reviewer' }]];
+    summariesState.current = [['spc_ops', { contract: { canManageRecall: true } }]];
 
     renderPageEmpty('/spaces/spc_ops/docs');
 
@@ -175,7 +171,7 @@ describe('PageEmpty', () => {
 
   it('shows an open memory action for team viewers without review capability', () => {
     spacesState.current = [{ id: 'spc_ops', kind: 'team', name: 'Ops Space' }];
-    summariesState.current = [['spc_ops', { canReview: false, surface: 'viewer' }]];
+    summariesState.current = [['spc_ops', { contract: { canManageRecall: false } }]];
 
     renderPageEmpty('/spaces/spc_ops/docs');
 

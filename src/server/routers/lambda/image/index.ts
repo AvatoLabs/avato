@@ -11,7 +11,7 @@ import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { keyVaults, serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { createAsyncCaller } from '@/server/routers/async/caller';
 import { FileService } from '@/server/services/file';
-import { resolveProviderReadableFileReference } from '@/server/services/file/resolveProviderReadableFileReference';
+import { resolveRuntimeFileInput } from '@/server/services/file/resolveRuntimeFileInput';
 import {
   AsyncTaskError,
   AsyncTaskErrorType,
@@ -82,7 +82,7 @@ export const imageRouter = router({
         const resolvedImageUrls = [...params.imageUrls];
 
         for (const [index, url] of params.imageUrls.entries()) {
-          const providerReadable = await resolveProviderReadableFileReference({
+          const resolvedInput = await resolveRuntimeFileInput({
             db: serverDB,
             fileService,
             sourceIp: ctx.clientIp ?? null,
@@ -92,26 +92,12 @@ export const imageRouter = router({
             via: 'image_generation_input',
           });
 
-          if (providerReadable) {
-            imageKeys.push(providerReadable.key);
-            resolvedImageUrls[index] = providerReadable.url;
+          if (resolvedInput) {
+            imageKeys.push(resolvedInput.key);
+            resolvedImageUrls[index] = resolvedInput.url;
             continue;
           }
-
-          const key = await fileService.getKeyFromFullUrl(url);
-          if (key) {
-            log('Converted URL %s to key %s', url, key);
-            imageKeys.push(key);
-
-            if (process.env.NODE_ENV === 'development') {
-              const s3Url = await fileService.getFullFileUrl(key);
-              if (s3Url) {
-                resolvedImageUrls[index] = s3Url;
-              }
-            }
-          } else {
-            log('Failed to extract key from URL: %s', url);
-          }
+          log('Failed to extract key from URL: %s', url);
         }
 
         configForDatabase = {
@@ -132,7 +118,7 @@ export const imageRouter = router({
     // 2) Process single image in imageUrl
     if (typeof params.imageUrl === 'string' && params.imageUrl) {
       try {
-        const providerReadable = await resolveProviderReadableFileReference({
+        const resolvedInput = await resolveRuntimeFileInput({
           db: serverDB,
           fileService,
           sourceIp: ctx.clientIp ?? null,
@@ -142,25 +128,12 @@ export const imageRouter = router({
           via: 'image_generation_input',
         });
 
-        if (providerReadable) {
+        if (resolvedInput) {
           log('Resolved internal imageUrl to provider-readable URL: %s', params.imageUrl);
-          configForDatabase = { ...configForDatabase, imageUrl: providerReadable.key };
-          generationParams = { ...generationParams, imageUrl: providerReadable.url };
+          configForDatabase = { ...configForDatabase, imageUrl: resolvedInput.key };
+          generationParams = { ...generationParams, imageUrl: resolvedInput.url };
         } else {
-          const key = await fileService.getKeyFromFullUrl(params.imageUrl);
-          if (key) {
-            log('Converted single imageUrl to key: %s -> %s', params.imageUrl, key);
-            configForDatabase = { ...configForDatabase, imageUrl: key };
-
-            if (process.env.NODE_ENV === 'development') {
-              const s3Url = await fileService.getFullFileUrl(key);
-              if (s3Url) {
-                generationParams = { ...generationParams, imageUrl: s3Url };
-              }
-            }
-          } else {
-            log('Failed to extract key from single imageUrl: %s', params.imageUrl);
-          }
+          log('Failed to extract key from single imageUrl: %s', params.imageUrl);
         }
       } catch (error) {
         if (error instanceof TRPCError) throw error;

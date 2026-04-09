@@ -10,16 +10,16 @@ class DesktopSkillRuntimeService {
   private async prepareSkillDirectoryForSkill(skill?: {
     id: string;
     name: string;
-    zipFileHash?: string | null;
+    zipSha256?: string | null;
   }) {
-    if (!skill?.zipFileHash) return undefined;
+    if (!skill?.zipSha256) return undefined;
 
     const zipUrl = await agentSkillService.getZipUrl(skill.id);
     if (!zipUrl.url) return undefined;
 
     const prepared = await localFileService.prepareSkillDirectory({
       url: zipUrl.url,
-      zipHash: skill.zipFileHash,
+      zipSha256: skill.zipSha256,
     });
 
     if (!prepared.success) {
@@ -45,7 +45,7 @@ class DesktopSkillRuntimeService {
     skillName?: string;
   }): Promise<string | undefined> {
     const skill = await this.resolveSkill({ id: params.skillId, name: params.skillName });
-    if (!skill?.zipFileHash) return undefined;
+    if (!skill?.zipSha256) return undefined;
 
     const zipUrl = await agentSkillService.getZipUrl(skill.id);
     if (!zipUrl.url) return undefined;
@@ -53,7 +53,7 @@ class DesktopSkillRuntimeService {
     const resolved = await localFileService.resolveSkillResourcePath({
       path: params.path,
       url: zipUrl.url,
-      zipHash: skill.zipFileHash,
+      zipSha256: skill.zipSha256,
     });
 
     if (!resolved.success) {

@@ -40,7 +40,7 @@ describe('desktopSkillRuntimeService', () => {
     getByNameMock.mockResolvedValue({
       id: 'skill-1',
       name: 'demo-skill',
-      zipFileHash: 'zip-hash-1',
+      zipSha256: 'zip-hash-1',
     });
     getZipUrlMock.mockResolvedValue({
       name: 'demo-skill',
@@ -60,7 +60,7 @@ describe('desktopSkillRuntimeService', () => {
     expect(getZipUrlMock).toHaveBeenCalledWith('skill-1');
     expect(prepareSkillDirectoryMock).toHaveBeenCalledWith({
       url: 'https://example.com/demo-skill.zip',
-      zipHash: 'zip-hash-1',
+      zipSha256: 'zip-hash-1',
     });
     expect(result).toBe('/tmp/demo-skill');
   });
@@ -70,7 +70,7 @@ describe('desktopSkillRuntimeService', () => {
     getByNameMock.mockResolvedValue({
       id: 'skill-1',
       name: 'demo-skill',
-      zipFileHash: 'zip-hash-1',
+      zipSha256: 'zip-hash-1',
     });
     getZipUrlMock.mockResolvedValue({
       name: 'demo-skill',
@@ -97,7 +97,7 @@ describe('desktopSkillRuntimeService', () => {
     getByNameMock.mockResolvedValue({
       id: 'skill-1',
       name: 'demo-skill',
-      zipFileHash: null,
+      zipSha256: null,
     });
 
     const result = await desktopSkillRuntimeService.resolveExecutionDirectory({
@@ -113,7 +113,7 @@ describe('desktopSkillRuntimeService', () => {
     getByNameMock.mockResolvedValue({
       id: 'skill-1',
       name: 'demo-skill',
-      zipFileHash: 'zip-hash-1',
+      zipSha256: 'zip-hash-1',
     });
     getZipUrlMock.mockResolvedValue({
       name: 'demo-skill',
@@ -133,7 +133,7 @@ describe('desktopSkillRuntimeService', () => {
     expect(resolveSkillResourcePathMock).toHaveBeenCalledWith({
       path: 'docs/bazi.py',
       url: 'https://example.com/demo-skill.zip',
-      zipHash: 'zip-hash-1',
+      zipSha256: 'zip-hash-1',
     });
     expect(result).toBe('/tmp/demo-skill/docs/bazi.py');
   });

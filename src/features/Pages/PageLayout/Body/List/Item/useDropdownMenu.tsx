@@ -153,9 +153,14 @@ export const useDropdownMenu = ({
     modal.confirm({
       okButtonProps: { danger: true },
       onOk: async () => {
-        await removeFilesFromSourceSet(sourceSetId, [pageId]);
-        syncSourceAssignments(undefined);
-        message.success(t('FileManager.actions.removeFromSourceSetSuccess', { ns: 'components' }));
+        try {
+          await removeFilesFromSourceSet(sourceSetId, [pageId]);
+          syncSourceAssignments(undefined);
+          message.success(t('FileManager.actions.removeFromSourceSetSuccess', { ns: 'components' }));
+        } catch (error) {
+          console.error('Failed to remove page from source set:', error);
+          message.error(t('FileManager.actions.removeFromSourceSetError', { ns: 'components' }));
+        }
       },
       title: t('FileManager.actions.confirmRemoveFromSourceSet', { count: 1, ns: 'components' }),
     });

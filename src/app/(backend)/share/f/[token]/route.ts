@@ -1,5 +1,4 @@
 import { contentRegistry } from '@lobechat/database/schemas';
-import { isRawFileContentId } from '@lobechat/types';
 import debug from 'debug';
 import { eq } from 'drizzle-orm';
 
@@ -9,6 +8,7 @@ import { FileModel } from '@/database/models/file';
 import { getServerDB } from '@/database/server';
 import { serveAuthorizedFileDownload } from '@/server/modules/file-proxy/serveAuthorizedFileDownload';
 import { resolveContentShareAccess } from '@/server/services/content/sharePolicy';
+import { isRawFileContentId } from '@/types/content';
 
 const log = debug('lobe-file:share-f');
 
@@ -44,6 +44,10 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
 
     if (access.status === 'missing_password') {
       return new Response('Password required', { status: 401 });
+    }
+
+    if (access.status !== 'ok') {
+      return new Response('Not found', { status: 404 });
     }
 
     const { link } = access;

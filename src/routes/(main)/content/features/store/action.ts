@@ -52,6 +52,10 @@ export interface Action {
    */
   setAssetReviewStatus: (reviewStatus?: FileAssetReviewStatus) => void;
   /**
+   * Set the current asset rights owner filter
+   */
+  setAssetRightsOwner: (rightsOwner?: string) => void;
+  /**
    * Set the current asset usage policy filter
    */
   setAssetUsagePolicy: (usagePolicy?: FileAssetUsagePolicy) => void;
@@ -144,8 +148,8 @@ export const store: CreateStore = (publicState) => (set, get) => ({
     const { useFileStore } = await import('@/store/file');
     const fileStore = useFileStore.getState();
 
-    // Delegate to FileStore's loadMoreContentItems
-    await fileStore.loadMoreContentItems();
+    // Delegate to FileStore's paginated knowledge loader
+    await fileStore.loadMoreKnowledgeItems();
 
     // Sync pagination state back to ContentManagerStore
     set({
@@ -239,6 +243,12 @@ export const store: CreateStore = (publicState) => (set, get) => ({
     if (get().assetReviewStatus === assetReviewStatus) return;
 
     set({ assetReviewStatus });
+  },
+
+  setAssetRightsOwner: (assetRightsOwner) => {
+    if (get().assetRightsOwner === assetRightsOwner) return;
+
+    set({ assetRightsOwner });
   },
 
   setAssetUsagePolicy: (assetUsagePolicy) => {

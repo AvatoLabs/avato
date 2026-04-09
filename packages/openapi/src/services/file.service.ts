@@ -1,7 +1,7 @@
 import type { FileMetadata } from '@lobechat/types';
 import { AsyncTaskStatus, AsyncTaskType } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
-import { and, count, desc, eq, gte, ilike, inArray, lte, sum } from 'drizzle-orm';
+import { and, count, desc, eq, gte, ilike, inArray, lte, or, sum } from 'drizzle-orm';
 import { sha256 } from 'js-sha256';
 
 import { serverDBEnv } from '@/config/db';
@@ -34,11 +34,7 @@ import { isChunkingUnsupported } from '@/utils/isChunkingUnsupported';
 import { nanoid } from '@/utils/uuid';
 
 import { BaseService } from '../common/base.service';
-import {
-  isSameOriginAppUrl,
-  isStableAppFileProxyUrl,
-  toAbsoluteStableAppFileProxyUrl,
-} from '../helpers/file';
+import { ensureFileResponseUrl } from '../helpers/file';
 import { processPaginationConditions } from '../helpers/pagination';
 import type {
   AsyncTaskErrorResponse,
@@ -99,26 +95,6 @@ export class FileUploadService extends BaseService {
     this.spaceModel = new SpaceModel(db, userId);
   }
 
-  /**
-   * 确保获取完整URL，避免重复拼接
-   * 检查URL是否已经是完整URL，如果不是则生成完整URL
-   */
-  private async ensureFullUrl(url?: string): Promise<string> {
-    if (!url) {
-      return '';
-    }
-
-    if ((url.startsWith('http://') || url.startsWith('https://')) && !isSameOriginAppUrl(url)) {
-      return url;
-    }
-
-    if (isStableAppFileProxyUrl(url)) {
-      return toAbsoluteStableAppFileProxyUrl(url);
-    }
-
-    return await this.coreFileService.getFullFileUrl(url);
-  }
-
   private async resolveResponseFileUrl(
     file: Pick<FileItem, 'id' | 'url'>,
     options?: {
@@ -148,7 +124,10 @@ export class FileUploadService extends BaseService {
       }
     }
 
-    const fullUrl = await this.ensureFullUrl(file.url);
+    const fullUrl = await ensureFileResponseUrl({
+      getFullFileUrl: this.coreFileService.getFullFileUrl.bind(this.coreFileService),
+      url: file.url,
+    });
 
     if (fullUrl && access && options?.via) {
       this.recordResponseFileUrlIssuedAccess(file.id, access, options.via);
@@ -185,6 +164,12 @@ export class FileUploadService extends BaseService {
       });
   }
 
+  private getFileArtifactKey(file: Pick<FileItem, 'blobId' | 'id'>): string {
+    if (file.blobId) return `blob:${file.blobId}`;
+
+    return `file:${file.id}`;
+  }
+
   /**
    * 转换为上传响应格式
    */
@@ -197,9 +182,10 @@ export class FileUploadService extends BaseService {
     },
   ): Promise<FileDetailResponse['file']> {
     const fullUrl = await this.resolveResponseFileUrl(file, options);
+    const { fileHash: _fileHash, ...safeFile } = file;
 
     return {
-      ...file,
+      ...safeFile,
       url: fullUrl,
     };
   }
@@ -561,7 +547,11 @@ export class FileUploadService extends BaseService {
       const { failed, successed } = await this.assertReadableSourceItems(request.fileIds);
 
       if (successed.length > 0) {
-        await this.sourceSetModel.addFilesToSourceSetAny(sourceSetId, successed, sourceSet.spaceId);
+        await this.sourceSetModel.addFilesToSourceSetAny(
+          sourceSetId,
+          successed,
+          sourceSet.spaceId ?? undefined,
+        );
       }
 
       return {
@@ -633,7 +623,7 @@ export class FileUploadService extends BaseService {
       await this.sourceSetModel.addFilesToSourceSetAny(
         request.targetSourceSetId,
         successed,
-        targetSourceSet.spaceId,
+        targetSourceSet.spaceId ?? undefined,
       );
 
       return {
@@ -729,9 +719,11 @@ export class FileUploadService extends BaseService {
       // 设置过期时间（默认并最大均为 1 小时）
       const expiresIn = clampFileUrlExpiresIn(options.expiresIn);
 
-      const signedUrl = isStableAppFileProxyUrl(file.url)
-        ? toAbsoluteStableAppFileProxyUrl(file.url)
-        : await this.coreFileService.getFullFileUrl(file.url, expiresIn);
+      const signedUrl = await ensureFileResponseUrl({
+        expiresIn,
+        getFullFileUrl: this.coreFileService.getFullFileUrl.bind(this.coreFileService),
+        url: file.url,
+      });
 
       // 计算过期时间戳
       const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
@@ -797,28 +789,37 @@ export class FileUploadService extends BaseService {
       // 1. 验证文件
       await this.validateFile(file, options.skipCheckFileType);
 
-      // 2. 计算文件哈希
+      // 2. 计算文件 SHA-256
       const fileArrayBuffer = await file.arrayBuffer();
-      const hash = sha256(fileArrayBuffer);
+      const sha256Hex = sha256(fileArrayBuffer);
       const resolvedSessionId = await this.resolveSessionId(options);
       const uploadSpaceId = await this.resolveUploadSpaceId(options);
 
       // 3. 同一 Space 内去重：仅查询 space_blobs（不调用全局 global_files / checkHash，避免跨用户存在性侧信道）
       if (!options.skipDeduplication) {
-        const existingBlob = await this.contentModel.findSpaceBlobByHash(uploadSpaceId, hash);
+        const existingBlob = await this.contentModel.findReadySpaceBlobBySha256(
+          uploadSpaceId,
+          sha256Hex,
+        );
 
         if (existingBlob) {
           this.log('info', 'OpenAPI upload dedup: space_blobs hit in space', {
-            hash,
+            sha256: sha256Hex,
             name: file.name,
             spaceId: uploadSpaceId,
             storageKey: existingBlob.storageKey,
           });
 
-          const existingUserFile = await this.findExistingUserFile(hash);
+          const existingUserFile = await this.fileModel.findExistingByBlobAndContext({
+            blobId: existingBlob.id,
+            fileType: file.type,
+            name: file.name,
+            sourceSetId: options.sourceSetId,
+            spaceId: uploadSpaceId,
+          });
 
           if (existingUserFile) {
-            this.log('info', 'User already has file row for this hash', {
+            this.log('info', 'User already has file row for this blob', {
               fileId: existingUserFile.id,
               name: existingUserFile.name,
             });
@@ -838,23 +839,17 @@ export class FileUploadService extends BaseService {
             (existingBlob.metadata as FileMetadata | undefined) ||
             this.generateFileMetadata(file, options.directory);
 
-          const fileRecord = {
-            chunkTaskId: null,
-            clientId: null,
-            embeddingTaskId: null,
-            fileHash: hash,
+          const createResult = await this.createSpaceScopedFileRecord({
+            blobId: existingBlob.id,
             fileType: file.type,
-            sourceSetId: options.sourceSetId,
             metadata: metaFromBlob,
             name: file.name,
+            sha256: sha256Hex,
             size: file.size,
+            sourceSetId: options.sourceSetId,
             spaceId: uploadSpaceId,
-            url: existingBlob.storageKey,
-            userId: this.userId,
-          };
-
-          // 仍尝试写入 global_files（onConflictDoNothing），满足 files.file_hash 外键；对象实际复用 space_blobs.storageKey
-          const createResult = await this.fileModel.create(fileRecord, true);
+            storageKey: existingBlob.storageKey,
+          });
 
           if (resolvedSessionId) {
             await this.createFileSessionRelation(createResult.id, resolvedSessionId);
@@ -874,7 +869,7 @@ export class FileUploadService extends BaseService {
         }
       }
 
-      // 4. 本 Space 无就绪 blob：走完整上传，并登记 space_blobs（仍写 global_files 以满足 fileHash 外键）
+      // 4. 本 Space 无就绪 blob：走完整上传，并登记 space_blobs / content registry
       const metadata = this.generateFileMetadata(file, options.directory);
 
       const fileBuffer = Buffer.from(fileArrayBuffer);
@@ -888,7 +883,7 @@ export class FileUploadService extends BaseService {
           extraMetadata: { ...metadata, source: 'openapi_upload' } as Record<string, unknown>,
           fileType: file.type,
           reason: 'size_mismatch',
-          sha256: hash,
+          sha256: sha256Hex,
           size: head.contentLength,
           spaceId: uploadSpaceId,
           storageKey: metadata.path,
@@ -896,34 +891,29 @@ export class FileUploadService extends BaseService {
         throw this.createBusinessError('上传校验失败：存储对象大小与声明不一致');
       }
 
-      const fileRecord = {
-        chunkTaskId: null,
-        clientId: null,
-        embeddingTaskId: null,
-        fileHash: hash,
-        fileType: file.type,
-        sourceSetId: options.sourceSetId,
-        metadata,
-        name: file.name,
-        size: file.size,
-        spaceId: uploadSpaceId,
-        url: metadata.path,
-        userId: this.userId,
-      };
-
-      const createResult = await this.fileModel.create(fileRecord, true);
-
-      await this.contentModel.upsertSpaceBlob({
+      const blob = await this.contentModel.upsertSpaceBlob({
         createdBy: this.userId!,
         etag: head.etag,
         fileType: file.type,
         metadata: metadata as Record<string, unknown>,
-        sha256: hash,
+        sha256: sha256Hex,
         size: file.size,
         spaceId: uploadSpaceId,
         status: 'ready',
         storageKey: metadata.path,
         verifiedAt: new Date(),
+      });
+
+      const createResult = await this.createSpaceScopedFileRecord({
+        blobId: blob.id,
+        fileType: file.type,
+        metadata,
+        name: file.name,
+        sha256: sha256Hex,
+        size: file.size,
+        sourceSetId: options.sourceSetId,
+        spaceId: uploadSpaceId,
+        storageKey: metadata.path,
       });
 
       if (resolvedSessionId) {
@@ -1164,9 +1154,10 @@ export class FileUploadService extends BaseService {
       }
 
       const file = await this.findFileByIdWithPermission(fileId, permissionResult);
+      const removeGlobalFile = serverDBEnv.REMOVE_GLOBAL_FILE ?? true;
 
-      // 删除数据库记录及关联 chunks / global_files（权限已在上方校验）
-      await this.fileModel.deleteAny(fileId, serverDBEnv.REMOVE_GLOBAL_FILE);
+      // 删除数据库记录及关联 chunks；底层对象是否可回收由 storage cleanup helper 判定。
+      await this.fileModel.deleteAny(fileId, removeGlobalFile);
       await this.contentModel.invalidateAuthzEpochsAfterRemoval([
         { contentUid: file.contentUid, spaceId: file.spaceId },
       ]);
@@ -1174,7 +1165,7 @@ export class FileUploadService extends BaseService {
       const removableUrls = await resolveRemovableStorageUrls(
         this.fileModel,
         [file],
-        serverDBEnv.REMOVE_GLOBAL_FILE,
+        removeGlobalFile,
       );
 
       if (removableUrls.length > 0) {
@@ -1415,18 +1406,34 @@ export class FileUploadService extends BaseService {
     }
   }
 
-  /**
-   * 查找用户是否已有指定哈希的文件记录
-   */
-  private async findExistingUserFile(hash: string): Promise<FileItem | null> {
+  private async createSpaceScopedFileRecord(params: {
+    blobId: string;
+    fileType: string;
+    metadata: FileMetadata;
+    name: string;
+    sha256: string;
+    size: number;
+    sourceSetId?: string;
+    spaceId: string;
+    storageKey: string;
+  }): Promise<{ id: string }> {
     try {
-      const existingFile = await this.db.query.files.findFirst({
-        where: and(eq(files.fileHash, hash), eq(files.userId, this.userId)),
+      const { fileId } = await this.coreFileService.createFileRecord({
+        blobId: params.blobId,
+        blobMetadata: params.metadata as Record<string, unknown>,
+        fileType: params.fileType,
+        metadata: params.metadata,
+        name: params.name,
+        sha256: params.sha256,
+        sourceSetId: params.sourceSetId,
+        size: params.size,
+        spaceId: params.spaceId,
+        storageKey: params.storageKey,
       });
 
-      return existingFile || null;
+      return { id: fileId };
     } catch (error) {
-      this.handleServiceError(error, '查找用户是否已有指定哈希的文件记录');
+      this.handleServiceError(error, '创建空间文件记录');
     }
   }
 
@@ -1512,18 +1519,18 @@ export class FileUploadService extends BaseService {
   ): Promise<FileDetailResponse['file'][]> {
     if (filesResult.length === 0) return [];
 
-    // 1. 按 fileHash 去重（相同 hash 的文件只保留第一个）
-    const uniqueFilesByHash = new Map<string, (typeof filesResult)[0]>();
+    // 1. 按 canonical artifact key 去重（blobId -> fileId）
+    const uniqueFilesByArtifact = new Map<string, (typeof filesResult)[0]>();
     for (const file of filesResult) {
-      const key = file.fileHash || file.id;
-      if (!uniqueFilesByHash.has(key)) {
-        uniqueFilesByHash.set(key, file);
+      const key = this.getFileArtifactKey(file);
+      if (!uniqueFilesByArtifact.has(key)) {
+        uniqueFilesByArtifact.set(key, file);
       }
     }
-    const dedupedFiles = Array.from(uniqueFilesByHash.values());
+    const dedupedFiles = Array.from(uniqueFilesByArtifact.values());
 
     const fileIds = dedupedFiles.map((file) => file.id);
-    const fileHashes = dedupedFiles.map((file) => file.fileHash).filter(Boolean) as string[];
+    const blobIds = dedupedFiles.map((file) => file.blobId).filter(Boolean) as string[];
 
     // 批量查询分块、任务状态
     const [chunkCounts, chunkTasks, embeddingTasks] = await Promise.all([
@@ -1538,19 +1545,24 @@ export class FileUploadService extends BaseService {
       ),
     ]);
 
-    // 2. 查询所有相同 hash 的文件对应的用户
+    // 2. 查询所有相同 blob 的文件对应的用户
     // 只有全局权限时才查询所有用户，否则只返回当前文件的用户
-    const hashUsersMap = new Map<string, any[]>();
+    const artifactUsersMap = new Map<string, any[]>();
+    const artifactConditions = [];
 
-    if (hasGlobalPermission && fileHashes.length > 0) {
-      // 查询所有相同 hash 的文件
-      const allFilesWithSameHash = await this.db.query.files.findMany({
-        columns: { fileHash: true, userId: true },
-        where: inArray(files.fileHash, fileHashes),
+    if (blobIds.length > 0) {
+      artifactConditions.push(inArray(files.blobId, blobIds));
+    }
+
+    if (hasGlobalPermission && artifactConditions.length > 0) {
+      const allFilesForArtifacts = await this.db.query.files.findMany({
+        columns: { blobId: true, id: true, userId: true },
+        where:
+          artifactConditions.length === 1 ? artifactConditions[0] : or(...artifactConditions),
       });
 
       // 收集所有用户 ID
-      const allUserIds = [...new Set(allFilesWithSameHash.map((f) => f.userId))];
+      const allUserIds = [...new Set(allFilesForArtifacts.map((f) => f.userId))];
 
       // 查询用户信息
       const allUsers =
@@ -1561,16 +1573,16 @@ export class FileUploadService extends BaseService {
             })
           : [];
 
-      // 构建 hash -> users 映射
-      for (const file of allFilesWithSameHash) {
-        if (!file.fileHash) continue;
+      // 构建 artifact -> users 映射
+      for (const file of allFilesForArtifacts) {
         const user = allUsers.find((u) => u.id === file.userId);
         if (user) {
-          if (!hashUsersMap.has(file.fileHash)) {
-            hashUsersMap.set(file.fileHash, []);
+          const key = this.getFileArtifactKey(file);
+          if (!artifactUsersMap.has(key)) {
+            artifactUsersMap.set(key, []);
           }
           // 避免重复添加同一用户
-          const existingUsers = hashUsersMap.get(file.fileHash)!;
+          const existingUsers = artifactUsersMap.get(key)!;
           if (!existingUsers.some((u) => u.id === user.id)) {
             existingUsers.push(user);
           }
@@ -1648,9 +1660,10 @@ export class FileUploadService extends BaseService {
         // 获取用户信息
         let fileUsers = [];
 
-        if (hasGlobalPermission && file.fileHash && hashUsersMap.has(file.fileHash)) {
-          // 全局权限：返回所有关联该 hash 的用户
-          fileUsers = hashUsersMap.get(file.fileHash) || [];
+        const artifactKey = this.getFileArtifactKey(file);
+        if (hasGlobalPermission && artifactUsersMap.has(artifactKey)) {
+          // 全局权限：返回所有关联该 artifact 的用户
+          fileUsers = artifactUsersMap.get(artifactKey) || [];
         } else {
           // 非全局权限：只返回当前文件的用户
           const currentUser = needsManualRelationFetch

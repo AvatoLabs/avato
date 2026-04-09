@@ -1,0 +1,130 @@
+diff --git a/lib/module/views/useHeaderConfigProps.js b/lib/module/views/useHeaderConfigProps.js
+--- a/lib/module/views/useHeaderConfigProps.js
++++ b/lib/module/views/useHeaderConfigProps.js
+@@ -247,6 +247,7 @@
+   // Back button menu is not disabled
+   headerBackButtonMenuEnabled !== false;
+   const isCenterViewRenderedAndroid = headerTitleAlign === 'center';
++  const shouldUseIOSHeaderProps = Platform.OS === 'ios';
+   const leftItems = headerLeftItems?.({
+     tintColor,
+     canGoBack
+@@ -333,35 +334,35 @@
+     backButtonInCustomView,
+     backgroundColor: headerBackgroundColor,
+     backTitle: headerBackTitle,
+-    backTitleVisible: isBackButtonDisplayModeAvailable ? undefined : headerBackButtonDisplayMode !== 'minimal',
++    backTitleVisible: shouldUseIOSHeaderProps && !isBackButtonDisplayModeAvailable ? undefined : shouldUseIOSHeaderProps ? headerBackButtonDisplayMode !== 'minimal' : undefined,
+     backButtonDisplayMode: isBackButtonDisplayModeAvailable ? headerBackButtonDisplayMode : undefined,
+-    backTitleFontFamily,
++    backTitleFontFamily: shouldUseIOSHeaderProps ? backTitleFontFamily : undefined,
+     backTitleFontSize,
+     blurEffect: headerBlurEffect,
+     color: tintColor,
+     direction,
+-    disableBackButtonMenu: headerBackButtonMenuEnabled === false,
++    disableBackButtonMenu: shouldUseIOSHeaderProps && headerBackButtonMenuEnabled === false ? true : undefined,
+     hidden: headerShown === false,
+     hideBackButton: headerBackVisible === false,
+     hideShadow: headerShadowVisible === false || headerBackground != null || headerTransparent && headerShadowVisible !== true,
+-    largeTitle: headerLargeTitleEnabled,
+-    largeTitleBackgroundColor,
+-    largeTitleColor,
+-    largeTitleFontFamily,
+-    largeTitleFontSize,
+-    largeTitleFontWeight,
+-    largeTitleHideShadow: headerLargeTitleShadowVisible === false,
++    largeTitle: shouldUseIOSHeaderProps ? headerLargeTitleEnabled : undefined,
++    largeTitleBackgroundColor: shouldUseIOSHeaderProps ? largeTitleBackgroundColor : undefined,
++    largeTitleColor: shouldUseIOSHeaderProps ? largeTitleColor : undefined,
++    largeTitleFontFamily: shouldUseIOSHeaderProps ? largeTitleFontFamily : undefined,
++    largeTitleFontSize: shouldUseIOSHeaderProps ? largeTitleFontSize : undefined,
++    largeTitleFontWeight: shouldUseIOSHeaderProps ? largeTitleFontWeight : undefined,
++    largeTitleHideShadow: shouldUseIOSHeaderProps && headerLargeTitleShadowVisible === false ? true : undefined,
+     title: titleText,
+     titleColor,
+     titleFontFamily,
+     titleFontSize,
+     titleFontWeight: String(titleFontWeight),
+-    topInsetEnabled: headerTopInsetEnabled,
++    topInsetEnabled: shouldUseIOSHeaderProps ? headerTopInsetEnabled : undefined,
+     translucent: translucent === true,
+     children,
+     headerLeftBarButtonItems: processBarButtonItems(leftItems, colors, fonts),
+     headerRightBarButtonItems: processBarButtonItems(rightItems, colors, fonts),
+-    experimental_userInterfaceStyle: dark ? 'dark' : 'light'
++    experimental_userInterfaceStyle: shouldUseIOSHeaderProps ? dark ? 'dark' : 'light' : undefined
+   };
+ }
+diff --git a/src/views/useHeaderConfigProps.tsx b/src/views/useHeaderConfigProps.tsx
+--- a/src/views/useHeaderConfigProps.tsx
++++ b/src/views/useHeaderConfigProps.tsx
+@@ -357,6 +357,7 @@
+     headerBackButtonMenuEnabled !== false;
+ 
+   const isCenterViewRenderedAndroid = headerTitleAlign === 'center';
++  const shouldUseIOSHeaderProps = Platform.OS === 'ios';
+ 
+   const leftItems = headerLeftItems?.({
+     tintColor,
+@@ -485,41 +486,46 @@
+     backButtonInCustomView,
+     backgroundColor: headerBackgroundColor,
+     backTitle: headerBackTitle,
+-    backTitleVisible: isBackButtonDisplayModeAvailable
+-      ? undefined
+-      : headerBackButtonDisplayMode !== 'minimal',
++    backTitleVisible:
++      shouldUseIOSHeaderProps && !isBackButtonDisplayModeAvailable
++        ? undefined
++        : shouldUseIOSHeaderProps
++          ? headerBackButtonDisplayMode !== 'minimal'
++          : undefined,
+     backButtonDisplayMode: isBackButtonDisplayModeAvailable
+       ? headerBackButtonDisplayMode
+       : undefined,
+-    backTitleFontFamily,
++    backTitleFontFamily: shouldUseIOSHeaderProps ? backTitleFontFamily : undefined,
+     backTitleFontSize,
+     blurEffect: headerBlurEffect,
+     color: tintColor,
+     direction,
+-    disableBackButtonMenu: headerBackButtonMenuEnabled === false,
++    disableBackButtonMenu:
++      shouldUseIOSHeaderProps && headerBackButtonMenuEnabled === false ? true : undefined,
+     hidden: headerShown === false,
+     hideBackButton: headerBackVisible === false,
+     hideShadow:
+       headerShadowVisible === false ||
+       headerBackground != null ||
+       (headerTransparent && headerShadowVisible !== true),
+-    largeTitle: headerLargeTitleEnabled,
+-    largeTitleBackgroundColor,
+-    largeTitleColor,
+-    largeTitleFontFamily,
+-    largeTitleFontSize,
+-    largeTitleFontWeight,
+-    largeTitleHideShadow: headerLargeTitleShadowVisible === false,
++    largeTitle: shouldUseIOSHeaderProps ? headerLargeTitleEnabled : undefined,
++    largeTitleBackgroundColor: shouldUseIOSHeaderProps ? largeTitleBackgroundColor : undefined,
++    largeTitleColor: shouldUseIOSHeaderProps ? largeTitleColor : undefined,
++    largeTitleFontFamily: shouldUseIOSHeaderProps ? largeTitleFontFamily : undefined,
++    largeTitleFontSize: shouldUseIOSHeaderProps ? largeTitleFontSize : undefined,
++    largeTitleFontWeight: shouldUseIOSHeaderProps ? largeTitleFontWeight : undefined,
++    largeTitleHideShadow:
++      shouldUseIOSHeaderProps && headerLargeTitleShadowVisible === false ? true : undefined,
+     title: titleText,
+     titleColor,
+     titleFontFamily,
+     titleFontSize,
+     titleFontWeight: String(titleFontWeight),
+-    topInsetEnabled: headerTopInsetEnabled,
++    topInsetEnabled: shouldUseIOSHeaderProps ? headerTopInsetEnabled : undefined,
+     translucent: translucent === true,
+     children,
+     headerLeftBarButtonItems: processBarButtonItems(leftItems, colors, fonts),
+     headerRightBarButtonItems: processBarButtonItems(rightItems, colors, fonts),
+-    experimental_userInterfaceStyle: dark ? 'dark' : 'light',
++    experimental_userInterfaceStyle: shouldUseIOSHeaderProps ? (dark ? 'dark' : 'light') : undefined,
+   } as const;
+ }

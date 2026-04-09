@@ -352,7 +352,7 @@ export interface ShowSaveDialogResult {
 export interface PrepareSkillDirectoryParams {
   forceRefresh?: boolean;
   url: string;
-  zipHash: string;
+  zipSha256: string;
 }
 
 export interface PrepareSkillDirectoryResult {
@@ -365,7 +365,7 @@ export interface PrepareSkillDirectoryResult {
 export interface ResolveSkillResourcePathParams {
   path: string;
   url: string;
-  zipHash: string;
+  zipSha256: string;
 }
 
 export interface ResolveSkillResourcePathResult {

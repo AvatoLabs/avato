@@ -306,7 +306,7 @@ export class StreamingExecutorActionImpl {
     } = params;
 
     // Extract values from context
-    const { agentId, topicId, threadId, subAgentId, groupId, scope } = context;
+    const { agentId, topicId, threadId, subAgentId, groupId, scope, spaceId } = context;
 
     // Determine effectiveAgentId for agent config retrieval:
     // - subAgentId is used when present (behavior depends on scope)
@@ -434,7 +434,12 @@ export class StreamingExecutorActionImpl {
 
     // Execute the agent runtime loop
     let stepCount = 0;
-    while (state.status !== 'done' && state.status !== 'error') {
+    while (
+      state.status !== 'done' &&
+      state.status !== 'error' &&
+      state.status !== 'waiting_for_human' &&
+      state.status !== 'interrupted'
+    ) {
       // Check if operation has been cancelled
       const currentOperation = this.#get().operations[operationId];
       if (currentOperation?.status === 'cancelled') {
@@ -648,7 +653,7 @@ export class StreamingExecutorActionImpl {
           // Use topic title or agent title as notification title
           let notificationTitle = t('notification.finishChatGeneration', { ns: 'electron' });
           if (topicId) {
-            const key = topicMapKey({ agentId, groupId, spaceId: operationContext.spaceId });
+            const key = topicMapKey({ agentId, groupId, spaceId });
             const topicData = this.#get().topicDataMap[key];
             const topic = topicData?.items?.find((item) => item.id === topicId);
             if (topic?.title) notificationTitle = topic.title;

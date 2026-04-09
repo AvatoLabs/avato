@@ -17,7 +17,7 @@ interface IdentityDropdownProps {
 
 const IdentityDropdown = memo<IdentityDropdownProps>(({ id, size = 'small' }) => {
   const { t } = useTranslation(['memory', 'common']);
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
   const [identityId, setIdentityId] = useQueryState('identityId', { clearOnDefault: true });
   const toggleRightPanel = useGlobalStore((s) => s.toggleRightPanel);
 
@@ -40,10 +40,15 @@ const IdentityDropdown = memo<IdentityDropdownProps>(({ id, size = 'small' }) =>
         okButtonProps: { danger: true },
         okText: t('delete', { ns: 'common' }),
         onOk: async () => {
-          await deleteIdentity(id);
-          if (identityId === id) {
-            setIdentityId(null);
-            toggleRightPanel(false);
+          try {
+            await deleteIdentity(id);
+            if (identityId === id) {
+              setIdentityId(null);
+              toggleRightPanel(false);
+            }
+          } catch (error) {
+            console.error('Failed to delete identity memory:', error);
+            message.error(t('identity.list.deleteError'));
           }
         },
         title: t('identity.list.confirmDelete'),

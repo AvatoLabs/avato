@@ -2,7 +2,7 @@
 
 import { Center } from '@lobehub/ui';
 import { VirtuosoMasonry } from '@virtuoso.dev/masonry';
-import { cssVar } from 'antd-style';
+import { createStaticStyles, cssVar } from 'antd-style';
 import { FileIcon } from 'lucide-react';
 import { type UIEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
@@ -16,6 +16,66 @@ import { type ExplorerItem } from '../items';
 import { useMasonryColumnCount } from '../useMasonryColumnCount';
 import MasonryItemWrapper from './MasonryItem/MasonryItemWrapper';
 import MasonryViewSkeleton from './Skeleton';
+
+const styles = createStaticStyles(({ css, cssVar }) => ({
+  loadingShell: css`
+    overflow: hidden;
+
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+
+    min-height: 0;
+
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, ${cssVar.colorBgContainer} 97%, ${cssVar.colorBgElevated}) 0%,
+        color-mix(in srgb, ${cssVar.colorBgContainer} 93%, ${cssVar.colorBgLayout}) 100%
+      );
+  `,
+  loadingHeader: css`
+    display: grid;
+    gap: 6px;
+    padding: 16px 18px 10px;
+    border-bottom: 1px solid ${cssVar.colorBorderSecondary};
+    background: color-mix(in srgb, ${cssVar.colorFillQuaternary} 72%, transparent);
+  `,
+  loadingHeaderEyebrow: css`
+    color: ${cssVar.colorTextSecondary};
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  `,
+  loadingHeaderSummary: css`
+    color: ${cssVar.colorTextDescription};
+    font-size: 13px;
+    line-height: 1.5;
+  `,
+  loadingHeaderTitle: css`
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.25;
+  `,
+  loadingMore: css`
+    color: ${cssVar.colorTextDescription};
+    font-size: 14px;
+    margin-block-start: 16px;
+    min-height: 40px;
+  `,
+  masonryScroll: css`
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    transition: opacity 0.2s ease-in-out;
+  `,
+  masonryStage: css`
+    padding-block: 12px 24px;
+    padding-inline: 24px;
+  `,
+}));
 
 interface MasonryViewProps {
   data: ExplorerItem[];
@@ -115,7 +175,16 @@ const MasonryView = memo<MasonryViewProps>(function MasonryView({
   );
 
   return showSkeleton ? (
-    <MasonryViewSkeleton columnCount={columnCount} />
+    <div className={styles.loadingShell} data-testid={'resource-masonry-loading-state'}>
+      <div className={styles.loadingHeader}>
+        <div className={styles.loadingHeaderEyebrow}>
+          {t('loading', { defaultValue: 'Loading...' })}
+        </div>
+        <div className={styles.loadingHeaderTitle}>{t('emptyState.files.title')}</div>
+        <div className={styles.loadingHeaderSummary}>{t('emptyState.files.description')}</div>
+      </div>
+      <MasonryViewSkeleton columnCount={columnCount} />
+    </div>
   ) : showEmptyState ? (
     <EmptyState
       description={t('emptyState.files.description')}
@@ -142,16 +211,11 @@ const MasonryView = memo<MasonryViewProps>(function MasonryView({
     />
   ) : (
     <div
-      style={{
-        flex: 1,
-        height: '100%',
-        opacity: effectiveIsMasonryReady ? 1 : 0,
-        overflowY: 'auto',
-        transition: 'opacity 0.2s ease-in-out',
-      }}
+      className={styles.masonryScroll}
+      style={{ opacity: effectiveIsMasonryReady ? 1 : 0 }}
       onScroll={handleScroll}
     >
-      <div style={{ paddingBlockEnd: 24, paddingBlockStart: 12, paddingInline: 24 }}>
+      <div className={styles.masonryStage}>
         <VirtuosoMasonry
           ItemContent={MasonryItemWrapper}
           columnCount={columnCount}
@@ -163,14 +227,7 @@ const MasonryView = memo<MasonryViewProps>(function MasonryView({
           }}
         />
         {isLoadingMore && (
-          <Center
-            style={{
-              color: cssVar.colorTextDescription,
-              fontSize: 14,
-              marginBlockStart: 16,
-              minHeight: 40,
-            }}
-          >
+          <Center className={styles.loadingMore}>
             {t('loading', { defaultValue: 'Loading...' })}
           </Center>
         )}

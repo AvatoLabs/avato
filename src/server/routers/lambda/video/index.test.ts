@@ -202,6 +202,75 @@ describe('videoRouter', () => {
     });
   });
 
+  it('uses provider-readable urls for topic share attachment references', async () => {
+    mockResolveProviderReadableFileReference.mockResolvedValue({
+      fileId: 'file-1',
+      key: 'v2/spaces/space-1/blobs/shared-frame.jpg',
+      url: 'https://blob.example.com/shared-frame.jpg',
+    });
+
+    const caller = videoRouter.createCaller(createMockCtx());
+    const result = await caller.createVideo(
+      createDefaultInput({
+        params: {
+          duration: 5,
+          endImageUrl: '/share/t/share-1/f/file-2',
+          imageUrl: '/share/t/share-1/f/file-1',
+          prompt: 'animate this image',
+        },
+      }),
+    );
+
+    expect(result.success).toBe(true);
+    expect(mockResolveProviderReadableFileReference).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        url: '/share/t/share-1/f/file-1',
+        via: 'video_generation_input',
+      }),
+    );
+    expect(mockResolveProviderReadableFileReference).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        url: '/share/t/share-1/f/file-2',
+        via: 'video_generation_input',
+      }),
+    );
+    expect(mockCreateVideo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({
+          imageUrl: 'https://blob.example.com/shared-frame.jpg',
+        }),
+      }),
+    );
+  });
+
+  it('converts canonical blob keys to provider-readable urls', async () => {
+    mockGetFullFileUrl.mockResolvedValue('https://blob.example.com/frame.jpg');
+
+    const caller = videoRouter.createCaller(createMockCtx());
+    const result = await caller.createVideo(
+      createDefaultInput({
+        params: {
+          duration: 5,
+          imageUrl: 'v2/spaces/space-1/blobs/frame.jpg',
+          prompt: 'animate this image',
+        },
+      }),
+    );
+
+    expect(result.success).toBe(true);
+    expect(mockGetKeyFromFullUrl).not.toHaveBeenCalled();
+    expect(mockGetFullFileUrl).toHaveBeenCalledWith('v2/spaces/space-1/blobs/frame.jpg');
+    expect(mockCreateVideo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({
+          imageUrl: 'https://blob.example.com/frame.jpg',
+        }),
+      }),
+    );
+  });
+
   it('fails closed when internal file reference is no longer readable', async () => {
     mockResolveProviderReadableFileReference.mockRejectedValue(
       new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' }),
@@ -212,6 +281,26 @@ describe('videoRouter', () => {
     await expect(caller.createVideo(createDefaultInput())).rejects.toThrow(
       'RESOURCE_ACCESS_DENIED',
     );
+    expect(mockCreateVideo).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when a canonical blob key cannot be converted to a readable url', async () => {
+    mockGetFullFileUrl.mockResolvedValue(null);
+
+    const caller = videoRouter.createCaller(createMockCtx());
+
+    await expect(
+      caller.createVideo(
+        createDefaultInput({
+          params: {
+            duration: 5,
+            imageUrl: 'v2/spaces/space-1/blobs/frame.jpg',
+            prompt: 'animate this image',
+          },
+        }),
+      ),
+    ).rejects.toThrow('RESOURCE_ACCESS_DENIED');
+    expect(mockGetKeyFromFullUrl).not.toHaveBeenCalled();
     expect(mockCreateVideo).not.toHaveBeenCalled();
   });
 });

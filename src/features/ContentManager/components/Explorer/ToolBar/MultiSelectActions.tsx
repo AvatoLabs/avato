@@ -30,6 +30,20 @@ const MultiSelectActions = memo<MultiSelectActionsProps>(
     const { modal, message } = App.useApp();
 
     const sourceSetId = useContentManagerStore((s) => s.sourceSetId);
+    const runAction = async (
+      type: MultiSelectActionType,
+      options: { errorKey: string; successKey?: string; successOptions?: Record<string, any> },
+    ) => {
+      try {
+        await onActionClick(type);
+        if (options.successKey) {
+          message.success(t(options.successKey as any, options.successOptions as any));
+        }
+      } catch (error) {
+        console.error(error);
+        message.error(t(options.errorKey as any));
+      }
+    };
 
     return (
       <Flexbox
@@ -81,8 +95,10 @@ const MultiSelectActions = memo<MultiSelectActionsProps>(
                         danger: true,
                       },
                       onOk: async () => {
-                        await onActionClick('removeFromSourceSet');
-                        message.success(t('FileManager.actions.removeFromSourceSetSuccess'));
+                        await runAction('removeFromSourceSet', {
+                          errorKey: 'FileManager.actions.removeFromSourceSetError',
+                          successKey: 'FileManager.actions.removeFromSourceSetSuccess',
+                        });
                       },
                       title: t('FileManager.actions.confirmRemoveFromSourceSet', {
                         count: selectCount,
@@ -166,7 +182,9 @@ const MultiSelectActions = memo<MultiSelectActionsProps>(
               size={'small'}
               variant={'filled'}
               onClick={async () => {
-                await onActionClick('batchChunking');
+                await runAction('batchChunking', {
+                  errorKey: 'FileManager.actions.batchChunkingError',
+                });
               }}
             >
               {t('FileManager.actions.batchChunking')}
@@ -183,8 +201,10 @@ const MultiSelectActions = memo<MultiSelectActionsProps>(
                     danger: true,
                   },
                   onOk: async () => {
-                    await onActionClick('delete');
-                    message.success(t('FileManager.actions.deleteSuccess'));
+                    await runAction('delete', {
+                      errorKey: 'FileManager.actions.deleteError',
+                      successKey: 'FileManager.actions.deleteSuccess',
+                    });
                   },
                   title: t('FileManager.actions.confirmDeleteMultiFiles', { count: selectCount }),
                 });

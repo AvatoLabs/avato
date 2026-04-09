@@ -6,6 +6,7 @@ import {
   MarkdownPlugin,
   useLexicalComposerContext,
 } from '@lobehub/editor';
+import type { IEditorKernel } from '@lobehub/editor/es/types';
 import { useLayoutEffect } from 'react';
 
 const BREAK_TAG_REGEXP = /^<\s*br\s*(?:\/\s*)?>$/i;
@@ -21,13 +22,9 @@ interface MarkdownShortcutService {
 class MarkdownBreakPlugin {
   static pluginName = 'MarkdownBreakPlugin';
 
-  private readonly kernel: {
-    requireService: (serviceId: typeof IMarkdownShortCutService) => MarkdownShortcutService | null;
-  };
+  private readonly kernel: IEditorKernel;
 
-  constructor(kernel: {
-    requireService: (serviceId: typeof IMarkdownShortCutService) => MarkdownShortcutService | null;
-  }) {
+  constructor(kernel: IEditorKernel) {
     this.kernel = kernel;
   }
 
@@ -45,6 +42,8 @@ class MarkdownBreakPlugin {
       MARKDOWN_READER_LEVEL_HIGH,
     );
   }
+
+  destroy() {}
 }
 
 const ReactMarkdownBreakPlugin = () => {

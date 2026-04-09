@@ -1,6 +1,6 @@
 import type { LobeChatDatabase } from '@lobechat/database';
 import type { MemoryExtractionResult } from '@lobechat/memory-user-memory';
-import { canCreateSpaceMemory } from '@lobechat/types';
+import { resolveSpaceMemorySurfaceState, type SpaceMemoryCandidateDraft } from '@lobechat/types';
 
 import { ContentModel } from '@/database/models/content';
 import { SpaceModel } from '@/database/models/space';
@@ -25,18 +25,38 @@ interface IngestTopicExtractionParams {
   traceId?: string;
 }
 
+type SpaceMemoryUserMemorySkipReason =
+  | 'duplicate'
+  | 'empty'
+  | 'forbidden'
+  | 'not_scoped'
+  | 'not_team_space';
+
 export interface SpaceMemoryUserMemoryIngestionResult {
   createdCount?: number;
-  reason?: 'duplicate' | 'empty' | 'forbidden' | 'not_scoped' | 'not_team_space';
+  reason?: SpaceMemoryUserMemorySkipReason;
   status: 'created' | 'skipped';
 }
 
 export interface SpaceMemoryUserMemoryTriggerResult {
   draftCount?: number;
-  reason?: 'duplicate' | 'empty' | 'forbidden' | 'not_scoped' | 'not_team_space';
+  reason?: SpaceMemoryUserMemorySkipReason;
   status: 'scheduled' | 'skipped';
   triggerId?: string;
 }
+
+type PreparedTopicExtractionResult =
+  | {
+      reason: SpaceMemoryUserMemorySkipReason;
+      status: 'skipped';
+    }
+  | {
+      drafts: SpaceMemoryCandidateDraft[];
+      producer: string;
+      spaceId: string;
+      status: 'ready';
+      traceId: string;
+    };
 
 export class SpaceMemoryUserMemoryIngestionService {
   private readonly contentModel: ContentModel;
@@ -57,13 +77,13 @@ export class SpaceMemoryUserMemoryIngestionService {
     producer,
     topic,
     traceId,
-  }: IngestTopicExtractionParams) => {
+  }: IngestTopicExtractionParams): Promise<PreparedTopicExtractionResult> => {
     if (!topic.spaceId) return { reason: 'not_scoped', status: 'skipped' };
 
     const space = await this.spaceModel.findAccessibleSpaceById(topic.spaceId);
     if (!space?.kind || space.kind !== 'team')
       return { reason: 'not_team_space', status: 'skipped' };
-    if (!canCreateSpaceMemory(space)) {
+    if (!resolveSpaceMemorySurfaceState(space).canCreate) {
       return { reason: 'forbidden', status: 'skipped' };
     }
 

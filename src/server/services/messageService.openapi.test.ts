@@ -60,6 +60,7 @@ describe('OpenAPI MessageService attachments', () => {
     });
     expect((service as any).coreFileService.getFullFileUrl).toHaveBeenCalledWith(
       'internal://notes',
+      undefined,
     );
     expect((service as any).contentModel.createAccessEvent).toHaveBeenCalledWith({
       accessType: 'file_url_issued',

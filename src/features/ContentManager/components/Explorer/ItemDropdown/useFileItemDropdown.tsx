@@ -261,9 +261,13 @@ export const useFileItemDropdown = ({
                     danger: true,
                   },
                   onOk: async () => {
-                    await removeFilesFromSourceSet(sourceSetId, [id]);
-
-                    message.success(t('FileManager.actions.removeFromSourceSetSuccess'));
+                    try {
+                      await removeFilesFromSourceSet(sourceSetId, [id]);
+                      message.success(t('FileManager.actions.removeFromSourceSetSuccess'));
+                    } catch (error) {
+                      console.error('Failed to remove item from source set:', error);
+                      message.error(t('FileManager.actions.removeFromSourceSetError'));
+                    }
                   },
                   title: t('FileManager.actions.confirmRemoveFromSourceSet', {
                     count: 1,
@@ -471,16 +475,21 @@ export const useFileItemDropdown = ({
                 : t('FileManager.actions.confirmDelete'),
               okButtonProps: { danger: true },
               onOk: async () => {
-                // Use optimistic delete - instant UI update, sync in background
-                await deleteContentItem(id);
+                try {
+                  // Use optimistic delete - instant UI update, sync in background
+                  await deleteContentItem(id);
 
-                // Ensure tree caches stay in sync with explorer
-                if (sourceSetId) {
-                  await clearTreeFolderCache(sourceSetId);
+                  // Ensure tree caches stay in sync with explorer
+                  if (sourceSetId) {
+                    await clearTreeFolderCache(sourceSetId);
+                  }
+                  await refreshFileList();
+
+                  message.success(t('FileManager.actions.deleteSuccess'));
+                } catch (error) {
+                  console.error('Failed to delete content item:', error);
+                  message.error(t('FileManager.actions.deleteError'));
                 }
-                await refreshFileList();
-
-                message.success(t('FileManager.actions.deleteSuccess'));
               },
             });
           },

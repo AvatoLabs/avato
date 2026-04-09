@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { agentSkillsRouter } from '@/server/routers/lambda/agentSkills';
 
-const mockFileModelCanAccessGlobalFileByHash = vi.fn();
+const mockFileModelCanAccessGlobalFileBySha256 = vi.fn();
 const mockFileModelCheckHash = vi.fn();
 const mockSkillModelFindById = vi.fn();
 
@@ -18,7 +18,7 @@ vi.mock('@/database/models/agentSkill', () => ({
 
 vi.mock('@/database/models/file', () => ({
   FileModel: vi.fn(() => ({
-    canAccessGlobalFileByHash: mockFileModelCanAccessGlobalFileByHash,
+    canAccessGlobalFileBySha256: mockFileModelCanAccessGlobalFileBySha256,
     checkHash: mockFileModelCheckHash,
   })),
 }));
@@ -51,11 +51,13 @@ vi.mock('@/server/services/skill', () => ({
 }));
 
 const createCaller = (ctxOverrides: Partial<any> = {}) =>
-  agentSkillsRouter.createCaller({
-    serverDB: {} as any,
-    userId: 'user-1',
-    ...ctxOverrides,
-  });
+  agentSkillsRouter.createCaller(
+    {
+      serverDB: {} as any,
+      userId: 'user-1',
+      ...ctxOverrides,
+    } as any,
+  );
 
 describe('agentSkillsRouter.getByIdWithZipUrl', () => {
   beforeEach(() => {
@@ -66,9 +68,9 @@ describe('agentSkillsRouter.getByIdWithZipUrl', () => {
     mockSkillModelFindById.mockResolvedValue({
       id: 'skill-1',
       name: 'Skill One',
-      zipFileHash: 'hash-1',
+      zipSha256: 'hash-1',
     });
-    mockFileModelCanAccessGlobalFileByHash.mockResolvedValue(true);
+    mockFileModelCanAccessGlobalFileBySha256.mockResolvedValue(true);
 
     const caller = createCaller();
     const result = await caller.getByIdWithZipUrl({ id: 'skill-1' });
@@ -84,9 +86,9 @@ describe('agentSkillsRouter.getByIdWithZipUrl', () => {
     mockSkillModelFindById.mockResolvedValue({
       id: 'skill-1',
       name: 'Skill One',
-      zipFileHash: 'hash-1',
+      zipSha256: 'hash-1',
     });
-    mockFileModelCanAccessGlobalFileByHash.mockResolvedValue(false);
+    mockFileModelCanAccessGlobalFileBySha256.mockResolvedValue(false);
 
     const caller = createCaller();
     const result = await caller.getByIdWithZipUrl({ id: 'skill-1' });

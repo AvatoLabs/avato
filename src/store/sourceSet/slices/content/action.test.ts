@@ -29,18 +29,21 @@ describe('SourceSetContentActions', () => {
           createdAt: new Date(),
           fileId: 'file-1',
           sourceSetId: 'kb-1',
+          spaceId: null,
           userId: 'user-1',
         },
         {
           createdAt: new Date(),
           fileId: 'file-2',
           sourceSetId: 'kb-1',
+          spaceId: null,
           userId: 'user-1',
         },
         {
           createdAt: new Date(),
           fileId: 'file-3',
           sourceSetId: 'kb-1',
+          spaceId: null,
           userId: 'user-1',
         },
       ]);
@@ -70,6 +73,7 @@ describe('SourceSetContentActions', () => {
           createdAt: new Date(),
           fileId: 'file-1',
           sourceSetId: 'kb-1',
+          spaceId: null,
           userId: 'user-1',
         },
       ]);
@@ -141,6 +145,7 @@ describe('SourceSetContentActions', () => {
             createdAt: new Date(),
             fileId: 'file-1',
             sourceSetId: 'kb-1',
+            spaceId: null,
             userId: 'user-1',
           },
         ]);

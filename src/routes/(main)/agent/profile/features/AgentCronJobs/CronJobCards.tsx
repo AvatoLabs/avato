@@ -27,7 +27,9 @@ const CronJobCards = memo<CronJobCardsProps>(({ cronJobs, loading, onDelete, onE
   const { updateCronJob } = useAgentCronJobs();
 
   const handleToggleEnabled = async (job: AgentCronJob) => {
-    await updateCronJob(job.id, { enabled: !job.enabled });
+    try {
+      await updateCronJob(job.id, { enabled: !job.enabled });
+    } catch {}
   };
 
   return (

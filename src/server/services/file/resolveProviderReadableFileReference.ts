@@ -1,6 +1,5 @@
 import type { LobeChatDatabase } from '@lobechat/database';
 import { contentRegistry, files, messages, messagesFiles } from '@lobechat/database/schemas';
-import { isRawFileContentId } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
 
@@ -12,6 +11,7 @@ import { ContentAuthorizer, type ContentCapability } from '@/server/services/con
 import { resolveContentShareAccess } from '@/server/services/content/sharePolicy';
 import type { FileService } from '@/server/services/file';
 import { isCanonicalSpaceBlobKey } from '@/server/services/file/canonicalSpaceBlobKey';
+import { isRawFileContentId } from '@/types/content';
 
 type TrustedFileReference =
   | { password?: string | null; token: string; type: 'contentShare' }
@@ -20,6 +20,7 @@ type TrustedFileReference =
   | { fileId: string; shareId: string; type: 'topicShare' };
 
 const DOCUMENT_REFERENCE_NOT_FETCHABLE_MESSAGE = 'DOCUMENT_REFERENCE_NOT_FETCHABLE';
+const isNonEmptyString = (value: string | undefined | null): value is string => Boolean(value);
 
 const assertRawFileReferenceId = (fileId: string) => {
   if (isRawFileContentId(fileId)) return;
@@ -74,7 +75,7 @@ const resolveTrustedFileReferenceFromUrl = (url: string): TrustedFileReference |
   try {
     const parsedUrl = new URL(url);
     const trustedOrigins = [appEnv.APP_URL, appEnv.INTERNAL_APP_URL]
-      .filter(Boolean)
+      .filter(isNonEmptyString)
       .map((origin) => new URL(origin).origin);
 
     if (!trustedOrigins.includes(parsedUrl.origin)) return null;
@@ -183,6 +184,10 @@ export const resolveProviderReadableFileReference = async (params: {
               }
 
               if (shareAccess.status === 'not_found') {
+                throw new TRPCError({ code: 'NOT_FOUND', message: 'FILE_NOT_FOUND' });
+              }
+
+              if (shareAccess.status !== 'ok') {
                 throw new TRPCError({ code: 'NOT_FOUND', message: 'FILE_NOT_FOUND' });
               }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { EDITOR_DEBOUNCE_TIME } from '@lobechat/const';
-import { Flexbox, Icon, Input, Skeleton, Tooltip } from '@lobehub/ui';
+import { Flexbox, Icon, Input, Skeleton, TextArea, Tooltip } from '@lobehub/ui';
 import { useDebounceFn } from 'ahooks';
 import { message } from 'antd';
 import { useTheme } from 'antd-style';
@@ -209,8 +209,7 @@ const IdentityCard = memo(() => {
                                 {t('settingAgent.description.title', { ns: 'setting' })}
                             </span>
                         </Flexbox>
-                        <Input
-                            as={'textarea'}
+                        <TextArea
                             rows={2}
                             placeholder={t('settingAgent.description.placeholder', { ns: 'setting' })}
                             value={localDescription}
@@ -223,7 +222,7 @@ const IdentityCard = memo(() => {
                                 resize: 'none',
                                 minHeight: 60,
                             }}
-                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                            onChange={(e) => {
                                 setLocalDescription(e.target.value);
                                 debouncedSaveDescription(e.target.value);
                             }}

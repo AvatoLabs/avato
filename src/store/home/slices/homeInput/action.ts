@@ -101,6 +101,7 @@ export class HomeInputActionImpl {
     try {
       const agentState = getAgentStoreState();
       const defaultAgentConfig = settingsSelectors.defaultAgentConfig(useUserStore.getState());
+      const resolvedSpaceId = resolveWorkspaceSpaceId();
 
       // 1. Get model/provider config from inbox agent
       const inboxAgentId = builtinAgentSelectors.inboxAgentId(agentState);
@@ -170,6 +171,7 @@ export class HomeInputActionImpl {
     try {
       const agentState = getAgentStoreState();
       const defaultAgentConfig = settingsSelectors.defaultAgentConfig(useUserStore.getState());
+      const resolvedSpaceId = resolveWorkspaceSpaceId();
 
       // 1. Get model/provider config from inbox agent
       const inboxAgentId = builtinAgentSelectors.inboxAgentId(agentState);

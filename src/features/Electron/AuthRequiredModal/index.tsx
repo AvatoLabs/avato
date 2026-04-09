@@ -102,10 +102,8 @@ export const useAuthRequiredModal = () => {
     };
 
     const handleSigningInChange = (isSigningIn: boolean) => {
+      void isSigningIn;
       instanceRef.current?.update?.({
-        closable: !isSigningIn,
-        keyboard: !isSigningIn,
-        mask: { closable: !isSigningIn },
       });
     };
 
@@ -113,10 +111,7 @@ export const useAuthRequiredModal = () => {
       children: (
         <AuthRequiredModalContent onClose={handleClose} onSigningInChange={handleSigningInChange} />
       ),
-      closable: false,
       footer: null,
-      keyboard: false,
-      mask: { closable: false },
       title: (
         <Flexbox horizontal align="center" gap={8}>
           <Icon icon={AlertCircle} />

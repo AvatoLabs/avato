@@ -1,5 +1,5 @@
 import { Button, Modal } from '@lobehub/ui';
-import { type FormInstance } from 'antd';
+import { App, type FormInstance } from 'antd';
 import { memo, use, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -15,6 +15,7 @@ interface ModelConfigModalProps {
 
 const ModelConfigModal = memo<ModelConfigModalProps>(({ open, setOpen }) => {
   const { t } = useTranslation(['modelProvider', 'common']);
+  const { message } = App.useApp();
   const [formInstance, setFormInstance] = useState<FormInstance>();
   const [loading, setLoading] = useState(false);
   const [editingProvider, createNewAiModel] = useAiInfraStore((s) => [
@@ -47,16 +48,18 @@ const ModelConfigModal = memo<ModelConfigModalProps>(({ open, setOpen }) => {
           type="primary"
           onClick={async () => {
             if (!editingProvider || !formInstance) return;
-            const data = formInstance.getFieldsValue();
-
             setLoading(true);
 
             try {
               await formInstance.validateFields();
+              const data = formInstance.getFieldsValue();
               await createNewAiModel({ ...data, providerId: editingProvider });
-              setLoading(false);
               closeModal();
-            } catch {
+            } catch (error: any) {
+              if (!error?.errorFields) {
+                message.error(t('providerModels.createNew.createError'));
+              }
+            } finally {
               setLoading(false);
             }
           }}

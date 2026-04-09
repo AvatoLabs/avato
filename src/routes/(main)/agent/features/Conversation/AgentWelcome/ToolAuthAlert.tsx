@@ -3,7 +3,7 @@
 import { type KlavisServerType } from '@lobechat/const';
 import { KLAVIS_SERVER_TYPES } from '@lobechat/const';
 import { Alert, Avatar, Button, Flexbox, Icon, Text } from '@lobehub/ui';
-import { Divider } from 'antd';
+import { App, Divider } from 'antd';
 import { cssVar } from 'antd-style';
 import isEqual from 'fast-deep-equal';
 import { PlusIcon } from 'lucide-react';
@@ -52,6 +52,7 @@ interface KlavisToolAuthItemProps {
 
 const KlavisToolAuthItem = memo<KlavisToolAuthItemProps>(({ tool, onAuthComplete }) => {
   const { t } = useTranslation('chat');
+  const { message } = App.useApp();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isWaitingAuth, setIsWaitingAuth] = useState(false);
 
@@ -174,16 +175,22 @@ const KlavisToolAuthItem = memo<KlavisToolAuthItemProps>(({ tool, onAuthComplete
         userId,
       });
 
-      if (newServer) {
-        if (newServer.isAuthenticated) {
-          await refreshKlavisServerTools(newServer.identifier);
-          onAuthComplete();
-        } else if (newServer.oauthUrl) {
-          openOAuthWindow(newServer.oauthUrl, newServer.identifier);
-        }
+      if (!newServer) {
+        message.error(t('toolAuth.authorizeFailed'));
+        return;
+      }
+
+      if (newServer.isAuthenticated) {
+        await refreshKlavisServerTools(newServer.identifier);
+        onAuthComplete();
+      } else if (newServer.oauthUrl) {
+        openOAuthWindow(newServer.oauthUrl, newServer.identifier);
+      } else {
+        message.error(t('toolAuth.authorizeFailed'));
       }
     } catch (error) {
       console.error('[ToolAuthAlert] Failed to create server:', error);
+      message.error(t('toolAuth.authorizeFailed'));
     } finally {
       setIsConnecting(false);
     }
@@ -235,6 +242,7 @@ interface MarketToolAuthItemProps {
 
 const MarketToolAuthItem = memo<MarketToolAuthItemProps>(({ tool }) => {
   const { t } = useTranslation('chat');
+  const { message } = App.useApp();
   const { signIn, isLoading } = useMarketAuth();
 
   const handleSignIn = async () => {
@@ -242,6 +250,7 @@ const MarketToolAuthItem = memo<MarketToolAuthItemProps>(({ tool }) => {
       await signIn();
     } catch (error) {
       console.error('[ToolAuthAlert] Market sign in failed:', error);
+      message.error(t('toolAuth.signInFailed'));
     }
   };
 

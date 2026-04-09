@@ -114,7 +114,7 @@ const SearchResults = memo<SearchResultsProps>(
           const pagePath = getPageDetailPath(
             result.id,
             getPageKindFromDocument(document),
-            result.spaceId ?? document?.spaceId,
+            document?.spaceId,
           );
           const pageSearch = document?.sourceSetId
             ? buildPageScopeSearch(createSourceSetPageScope(document.sourceSetId))

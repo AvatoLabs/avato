@@ -74,10 +74,10 @@ describe('FileViewer', () => {
     expect(screen.getByTestId('markdown-viewer')).toBeInTheDocument();
   });
 
-  it('keeps mdx files on the code viewer path', () => {
+  it('routes mdx files to the markdown viewer path', () => {
     render(<FileViewer {...createFile({ id: 'file-3', name: 'docs.mdx', url: '/docs.mdx' })} />);
 
-    expect(screen.getByTestId('code-viewer')).toBeInTheDocument();
+    expect(screen.getByTestId('markdown-viewer')).toBeInTheDocument();
   });
 
   it('routes mermaid files to the code viewer path so they can be upgraded there', () => {

@@ -9,13 +9,11 @@ export const FILE_MODAL_QUERY_KEY = 'file';
 /**
  * Hook to get and set the file modal ID from URL query parameters
  * Uses react-router-dom's useSearchParams for MemoryRouter compatibility
- * Supports both ?file=[id] and legacy ?files=[id]
  */
 export const useFileModalId = (): string | undefined => {
   const [searchParams] = useSearchParams();
 
-  // Support both 'file' and legacy 'files' for backwards compatibility
-  return searchParams.get(FILE_MODAL_QUERY_KEY) ?? searchParams.get('files') ?? undefined;
+  return searchParams.get(FILE_MODAL_QUERY_KEY) ?? undefined;
 };
 
 /**
@@ -28,9 +26,7 @@ export const useSetFileModalId = () => {
   return (id?: string) => {
     const newParams = new URLSearchParams(searchParams);
 
-    // Remove both new and legacy query params
     newParams.delete(FILE_MODAL_QUERY_KEY);
-    newParams.delete('files');
 
     if (id) {
       newParams.set(FILE_MODAL_QUERY_KEY, id);
@@ -50,9 +46,7 @@ export const createSetFileModalId = (setSearchParams: ReturnType<typeof useSearc
       (prev) => {
         const newParams = new URLSearchParams(prev);
 
-        // Remove both new and legacy query params
         newParams.delete(FILE_MODAL_QUERY_KEY);
-        newParams.delete('files');
 
         if (id) {
           newParams.set(FILE_MODAL_QUERY_KEY, id);

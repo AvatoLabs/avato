@@ -30,7 +30,7 @@ const EmptyState = memo<EmptyStateProps>(({ emptyHint }) => {
               {t('empty.workspace.desc')}
             </Text>
             <Text
-              size={'small'}
+              fontSize={12}
               style={{ lineHeight: 1.5, textAlign: 'center' }}
               type={'secondary'}
             >

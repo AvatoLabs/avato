@@ -136,6 +136,11 @@ export interface ConversationContext {
    */
   isSupervisor?: boolean;
   /**
+   * Optional contextual metadata for specialized conversation scopes.
+   * Examples include document ids for doc chat and source-set ids for scoped resources.
+   */
+  metadata?: Record<string, any>;
+  /**
    * Scope type for the conversation
    * - 'main': Agent main conversation (default)
    * - 'thread': Agent thread conversation

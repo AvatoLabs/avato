@@ -325,7 +325,7 @@ describe('LocalFileCtr', () => {
 
       const result = await (localFileCtr as any).handlePrepareSkillDirectory({
         url: 'https://example.com/demo-skill.zip',
-        zipHash: 'zip-hash-123',
+        zipSha256: 'zip-hash-123',
       });
 
       expect(result).toEqual({
@@ -353,7 +353,7 @@ describe('LocalFileCtr', () => {
 
       const result = await (localFileCtr as any).handlePrepareSkillDirectory({
         url: 'https://example.com/demo-skill.zip',
-        zipHash: 'zip-hash-123',
+        zipSha256: 'zip-hash-123',
       });
 
       expect(result).toEqual({
@@ -373,7 +373,7 @@ describe('LocalFileCtr', () => {
       const result = await (localFileCtr as any).handleResolveSkillResourcePath({
         path: 'docs/reference.txt',
         url: 'https://example.com/demo-skill.zip',
-        zipHash: 'zip-hash-123',
+        zipSha256: 'zip-hash-123',
       });
 
       expect(result).toEqual({
@@ -389,7 +389,7 @@ describe('LocalFileCtr', () => {
       const result = await (localFileCtr as any).handleResolveSkillResourcePath({
         path: '../secrets.txt',
         url: 'https://example.com/demo-skill.zip',
-        zipHash: 'zip-hash-123',
+        zipSha256: 'zip-hash-123',
       });
 
       expect(result).toEqual({

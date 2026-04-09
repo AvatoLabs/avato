@@ -41,7 +41,7 @@ export default defineConfig({
     /** Debug Proxy loads the doc on app.lobehub.com while assets are localhost — manifest would be cross-origin and Chrome ignores start_url. */
     isDev && {
       name: 'spa-dev-strip-web-manifest-link',
-      transformIndexHtml(html) {
+      transformIndexHtml(html: string) {
         return html.replace(/\s*<link[^>]*rel=["']manifest["'][^>]*>\s*/i, '\n');
       },
     },

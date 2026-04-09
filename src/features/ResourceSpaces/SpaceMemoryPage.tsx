@@ -2,7 +2,6 @@
 
 import {
   canManageSpaceMemoryFromContract,
-  getSpaceMemorySurfaceContract,
   spaceMemoryCategories,
   type SpaceMemoryCategory,
   type SpaceMemoryEntryResult,
@@ -27,12 +26,44 @@ import { useUserStore } from '@/store/user';
 import { userProfileSelectors } from '@/store/user/slices/auth/selectors';
 import { sanitizeFileName } from '@/utils/sanitizeFileName';
 
-import MemoryScopeSection from './MemoryScopeSection';
-import { buildSpaceMemoryAuditPath, buildSpaceMemoryPath, buildSpaceRootPath } from './paths';
+import MemorySidebarPortal from './MemorySidebarPortal';
+import {
+  buildFilesRootPath,
+  buildSpaceMemoryAuditPath,
+  buildSpaceMemoryPath,
+} from './paths';
 import { resolveSpaceDisplayName } from './resolveSpaceDisplayName';
 import SurfaceBreadcrumb from './SurfaceBreadcrumb';
 
 const useStyles = createStyles(({ css, token }) => ({
+  controlsDeck: css`
+    display: grid;
+    gap: 12px;
+  `,
+  activeSectionMeta: css`
+    display: grid;
+    gap: 12px;
+  `,
+  activeSectionPanel: css`
+    display: grid;
+    gap: 14px;
+
+    @media (min-width: 960px) {
+      grid-template-columns: minmax(0, 0.9fr) minmax(300px, 1.1fr);
+      align-items: start;
+    }
+  `,
+  activeSectionPanelLead: css`
+    display: grid;
+    gap: 10px;
+  `,
+  activeSectionSummaryLabel: css`
+    color: ${token.colorTextSecondary};
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  `,
   entryHistoryStrip: css`
     display: flex;
     gap: 8px;
@@ -90,19 +121,64 @@ const useStyles = createStyles(({ css, token }) => ({
       box-shadow 0.2s ease,
       background 0.2s ease;
   `,
+  memoryEntryActions: css`
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  `,
+  memoryEntryBody: css`
+    display: grid;
+    gap: 10px;
+  `,
   memoryEntryFocused: css`
     border-color: ${token.colorPrimaryBorder};
     box-shadow: 0 0 0 2px ${token.colorPrimaryBorderHover};
     background: ${token.colorPrimaryBg};
   `,
+  memoryEntryHeader: css`
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  `,
+  memoryEntryHeadline: css`
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+  `,
   memoryEntryList: css`
     display: grid;
     gap: 12px;
+  `,
+  memoryEntryMeta: css`
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  `,
+  memoryEntrySourceRail: css`
+    display: grid;
+    gap: 6px;
+  `,
+  memoryEntrySummary: css`
+    color: ${token.colorTextSecondary};
+    line-height: 1.6;
   `,
   sourceRefList: css`
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+  `,
+  sourceRefSummary: css`
+    color: ${token.colorTextSecondary};
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
   `,
   detailBlock: css`
     display: grid;
@@ -112,12 +188,44 @@ const useStyles = createStyles(({ css, token }) => ({
     border-radius: ${token.borderRadiusLG}px;
     background: ${token.colorBgContainer};
   `,
+  detailDrawerActions: css`
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  `,
+  detailDrawerTabs: css`
+    display: grid;
+    gap: 8px;
+  `,
+  detailHero: css`
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid ${token.colorBorderSecondary};
+    border-radius: ${token.borderRadiusLG}px;
+    background: ${token.colorFillQuaternary};
+  `,
+  detailHeroMeta: css`
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  `,
   detailLabel: css`
     color: ${token.colorTextSecondary};
     font-size: 12px;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.02em;
+  `,
+  overviewGrid: css`
+    display: grid;
+    gap: 16px;
+
+    @media (min-width: 960px) {
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+      align-items: start;
+    }
   `,
   page: css`
     overflow: auto;
@@ -130,12 +238,64 @@ const useStyles = createStyles(({ css, token }) => ({
       padding: 20px 16px;
     }
   `,
-  scopeRail: css`
-    position: sticky;
-    inset-block-start: 0;
-    flex: none;
-    width: 248px;
-    align-self: flex-start;
+  pageShell: css`
+    display: grid;
+    gap: 20px;
+    width: min(1180px, 100%);
+    margin: 0 auto;
+  `,
+  recallPanelHeader: css`
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  `,
+  recallMetrics: css`
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  `,
+  recallMetricButton: css`
+    min-width: fit-content;
+    border-radius: ${token.borderRadiusLG}px;
+  `,
+  sectionRail: css`
+    display: grid;
+    gap: 12px;
+  `,
+  sectionSegmentedShell: css`
+    display: grid;
+    gap: 10px;
+  `,
+  sectionRecallList: css`
+    display: grid;
+    gap: 12px;
+
+    @media (min-width: 960px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  `,
+  sectionRecallRow: css`
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid ${token.colorBorderSecondary};
+    border-radius: ${token.borderRadiusLG}px;
+    background: ${token.colorFillQuaternary};
+  `,
+  sectionRecallRowHeader: css`
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  `,
+  sectionRecallRowMeta: css`
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
   `,
 }));
 
@@ -155,6 +315,7 @@ interface MergeResolutionState {
 
 type SpaceMemoryDetailView = 'audit' | 'overview';
 type RecallFilterMode = 'active' | 'all' | 'disabled' | 'expired' | 'stale';
+type RecallSummaryStatus = Exclude<RecallFilterMode, 'all'>;
 
 interface RecallPolicyDraftState {
   expiresAt: string;
@@ -163,12 +324,17 @@ interface RecallPolicyDraftState {
   staleAt: string | null;
 }
 
-const emptyRecallSummary = {
+const emptyRecallSummary: Record<RecallSummaryStatus, number> = {
   active: 0,
   disabled: 0,
   expired: 0,
   stale: 0,
 };
+
+const recallSummaryStatuses: RecallSummaryStatus[] = ['active', 'disabled', 'expired', 'stale'];
+
+const hasRecallActivity = (recall: Record<RecallSummaryStatus, number>) =>
+  recallSummaryStatuses.some((status) => recall[status] > 0);
 
 const padDateSegment = (value: number) => String(value).padStart(2, '0');
 
@@ -244,6 +410,8 @@ const getSectionForEntry = (entry: SpaceMemoryEntryPreview): SpaceMemorySection 
 
 const SpaceMemoryPage = memo(() => {
   const { t } = useTranslation(['common', 'file']);
+  const translateText = (key: string, options?: Record<string, any>) =>
+    t(key as any, options as any) as string;
   const { styles } = useStyles();
   const { message } = App.useApp();
   const { mutate } = useSWRConfig();
@@ -316,12 +484,9 @@ const SpaceMemoryPage = memo(() => {
   const requestedSection = spaceMemorySections.includes(sectionParam as SpaceMemorySection)
     ? (sectionParam as SpaceMemorySection)
     : 'inbox';
-  const summaryContract = summary
-    ? (summary.contract ?? getSpaceMemorySurfaceContract(summary.surface))
-    : undefined;
   const visibleSections = !summary
     ? sections
-    : sections.filter((item) => summaryContract?.sections.includes(item.key) ?? true);
+    : sections.filter((item) => summary.contract.sections.includes(item.key));
   const fallbackSection = visibleSections[0]?.key ?? 'published';
   const section = visibleSections.some((item) => item.key === requestedSection)
     ? requestedSection
@@ -344,11 +509,7 @@ const SpaceMemoryPage = memo(() => {
       }),
     { revalidateOnFocus: false },
   );
-  const sectionSurface = sectionEntries?.surface ?? summary?.surface;
-  const sectionContract =
-    (sectionEntries?.contract ??
-      (sectionSurface ? getSpaceMemorySurfaceContract(sectionSurface) : undefined)) ??
-    summaryContract;
+  const sectionContract = sectionEntries?.contract ?? summary?.contract;
   const sectionEntryList = sectionEntries?.items ?? [];
   const sectionDetailEntry = detailEntryId
     ? (sectionEntryList.find((entry) => entry.id === detailEntryId) ?? null)
@@ -365,11 +526,7 @@ const SpaceMemoryPage = memo(() => {
     { revalidateOnFocus: false },
   );
   const fetchedDetailEntry = fetchedDetailResult?.entry;
-  const detailSurface =
-    fetchedDetailResult?.surface ?? (sectionDetailEntry ? sectionSurface : summary?.surface);
-  const detailContract =
-    fetchedDetailResult?.contract ??
-    (detailSurface ? getSpaceMemorySurfaceContract(detailSurface) : undefined);
+  const detailContract = fetchedDetailResult?.contract ?? sectionContract;
 
   useEffect(() => {
     if (!summary) return;
@@ -386,21 +543,18 @@ const SpaceMemoryPage = memo(() => {
 
   useEffect(() => {
     if (!summary) return;
-    if (summaryContract?.detailViews.includes('audit') && summaryContract.recallFilters.length > 1)
+    if (summary.contract.detailViews.includes('audit') && summary.contract.recallFilters.length > 1)
       return;
 
     const next = new URLSearchParams(searchParams);
     let changed = false;
 
-    if (next.has('recallFilter') && !(summaryContract?.recallFilters.includes(recallFilter) ?? true)) {
+    if (next.has('recallFilter') && !summary.contract.recallFilters.includes(recallFilter)) {
       next.delete('recallFilter');
       changed = true;
     }
 
-    if (
-      next.get('detailView') === 'audit' &&
-      !(summaryContract?.detailViews.includes('audit') ?? false)
-    ) {
+    if (next.get('detailView') === 'audit' && !summary.contract.detailViews.includes('audit')) {
       next.delete('detailView');
       changed = true;
     }
@@ -441,7 +595,8 @@ const SpaceMemoryPage = memo(() => {
 
   const entryList = sectionEntryList;
   const detailEntry = sectionDetailEntry ?? fetchedDetailEntry ?? null;
-  const supportsRecallFilter = section !== 'inbox' && (sectionContract?.recallFilters.length ?? 0) > 1;
+  const supportsRecallFilter =
+    section !== 'inbox' && (sectionContract?.recallFilters.length ?? 0) > 1;
   const effectiveRecallFilter: RecallFilterMode =
     supportsRecallFilter && (sectionContract?.recallFilters.includes(recallFilter) ?? false)
       ? recallFilter
@@ -489,37 +644,25 @@ const SpaceMemoryPage = memo(() => {
   if (!summary) return null;
 
   const isTeamSpace = summary.kind === 'team';
-  const canReview = canManageSpaceMemoryFromContract(summaryContract);
+  const canReview = canManageSpaceMemoryFromContract(summary.contract);
   const sectionCanReview = canManageSpaceMemoryFromContract(sectionContract);
   const detailCanReview = canManageSpaceMemoryFromContract(detailContract);
-  const canCreate = summary.canCreate;
+  const canCreate = summary.contract.canCreate;
   const displayName = resolveSpaceDisplayName(summary, t, { fullName, username });
-  const getSectionRecallSummary = (targetSection: SpaceMemorySection) =>
+  const getSectionRecallSummary = (
+    targetSection: SpaceMemorySection,
+  ): Record<RecallSummaryStatus, number> =>
     summary.sections[targetSection].recall ?? emptyRecallSummary;
-  const recallOverview = supportsRecallFilter && sectionCanReview
-    ? [
-        {
-          count: getSectionRecallSummary(section).active,
-          label: t('space.memory.filters.recall.active', { ns: 'file' }),
-          value: 'active' as RecallFilterMode,
-        },
-        {
-          count: getSectionRecallSummary(section).disabled,
-          label: t('space.memory.filters.recall.disabled', { ns: 'file' }),
-          value: 'disabled' as RecallFilterMode,
-        },
-        {
-          count: getSectionRecallSummary(section).expired,
-          label: t('space.memory.filters.recall.expired', { ns: 'file' }),
-          value: 'expired' as RecallFilterMode,
-        },
-        {
-          count: getSectionRecallSummary(section).stale,
-          label: t('space.memory.filters.recall.stale', { ns: 'file' }),
-          value: 'stale' as RecallFilterMode,
-        },
-      ]
-    : [];
+  const getRecallStatusItems = (recall: Record<RecallSummaryStatus, number>) =>
+    recallSummaryStatuses.map((value) => ({
+      count: recall[value],
+      label: t(`space.memory.filters.recall.${value}`, { ns: 'file' }),
+      value,
+    }));
+  const recallOverview =
+    supportsRecallFilter && sectionCanReview
+      ? getRecallStatusItems(getSectionRecallSummary(section))
+      : [];
   const reviewedSectionRecallSummaries = visibleSections
     .filter((item) => item.key !== 'inbox')
     .map((item) => ({
@@ -527,43 +670,23 @@ const SpaceMemoryPage = memo(() => {
       key: item.key,
       recall: getSectionRecallSummary(item.key),
       title: item.title,
-    }));
+    }))
+    .filter((item) => item.count > 0 || hasRecallActivity(item.recall));
   const workspaceRecallOverview =
     canReview && reviewedSectionRecallSummaries.length > 0
-      ? [
-          {
-            count: reviewedSectionRecallSummaries.reduce(
-              (total, item) => total + item.recall.active,
-              0,
-            ),
-            label: t('space.memory.filters.recall.active', { ns: 'file' }),
-            value: 'active' as RecallFilterMode,
-          },
-          {
-            count: reviewedSectionRecallSummaries.reduce(
-              (total, item) => total + item.recall.disabled,
-              0,
-            ),
-            label: t('space.memory.filters.recall.disabled', { ns: 'file' }),
-            value: 'disabled' as RecallFilterMode,
-          },
-          {
-            count: reviewedSectionRecallSummaries.reduce(
-              (total, item) => total + item.recall.expired,
-              0,
-            ),
-            label: t('space.memory.filters.recall.expired', { ns: 'file' }),
-            value: 'expired' as RecallFilterMode,
-          },
-          {
-            count: reviewedSectionRecallSummaries.reduce(
-              (total, item) => total + item.recall.stale,
-              0,
-            ),
-            label: t('space.memory.filters.recall.stale', { ns: 'file' }),
-            value: 'stale' as RecallFilterMode,
-          },
-        ]
+      ? getRecallStatusItems(
+          recallSummaryStatuses.reduce<Record<RecallSummaryStatus, number>>(
+            (next, value) => {
+              next[value] = reviewedSectionRecallSummaries.reduce(
+                (total, item) => total + item.recall[value],
+                0,
+              );
+
+              return next;
+            },
+            { ...emptyRecallSummary },
+          ),
+        )
       : [];
 
   const focusReviewedEntry = (params: {
@@ -798,20 +921,15 @@ const SpaceMemoryPage = memo(() => {
 
   if (!isTeamSpace) {
     return (
-      <Flexbox className={styles.page} gap={24} horizontal={!isMobile}>
-        {!isMobile && (
-          <Block className={styles.scopeRail} padding={12} variant={'outlined'}>
-            <MemoryScopeSection currentScope="personal" />
-          </Block>
-        )}
-
-        <Flexbox flex={1} gap={24} style={{ minWidth: 0 }}>
+      <>
+        {!isMobile && <MemorySidebarPortal currentScope="personal" />}
+        <Flexbox className={styles.page} gap={24}>
           <SurfaceBreadcrumb
             segments={[
               {
                 key: 'space',
                 label: displayName,
-                onClick: () => navigate(buildSpaceRootPath(summary.id)),
+                onClick: () => navigate(buildFilesRootPath(summary.id)),
               },
               {
                 current: true,
@@ -847,14 +965,14 @@ const SpaceMemoryPage = memo(() => {
                 <Button type={'primary'} onClick={() => navigate('/memory')}>
                   {t('space.memory.actions.openPersonal', { ns: 'file' })}
                 </Button>
-                <Button onClick={() => navigate(buildSpaceRootPath(summary.id))}>
+                <Button onClick={() => navigate(buildFilesRootPath(summary.id))}>
                   {t('space.settings.back', { ns: 'file' })}
                 </Button>
               </Flexbox>
             </Flexbox>
           </Block>
         </Flexbox>
-      </Flexbox>
+      </>
     );
   }
 
@@ -1003,8 +1121,9 @@ const SpaceMemoryPage = memo(() => {
 
     const details = Object.entries(counts)
       .map(([reason, count]) =>
-        t(`space.memory.actions.batchFailureReason.${reason}`, {
+        translateText(`space.memory.actions.batchFailureReason.${reason}`, {
           count,
+          defaultValue: reason,
           ns: 'file',
         }),
       )
@@ -1477,17 +1596,17 @@ const SpaceMemoryPage = memo(() => {
             <Tag size={'small'} variant={'outlined'}>
               {t('space.memory.entries.reviewHint.duplicatePublished', { ns: 'file' })}
             </Tag>
-            <Text size={'small'} type={'secondary'}>
+            <Text type={'secondary'}>
               {t('space.memory.entries.reviewHint.mergeHint', { ns: 'file' })}
             </Text>
-            <Text size={'small'} type={'secondary'}>
+            <Text type={'secondary'}>
               {t('space.memory.entries.reviewHint.matchTitle', {
                 name: entry.reviewHint.match.title,
                 ns: 'file',
               })}
             </Text>
             {publishedTime && (
-              <Text size={'small'} type={'secondary'}>
+              <Text type={'secondary'}>
                 {t('space.memory.entries.reviewHint.matchPublishedAt', {
                   ns: 'file',
                   time: publishedTime,
@@ -1497,7 +1616,7 @@ const SpaceMemoryPage = memo(() => {
           </Flexbox>
 
           <div className={styles.compareBlock}>
-            <Text strong size={'small'}>
+            <Text strong>
               {t('space.memory.entries.reviewHint.compareTitle', { ns: 'file' })}
             </Text>
 
@@ -1506,12 +1625,12 @@ const SpaceMemoryPage = memo(() => {
                 <Text className={styles.compareLabel}>
                   {t('space.memory.entries.reviewHint.comparePublished', { ns: 'file' })}
                 </Text>
-                <Text strong size={'small'}>
+                <Text strong>
                   {t('space.memory.entries.reviewHint.compareTitleField', { ns: 'file' })}:&nbsp;
                   {entry.reviewHint.match.title}
                 </Text>
                 {hasSummary && (
-                  <Text className={styles.compareValue} size={'small'} type={'secondary'}>
+                  <Text className={styles.compareValue} type={'secondary'}>
                     {t('space.memory.entries.reviewHint.compareSummaryField', {
                       ns: 'file',
                     })}
@@ -1519,7 +1638,7 @@ const SpaceMemoryPage = memo(() => {
                   </Text>
                 )}
                 {hasContent && (
-                  <Text className={styles.compareValue} size={'small'} type={'secondary'}>
+                  <Text className={styles.compareValue} type={'secondary'}>
                     {t('space.memory.entries.reviewHint.compareContentField', {
                       ns: 'file',
                     })}
@@ -1532,12 +1651,12 @@ const SpaceMemoryPage = memo(() => {
                 <Text className={styles.compareLabel}>
                   {t('space.memory.entries.reviewHint.compareCandidate', { ns: 'file' })}
                 </Text>
-                <Text strong size={'small'}>
+                <Text strong>
                   {t('space.memory.entries.reviewHint.compareTitleField', { ns: 'file' })}:&nbsp;
                   {entry.title}
                 </Text>
                 {hasSummary && (
-                  <Text className={styles.compareValue} size={'small'} type={'secondary'}>
+                  <Text className={styles.compareValue} type={'secondary'}>
                     {t('space.memory.entries.reviewHint.compareSummaryField', {
                       ns: 'file',
                     })}
@@ -1545,7 +1664,7 @@ const SpaceMemoryPage = memo(() => {
                   </Text>
                 )}
                 {hasContent && (
-                  <Text className={styles.compareValue} size={'small'} type={'secondary'}>
+                  <Text className={styles.compareValue} type={'secondary'}>
                     {t('space.memory.entries.reviewHint.compareContentField', {
                       ns: 'file',
                     })}
@@ -1744,7 +1863,7 @@ const SpaceMemoryPage = memo(() => {
 
     return (
       <div className={styles.compareBlock}>
-        <Text strong size={'small'}>
+        <Text strong>
           {t('space.memory.entries.history.changeSet', { ns: 'file' })}
         </Text>
         <div className={styles.compareColumns}>
@@ -1754,10 +1873,10 @@ const SpaceMemoryPage = memo(() => {
             </Text>
             {changeRows.map((row) => (
               <Flexbox gap={4} key={`before-${item.at}-${row.key}`}>
-                <Text strong size={'small'}>
+                <Text strong>
                   {row.label}
                 </Text>
-                <Text className={styles.compareValue} size={'small'} type={'secondary'}>
+                <Text className={styles.compareValue} type={'secondary'}>
                   {formatHistoryChangeValue(row.value.before)}
                 </Text>
               </Flexbox>
@@ -1769,10 +1888,10 @@ const SpaceMemoryPage = memo(() => {
             </Text>
             {changeRows.map((row) => (
               <Flexbox gap={4} key={`after-${item.at}-${row.key}`}>
-                <Text strong size={'small'}>
+                <Text strong>
                   {row.label}
                 </Text>
-                <Text className={styles.compareValue} size={'small'} type={'secondary'}>
+                <Text className={styles.compareValue} type={'secondary'}>
                   {formatHistoryChangeValue(row.value.after)}
                 </Text>
               </Flexbox>
@@ -1798,13 +1917,13 @@ const SpaceMemoryPage = memo(() => {
           <Tag size={'small'} variant={'filled'}>
             {t('space.memory.entries.history.label', { ns: 'file' })}
           </Tag>
-          <Text size={'small'}>{renderHistoryMessage(latestHistory)}</Text>
+          <Text>{renderHistoryMessage(latestHistory)}</Text>
           {renderHistoryActor(latestHistory) && (
-            <Text size={'small'} type={'secondary'}>
+            <Text type={'secondary'}>
               {renderHistoryActor(latestHistory)}
             </Text>
           )}
-          <Text size={'small'} type={'secondary'}>
+          <Text type={'secondary'}>
             {new Date(latestHistory.at).toLocaleString()}
           </Text>
           <Button
@@ -1830,11 +1949,11 @@ const SpaceMemoryPage = memo(() => {
             {extraHistory.map((item, index) => (
               <div className={styles.entryHistoryItem} key={`${entry.id}-${item.at}-${index}`}>
                 <Flexbox gap={6}>
-                  <Text size={'small'} type={'secondary'}>
+                  <Text type={'secondary'}>
                     {renderHistoryMessage(item, true)}
                   </Text>
                   {renderHistoryActor(item) && (
-                    <Text size={'small'} type={'secondary'}>
+                    <Text type={'secondary'}>
                       {renderHistoryActor(item)}
                     </Text>
                   )}
@@ -1895,8 +2014,42 @@ const SpaceMemoryPage = memo(() => {
         onClose={closeDetailDrawer}
       >
         <Flexbox gap={12}>
+          <div className={styles.detailHero}>
+            <Flexbox gap={6}>
+              <Text fontSize={18} weight={600}>
+                {detailEntry.title}
+              </Text>
+              <Text type={'secondary'}>
+                {detailEntry.summary || t('space.memory.detail.empty', { ns: 'file' })}
+              </Text>
+            </Flexbox>
+            <div className={styles.detailHeroMeta}>
+              <Tag size={'small'} variant={'outlined'}>
+                {t(`space.memory.categories.${detailEntry.category}`, { ns: 'file' })}
+              </Tag>
+              <Tag size={'small'} variant={'outlined'}>
+                {detailEntry.kind === 'candidate'
+                  ? t('space.memory.entries.candidate', { ns: 'file' })
+                  : t('space.memory.entries.memory', { ns: 'file' })}
+              </Tag>
+              {detailEntry.kind === 'memory' && detailCanReview && (
+                <Tag size={'small'} variant={'outlined'}>
+                  {renderRecallStatusLabel(detailEntry)}
+                </Tag>
+              )}
+              <Text type={'secondary'}>
+                {renderTimelineLabel(detailEntry)}
+              </Text>
+              {renderActorLabel(detailEntry) && (
+                <Text type={'secondary'}>
+                  {renderActorLabel(detailEntry)}
+                </Text>
+              )}
+            </div>
+          </div>
+
           {showAuditTab && (
-            <Flexbox gap={8}>
+            <div className={styles.detailDrawerTabs}>
               <Segmented
                 block
                 value={activeDetailView}
@@ -1913,7 +2066,7 @@ const SpaceMemoryPage = memo(() => {
                 onChange={(value) => setDetailView(value as SpaceMemoryDetailView)}
               />
               {activeDetailView === 'audit' && (
-                <Flexbox horizontal gap={8} wrap={'wrap'}>
+                <div className={styles.detailDrawerActions}>
                   <Button onClick={() => handleCopyAuditLink(detailEntry)}>
                     {t('space.memory.actions.copyAuditLink', { ns: 'file' })}
                   </Button>
@@ -1923,9 +2076,9 @@ const SpaceMemoryPage = memo(() => {
                   >
                     {t('space.memory.actions.exportAudit', { ns: 'file' })}
                   </Button>
-                </Flexbox>
+                </div>
               )}
-            </Flexbox>
+            </div>
           )}
 
           {activeDetailView === 'overview' ? (
@@ -2035,7 +2188,7 @@ const SpaceMemoryPage = memo(() => {
                       </Checkbox>
 
                       <Flexbox gap={4}>
-                        <Text size={'small'} type={'secondary'}>
+                        <Text type={'secondary'}>
                           {t('space.memory.detail.recall.expiresAt', { ns: 'file' })}
                         </Text>
                         <Input
@@ -2136,11 +2289,11 @@ const SpaceMemoryPage = memo(() => {
                         key={`${detailEntry.id}-${item.at}-${index}`}
                       >
                         <Flexbox gap={6}>
-                          <Text size={'small'} type={'secondary'}>
+                          <Text type={'secondary'}>
                             {renderHistoryMessage(item, true)}
                           </Text>
                           {renderHistoryActor(item) && (
-                            <Text size={'small'} type={'secondary'}>
+                            <Text type={'secondary'}>
                               {renderHistoryActor(item)}
                             </Text>
                           )}
@@ -2160,160 +2313,151 @@ const SpaceMemoryPage = memo(() => {
   };
 
   return (
-    <Flexbox className={styles.page} gap={24} horizontal={!isMobile}>
-      {!isMobile && (
-        <Block className={styles.scopeRail} padding={12} variant={'outlined'}>
-          <MemoryScopeSection activeSpaceId={summary.id} currentScope="space" />
-        </Block>
-      )}
-
-      <Flexbox flex={1} gap={24} style={{ minWidth: 0 }}>
-        <SurfaceBreadcrumb
-          segments={[
-            {
-              key: 'space',
-              label: displayName,
-              onClick: () => navigate(buildSpaceRootPath(summary.id)),
-            },
-            {
-              current: true,
-              key: 'memory',
-              label: t('space.memory.title', { ns: 'file' }),
-            },
-          ]}
-        />
-
-        <Flexbox gap={10}>
-          <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
-            <Text as={'h1'} fontSize={32} style={{ margin: 0 }} weight={700}>
-              {t('space.memory.title', { ns: 'file' })}
-            </Text>
-            <Tag size={'small'} variant={'filled'}>
-              {displayName}
-            </Tag>
-            <Tag size={'small'} variant={'outlined'}>
-              {t(isTeamSpace ? 'space.home.badges.team' : 'space.home.badges.personal', {
-                ns: 'file',
-              })}
-            </Tag>
-          </Flexbox>
-          <Text type={'secondary'}>
-            {t(isTeamSpace ? 'space.memory.subtitle.team' : 'space.memory.subtitle.personal', {
-              ns: 'file',
-            })}
-          </Text>
-        </Flexbox>
-
-        <Block padding={18} variant={'outlined'}>
-          <Flexbox gap={8}>
-            <Text strong>{t('space.memory.overview.title', { ns: 'file' })}</Text>
-            <Text type={'secondary'}>
-              <Trans i18nKey={'space.memory.overview.body'} ns={'file'} />
-            </Text>
-            <Text type={'secondary'}>
-              {t(
-                !isTeamSpace
-                  ? 'space.memory.overview.mode.personal'
-                  : canReview
-                    ? 'space.memory.overview.mode.reviewer'
-                    : 'space.memory.overview.mode.viewer',
-                { ns: 'file' },
-              )}
-            </Text>
-            {!isTeamSpace && (
-              <Flexbox horizontal gap={8}>
-                <Button type={'primary'} onClick={() => navigate('/memory')}>
-                  {t('space.memory.actions.openPersonal', { ns: 'file' })}
-                </Button>
-              </Flexbox>
-            )}
-          </Flexbox>
-        </Block>
-
-        {isTeamSpace && canReview && workspaceRecallOverview.length > 0 && (
-          <Block padding={18} variant={'outlined'}>
-            <Flexbox gap={10}>
-              <Text strong>{t('space.memory.overview.recallStatus', { ns: 'file' })}</Text>
-              <Flexbox horizontal gap={8} wrap={'wrap'}>
-                {workspaceRecallOverview.map((item) => (
-                  <Button
-                    aria-label={`Workspace ${item.label} ${item.count}`}
-                    disabled={item.count === 0}
-                    key={item.value}
-                    size={'small'}
-                    type={'default'}
-                    onClick={() =>
-                      navigateToSection(findFirstSectionForRecallFilter(item.value), item.value)
-                    }
-                  >
-                    {`${item.label} ${item.count}`}
-                  </Button>
-                ))}
-              </Flexbox>
-            </Flexbox>
-          </Block>
-        )}
-
-        <Flexbox gap={12}>
-          <Segmented
-            block
-            value={section}
-            variant={'filled'}
-            options={visibleSections.map((item) => ({
-              label: `${item.title} · ${summary.sections[item.key].count}`,
-              value: item.key,
-            }))}
-            onChange={(value) => navigateToSection(value as SpaceMemorySection)}
+    <>
+      {!isMobile && <MemorySidebarPortal activeSpaceId={summary.id} currentScope="space" />}
+      <Flexbox className={styles.page} gap={24}>
+        <div className={styles.pageShell}>
+          <SurfaceBreadcrumb
+            segments={[
+              {
+                key: 'space',
+                label: displayName,
+                onClick: () => navigate(buildFilesRootPath(summary.id)),
+              },
+              {
+                current: true,
+                key: 'memory',
+                label: t('space.memory.title', { ns: 'file' }),
+              },
+            ]}
           />
 
-          {isTeamSpace && canReview && reviewedSectionRecallSummaries.length > 0 && (
+          <Flexbox gap={10}>
+            <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
+              <Text as={'h1'} fontSize={32} style={{ margin: 0 }} weight={700}>
+                {t('space.memory.title', { ns: 'file' })}
+              </Text>
+              <Tag size={'small'} variant={'filled'}>
+                {displayName}
+              </Tag>
+              <Tag size={'small'} variant={'outlined'}>
+                {t(isTeamSpace ? 'space.home.badges.team' : 'space.home.badges.personal', {
+                  ns: 'file',
+                })}
+              </Tag>
+            </Flexbox>
+            <Text type={'secondary'}>
+              {t(isTeamSpace ? 'space.memory.subtitle.team' : 'space.memory.subtitle.personal', {
+                ns: 'file',
+              })}
+            </Text>
+          </Flexbox>
+
+          <div className={styles.overviewGrid}>
             <Block padding={18} variant={'outlined'}>
-              <Flexbox gap={10}>
-                <Text strong>{t('space.memory.sections.recallSummary', { ns: 'file' })}</Text>
-                <Flexbox horizontal gap={8} wrap={'wrap'}>
-                  {reviewedSectionRecallSummaries.map((item) => (
-                    <Block key={item.key} padding={12} variant={'outlined'}>
-                      <Flexbox gap={8}>
-                        <Flexbox horizontal align={'center'} gap={8} justify={'space-between'}>
-                          <Button
-                            aria-label={`${item.title} ${item.count}`}
-                            size={'small'}
-                            type={
-                              section === item.key && recallFilter === 'all' ? 'primary' : 'default'
-                            }
-                            onClick={() => navigateToSection(item.key)}
-                          >
-                            {item.title}
-                          </Button>
-                          <Tag size={'small'} variant={'outlined'}>
-                            {item.count}
-                          </Tag>
-                        </Flexbox>
-                        <Flexbox horizontal gap={8} wrap={'wrap'}>
-                          {[
-                            {
-                              count: item.recall.active,
-                              label: t('space.memory.filters.recall.active', { ns: 'file' }),
-                              value: 'active' as RecallFilterMode,
-                            },
-                            {
-                              count: item.recall.disabled,
-                              label: t('space.memory.filters.recall.disabled', { ns: 'file' }),
-                              value: 'disabled' as RecallFilterMode,
-                            },
-                            {
-                              count: item.recall.expired,
-                              label: t('space.memory.filters.recall.expired', { ns: 'file' }),
-                              value: 'expired' as RecallFilterMode,
-                            },
-                            {
-                              count: item.recall.stale,
-                              label: t('space.memory.filters.recall.stale', { ns: 'file' }),
-                              value: 'stale' as RecallFilterMode,
-                            },
-                          ].map((status) => (
+              <Flexbox gap={8}>
+                <Text strong>{t('space.memory.overview.title', { ns: 'file' })}</Text>
+                <Text type={'secondary'}>
+                  <Trans i18nKey={'space.memory.overview.body'} ns={'file'} />
+                </Text>
+                <Text type={'secondary'}>
+                  {t(
+                    !isTeamSpace
+                      ? 'space.memory.overview.mode.personal'
+                      : canReview
+                        ? 'space.memory.overview.mode.reviewer'
+                        : 'space.memory.overview.mode.viewer',
+                    { ns: 'file' },
+                  )}
+                </Text>
+                {!isTeamSpace && (
+                  <Flexbox horizontal gap={8}>
+                    <Button type={'primary'} onClick={() => navigate('/memory')}>
+                      {t('space.memory.actions.openPersonal', { ns: 'file' })}
+                    </Button>
+                  </Flexbox>
+                )}
+              </Flexbox>
+            </Block>
+
+            {isTeamSpace && canReview && workspaceRecallOverview.length > 0 && (
+              <Block padding={18} variant={'outlined'}>
+                <Flexbox gap={10}>
+                  <Text strong>{t('space.memory.overview.recallStatus', { ns: 'file' })}</Text>
+                  <div className={styles.recallMetrics}>
+                    {workspaceRecallOverview.map((item) => (
+                      <Button
+                        aria-label={`Workspace ${item.label} ${item.count}`}
+                        disabled={item.count === 0}
+                        key={item.value}
+                        size={'small'}
+                        type={'default'}
+                        onClick={() =>
+                          navigateToSection(findFirstSectionForRecallFilter(item.value), item.value)
+                        }
+                      >
+                        {`${item.label} ${item.count}`}
+                      </Button>
+                    ))}
+                  </div>
+                </Flexbox>
+              </Block>
+            )}
+          </div>
+
+          <Flexbox className={styles.controlsDeck} gap={12}>
+            <Block padding={18} variant={'outlined'}>
+              <div className={styles.sectionSegmentedShell}>
+                <Text type={'secondary'}>
+                  {t('space.memory.entries.title', { ns: 'file', section: activeSection.title })}
+                </Text>
+                <Segmented
+                  block
+                  value={section}
+                  variant={'filled'}
+                  options={visibleSections.map((item) => ({
+                    label: `${item.title} · ${summary.sections[item.key].count}`,
+                    value: item.key,
+                  }))}
+                  onChange={(value) => navigateToSection(value as SpaceMemorySection)}
+                />
+              </div>
+            </Block>
+
+            {isTeamSpace && canReview && reviewedSectionRecallSummaries.length > 0 && (
+              <Block padding={18} variant={'outlined'}>
+                <Flexbox gap={12}>
+                  <div className={styles.recallPanelHeader}>
+                    <Text strong>{t('space.memory.sections.recallSummary', { ns: 'file' })}</Text>
+                  </div>
+                  <div className={styles.sectionRecallList}>
+                    {reviewedSectionRecallSummaries.map((item) => (
+                      <div className={styles.sectionRecallRow} key={item.key}>
+                        <div className={styles.sectionRecallRowHeader}>
+                          <div className={styles.sectionRecallRowMeta}>
+                            <Button
+                              aria-label={`${item.title} ${item.count}`}
+                              className={styles.recallMetricButton}
+                              size={'small'}
+                              type={
+                                section === item.key && recallFilter === 'all'
+                                  ? 'primary'
+                                  : 'default'
+                              }
+                              onClick={() => navigateToSection(item.key)}
+                            >
+                              {item.title}
+                            </Button>
+                            <Tag size={'small'} variant={'outlined'}>
+                              {item.count}
+                            </Tag>
+                          </div>
+                        </div>
+                        <div className={styles.recallMetrics}>
+                          {getRecallStatusItems(item.recall).map((status) => (
                             <Button
                               aria-label={`${item.title} ${status.label} ${status.count}`}
+                              className={styles.recallMetricButton}
                               key={status.value}
                               size={'small'}
                               type={
@@ -2326,208 +2470,156 @@ const SpaceMemoryPage = memo(() => {
                               {`${status.label} ${status.count}`}
                             </Button>
                           ))}
-                        </Flexbox>
-                      </Flexbox>
-                    </Block>
-                  ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </Flexbox>
-              </Flexbox>
+              </Block>
+            )}
+
+            <Block padding={18} variant={'outlined'}>
+              <div className={styles.activeSectionPanel}>
+                <div className={styles.activeSectionPanelLead}>
+                  <Flexbox horizontal align={'center'} gap={10} wrap={'wrap'}>
+                    <activeSection.icon size={20} strokeWidth={2.1} />
+                    <Text fontSize={18} weight={600}>
+                      {activeSection.title}
+                    </Text>
+                    <Tag size={'small'} variant={'outlined'}>
+                      {summary.sections[section].count}
+                    </Tag>
+                  </Flexbox>
+                  <Text type={'secondary'}>{activeSection.description}</Text>
+                </div>
+                {supportsRecallFilter && sectionCanReview && entryList.length > 0 && (
+                  <div className={styles.activeSectionMeta}>
+                    <Text className={styles.activeSectionSummaryLabel}>
+                      {t('space.memory.filters.recall.summary', { ns: 'file' })}
+                    </Text>
+                    <div className={styles.recallMetrics}>
+                      {recallOverview.map((item) => (
+                        <Button
+                          className={styles.recallMetricButton}
+                          key={item.value}
+                          size={'small'}
+                          type={effectiveRecallFilter === item.value ? 'primary' : 'default'}
+                          onClick={() => setRecallFilter(item.value)}
+                        >
+                          {`${item.label} ${item.count}`}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </Block>
-          )}
+          </Flexbox>
 
           <Block padding={18} variant={'outlined'}>
-            <Flexbox gap={10}>
-              <Flexbox horizontal align={'center'} gap={10}>
-                <activeSection.icon size={20} strokeWidth={2.1} />
-                <Text fontSize={18} weight={600}>
-                  {activeSection.title}
-                </Text>
-                <Tag size={'small'} variant={'outlined'}>
-                  {summary.sections[section].count}
-                </Tag>
-              </Flexbox>
-              <Text type={'secondary'}>{activeSection.description}</Text>
-            </Flexbox>
-          </Block>
-        </Flexbox>
+            <Flexbox gap={12}>
+              {section === 'inbox' && canCreate && (
+                <Block padding={16} variant={'outlined'}>
+                  <Flexbox gap={12}>
+                    <Flexbox gap={4}>
+                      <Text fontSize={16} weight={600}>
+                        {t('space.memory.actions.create', { ns: 'file' })}
+                      </Text>
+                      <Text type={'secondary'}>
+                        {t('space.memory.composer.description', { ns: 'file' })}
+                      </Text>
+                    </Flexbox>
 
-        <Block padding={18} variant={'outlined'}>
-          <Flexbox gap={12}>
-            {section === 'inbox' && canCreate && (
-              <Block padding={16} variant={'outlined'}>
-                <Flexbox gap={12}>
-                  <Flexbox gap={4}>
-                    <Text fontSize={16} weight={600}>
-                      {t('space.memory.actions.create', { ns: 'file' })}
-                    </Text>
                     <Text type={'secondary'}>
-                      {t('space.memory.composer.description', { ns: 'file' })}
+                      {t('space.memory.composer.titleLabel', { ns: 'file' })}
                     </Text>
-                  </Flexbox>
-
-                  <Text size={'small'} type={'secondary'}>
-                    {t('space.memory.composer.titleLabel', { ns: 'file' })}
-                  </Text>
-                  <Input
-                    aria-label={t('space.memory.composer.titleLabel', { ns: 'file' })}
-                    maxLength={255}
-                    name={'space-memory-candidate-title'}
-                    placeholder={t('space.memory.composer.titlePlaceholder', { ns: 'file' })}
-                    value={draftTitle}
-                    onChange={(e) => setDraftTitle(e.target.value)}
-                  />
-
-                  <Text size={'small'} type={'secondary'}>
-                    {t('space.memory.composer.summaryLabel', { ns: 'file' })}
-                  </Text>
-                  <Input.TextArea
-                    aria-label={t('space.memory.composer.summaryLabel', { ns: 'file' })}
-                    autoSize={{ maxRows: 5, minRows: 3 }}
-                    maxLength={1000}
-                    name={'space-memory-candidate-summary'}
-                    placeholder={t('space.memory.composer.summaryPlaceholder', { ns: 'file' })}
-                    value={draftSummary}
-                    onChange={(e) => setDraftSummary(e.target.value)}
-                  />
-
-                  <Flexbox gap={8}>
-                    <Text size={'small'} type={'secondary'}>
-                      {t('space.memory.composer.categoryLabel', { ns: 'file' })}
-                    </Text>
-                    <Segmented
-                      block
-                      value={draftCategory}
-                      options={spaceMemoryCategories.map((category) => ({
-                        label: t(`space.memory.categories.${category}`, { ns: 'file' }),
-                        value: category,
-                      }))}
-                      onChange={(value) => setDraftCategory(value as SpaceMemoryCategory)}
+                    <Input
+                      aria-label={t('space.memory.composer.titleLabel', { ns: 'file' })}
+                      maxLength={255}
+                      name={'space-memory-candidate-title'}
+                      placeholder={t('space.memory.composer.titlePlaceholder', { ns: 'file' })}
+                      value={draftTitle}
+                      onChange={(e) => setDraftTitle(e.target.value)}
                     />
-                  </Flexbox>
 
-                  <Flexbox horizontal justify={'flex-end'}>
-                    <Button loading={creating} type={'primary'} onClick={handleCreateCandidate}>
-                      {t('space.memory.actions.create', { ns: 'file' })}
-                    </Button>
-                  </Flexbox>
-                </Flexbox>
-              </Block>
-            )}
+                    <Text type={'secondary'}>
+                      {t('space.memory.composer.summaryLabel', { ns: 'file' })}
+                    </Text>
+                    <Input.TextArea
+                      aria-label={t('space.memory.composer.summaryLabel', { ns: 'file' })}
+                      autoSize={{ maxRows: 5, minRows: 3 }}
+                      maxLength={1000}
+                      name={'space-memory-candidate-summary'}
+                      placeholder={t('space.memory.composer.summaryPlaceholder', { ns: 'file' })}
+                      value={draftSummary}
+                      onChange={(e) => setDraftSummary(e.target.value)}
+                    />
 
-            <Flexbox horizontal align={'center'} gap={10} justify={'space-between'}>
-              <Text fontSize={18} weight={600}>
-                {t('space.memory.entries.title', { ns: 'file', section: activeSection.title })}
-              </Text>
-              <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
-                {supportsRecallFilter && sectionCanReview && (
-                  <Segmented
-                    size={'small'}
-                    value={effectiveRecallFilter}
-                    options={[
-                      {
-                        label: t('space.memory.filters.recall.all', { ns: 'file' }),
-                        value: 'all',
-                      },
-                      {
-                        label: t('space.memory.filters.recall.active', { ns: 'file' }),
-                        value: 'active',
-                      },
-                      {
-                        label: t('space.memory.filters.recall.disabled', { ns: 'file' }),
-                        value: 'disabled',
-                      },
-                      {
-                        label: t('space.memory.filters.recall.expired', { ns: 'file' }),
-                        value: 'expired',
-                      },
-                      {
-                        label: t('space.memory.filters.recall.stale', { ns: 'file' }),
-                        value: 'stale',
-                      },
-                    ]}
-                    onChange={(value) => setRecallFilter(value as RecallFilterMode)}
-                  />
-                )}
-                <Tag size={'small'} variant={'outlined'}>
-                  {visibleEntryList.length}
-                </Tag>
-              </Flexbox>
-            </Flexbox>
+                    <Flexbox gap={8}>
+                      <Text type={'secondary'}>
+                        {t('space.memory.composer.categoryLabel', { ns: 'file' })}
+                      </Text>
+                      <Segmented
+                        block
+                        value={draftCategory}
+                        options={spaceMemoryCategories.map((category) => ({
+                          label: t(`space.memory.categories.${category}`, { ns: 'file' }),
+                          value: category,
+                        }))}
+                        onChange={(value) => setDraftCategory(value as SpaceMemoryCategory)}
+                      />
+                    </Flexbox>
 
-            {supportsRecallFilter && sectionCanReview && entryList.length > 0 && (
-              <Block padding={12} variant={'outlined'}>
-                <Flexbox gap={8}>
-                  <Text size={'small'} type={'secondary'}>
-                    {t('space.memory.filters.recall.summary', { ns: 'file' })}
-                  </Text>
-                  <Flexbox horizontal gap={8} wrap={'wrap'}>
-                    {recallOverview.map((item) => (
-                      <Button
-                        key={item.value}
-                        size={'small'}
-                        type={effectiveRecallFilter === item.value ? 'primary' : 'default'}
-                        onClick={() => setRecallFilter(item.value)}
-                      >
-                        {`${item.label} ${item.count}`}
+                    <Flexbox horizontal justify={'flex-end'}>
+                      <Button loading={creating} type={'primary'} onClick={handleCreateCandidate}>
+                        {t('space.memory.actions.create', { ns: 'file' })}
                       </Button>
-                    ))}
+                    </Flexbox>
                   </Flexbox>
-                </Flexbox>
-              </Block>
-            )}
+                </Block>
+              )}
 
-            {section === 'inbox' && sectionCanReview && visibleEntryList.length > 0 && (
-              <Block padding={12} variant={'outlined'}>
-                <Flexbox
-                  horizontal
-                  align={'center'}
-                  gap={10}
-                  justify={'space-between'}
-                  wrap={'wrap'}
-                >
-                  <Text size={'small'} type={'secondary'}>
-                    {t('space.memory.entries.selection', {
-                      count: selectedEntryIds.length,
-                      ns: 'file',
-                    })}
-                  </Text>
-                  <Flexbox horizontal gap={8} wrap={'wrap'}>
-                    <Button
-                      disabled={selectedEntryIds.length === 0}
-                      loading={batchAction === 'reject'}
+              <Flexbox horizontal align={'center'} gap={10} justify={'space-between'}>
+                <Text fontSize={18} weight={600}>
+                  {t('space.memory.entries.title', { ns: 'file', section: activeSection.title })}
+                </Text>
+                <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
+                  {supportsRecallFilter && sectionCanReview && (
+                    <Segmented
                       size={'small'}
-                      onClick={handleBatchReject}
-                    >
-                      {t('space.memory.actions.rejectSelected', { ns: 'file' })}
-                    </Button>
-                    <Button
-                      disabled={selectedEntryIds.length === 0}
-                      loading={batchAction === 'publish'}
-                      size={'small'}
-                      type={'primary'}
-                      onClick={handleBatchPublish}
-                    >
-                      {t('space.memory.actions.publishSelected', { ns: 'file' })}
-                    </Button>
-                    <Button disabled={allVisibleSelected} size={'small'} onClick={selectAllVisible}>
-                      {t('space.memory.actions.selectAll', { ns: 'file' })}
-                    </Button>
-                    <Button
-                      disabled={selectedEntryIds.length === 0}
-                      size={'small'}
-                      onClick={clearSelection}
-                    >
-                      {t('space.memory.actions.clearSelection', { ns: 'file' })}
-                    </Button>
-                  </Flexbox>
+                      value={effectiveRecallFilter}
+                      options={[
+                        {
+                          label: t('space.memory.filters.recall.all', { ns: 'file' }),
+                          value: 'all',
+                        },
+                        {
+                          label: t('space.memory.filters.recall.active', { ns: 'file' }),
+                          value: 'active',
+                        },
+                        {
+                          label: t('space.memory.filters.recall.disabled', { ns: 'file' }),
+                          value: 'disabled',
+                        },
+                        {
+                          label: t('space.memory.filters.recall.expired', { ns: 'file' }),
+                          value: 'expired',
+                        },
+                        {
+                          label: t('space.memory.filters.recall.stale', { ns: 'file' }),
+                          value: 'stale',
+                        },
+                      ]}
+                      onChange={(value) => setRecallFilter(value as RecallFilterMode)}
+                    />
+                  )}
+                  <Tag size={'small'} variant={'outlined'}>
+                    {visibleEntryList.length}
+                  </Tag>
                 </Flexbox>
-              </Block>
-            )}
+              </Flexbox>
 
-            {supportsRecallFilter &&
-              effectiveRecallFilter === 'stale' &&
-              sectionCanReview &&
-              visibleEntryList.length > 0 && (
+              {section === 'inbox' && sectionCanReview && visibleEntryList.length > 0 && (
                 <Block padding={12} variant={'outlined'}>
                   <Flexbox
                     horizontal
@@ -2536,7 +2628,7 @@ const SpaceMemoryPage = memo(() => {
                     justify={'space-between'}
                     wrap={'wrap'}
                   >
-                    <Text size={'small'} type={'secondary'}>
+                    <Text type={'secondary'}>
                       {t('space.memory.entries.selection', {
                         count: selectedEntryIds.length,
                         ns: 'file',
@@ -2545,28 +2637,20 @@ const SpaceMemoryPage = memo(() => {
                     <Flexbox horizontal gap={8} wrap={'wrap'}>
                       <Button
                         disabled={selectedEntryIds.length === 0}
-                        loading={exportingSelectedAuditSummary}
+                        loading={batchAction === 'reject'}
                         size={'small'}
-                        onClick={handleExportSelectedAuditSummary}
+                        onClick={handleBatchReject}
                       >
-                        {t('space.memory.actions.exportSelectedAuditSummary', { ns: 'file' })}
+                        {t('space.memory.actions.rejectSelected', { ns: 'file' })}
                       </Button>
                       <Button
                         disabled={selectedEntryIds.length === 0}
-                        loading={exportingSelectedAudits}
-                        size={'small'}
-                        onClick={handleExportSelectedAudits}
-                      >
-                        {t('space.memory.actions.exportSelectedAudits', { ns: 'file' })}
-                      </Button>
-                      <Button
-                        disabled={selectedEntryIds.length === 0}
-                        loading={batchAction === 'revalidate'}
+                        loading={batchAction === 'publish'}
                         size={'small'}
                         type={'primary'}
-                        onClick={handleBatchRevalidate}
+                        onClick={handleBatchPublish}
                       >
-                        {t('space.memory.actions.revalidateSelected', { ns: 'file' })}
+                        {t('space.memory.actions.publishSelected', { ns: 'file' })}
                       </Button>
                       <Button
                         disabled={allVisibleSelected}
@@ -2587,280 +2671,364 @@ const SpaceMemoryPage = memo(() => {
                 </Block>
               )}
 
-            {supportsRecallFilter &&
-              (effectiveRecallFilter === 'disabled' || effectiveRecallFilter === 'expired') &&
-              sectionCanReview &&
-              visibleEntryList.length > 0 && (
-                <Block padding={12} variant={'outlined'}>
-                  <Flexbox
-                    horizontal
-                    align={'center'}
-                    gap={10}
-                    justify={'space-between'}
-                    wrap={'wrap'}
-                  >
-                    <Text size={'small'} type={'secondary'}>
-                      {t('space.memory.entries.selection', {
-                        count: selectedEntryIds.length,
-                        ns: 'file',
-                      })}
-                    </Text>
-                    <Flexbox horizontal gap={8} wrap={'wrap'}>
-                      <Button
-                        disabled={selectedEntryIds.length === 0}
-                        loading={exportingSelectedAuditSummary}
-                        size={'small'}
-                        onClick={handleExportSelectedAuditSummary}
-                      >
-                        {t('space.memory.actions.exportSelectedAuditSummary', { ns: 'file' })}
-                      </Button>
-                      <Button
-                        disabled={selectedEntryIds.length === 0}
-                        loading={exportingSelectedAudits}
-                        size={'small'}
-                        onClick={handleExportSelectedAudits}
-                      >
-                        {t('space.memory.actions.exportSelectedAudits', { ns: 'file' })}
-                      </Button>
-                      <Button
-                        disabled={allVisibleSelected}
-                        size={'small'}
-                        onClick={selectAllVisible}
-                      >
-                        {t('space.memory.actions.selectAll', { ns: 'file' })}
-                      </Button>
-                      <Button
-                        disabled={selectedEntryIds.length === 0}
-                        size={'small'}
-                        onClick={clearSelection}
-                      >
-                        {t('space.memory.actions.clearSelection', { ns: 'file' })}
-                      </Button>
+              {supportsRecallFilter &&
+                effectiveRecallFilter === 'stale' &&
+                sectionCanReview &&
+                visibleEntryList.length > 0 && (
+                  <Block padding={12} variant={'outlined'}>
+                    <Flexbox
+                      horizontal
+                      align={'center'}
+                      gap={10}
+                      justify={'space-between'}
+                      wrap={'wrap'}
+                    >
+                      <Text type={'secondary'}>
+                        {t('space.memory.entries.selection', {
+                          count: selectedEntryIds.length,
+                          ns: 'file',
+                        })}
+                      </Text>
+                      <Flexbox horizontal gap={8} wrap={'wrap'}>
+                        <Button
+                          disabled={selectedEntryIds.length === 0}
+                          loading={exportingSelectedAuditSummary}
+                          size={'small'}
+                          onClick={handleExportSelectedAuditSummary}
+                        >
+                          {t('space.memory.actions.exportSelectedAuditSummary', { ns: 'file' })}
+                        </Button>
+                        <Button
+                          disabled={selectedEntryIds.length === 0}
+                          loading={exportingSelectedAudits}
+                          size={'small'}
+                          onClick={handleExportSelectedAudits}
+                        >
+                          {t('space.memory.actions.exportSelectedAudits', { ns: 'file' })}
+                        </Button>
+                        <Button
+                          disabled={selectedEntryIds.length === 0}
+                          loading={batchAction === 'revalidate'}
+                          size={'small'}
+                          type={'primary'}
+                          onClick={handleBatchRevalidate}
+                        >
+                          {t('space.memory.actions.revalidateSelected', { ns: 'file' })}
+                        </Button>
+                        <Button
+                          disabled={allVisibleSelected}
+                          size={'small'}
+                          onClick={selectAllVisible}
+                        >
+                          {t('space.memory.actions.selectAll', { ns: 'file' })}
+                        </Button>
+                        <Button
+                          disabled={selectedEntryIds.length === 0}
+                          size={'small'}
+                          onClick={clearSelection}
+                        >
+                          {t('space.memory.actions.clearSelection', { ns: 'file' })}
+                        </Button>
+                      </Flexbox>
                     </Flexbox>
-                  </Flexbox>
-                </Block>
-              )}
+                  </Block>
+                )}
 
-            {supportsRecallFilter &&
-              (effectiveRecallFilter === 'active' || effectiveRecallFilter === 'all') &&
-              sectionCanReview &&
-              selectableEntryIds.length > 0 && (
-                <Block padding={12} variant={'outlined'}>
-                  <Flexbox
-                    horizontal
-                    align={'center'}
-                    gap={10}
-                    justify={'space-between'}
-                    wrap={'wrap'}
-                  >
-                    <Text size={'small'} type={'secondary'}>
-                      {t('space.memory.entries.selection', {
-                        count: selectedEntryIds.length,
-                        ns: 'file',
-                      })}
-                    </Text>
-                    <Flexbox horizontal gap={8} wrap={'wrap'}>
-                      <Button
-                        disabled={selectedEntryIds.length === 0}
-                        loading={exportingSelectedAuditSummary}
-                        size={'small'}
-                        onClick={handleExportSelectedAuditSummary}
-                      >
-                        {t('space.memory.actions.exportSelectedAuditSummary', { ns: 'file' })}
-                      </Button>
-                      <Button
-                        disabled={selectedEntryIds.length === 0}
-                        loading={exportingSelectedAudits}
-                        size={'small'}
-                        onClick={handleExportSelectedAudits}
-                      >
-                        {t('space.memory.actions.exportSelectedAudits', { ns: 'file' })}
-                      </Button>
-                      <Button
-                        disabled={selectedEntryIds.length === 0}
-                        loading={batchAction === 'stale'}
-                        size={'small'}
-                        onClick={handleBatchMarkStale}
-                      >
-                        {t('space.memory.actions.staleSelected', { ns: 'file' })}
-                      </Button>
-                      <Button
-                        disabled={allVisibleSelected}
-                        size={'small'}
-                        onClick={selectAllVisible}
-                      >
-                        {t('space.memory.actions.selectAll', { ns: 'file' })}
-                      </Button>
-                      <Button
-                        disabled={selectedEntryIds.length === 0}
-                        size={'small'}
-                        onClick={clearSelection}
-                      >
-                        {t('space.memory.actions.clearSelection', { ns: 'file' })}
-                      </Button>
+              {supportsRecallFilter &&
+                (effectiveRecallFilter === 'disabled' || effectiveRecallFilter === 'expired') &&
+                sectionCanReview &&
+                visibleEntryList.length > 0 && (
+                  <Block padding={12} variant={'outlined'}>
+                    <Flexbox
+                      horizontal
+                      align={'center'}
+                      gap={10}
+                      justify={'space-between'}
+                      wrap={'wrap'}
+                    >
+                      <Text type={'secondary'}>
+                        {t('space.memory.entries.selection', {
+                          count: selectedEntryIds.length,
+                          ns: 'file',
+                        })}
+                      </Text>
+                      <Flexbox horizontal gap={8} wrap={'wrap'}>
+                        <Button
+                          disabled={selectedEntryIds.length === 0}
+                          loading={exportingSelectedAuditSummary}
+                          size={'small'}
+                          onClick={handleExportSelectedAuditSummary}
+                        >
+                          {t('space.memory.actions.exportSelectedAuditSummary', { ns: 'file' })}
+                        </Button>
+                        <Button
+                          disabled={selectedEntryIds.length === 0}
+                          loading={exportingSelectedAudits}
+                          size={'small'}
+                          onClick={handleExportSelectedAudits}
+                        >
+                          {t('space.memory.actions.exportSelectedAudits', { ns: 'file' })}
+                        </Button>
+                        <Button
+                          disabled={allVisibleSelected}
+                          size={'small'}
+                          onClick={selectAllVisible}
+                        >
+                          {t('space.memory.actions.selectAll', { ns: 'file' })}
+                        </Button>
+                        <Button
+                          disabled={selectedEntryIds.length === 0}
+                          size={'small'}
+                          onClick={clearSelection}
+                        >
+                          {t('space.memory.actions.clearSelection', { ns: 'file' })}
+                        </Button>
+                      </Flexbox>
                     </Flexbox>
-                  </Flexbox>
-                </Block>
-              )}
+                  </Block>
+                )}
 
-            {visibleEntryList.length === 0 ? (
-              <Text type={'secondary'}>
-                {supportsRecallFilter && effectiveRecallFilter === 'active' && entryList.length > 0
-                  ? t('space.memory.filters.recall.emptyActive', { ns: 'file' })
-                  : supportsRecallFilter &&
-                      effectiveRecallFilter === 'stale' &&
-                      entryList.length > 0
-                    ? t('space.memory.filters.recall.emptyStale', { ns: 'file' })
+              {supportsRecallFilter &&
+                (effectiveRecallFilter === 'active' || effectiveRecallFilter === 'all') &&
+                sectionCanReview &&
+                selectableEntryIds.length > 0 && (
+                  <Block padding={12} variant={'outlined'}>
+                    <Flexbox
+                      horizontal
+                      align={'center'}
+                      gap={10}
+                      justify={'space-between'}
+                      wrap={'wrap'}
+                    >
+                      <Text type={'secondary'}>
+                        {t('space.memory.entries.selection', {
+                          count: selectedEntryIds.length,
+                          ns: 'file',
+                        })}
+                      </Text>
+                      <Flexbox horizontal gap={8} wrap={'wrap'}>
+                        <Button
+                          disabled={selectedEntryIds.length === 0}
+                          loading={exportingSelectedAuditSummary}
+                          size={'small'}
+                          onClick={handleExportSelectedAuditSummary}
+                        >
+                          {t('space.memory.actions.exportSelectedAuditSummary', { ns: 'file' })}
+                        </Button>
+                        <Button
+                          disabled={selectedEntryIds.length === 0}
+                          loading={exportingSelectedAudits}
+                          size={'small'}
+                          onClick={handleExportSelectedAudits}
+                        >
+                          {t('space.memory.actions.exportSelectedAudits', { ns: 'file' })}
+                        </Button>
+                        <Button
+                          disabled={selectedEntryIds.length === 0}
+                          loading={batchAction === 'stale'}
+                          size={'small'}
+                          onClick={handleBatchMarkStale}
+                        >
+                          {t('space.memory.actions.staleSelected', { ns: 'file' })}
+                        </Button>
+                        <Button
+                          disabled={allVisibleSelected}
+                          size={'small'}
+                          onClick={selectAllVisible}
+                        >
+                          {t('space.memory.actions.selectAll', { ns: 'file' })}
+                        </Button>
+                        <Button
+                          disabled={selectedEntryIds.length === 0}
+                          size={'small'}
+                          onClick={clearSelection}
+                        >
+                          {t('space.memory.actions.clearSelection', { ns: 'file' })}
+                        </Button>
+                      </Flexbox>
+                    </Flexbox>
+                  </Block>
+                )}
+
+              {visibleEntryList.length === 0 ? (
+                <Text type={'secondary'}>
+                  {supportsRecallFilter &&
+                  effectiveRecallFilter === 'active' &&
+                  entryList.length > 0
+                    ? t('space.memory.filters.recall.emptyActive', { ns: 'file' })
                     : supportsRecallFilter &&
-                        effectiveRecallFilter === 'disabled' &&
+                        effectiveRecallFilter === 'stale' &&
                         entryList.length > 0
-                      ? t('space.memory.filters.recall.emptyDisabled', { ns: 'file' })
+                      ? t('space.memory.filters.recall.emptyStale', { ns: 'file' })
                       : supportsRecallFilter &&
-                          effectiveRecallFilter === 'expired' &&
+                          effectiveRecallFilter === 'disabled' &&
                           entryList.length > 0
-                        ? t('space.memory.filters.recall.emptyExpired', { ns: 'file' })
-                        : t(`space.memory.sections.${section}.empty`, { ns: 'file' })}
-              </Text>
-            ) : (
-              <div className={styles.memoryEntryList}>
-                {visibleEntryList.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className={
-                      focusedEntryId === entry.id
-                        ? `${styles.memoryEntry} ${styles.memoryEntryFocused}`
-                        : styles.memoryEntry
-                    }
-                    ref={(node) => {
-                      entryRefs.current[entry.id] = node;
-                    }}
-                  >
-                    <Flexbox gap={10}>
-                      <Flexbox horizontal align={'center'} gap={8} justify={'space-between'}>
-                        <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
-                          {selectableEntryIdSet.has(entry.id) && (
-                            <Checkbox
-                              checked={selectedEntryIds.includes(entry.id)}
-                              onChange={(event) =>
-                                toggleEntrySelection(entry.id, event.target.checked)
-                              }
-                            />
-                          )}
-                          <Text fontSize={16} weight={600}>
-                            {entry.title}
-                          </Text>
-                          <Tag size={'small'} variant={'outlined'}>
-                            {t(`space.memory.categories.${entry.category}`, { ns: 'file' })}
-                          </Tag>
-                          <Tag size={'small'} variant={'outlined'}>
-                            {entry.kind === 'candidate'
-                              ? t('space.memory.entries.candidate', { ns: 'file' })
-                              : t('space.memory.entries.memory', { ns: 'file' })}
-                          </Tag>
-                          {entry.kind === 'memory' && sectionCanReview && (
+                        ? t('space.memory.filters.recall.emptyDisabled', { ns: 'file' })
+                        : supportsRecallFilter &&
+                            effectiveRecallFilter === 'expired' &&
+                            entryList.length > 0
+                          ? t('space.memory.filters.recall.emptyExpired', { ns: 'file' })
+                          : t(`space.memory.sections.${section}.empty`, { ns: 'file' })}
+                </Text>
+              ) : (
+                <div className={styles.memoryEntryList}>
+                  {visibleEntryList.map((entry) => {
+                    const duplicatePublishedMatchId =
+                      entry.reviewHint?.kind === 'duplicate_published'
+                        ? entry.reviewHint.match.id
+                        : undefined;
+
+                    return (
+                    <div
+                      key={entry.id}
+                      className={
+                        focusedEntryId === entry.id
+                          ? `${styles.memoryEntry} ${styles.memoryEntryFocused}`
+                          : styles.memoryEntry
+                      }
+                      ref={(node) => {
+                        entryRefs.current[entry.id] = node;
+                      }}
+                    >
+                      <div className={styles.memoryEntryBody}>
+                        <div className={styles.memoryEntryHeader}>
+                          <div className={styles.memoryEntryHeadline}>
+                            <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
+                              {selectableEntryIdSet.has(entry.id) && (
+                                <Checkbox
+                                  checked={selectedEntryIds.includes(entry.id)}
+                                  onChange={(event) =>
+                                    toggleEntrySelection(entry.id, event.target.checked)
+                                  }
+                                />
+                              )}
+                              <Text fontSize={16} weight={600}>
+                                {entry.title}
+                              </Text>
+                              <Tag size={'small'} variant={'outlined'}>
+                                {t(`space.memory.categories.${entry.category}`, { ns: 'file' })}
+                              </Tag>
+                              <Tag size={'small'} variant={'outlined'}>
+                                {entry.kind === 'candidate'
+                                  ? t('space.memory.entries.candidate', { ns: 'file' })
+                                  : t('space.memory.entries.memory', { ns: 'file' })}
+                              </Tag>
+                              {entry.kind === 'memory' && sectionCanReview && (
+                                <Tag size={'small'} variant={'outlined'}>
+                                  {renderRecallStatusLabel(entry)}
+                                </Tag>
+                              )}
+                            </Flexbox>
+                            {entry.summary && (
+                              <Text className={styles.memoryEntrySummary}>
+                                {entry.summary}
+                              </Text>
+                            )}
+                          </div>
+
+                          <div className={styles.memoryEntryActions}>
+                            <Button
+                              size={'small'}
+                              type={'text'}
+                              onClick={() => openDetailEntry(entry.id)}
+                            >
+                              {t('space.memory.actions.viewDetails', { ns: 'file' })}
+                            </Button>
+                            {section === 'inbox' && sectionCanReview && (
+                              <>
+                                {duplicatePublishedMatchId && (
+                                  <Button
+                                    loading={mergingId === entry.id}
+                                    size={'small'}
+                                    onClick={() => handleMerge(entry, duplicatePublishedMatchId)}
+                                  >
+                                    {t('space.memory.actions.merge', { ns: 'file' })}
+                                  </Button>
+                                )}
+                                <Button
+                                  loading={rejectingId === entry.id}
+                                  size={'small'}
+                                  onClick={() => handleReject(entry.id)}
+                                >
+                                  {t('space.memory.actions.reject', { ns: 'file' })}
+                                </Button>
+                                <Button
+                                  loading={publishingId === entry.id}
+                                  size={'small'}
+                                  type={'primary'}
+                                  onClick={() => handlePublish(entry)}
+                                >
+                                  {t('space.memory.actions.publish', { ns: 'file' })}
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {renderGovernanceHistory(entry)}
+                        {renderReviewHint(entry)}
+
+                        <div className={styles.memoryEntryMeta}>
+                          {renderIntakeOriginLabel(entry) && (
                             <Tag size={'small'} variant={'outlined'}>
-                              {renderRecallStatusLabel(entry)}
+                              {renderIntakeOriginLabel(entry)}
                             </Tag>
                           )}
-                          <Button
-                            size={'small'}
-                            type={'text'}
-                            onClick={() => openDetailEntry(entry.id)}
-                          >
-                            {t('space.memory.actions.viewDetails', { ns: 'file' })}
-                          </Button>
-                        </Flexbox>
-
-                        {section === 'inbox' && sectionCanReview && (
-                          <Flexbox horizontal gap={8}>
-                            {entry.reviewHint?.kind === 'duplicate_published' && (
-                              <Button
-                                loading={mergingId === entry.id}
-                                size={'small'}
-                                onClick={() => handleMerge(entry, entry.reviewHint.match.id)}
-                              >
-                                {t('space.memory.actions.merge', { ns: 'file' })}
-                              </Button>
-                            )}
-                            <Button
-                              loading={rejectingId === entry.id}
-                              size={'small'}
-                              onClick={() => handleReject(entry.id)}
-                            >
-                              {t('space.memory.actions.reject', { ns: 'file' })}
-                            </Button>
-                            <Button
-                              loading={publishingId === entry.id}
-                              size={'small'}
-                              type={'primary'}
-                              onClick={() => handlePublish(entry)}
-                            >
-                              {t('space.memory.actions.publish', { ns: 'file' })}
-                            </Button>
-                          </Flexbox>
-                        )}
-                      </Flexbox>
-
-                      <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
-                        {renderGovernanceHistory(entry)}
-                        {entry.summary && (
-                          <Text size={'small'} type={'secondary'}>
-                            {entry.summary}
+                          {renderProducerLabel(entry) && (
+                            <Text type={'secondary'}>
+                              {renderProducerLabel(entry)}
+                            </Text>
+                          )}
+                          <Text type={'secondary'}>
+                            {t('space.memory.entries.sources', {
+                              count: entry.sourceCount,
+                              ns: 'file',
+                            })}
                           </Text>
-                        )}
-                        {renderReviewHint(entry)}
-                        {renderIntakeOriginLabel(entry) && (
-                          <Tag size={'small'} variant={'outlined'}>
-                            {renderIntakeOriginLabel(entry)}
-                          </Tag>
-                        )}
-                        {renderProducerLabel(entry) && (
-                          <Text size={'small'} type={'secondary'}>
-                            {renderProducerLabel(entry)}
+                          <Text type={'secondary'}>
+                            {renderTimelineLabel(entry)}
                           </Text>
-                        )}
+                          {renderActorLabel(entry) && (
+                            <Text type={'secondary'}>
+                              {renderActorLabel(entry)}
+                            </Text>
+                          )}
+                        </div>
+
                         {entry.sourceRefs.length > 0 && (
-                          <div className={styles.sourceRefList}>
-                            {entry.sourceRefs.map((source) => (
-                              <Tag
-                                key={`${entry.id}-${source.kind}-${source.id}`}
-                                size={'small'}
-                                variant={'filled'}
-                              >
-                                {renderSourceLabel(source)}
-                              </Tag>
-                            ))}
+                          <div className={styles.memoryEntrySourceRail}>
+                            <Text className={styles.sourceRefSummary}>
+                              {t('space.memory.detail.sources', { ns: 'file' })}
+                            </Text>
+                            <div className={styles.sourceRefList}>
+                              {entry.sourceRefs.map((source) => (
+                                <Tag
+                                  key={`${entry.id}-${source.kind}-${source.id}`}
+                                  size={'small'}
+                                  variant={'filled'}
+                                >
+                                  {renderSourceLabel(source)}
+                                </Tag>
+                              ))}
+                            </div>
                           </div>
                         )}
-                        <Text size={'small'} type={'secondary'}>
-                          {t('space.memory.entries.sources', {
-                            count: entry.sourceCount,
-                            ns: 'file',
-                          })}
-                        </Text>
-                        <Text size={'small'} type={'secondary'}>
-                          {renderTimelineLabel(entry)}
-                        </Text>
-                        {renderActorLabel(entry) && (
-                          <Text size={'small'} type={'secondary'}>
-                            {renderActorLabel(entry)}
-                          </Text>
-                        )}
-                      </Flexbox>
-                    </Flexbox>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Flexbox>
-        </Block>
+                      </div>
+                    </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Flexbox>
+          </Block>
 
-        <Button onClick={() => navigate(buildSpaceRootPath(summary.id))}>
-          {t('space.settings.back', { ns: 'file' })}
-        </Button>
+          <Button onClick={() => navigate(buildFilesRootPath(summary.id))}>
+            {t('space.settings.back', { ns: 'file' })}
+          </Button>
+        </div>
       </Flexbox>
       {renderDetailDrawer()}
-    </Flexbox>
+    </>
   );
 });
 

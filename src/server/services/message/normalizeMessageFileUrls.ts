@@ -1,45 +1,10 @@
 import type { ChatFileItem, ChatImageItem, ChatVideoItem, UIChatMessage } from '@lobechat/types';
 
 import { appEnv } from '@/envs/app';
-
-const STABLE_APP_FILE_PROXY_PATTERNS = [
-  /^\/f\/[^/?#]+$/,
-  /^\/share\/f\/[^/?#]+$/,
-  /^\/share\/t\/[^/?#]+\/f\/[^/?#]+$/,
-  /^\/skills\/[^/?#]+\/zip$/,
-  /^\/eval\/records\/[^/?#]+$/,
-] as const;
-
-const isSameOriginAppUrl = (url: string) => {
-  try {
-    return new URL(url).origin === new URL(appEnv.APP_URL).origin;
-  } catch {
-    return false;
-  }
-};
-
-const getUrlPathname = (url: string) => {
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    if (!isSameOriginAppUrl(url)) return null;
-
-    try {
-      return new URL(url).pathname;
-    } catch {
-      return null;
-    }
-  }
-
-  return url.split(/[?#]/, 1)[0];
-};
-
-const isStableAppFileProxyUrl = (url?: string) => {
-  if (!url) return false;
-
-  const pathname = getUrlPathname(url);
-  if (!pathname) return false;
-
-  return STABLE_APP_FILE_PROXY_PATTERNS.some((pattern) => pattern.test(pathname));
-};
+import {
+  isSameOriginAppUrl,
+  isStableAppFileProxyUrl,
+} from '@/server/services/file/stableAppFileProxy';
 
 const shouldUseProxyUrl = (url?: string) => {
   if (!url) return false;

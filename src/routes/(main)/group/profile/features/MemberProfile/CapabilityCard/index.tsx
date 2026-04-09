@@ -1,7 +1,7 @@
 'use client';
 
 import { Flexbox, Icon } from '@lobehub/ui';
-import { Collapse } from 'antd';
+import { App, Collapse } from 'antd';
 import { useTheme } from 'antd-style';
 import isEqual from 'fast-deep-equal';
 import { BrainIcon, PuzzleIcon, SparklesIcon } from 'lucide-react';
@@ -21,6 +21,7 @@ interface CapabilityCardProps {
 
 const CapabilityCard = memo<CapabilityCardProps>(({ readOnly }) => {
     const { t } = useTranslation('setting');
+    const { message } = App.useApp();
     const theme = useTheme();
     const agentId = useGroupProfileStore((s) => s.activeTabId);
     const config = useAgentStore(agentByIdSelectors.getAgentConfigById(agentId), isEqual);
@@ -33,9 +34,14 @@ const CapabilityCard = memo<CapabilityCardProps>(({ readOnly }) => {
         return `${config.provider} / ${config.model}`;
     }, [config?.model, config?.provider]);
 
-    const handleConfigChange = (newConfig: { model?: string; provider?: string }) => {
+    const handleConfigChange = async (newConfig: { model?: string; provider?: string }) => {
         if (!readOnly && agentId) {
-            updateAgentConfigById(agentId, newConfig);
+            try {
+                await updateAgentConfigById(agentId, newConfig);
+            } catch (error) {
+                console.error('[CapabilityCard] Failed to update agent model:', error);
+                message.error(t('settingAgent.model.updateError'));
+            }
         }
     };
 

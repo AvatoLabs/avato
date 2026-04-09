@@ -9,7 +9,23 @@ import { useTopicItemDropdownMenu } from './useDropdownMenu';
 const mockNavigate = vi.hoisted(() => vi.fn());
 const mockOpenCreateSpaceMemoryCandidateModal = vi.hoisted(() => vi.fn());
 let mockResolvedSpaceId = 'spc_team';
-let mockSpaceMemoryTargets = {
+interface TopicSpaceMemoryTargets {
+  defaultSpaceId?: string;
+  isLoading: boolean;
+  teamSpaces: Array<{
+    id: string;
+    kind: string;
+    membershipRole: string;
+    name: string;
+  }>;
+}
+
+const findAction = (items: any[] | undefined, key: string) =>
+  items?.find(
+    (item) => Boolean(item) && typeof item === 'object' && 'key' in item && item.key === key,
+  );
+
+let mockSpaceMemoryTargets: TopicSpaceMemoryTargets = {
   defaultSpaceId: 'spc_team',
   isLoading: false,
   teamSpaces: [{ id: 'spc_team', kind: 'team', membershipRole: 'editor', name: 'Ops Team' }],
@@ -101,12 +117,14 @@ describe('useTopicItemDropdownMenu (agent)', () => {
       }),
     );
 
-    const action = result.current().find((item: any) => item?.key === 'addToSpaceMemory');
+    const action = findAction(result.current(), 'addToSpaceMemory');
 
     expect(action?.label).toBe('space.memory.actions.addFromSource');
+    expect(action).toBeDefined();
+    if (!action) return;
 
     await act(async () => {
-      await action.onClick();
+      await (action.onClick as any)();
     });
 
     expect(mockOpenCreateSpaceMemoryCandidateModal).toHaveBeenCalledWith({
@@ -132,7 +150,7 @@ describe('useTopicItemDropdownMenu (agent)', () => {
       }),
     );
 
-    const action = result.current().find((item: any) => item?.key === 'addToSpaceMemory');
+    const action = findAction(result.current(), 'addToSpaceMemory');
 
     expect(action).toBeUndefined();
   });
@@ -154,10 +172,12 @@ describe('useTopicItemDropdownMenu (agent)', () => {
       }),
     );
 
-    const action = result.current().find((item: any) => item?.key === 'addToSpaceMemory');
+    const action = findAction(result.current(), 'addToSpaceMemory');
+    expect(action).toBeDefined();
+    if (!action) return;
 
     await act(async () => {
-      await action.onClick();
+      await (action.onClick as any)();
     });
 
     expect(mockOpenCreateSpaceMemoryCandidateModal).toHaveBeenCalledWith(

@@ -2,7 +2,7 @@
 
 import { Center, Checkbox, Flexbox } from '@lobehub/ui';
 import { VirtuosoMasonry } from '@virtuoso.dev/masonry';
-import { cssVar } from 'antd-style';
+import { createStaticStyles, cssVar } from 'antd-style';
 import { Search } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +23,120 @@ import { getExplorerCategoryFilter } from './queryParams';
 import { useMasonryColumnCount } from './useMasonryColumnCount';
 
 const SWR_RESOURCE_SEARCH = 'SWR_RESOURCE_SEARCH';
+
+const styles = createStaticStyles(({ css, cssVar }) => ({
+  body: css`
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  `,
+  count: css`
+    flex-shrink: 0;
+
+    padding: 5px 10px;
+    border: 1px solid ${cssVar.colorBorderSecondary};
+    border-radius: 999px;
+
+    color: ${cssVar.colorTextSecondary};
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+
+    background: color-mix(in srgb, ${cssVar.colorFillQuaternary} 78%, transparent);
+  `,
+  header: css`
+    gap: 10px;
+    padding: 16px 18px;
+    border-bottom: 1px solid ${cssVar.colorBorderSecondary};
+
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, ${cssVar.colorFillQuaternary} 76%, transparent) 0%,
+        color-mix(in srgb, ${cssVar.colorBgContainer} 88%, transparent) 100%
+      );
+  `,
+  headerEyebrow: css`
+    display: flex;
+    gap: 8px;
+    align-items: center;
+
+    color: ${cssVar.colorTextSecondary};
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  `,
+  headerSummary: css`
+    color: ${cssVar.colorTextSecondary};
+    font-size: 13px;
+    line-height: 1.5;
+  `,
+  headerTitle: css`
+    overflow: hidden;
+
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  `,
+  headerTop: css`
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  `,
+  listBody: css`
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    overflow: auto hidden;
+  `,
+  listHeader: css`
+    border-block-end: 1px solid ${cssVar.colorBorderSecondary};
+    color: ${cssVar.colorTextDescription};
+    font-size: 12px;
+    min-width: 800px;
+  `,
+  masonryScroll: css`
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  `,
+  masonryStage: css`
+    padding-inline: clamp(16px, 2.2vw, 24px);
+    padding-block: 14px 24px;
+  `,
+  overlay: css`
+    position: absolute;
+    z-index: 10;
+    inset: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    min-height: 0;
+    overflow: hidden;
+
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, ${cssVar.colorBgContainer} 97%, ${cssVar.colorBgElevated}) 0%,
+        color-mix(in srgb, ${cssVar.colorBgContainer} 93%, ${cssVar.colorBgLayout}) 100%
+      );
+    backdrop-filter: blur(14px);
+  `,
+  listViewport: css`
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  `,
+}));
 
 const SearchResultsOverlay = memo(() => {
   const { t } = useTranslation(['components', 'file']);
@@ -78,54 +192,48 @@ const SearchResultsOverlay = memo(() => {
 
   if (!isActive) return null;
 
+  const resultCount = data?.length ?? 0;
+
   return (
-    <div
-      style={{
-        background: cssVar.colorBgContainer as string,
-        bottom: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        left: 0,
-        minHeight: 0,
-        position: 'absolute',
-        right: 0,
-        top: 0,
-        zIndex: 10,
-      }}
-    >
+    <div className={styles.overlay} data-testid={'resource-search-overlay'}>
+      <Flexbox className={styles.header}>
+        <div className={styles.headerEyebrow}>
+          <Search size={14} />
+          {t('emptyState.search.title', { ns: 'file' })}
+        </div>
+        <div className={styles.headerTop}>
+          <div style={{ minWidth: 0 }}>
+            <div className={styles.headerTitle}>{searchQuery}</div>
+            <div className={styles.headerSummary}>
+              {isLoading
+                ? t('discover.searching', { ns: 'components', defaultValue: 'Searching…' })
+                : `${resultCount}`}
+            </div>
+          </div>
+          {!isLoading && <div className={styles.count}>{resultCount}</div>}
+        </div>
+      </Flexbox>
       {isLoading ? (
-        <Center height="100%">
+        <Center className={styles.body} height="100%">
           <NeuralNetworkLoading size={48} />
         </Center>
       ) : !data || data.length === 0 ? (
-        <EmptyState
-          description={t('emptyState.search.description', { ns: 'file' })}
-          icon={Search}
-          title={t('emptyState.search.title', { ns: 'file' })}
-        />
+        <div className={styles.body}>
+          <EmptyState
+            description={t('emptyState.search.description', { ns: 'file' })}
+            icon={Search}
+            title={t('emptyState.search.title', { ns: 'file' })}
+          />
+        </div>
       ) : viewMode === 'list' ? (
         <Flexbox height={'100%'} style={{ minHeight: 0 }}>
-          <div
-            style={{
-              display: 'flex',
-              flex: 1,
-              flexDirection: 'column',
-              minHeight: 0,
-              overflow: 'auto hidden',
-            }}
-          >
+          <div className={styles.listBody}>
             <Flexbox
+              className={styles.listHeader}
               horizontal
               align="center"
               paddingInline={8}
-              style={{
-                borderBlockEnd: `1px solid ${cssVar.colorBorderSecondary}`,
-                color: cssVar.colorTextDescription as string,
-                fontSize: 12,
-                height: 40,
-                minHeight: 40,
-                minWidth: 800,
-              }}
+              style={{ height: 40, minHeight: 40 }}
             >
               <Center height={40} style={{ paddingInline: 4 }}>
                 <Checkbox disabled checked={false} />
@@ -165,11 +273,11 @@ const SearchResultsOverlay = memo(() => {
                   paddingInlineEnd: 16,
                   width: columnWidths.size,
                 }}
-              >
-                {t('FileManager.title.size', { ns: 'components' })}
-              </Flexbox>
+                >
+                  {t('FileManager.title.size', { ns: 'components' })}
+                </Flexbox>
             </Flexbox>
-            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
+            <div className={styles.listViewport}>
               <Virtuoso
                 data={data}
                 defaultItemHeight={48}
@@ -201,15 +309,8 @@ const SearchResultsOverlay = memo(() => {
           </div>
         </Flexbox>
       ) : (
-        <div
-          style={{
-            flex: 1,
-            height: '100%',
-            minHeight: 0,
-            overflowY: 'auto',
-          }}
-        >
-          <div style={{ paddingBlockEnd: 24, paddingBlockStart: 12, paddingInline: 24 }}>
+        <div className={styles.masonryScroll}>
+          <div className={styles.masonryStage}>
             <VirtuosoMasonry
               ItemContent={MasonryItemWrapper}
               columnCount={columnCount}

@@ -28,22 +28,28 @@ const AskAIMenu = memo(() => {
     ? t('cmdk.askAIHeading', { query: `"${search.trim()}"` })
     : t('cmdk.askAIHeadingEmpty');
 
-  const handleAgentBuilder = () => {
+  const handleBuilderAction = (
+    action: 'sendAsAgent' | 'sendAsGroup',
+    label: 'agent builder' | 'group builder',
+  ) => {
     const trimmedSearch = search.trim();
-    closeCommandMenu(); // Close immediately
-    if (trimmedSearch) {
-      // Use sendAsAgent to create a blank agent and open agent builder
-      useHomeStore.getState().sendAsAgent(trimmedSearch);
-    }
+    closeCommandMenu();
+    if (!trimmedSearch) return;
+
+    void useHomeStore
+      .getState()
+      [action](trimmedSearch)
+      .catch((error) => {
+        console.error(`[AskAIMenu] Failed to open ${label}:`, error);
+      });
+  };
+
+  const handleAgentBuilder = () => {
+    handleBuilderAction('sendAsAgent', 'agent builder');
   };
 
   const handleGroupBuilder = () => {
-    const trimmedSearch = search.trim();
-    closeCommandMenu(); // Close immediately
-    if (trimmedSearch) {
-      // Use sendAsGroup to create a blank group and open group builder
-      useHomeStore.getState().sendAsGroup(trimmedSearch);
-    }
+    handleBuilderAction('sendAsGroup', 'group builder');
   };
 
   const handleAgentSelect = (agentId: string) => {

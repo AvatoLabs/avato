@@ -1,5 +1,4 @@
-import { getCanonicalSharedContentKind } from '@lobechat/types';
-
+import { getCanonicalSharedContentKind } from '@/types/content';
 import { getPageDetailPath, getPageKind } from '@/utils/docs';
 
 import { buildFilesPreviewPath, buildSourceSetPath } from './paths';

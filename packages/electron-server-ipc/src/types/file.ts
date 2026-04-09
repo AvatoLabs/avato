@@ -6,7 +6,7 @@ export interface DeleteFilesResponse {
 export interface CreateFileParams {
   content: string; // Base64 encoded binary data
   filename: string;
-  hash: string;
+  sha256: string;
   path: string;
   type: string;
 }

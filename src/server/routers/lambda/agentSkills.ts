@@ -135,14 +135,14 @@ export const agentSkillsRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Skill not found' });
       }
 
-      if (!skill.zipFileHash) {
+      if (!skill.zipSha256) {
         return { name: skill.name, url: null };
       }
 
       const url = await resolveAccessibleSkillZipProxyUrl({
         fileModel: ctx.fileModel,
         skillId: skill.id,
-        zipFileHash: skill.zipFileHash,
+        zipSha256: skill.zipSha256,
       });
 
       return { name: skill.name, url: url ?? null };

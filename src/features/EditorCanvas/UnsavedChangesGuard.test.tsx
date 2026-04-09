@@ -141,4 +141,32 @@ describe('UnsavedChangesGuard', () => {
     expect(cleanEvent.defaultPrevented).toBe(false);
     expect(cleanEvent.returnValue).toBeUndefined();
   });
+
+  it('should confirm route leave when dirty and auto-save is not configured', async () => {
+    const blocker = createMockBlocker('blocked');
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    useBlockerMock.mockReturnValue(blocker);
+
+    render(<UnsavedChangesGuard isDirty={true} message="unsaved" title="Unsaved changes" />);
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledWith('Unsaved changes\n\nunsaved');
+      expect(blocker.proceed).toHaveBeenCalledTimes(1);
+      expect(blocker.reset).not.toHaveBeenCalled();
+    });
+  });
+
+  it('should stay on the page when the confirm leave dialog is cancelled', async () => {
+    const blocker = createMockBlocker('blocked');
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    useBlockerMock.mockReturnValue(blocker);
+
+    render(<UnsavedChangesGuard isDirty={true} message="unsaved" title="Unsaved changes" />);
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledWith('Unsaved changes\n\nunsaved');
+      expect(blocker.reset).toHaveBeenCalledTimes(1);
+      expect(blocker.proceed).not.toHaveBeenCalled();
+    });
+  });
 });

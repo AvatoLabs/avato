@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { ChatMessage, ChatMessageMetadata, ChatToolPayload, MessageRole } from '../types';
 import { buildDisplayMessages, getAssistantChainActionMessageId } from './messageDisplay';
 
 // Avoid loading React Native when messageDisplay imports chatHelpers
@@ -10,16 +11,12 @@ vi.mock('./user', () => ({ getUserMemorySettings: vi.fn() }));
 vi.mock('../lib/session', () => ({ isGroupSessionLike: () => false }));
 
 const baseMessage = (
-  overrides: Partial<{
-    id: string;
-    role: string;
-    content: string;
-    parentId: string;
-    tools: any[];
-    plugin: any;
-    pluginError: unknown;
-  }> = {},
-) => ({
+  overrides: Partial<ChatMessage> & {
+    metadata?: ChatMessageMetadata;
+    role?: MessageRole;
+    tools?: ChatToolPayload[];
+  } = {},
+): ChatMessage => ({
   content: '',
   createdAt: '2025-01-01T00:00:00Z',
   id: 'msg-1',
@@ -42,9 +39,19 @@ describe('messageDisplay', () => {
         baseMessage({ id: 'a1', role: 'assistant', content: 'hello' }),
       ];
       const result = buildDisplayMessages(messages);
+      expect(result).toBe(messages);
       expect(result).toHaveLength(2);
       expect(result[0]!.role).toBe('user');
       expect(result[1]!.role).toBe('assistant');
+    });
+
+    it('returns original array in group sessions when no task grouping is needed', () => {
+      const messages = [
+        baseMessage({ id: 'u1', role: 'user', content: 'hi' }),
+        baseMessage({ id: 'a1', role: 'assistant', content: 'hello' }),
+      ];
+
+      expect(buildDisplayMessages(messages, true)).toBe(messages);
     });
 
     it('collapses standalone tool messages into parent assistant', () => {
@@ -64,6 +71,7 @@ describe('messageDisplay', () => {
             apiName: 'search',
             arguments: '{"q":"x"}',
             identifier: 'lobe-web-browsing',
+            type: 'function',
           },
         }),
       ];
@@ -87,7 +95,7 @@ describe('messageDisplay', () => {
           parentId: 'a1',
           content: '',
           pluginError: { message: 'Tool failed' },
-          plugin: { apiName: 'foo', arguments: '{}', identifier: 'pkg' },
+          plugin: { apiName: 'foo', arguments: '{}', identifier: 'pkg', type: 'function' },
         }),
       ];
       const result = buildDisplayMessages(messages);
@@ -119,7 +127,7 @@ describe('messageDisplay', () => {
         }),
       ];
       // Link a2 to a1 via tool result_msg_id
-      (messages[1] as any).tools = [
+      messages[1]!.tools = [
         {
           id: 'tc-1',
           result_msg_id: 'a1',
@@ -128,11 +136,52 @@ describe('messageDisplay', () => {
           identifier: 'lobe-web-browsing',
           type: 'function',
           result_content: 'result',
-        },
+        } satisfies ChatToolPayload,
       ];
       const result = buildDisplayMessages(messages);
       // Should merge assistant chain
       expect(result.length).toBeLessThanOrEqual(2);
+    });
+
+    it('reuses merged assistant chain objects when source message refs are unchanged', () => {
+      const messages = [
+        baseMessage({
+          id: 'a1',
+          role: 'assistant',
+          content: 'step 1',
+          tools: [
+            {
+              id: 'tc-1',
+              apiName: 'search',
+              arguments: '{}',
+              identifier: 'lobe-web-browsing',
+              type: 'function',
+            },
+          ],
+        }),
+        baseMessage({
+          id: 'a2',
+          role: 'assistant',
+          content: 'step 2',
+          parentId: 'a1',
+          tools: [
+            {
+              id: 'tc-1',
+              result_msg_id: 'a1',
+              apiName: 'search',
+              arguments: '{}',
+              identifier: 'lobe-web-browsing',
+              type: 'function',
+              result_content: 'result',
+            },
+          ],
+        }),
+      ];
+
+      const first = buildDisplayMessages(messages);
+      const second = buildDisplayMessages(messages);
+
+      expect(first[0]).toBe(second[0]);
     });
   });
 

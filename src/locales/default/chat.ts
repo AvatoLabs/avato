@@ -27,6 +27,8 @@ export default {
   'agentDefaultMessageWithoutEdit':
     "Hi, I’m **{{name}}**. One sentence is enough—you're in control.",
   'agents': 'Agents',
+  'createAgentFailed': 'Failed to create agent',
+  'createGroupFailed': 'Failed to create group',
   'artifact.generating': 'Generating',
   'artifact.inThread':
     'Cannot view in subtopic, please switch to the main conversation area to open',
@@ -75,11 +77,13 @@ export default {
     'You are about to clear the current session messages. Once cleared, they cannot be retrieved. Please confirm your action.',
   'confirmRemoveChatGroupItemAlert':
     'This Group will be deleted. Group-specific assistants will also be deleted, while external assistants will not be affected.',
+  'confirmRemoveGroupError': 'Failed to delete group',
   'confirmRemoveGroupItemAlert':
     'You are about to delete this category. After deletion, its agents will be moved to the default list. Please confirm your action.',
   'confirmRemoveGroupSuccess': 'Group deleted successfully',
   'confirmRemoveSessionItemAlert':
     'You are about to delete this agent. Once deleted, it cannot be retrieved. Please confirm your action.',
+  'confirmRemoveSessionError': 'Failed to delete agent',
   'confirmRemoveSessionSuccess': 'Agent removed successfully',
   'defaultAgent': 'Default Agent',
   'defaultGroupChat': 'Group',
@@ -371,6 +375,7 @@ export default {
   'sessionGroup.noMatchingAgents': 'No matching agents found',
   'sessionGroup.noSelectedAgents': 'Please select agents',
   'sessionGroup.rename': 'Rename Category',
+  'sessionGroup.renameError': 'Failed to rename category',
   'sessionGroup.renameSuccess': 'Renamed successfully',
   'sessionGroup.searchAgents': 'Search agents',
   'sessionGroup.selectedAgents': 'Selected agents ({{count}})',
@@ -508,9 +513,11 @@ export default {
   'tool.intervention.toolAbort': 'You canceled this Skill call',
   'tool.intervention.toolRejected': 'This Skill call was rejected',
   'toolAuth.authorize': 'Authorize',
+  'toolAuth.authorizeFailed': 'Authorization failed. Please try again.',
   'toolAuth.authorizing': 'Authorizing...',
   'toolAuth.hint':
     'Without authorization or configuration, Skills may not work. This can limit the Agent or cause errors.',
+  'toolAuth.signInFailed': 'Sign in failed. Please try again.',
   'toolAuth.signIn': 'Sign In',
   'toolAuth.title': 'Authorize Skills for this Agent',
   'topic.checkOpenNewTopic': 'Start a new topic?',

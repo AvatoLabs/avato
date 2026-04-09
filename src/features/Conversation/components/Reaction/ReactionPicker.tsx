@@ -115,7 +115,7 @@ const ReactionPicker: FC<ReactionPickerProps> = memo(({ messageId, trigger }) =>
       content={content}
       open={open}
       placement="top"
-      styles={{ body: { padding: 0 } }}
+      styles={{ content: { padding: 0 } }}
       trigger="click"
       onOpenChange={handleOpenChange}
     >

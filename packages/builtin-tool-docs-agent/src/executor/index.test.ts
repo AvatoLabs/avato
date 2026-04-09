@@ -14,8 +14,8 @@ describe('DocsAgentExecutor', () => {
     // Create mock runtime with all methods
     mockRuntime = {
       editTitle: vi.fn(),
-      getPageContent: vi.fn(),
-      initPage: vi.fn(),
+      getDocContent: vi.fn(),
+      initDoc: vi.fn(),
       modifyNodes: vi.fn(),
       replaceText: vi.fn(),
     } as unknown as EditorRuntime;
@@ -29,9 +29,9 @@ describe('DocsAgentExecutor', () => {
     });
 
     it('should have all API methods registered', () => {
-      expect(executor.hasApi('initPage')).toBe(true);
+      expect(executor.hasApi('initDoc')).toBe(true);
       expect(executor.hasApi('editTitle')).toBe(true);
-      expect(executor.hasApi('getPageContent')).toBe(true);
+      expect(executor.hasApi('getDocContent')).toBe(true);
       expect(executor.hasApi('modifyNodes')).toBe(true);
       expect(executor.hasApi('replaceText')).toBe(true);
     });
@@ -41,14 +41,14 @@ describe('DocsAgentExecutor', () => {
     });
   });
 
-  describe('initPage', () => {
+  describe('initDoc', () => {
     it('should format result with extracted title', async () => {
-      vi.mocked(mockRuntime.initPage).mockResolvedValue({
+      vi.mocked(mockRuntime.initDoc).mockResolvedValue({
         extractedTitle: 'My Document',
         nodeCount: 5,
       });
 
-      const result = await executor.initPage({ markdown: '# My Document\n\nContent' });
+      const result = await executor.initDoc({ markdown: '# My Document\n\nContent' });
 
       expect(result.success).toBe(true);
       expect(result.content).toBe(
@@ -61,21 +61,21 @@ describe('DocsAgentExecutor', () => {
     });
 
     it('should format result without extracted title', async () => {
-      vi.mocked(mockRuntime.initPage).mockResolvedValue({
+      vi.mocked(mockRuntime.initDoc).mockResolvedValue({
         extractedTitle: undefined,
         nodeCount: 3,
       });
 
-      const result = await executor.initPage({ markdown: 'Just content' });
+      const result = await executor.initDoc({ markdown: 'Just content' });
 
       expect(result.success).toBe(true);
       expect(result.content).toBe('Document initialized with 3 nodes.');
     });
 
     it('should handle errors', async () => {
-      vi.mocked(mockRuntime.initPage).mockRejectedValue(new Error('Editor not initialized'));
+      vi.mocked(mockRuntime.initDoc).mockRejectedValue(new Error('Editor not initialized'));
 
-      const result = await executor.initPage({ markdown: 'content' });
+      const result = await executor.initDoc({ markdown: 'content' });
 
       expect(result.success).toBe(false);
       expect(result.error?.message).toBe('Editor not initialized');
@@ -110,9 +110,9 @@ describe('DocsAgentExecutor', () => {
     });
   });
 
-  describe('getPageContent', () => {
+  describe('getDocContent', () => {
     it('should format result with markdown content', async () => {
-      vi.mocked(mockRuntime.getPageContent).mockResolvedValue({
+      vi.mocked(mockRuntime.getDocContent).mockResolvedValue({
         charCount: 100,
         documentId: 'doc-123',
         lineCount: 10,
@@ -121,7 +121,7 @@ describe('DocsAgentExecutor', () => {
         xml: undefined,
       });
 
-      const result = await executor.getPageContent({ format: 'markdown' });
+      const result = await executor.getDocContent({ format: 'markdown' });
 
       expect(result.success).toBe(true);
       expect(result.content).toBe('# Title\n\nContent here');
@@ -139,7 +139,7 @@ describe('DocsAgentExecutor', () => {
     });
 
     it('should format result with XML content', async () => {
-      vi.mocked(mockRuntime.getPageContent).mockResolvedValue({
+      vi.mocked(mockRuntime.getDocContent).mockResolvedValue({
         charCount: 50,
         documentId: 'doc-123',
         lineCount: 5,
@@ -148,16 +148,16 @@ describe('DocsAgentExecutor', () => {
         xml: '<p id="1">Content</p>',
       });
 
-      const result = await executor.getPageContent({ format: 'xml' });
+      const result = await executor.getDocContent({ format: 'xml' });
 
       expect(result.success).toBe(true);
       expect(result.content).toBe('<p id="1">Content</p>');
     });
 
     it('should handle errors', async () => {
-      vi.mocked(mockRuntime.getPageContent).mockRejectedValue(new Error('Editor not initialized'));
+      vi.mocked(mockRuntime.getDocContent).mockRejectedValue(new Error('Editor not initialized'));
 
-      const result = await executor.getPageContent({ format: 'both' });
+      const result = await executor.getDocContent({ format: 'both' });
 
       expect(result.success).toBe(false);
       expect(result.error?.message).toBe('Editor not initialized');

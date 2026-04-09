@@ -1,7 +1,6 @@
 import { type LobeChatDatabase } from '@lobechat/database';
 import { type DocumentItem } from '@lobechat/database/schemas';
 import { loadFile } from '@lobechat/file-loaders';
-import { getCanonicalContentKind } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import debug from 'debug';
 
@@ -10,6 +9,7 @@ import { ContentModel } from '@/database/models/content';
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
 import { SpaceModel } from '@/database/models/space';
+import { getCanonicalContentKind } from '@/types/content';
 import { DocumentSourceType, type LobeDocument } from '@/types/document';
 
 import { ChunkService } from '../chunk';
@@ -501,7 +501,7 @@ export class DocumentService {
       const removableUrls = await resolveRemovableStorageUrls(
         this.fileModel,
         fileRowsForCleanup,
-        serverDBEnv.REMOVE_GLOBAL_FILE,
+        serverDBEnv.REMOVE_GLOBAL_FILE ?? true,
       );
 
       if (removableUrls.length > 0) {

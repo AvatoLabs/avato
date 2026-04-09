@@ -1,6 +1,6 @@
 import type { LobeChatDatabase } from '@lobechat/database';
 import type { SpaceMemoryCandidateDraft, SpaceMemoryIngestOrigin } from '@lobechat/types';
-import { canCreateSpaceMemory } from '@lobechat/types';
+import { resolveSpaceMemorySurfaceState } from '@lobechat/types';
 
 import { ContentModel } from '@/database/models/content';
 import { SpaceModel } from '@/database/models/space';
@@ -31,7 +31,7 @@ export class SpaceMemoryIntakeService {
       throw new Error('SPACE_NOT_FOUND');
     }
 
-    const canCreate = canCreateSpaceMemory(space);
+    const { canCreate } = resolveSpaceMemorySurfaceState(space);
 
     if (!canCreate) {
       throw new Error('SPACE_MEMORY_CREATE_DENIED');

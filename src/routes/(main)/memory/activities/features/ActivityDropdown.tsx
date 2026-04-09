@@ -17,7 +17,7 @@ interface ActivityDropdownProps {
 
 const ActivityDropdown = memo<ActivityDropdownProps>(({ id, size = 'small' }) => {
   const { t } = useTranslation(['memory', 'common']);
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
   const [activityId, setActivityId] = useQueryState('activityId', { clearOnDefault: true });
   const toggleRightPanel = useGlobalStore((s) => s.toggleRightPanel);
 
@@ -40,10 +40,15 @@ const ActivityDropdown = memo<ActivityDropdownProps>(({ id, size = 'small' }) =>
         okButtonProps: { danger: true },
         okText: t('confirm', { ns: 'common' }),
         onOk: async () => {
-          await deleteActivity(id);
-          if (activityId === id) {
-            setActivityId(null);
-            toggleRightPanel(false);
+          try {
+            await deleteActivity(id);
+            if (activityId === id) {
+              setActivityId(null);
+              toggleRightPanel(false);
+            }
+          } catch (error) {
+            console.error('Failed to delete activity memory:', error);
+            message.error(t('activity.deleteError'));
           }
         },
         title: t('activity.deleteTitle'),

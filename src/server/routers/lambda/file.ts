@@ -1,9 +1,9 @@
 import {
   FileAssetClassification,
+  type FileAssetMetadata,
   FileAssetRenditionKind,
   FileAssetReviewStatus,
   FileAssetUsagePolicy,
-  getCanonicalContentKind,
 } from '@lobechat/types';
 import { getMimeType } from '@lobechat/utils';
 import { TRPCError } from '@trpc/server';
@@ -32,7 +32,12 @@ import { FileService } from '@/server/services/file';
 import { resolveRemovableStorageUrls } from '@/server/services/file/removableStorageUrls';
 import { isStorageObjectMissingError } from '@/server/services/file/storageErrors';
 import { AsyncTaskStatus, AsyncTaskType } from '@/types/asyncTask';
-import { type FileGovernanceSummary, type FileListItem } from '@/types/files';
+import { getCanonicalContentKind } from '@/types/content';
+import {
+  type FileGovernanceSummary,
+  type FileListItem,
+  type QueryFileListParams,
+} from '@/types/files';
 import { QueryFileListSchema, UploadFileSchema } from '@/types/files';
 
 /**
@@ -50,8 +55,25 @@ const governanceAuditActionValues = [...governanceAuditActions];
 const getCanonicalKnowledgeItemSourceType = (
   item: Pick<FileListItem, 'id' | 'sourceType'>,
 ): 'file' | 'document' => {
-  return getCanonicalContentKind(item);
+  return getCanonicalContentKind({
+    id: item.id,
+    sourceType: item.sourceType === 'document' ? 'document' : 'file',
+  });
 };
+
+const toQueryFileListParams = (
+  input: z.infer<typeof QueryFileListSchema>,
+  overrides?: Partial<QueryFileListParams>,
+): QueryFileListParams => ({
+  ...input,
+  ...overrides,
+  assetClassification:
+    (overrides?.assetClassification ?? input.assetClassification) as QueryFileListParams['assetClassification'],
+  assetReviewStatus:
+    (overrides?.assetReviewStatus ?? input.assetReviewStatus) as QueryFileListParams['assetReviewStatus'],
+  assetUsagePolicy:
+    (overrides?.assetUsagePolicy ?? input.assetUsagePolicy) as QueryFileListParams['assetUsagePolicy'],
+});
 
 const normalizeFileType = (fileType?: string | null, name?: string | null): string => {
   if (!fileType || fileType.toLowerCase().includes('octet-stream')) {
@@ -60,6 +82,27 @@ const normalizeFileType = (fileType?: string | null, name?: string | null): stri
   }
 
   return fileType || 'application/octet-stream';
+};
+
+type ListedFile = {
+  chunkTaskId?: string | null;
+  contentUid?: string | null;
+  createdAt: Date;
+  embeddingTaskId?: string | null;
+  fileType: string;
+  id: string;
+  name: string;
+  size: number;
+  spaceId?: string | null;
+  updatedAt: Date;
+  url: string;
+};
+
+type GovernanceRow = {
+  assetClassification?: FileAssetClassification | null;
+  assetReviewStatus?: FileAssetReviewStatus | null;
+  assetUsagePolicy?: FileAssetUsagePolicy | null;
+  id: string;
 };
 
 const fileAssetMetadataSchema = z
@@ -659,7 +702,7 @@ export const fileRouter = router({
         fileType: actualFileType,
         metadata: input.metadata,
         name: input.name,
-        parentId: resolvedParentId,
+        parentId: resolvedParentId ?? undefined,
         sha256: input.sha256,
         source: input.source,
         sourceSetId: input.sourceSetId,
@@ -740,7 +783,7 @@ export const fileRouter = router({
         name: item.name,
         parentId: item.parentId,
         size: item.size,
-        sourceSetId: item.sourceSetId,
+        sourceSetId: undefined,
         sourceType: 'file' as const,
         spaceId: item.spaceId,
         updatedAt: item.updatedAt,
@@ -807,7 +850,7 @@ export const fileRouter = router({
     }),
 
   getFiles: fileProcedure.input(QueryFileListSchema).query(async ({ ctx, input }) => {
-    const fileList = await ctx.fileModel.query(input);
+    const fileList = (await ctx.fileModel.query(toQueryFileListParams(input))) as ListedFile[];
 
     const visibleIdSet = new Set(
       await ctx.contentAuthorizer.filterVisibleFileIdsForList(fileList.map((item) => item.id)),
@@ -875,10 +918,11 @@ export const fileRouter = router({
 
     // Request one more item than limit to check if there are more items
     const limit = input.limit ?? 50;
-    const knowledgeItems = await ctx.knowledgeRepo.query({
-      ...input,
-      limit: limit + 1,
-    });
+    const knowledgeItems = await ctx.knowledgeRepo.query(
+      toQueryFileListParams(input, {
+        limit: limit + 1,
+      }),
+    );
 
     // Check if there are more items
     const hasMore = knowledgeItems.length > limit;
@@ -1027,19 +1071,22 @@ export const fileRouter = router({
       await assertAccessibleKnowledgeSpace(ctx, input);
 
       const [classificationRows, reviewStatusRows, usagePolicyRows] = await Promise.all([
-        ctx.fileModel.queryGovernanceRows({
-          ...input,
-          assetClassification: undefined,
-        }),
-        ctx.fileModel.queryGovernanceRows({
-          ...input,
-          assetReviewStatus: undefined,
-        }),
-        ctx.fileModel.queryGovernanceRows({
-          ...input,
-          assetUsagePolicy: undefined,
-        }),
-      ]);
+        ctx.fileModel.queryGovernanceRows(
+          toQueryFileListParams(input, {
+            assetClassification: undefined,
+          }),
+        ),
+        ctx.fileModel.queryGovernanceRows(
+          toQueryFileListParams(input, {
+            assetReviewStatus: undefined,
+          }),
+        ),
+        ctx.fileModel.queryGovernanceRows(
+          toQueryFileListParams(input, {
+            assetUsagePolicy: undefined,
+          }),
+        ),
+      ]) as [GovernanceRow[], GovernanceRow[], GovernanceRow[]];
 
       const [visibleClassificationRows, visibleReviewStatusRows, visibleUsagePolicyRows] =
         await Promise.all(
@@ -1097,7 +1144,7 @@ export const fileRouter = router({
       const latestGovernanceAuditMap = await buildLatestGovernanceAuditMap(
         ctx,
         fileItems.map((item) => ({
-          contentUid: item.contentUid,
+          contentUid: (item as { contentUid?: string | null }).contentUid,
           fileId: item.fileId || item.id,
         })),
       );
@@ -1185,19 +1232,20 @@ export const fileRouter = router({
       throw new TRPCError({ code: 'FORBIDDEN', message: 'CLEAR_FILES_DENIED' });
     }
 
-    const cleared = await ctx.fileModel.clear(serverDBEnv.REMOVE_GLOBAL_FILE, {
-      includeUnscoped: true,
-      spaceId: personalSpace.id,
-    });
+      const removeGlobalFile = serverDBEnv.REMOVE_GLOBAL_FILE ?? true;
+      const cleared = await ctx.fileModel.clear(removeGlobalFile, {
+        includeUnscoped: true,
+        spaceId: personalSpace.id,
+      });
     await ctx.contentModel.invalidateAuthzEpochsAfterRemoval(
       cleared.map((file) => ({ contentUid: file.contentUid, spaceId: file.spaceId })),
     );
 
-    const removableUrls = await resolveRemovableStorageUrls(
-      ctx.fileModel,
-      cleared,
-      serverDBEnv.REMOVE_GLOBAL_FILE,
-    );
+      const removableUrls = await resolveRemovableStorageUrls(
+        ctx.fileModel,
+        cleared,
+        removeGlobalFile,
+      );
 
     if (removableUrls.length === 1) {
       await ctx.fileService.deleteFile(removableUrls[0]!);
@@ -1233,7 +1281,8 @@ export const fileRouter = router({
         const existingFile = await ctx.fileModel.findByIdAny(input.id);
         if (!existingFile) return;
 
-        await ctx.fileModel.deleteAny(input.id, serverDBEnv.REMOVE_GLOBAL_FILE);
+        const removeGlobalFile = serverDBEnv.REMOVE_GLOBAL_FILE ?? true;
+        await ctx.fileModel.deleteAny(input.id, removeGlobalFile);
 
         await ctx.contentModel.invalidateAuthzEpochsAfterRemoval([
           { contentUid: existingFile.contentUid, spaceId: existingFile.spaceId },
@@ -1242,7 +1291,7 @@ export const fileRouter = router({
         const removableUrls = await resolveRemovableStorageUrls(
           ctx.fileModel,
           [existingFile],
-          serverDBEnv.REMOVE_GLOBAL_FILE,
+          removeGlobalFile,
         );
 
         if (removableUrls.length > 0) {
@@ -1297,13 +1346,14 @@ export const fileRouter = router({
         // as the files are still in the database (just marked as deleted)
       } else {
         // Hard delete: remove from database and S3
+        const removeGlobalFile = serverDBEnv.REMOVE_GLOBAL_FILE ?? true;
         const existingFiles = (
           await Promise.all(input.ids.map((id) => ctx.fileModel.findByIdAny(id)))
-        ).filter(Boolean);
+        ).filter((file): file is NonNullable<typeof file> => Boolean(file));
 
         if (existingFiles.length === 0) return;
 
-        await ctx.fileModel.deleteManyAny(input.ids, serverDBEnv.REMOVE_GLOBAL_FILE);
+        await ctx.fileModel.deleteManyAny(input.ids, removeGlobalFile);
 
         await ctx.contentModel.invalidateAuthzEpochsAfterRemoval(
           existingFiles.map((f) => ({ contentUid: f.contentUid, spaceId: f.spaceId })),
@@ -1312,7 +1362,7 @@ export const fileRouter = router({
         const removableUrls = await resolveRemovableStorageUrls(
           ctx.fileModel,
           existingFiles,
-          serverDBEnv.REMOVE_GLOBAL_FILE,
+          removeGlobalFile,
         );
 
         if (removableUrls.length > 0) {
@@ -1361,7 +1411,7 @@ export const fileRouter = router({
         currentFile = await ctx.resolver.requireFile(id, 'move');
         const resolvedParentId = await resolveParentDocumentId(ctx, {
           parentId,
-          spaceId: currentFile.spaceId,
+          spaceId: currentFile.spaceId ?? undefined,
         });
         updates.parentId = resolvedParentId;
       }
@@ -1432,7 +1482,7 @@ export const fileRouter = router({
         createdBy: ctx.userId,
         fileId: input.id,
         classification: input.classification,
-        metadata: input.metadata ?? undefined,
+        metadata: (input.metadata as FileAssetMetadata | null | undefined) ?? undefined,
         ...reviewStatus,
         rightsOwner: input.rightsOwner,
         spaceId,

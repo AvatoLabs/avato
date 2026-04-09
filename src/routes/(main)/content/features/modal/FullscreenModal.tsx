@@ -11,6 +11,16 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     height: 100%;
     max-height: calc(100dvh - 56px) !important;
   `,
+  body_withDetail: css`
+    --fullscreen-detail-width: clamp(380px, 34vw, 500px);
+
+    padding-inline-end: calc(var(--fullscreen-detail-width) + 28px) !important;
+
+    @media (max-width: 900px) {
+      padding-inline-end: 0 !important;
+      padding-block-end: calc(min(58dvh, 600px) + env(safe-area-inset-bottom, 0px)) !important;
+    }
+  `,
   content: css`
     height: 100%;
     border: none !important;
@@ -19,13 +29,71 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   extra: css`
     position: fixed;
     z-index: ${cssVar.zIndexPopupBase + 10};
-    inset-block: 0;
-    inset-inline-end: 0;
+    inset-block: 12px;
+    inset-inline-end: 12px;
 
-    width: 0;
-    border-inline-start: 1px solid ${cssVar.colorSplit};
+    display: flex;
+    flex-direction: column;
 
-    background: ${cssVar.colorBgLayout};
+    overflow: hidden;
+
+    width: min(var(--fullscreen-detail-width, 420px), calc(100vw - 24px));
+    border: 1px solid color-mix(in srgb, ${cssVar.colorBorderSecondary} 92%, transparent);
+    border-radius: 24px;
+
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, ${cssVar.colorBgContainer} 96%, ${cssVar.colorBgElevated}) 0%,
+        color-mix(in srgb, ${cssVar.colorBgContainer} 92%, ${cssVar.colorBgLayout}) 100%
+      );
+    box-shadow:
+      -24px 0 56px -44px color-mix(in srgb, ${cssVar.colorText} 28%, transparent),
+      inset 0 1px 0 color-mix(in srgb, white 55%, transparent);
+    backdrop-filter: blur(18px);
+
+    @media (max-width: 900px) {
+      inset-block: auto 0;
+      inset-inline: 0;
+
+      width: 100%;
+      max-height: calc(min(58dvh, 600px) + env(safe-area-inset-bottom, 0px));
+      padding-block-end: env(safe-area-inset-bottom, 0px);
+      border: 1px solid color-mix(in srgb, ${cssVar.colorBorderSecondary} 92%, transparent);
+      border-radius: 24px 24px 0 0;
+      box-shadow:
+        0 -24px 56px -44px color-mix(in srgb, ${cssVar.colorText} 28%, transparent),
+        inset 0 1px 0 color-mix(in srgb, white 55%, transparent);
+    }
+  `,
+  extraHandle: css`
+    flex-shrink: 0;
+    align-self: center;
+
+    width: 44px;
+    height: 5px;
+    margin-block: 12px 8px;
+    border-radius: 999px;
+
+    background: color-mix(in srgb, ${cssVar.colorTextSecondary} 18%, ${cssVar.colorFillSecondary});
+    opacity: 0.9;
+
+    @media (min-width: 901px) {
+      display: none;
+    }
+  `,
+  extraInner: css`
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+  `,
+  extraContent: css`
+    min-height: 100%;
+    padding: 12px;
+
+    @media (max-width: 900px) {
+      padding: 10px 10px 0;
+    }
   `,
   header: css`
     background: transparent !important;
@@ -45,7 +113,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     }
   `,
   modal_withDetail: css`
-    width: calc(100vw) !important;
+    width: 100vw !important;
   `,
 }));
 
@@ -69,7 +137,11 @@ const FullscreenModal = ({ children, detail, onClose }: FullscreenModalProps) =>
       <ConfigProvider theme={{ token: { motion: false } }}>
         <Modal
           className={cx(styles.modal, showDetail && styles.modal_withDetail)}
-          classNames={{ body: styles.body, header: styles.header, wrapper: styles.content }}
+          classNames={{
+            body: cx(styles.body, showDetail && styles.body_withDetail),
+            header: styles.header,
+            wrapper: styles.content,
+          }}
           footer={false}
           open={open}
           width={'auto'}
@@ -78,7 +150,19 @@ const FullscreenModal = ({ children, detail, onClose }: FullscreenModalProps) =>
           {children}
         </Modal>
       </ConfigProvider>
-      {!!detail && <div className={styles.extra}>{detail}</div>}
+      {!!detail && (
+        <div
+          aria-label={'Detail panel'}
+          className={styles.extra}
+          data-testid={'fullscreen-modal-detail'}
+          role={'complementary'}
+        >
+          <div className={styles.extraHandle} />
+          <div className={styles.extraInner}>
+            <div className={styles.extraContent}>{detail}</div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

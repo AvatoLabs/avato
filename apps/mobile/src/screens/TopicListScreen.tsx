@@ -221,15 +221,18 @@ export default function TopicListScreen({ route, navigation }: RootStackScreenPr
     [fetchMessages, navigation, sessionId, switchTopic, t.errorUnknown, toast],
   );
 
-  const filteredTopics = searchQuery
-    ? topics.filter((tp) => (tp.title || '').toLowerCase().includes(searchQuery.toLowerCase()))
-    : topics;
+  const sortedTopics = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const filteredTopics = normalizedQuery
+      ? topics.filter((topic) => (topic.title || '').toLowerCase().includes(normalizedQuery))
+      : topics;
 
-  const sortedTopics = [...filteredTopics].sort((a, b) => {
-    if (a.favorite && !b.favorite) return -1;
-    if (!a.favorite && b.favorite) return 1;
-    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-  });
+    return [...filteredTopics].sort((a, b) => {
+      if (a.favorite && !b.favorite) return -1;
+      if (!a.favorite && b.favorite) return 1;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  }, [searchQuery, topics]);
 
   const renderTopicItem = useCallback(
     ({ item }: { item: Topic }) => {

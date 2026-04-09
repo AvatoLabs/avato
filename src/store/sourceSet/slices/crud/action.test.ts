@@ -137,31 +137,38 @@ describe('SourceSetCrudAction', () => {
   });
 
   describe('removeSourceSet', () => {
-    it('should delete a source set and refresh the list', async () => {
+    it('should delete a source set, refresh the list, and reset loading state', async () => {
       vi.spyOn(sourceSetService, 'deleteSourceSet').mockResolvedValue(undefined as any);
 
       const { result } = renderHook(() => useSourceSetStore());
+      const toggleLoadingSpy = vi.spyOn(result.current, 'internal_setSourceSetLoading');
       const refreshSpy = vi.spyOn(result.current, 'refreshSourceSetList').mockResolvedValue();
 
       await act(async () => {
         await result.current.removeSourceSet('kb-to-delete');
       });
 
+      expect(toggleLoadingSpy).toHaveBeenCalledWith('kb-to-delete', true);
       expect(sourceSetService.deleteSourceSet).toHaveBeenCalledWith('kb-to-delete');
       expect(refreshSpy).toHaveBeenCalled();
+      expect(toggleLoadingSpy).toHaveBeenCalledWith('kb-to-delete', false);
     });
 
-    it('should handle errors during deletion', async () => {
+    it('should reset loading state when deletion fails', async () => {
       const error = new Error('Deletion failed');
       vi.spyOn(sourceSetService, 'deleteSourceSet').mockRejectedValue(error);
 
       const { result } = renderHook(() => useSourceSetStore());
+      const toggleLoadingSpy = vi.spyOn(result.current, 'internal_setSourceSetLoading');
 
       await expect(
         act(async () => {
           await result.current.removeSourceSet('kb-id');
         }),
       ).rejects.toThrow('Deletion failed');
+
+      expect(toggleLoadingSpy).toHaveBeenCalledWith('kb-id', true);
+      expect(toggleLoadingSpy).toHaveBeenCalledWith('kb-id', false);
     });
   });
 
@@ -202,7 +209,7 @@ describe('SourceSetCrudAction', () => {
       ).rejects.toThrow('Update failed');
 
       expect(toggleLoadingSpy).toHaveBeenCalledWith('kb-1', true);
-      // The false toggle won't be called because the error interrupts the flow
+      expect(toggleLoadingSpy).toHaveBeenCalledWith('kb-1', false);
     });
   });
 
@@ -215,7 +222,6 @@ describe('SourceSetCrudAction', () => {
         avatar: 'avatar-url',
         type: 'file',
         enabled: true,
-        isPublic: false,
         settings: {},
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -242,7 +248,6 @@ describe('SourceSetCrudAction', () => {
         avatar: 'avatar-url-2',
         type: 'file',
         enabled: true,
-        isPublic: false,
         settings: {},
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -294,7 +299,6 @@ describe('SourceSetCrudAction', () => {
         avatar: 'avatar-existing',
         type: 'file',
         enabled: true,
-        isPublic: false,
         settings: {},
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -307,7 +311,6 @@ describe('SourceSetCrudAction', () => {
         avatar: 'avatar-new',
         type: 'file',
         enabled: true,
-        isPublic: false,
         settings: {},
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -347,7 +350,6 @@ describe('SourceSetCrudAction', () => {
           avatar: 'avatar-1',
           type: 'file',
           enabled: true,
-          isPublic: false,
           settings: {},
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -359,7 +361,6 @@ describe('SourceSetCrudAction', () => {
           avatar: 'avatar-2',
           type: 'file',
           enabled: false,
-          isPublic: false,
           settings: {},
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -401,7 +402,6 @@ describe('SourceSetCrudAction', () => {
           avatar: 'avatar-1',
           type: 'file',
           enabled: true,
-          isPublic: false,
           settings: {},
           createdAt: new Date(),
           updatedAt: new Date(),

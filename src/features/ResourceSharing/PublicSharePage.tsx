@@ -1,6 +1,5 @@
 'use client';
 
-import { getCanonicalSharedContentKind } from '@lobechat/types';
 import {
   Block,
   Button,
@@ -25,6 +24,7 @@ import Loading from '@/components/Loading/BrandTextLoading';
 import { buildFilesPreviewPath, buildSourceSetPath } from '@/features/ResourceSpaces/paths';
 import { documentMarkdownRemarkPlugins } from '@/libs/markdown/remarkEncodedBreakTag';
 import { lambdaClient } from '@/libs/trpc/client';
+import { getCanonicalSharedContentKind } from '@/types/content';
 import { getPageDetailPath, getPageKind, TABLE_PAGE_KIND } from '@/utils/docs';
 import {
   decodeBase64,
@@ -456,14 +456,13 @@ const PublicSharePage = memo(() => {
       <div className={styles.authShell}>
         <Center height={'100%'} width={'100%'}>
           <Block className={styles.authCard}>
-            <Flexbox
-              as={'form'}
-              gap={14}
+            <form
               onSubmit={(event: FormEvent<HTMLFormElement>) => {
                 event.preventDefault();
                 handlePasswordSubmit();
               }}
             >
+              <Flexbox gap={14}>
               <Center>
                 <ProductLogo size={40} />
               </Center>
@@ -473,9 +472,12 @@ const PublicSharePage = memo(() => {
               <Text style={{ textAlign: 'center' }} type={'secondary'}>
                 {t('publicShare.passwordSubtitle')}
               </Text>
-              <Text as={'label'} htmlFor={'public-share-password'} size={'small'} weight={500}>
+              <label
+                htmlFor={'public-share-password'}
+                style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.5 }}
+              >
                 {t('publicShare.passwordLabel')}
-              </Text>
+              </label>
               <Input
                 autoFocus
                 aria-describedby={passwordFeedback ? passwordFeedbackId : undefined}
@@ -499,21 +501,19 @@ const PublicSharePage = memo(() => {
                 }}
               />
               {passwordFeedback && (
-                <Text
-                  as={'p'}
+                <p
                   id={passwordFeedbackId}
                   role={showInvalidPassword ? 'alert' : 'status'}
-                  size={'small'}
-                  style={{ margin: 0 }}
-                  type={'danger'}
+                  style={{ color: 'var(--lobe-color-error, #ff4d4f)', fontSize: 12, margin: 0 }}
                 >
                   {passwordFeedback}
-                </Text>
+                </p>
               )}
               <Button type={'primary'} onClick={handlePasswordSubmit}>
                 {t('publicShare.passwordConfirm')}
               </Button>
-            </Flexbox>
+              </Flexbox>
+            </form>
           </Block>
         </Center>
       </div>

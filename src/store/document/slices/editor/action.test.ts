@@ -8,7 +8,7 @@ import { useDocumentStore } from '../../store';
 // Mock services
 vi.mock('@/services/document', () => ({
   documentService: {
-    updateDocument: vi.fn().mockResolvedValue({}),
+    updateDocument: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -29,8 +29,8 @@ const createMockEditor = () => ({
 });
 
 describe('DocumentStore - Editor Actions', () => {
-  beforeEach(() => {
-    vi.mocked(documentService.updateDocument).mockReset().mockResolvedValue({});
+beforeEach(() => {
+    vi.mocked(documentService.updateDocument).mockReset().mockResolvedValue(undefined);
 
     // Reset store state before each test
     const { result } = renderHook(() => useDocumentStore());

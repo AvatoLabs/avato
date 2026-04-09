@@ -36,7 +36,9 @@ const AgentCronJobs = memo(() => {
   // Delete: Keep the existing delete logic
   const handleDelete = useCallback(
     async (jobId: string) => {
-      await deleteCronJob(jobId);
+      try {
+        await deleteCronJob(jobId);
+      } catch {}
     },
     [deleteCronJob],
   );

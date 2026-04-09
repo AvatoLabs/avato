@@ -1,8 +1,11 @@
+import { BUILTIN_AGENT_SLUGS } from '@lobechat/builtin-agents';
+import { INBOX_SESSION_ID } from '@lobechat/const';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { setActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { documentService } from '@/services/document';
+import { useAgentStore } from '@/store/agent/store';
 import { sessionService } from '@/services/session';
 import { useChatStore } from '@/store/chat';
 import { useGlobalStore } from '@/store/global';
@@ -37,9 +40,11 @@ describe('HomeInputAction', () => {
   const mockNavigate = vi.fn();
   const mockSendMessage = vi.fn().mockResolvedValue({});
   const mockRefreshSessions = vi.fn().mockResolvedValue(undefined);
+  const mockUpdateAgentConfigById = vi.fn().mockResolvedValue(undefined);
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUpdateAgentConfigById.mockReset().mockResolvedValue(undefined);
     setActiveWorkspaceSpaceId(undefined);
     if (typeof window !== 'undefined') {
       window.history.replaceState({}, '', '/');
@@ -56,6 +61,21 @@ describe('HomeInputAction', () => {
 
     // Mock sessionService.createSession to return new agent id
     vi.mocked(sessionService.createSession).mockResolvedValue('new-agent-id');
+
+    useAgentStore.setState({
+      agentMap: {
+        'inbox-agent-id': {
+          model: 'claude-3-7-sonnet',
+          provider: 'anthropic',
+        } as any,
+      },
+      builtinAgentIdMap: {
+        [BUILTIN_AGENT_SLUGS.agentBuilder]: 'agent-builder-id',
+        [BUILTIN_AGENT_SLUGS.docsAgent]: 'docs-agent-id',
+        [INBOX_SESSION_ID]: 'inbox-agent-id',
+      },
+      updateAgentConfigById: mockUpdateAgentConfigById as any,
+    });
 
     // Reset store state with mocked refreshSessions
     useSessionStore.setState({
@@ -163,9 +183,17 @@ describe('HomeInputAction', () => {
         await result.current.sendAsAgent('Test prompt');
       });
 
-      // createSession is called internally via the store action
-      // which eventually calls sessionService.createSession
-      expect(sessionService.createSession).toHaveBeenCalled();
+      expect(sessionService.createSession).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          config: expect.objectContaining({
+            model: 'claude-3-7-sonnet',
+            provider: 'anthropic',
+            systemRole: 'Test prompt',
+          }),
+          meta: expect.objectContaining({ title: 'Test prompt' }),
+        }),
+      );
     });
 
     it('should truncate long titles to 50 characters', async () => {
@@ -197,8 +225,21 @@ describe('HomeInputAction', () => {
       });
 
       expect(mockSendMessage).toHaveBeenCalledWith({
-        context: { agentId: 'new-agent-id', scope: 'agent_builder' },
+        context: { agentId: 'agent-builder-id', scope: 'agent_builder' },
         message: 'Test message',
+      });
+    });
+
+    it('should sync agent builder model/provider before sending', async () => {
+      const { result } = renderHook(() => useSessionStore());
+
+      await act(async () => {
+        await result.current.sendAsAgent('Test message');
+      });
+
+      expect(mockUpdateAgentConfigById).toHaveBeenCalledWith('agent-builder-id', {
+        model: 'claude-3-7-sonnet',
+        provider: 'anthropic',
       });
     });
 
@@ -278,11 +319,12 @@ describe('HomeInputAction', () => {
       const { result } = renderHook(() => useSessionStore());
 
       await act(async () => {
-        await result.current.sendAsWrite('Document content');
+      await result.current.sendAsWrite('Document content');
       });
 
       expect(documentService.createDocument).toHaveBeenCalledWith({
-        editorData: '',
+        editorData: '{}',
+        fileType: 'custom/document',
         title: 'Document content',
       });
     });
@@ -292,11 +334,12 @@ describe('HomeInputAction', () => {
       const longMessage = 'B'.repeat(100);
 
       await act(async () => {
-        await result.current.sendAsWrite(longMessage);
+      await result.current.sendAsWrite(longMessage);
       });
 
       expect(documentService.createDocument).toHaveBeenCalledWith({
-        editorData: '',
+        editorData: '{}',
+        fileType: 'custom/document',
         title: 'B'.repeat(50),
       });
     });
@@ -322,7 +365,8 @@ describe('HomeInputAction', () => {
       });
 
       expect(documentService.createDocument).toHaveBeenCalledWith({
-        editorData: '',
+        editorData: '{}',
+        fileType: 'custom/document',
         spaceId: 'space-route',
         title: 'Content',
       });
@@ -338,10 +382,23 @@ describe('HomeInputAction', () => {
 
       expect(mockSendMessage).toHaveBeenCalledWith({
         context: {
-          agentId: 'new-doc-id',
+          agentId: 'docs-agent-id',
           scope: 'doc',
         },
         message: 'Content',
+      });
+    });
+
+    it('should sync docs agent model/provider before sending', async () => {
+      const { result } = renderHook(() => useSessionStore());
+
+      await act(async () => {
+        await result.current.sendAsWrite('Content');
+      });
+
+      expect(mockUpdateAgentConfigById).toHaveBeenCalledWith('docs-agent-id', {
+        model: 'claude-3-7-sonnet',
+        provider: 'anthropic',
       });
     });
 

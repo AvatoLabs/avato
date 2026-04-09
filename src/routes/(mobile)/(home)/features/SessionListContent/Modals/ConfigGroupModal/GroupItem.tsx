@@ -50,7 +50,12 @@ const GroupItem = memo<SessionGroupItem>(({ id, name }) => {
                   type: 'primary',
                 },
                 onOk: async () => {
-                  await removeSessionGroup(id);
+                  try {
+                    await removeSessionGroup(id);
+                  } catch (error) {
+                    console.error('Failed to delete mobile session group from config modal:', error);
+                    message.error(t('confirmRemoveGroupError'));
+                  }
                 },
                 title: t('sessionGroup.confirmRemoveGroupAlert'),
               });
@@ -70,8 +75,14 @@ const GroupItem = memo<SessionGroupItem>(({ id, name }) => {
               if (input.length === 0 || input.length > 20 || input.trim() === '')
                 return message.warning(t('sessionGroup.tooLong'));
 
-              await updateSessionGroupName(id, input);
-              message.success(t('sessionGroup.renameSuccess'));
+              try {
+                await updateSessionGroupName(id, input);
+                message.success(t('sessionGroup.renameSuccess'));
+              } catch (error) {
+                console.error('Failed to rename mobile session group:', error);
+                message.error(t('sessionGroup.renameError'));
+                return;
+              }
             }
             setEditing(false);
           }}

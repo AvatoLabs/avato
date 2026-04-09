@@ -2,14 +2,17 @@
 
 import { Flexbox } from '@lobehub/ui';
 import { memo, useLayoutEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 
+import { getFileScope, getSourceSetScopeId } from '@/features/ContentManager/useFileScope';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 
 import { TrashContent } from './TrashContent';
 
 const TrashPage = memo(() => {
-  const { id: sourceSetId, spaceId } = useParams<{ id?: string; spaceId?: string }>();
+  const [searchParams] = useSearchParams();
+  const { spaceId } = useParams<{ spaceId?: string }>();
+  const sourceSetId = getSourceSetScopeId(getFileScope(searchParams)) ?? undefined;
   const [setSourceSetId, setSpaceId] = useContentManagerStore((s) => [
     s.setSourceSetId,
     s.setSpaceId,

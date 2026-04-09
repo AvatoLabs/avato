@@ -19,6 +19,10 @@ export interface State {
    */
   assetReviewStatus?: FileAssetReviewStatus;
   /**
+   * Current asset rights owner filter
+   */
+  assetRightsOwner?: string;
+  /**
    * Current asset usage policy filter
    */
   assetUsagePolicy?: FileAssetUsagePolicy;
@@ -90,6 +94,7 @@ export interface State {
 
 export const initialState: State = {
   assetClassification: undefined,
+  assetRightsOwner: undefined,
   assetReviewStatus: undefined,
   assetUsagePolicy: undefined,
   category: FilesTabs.Home,

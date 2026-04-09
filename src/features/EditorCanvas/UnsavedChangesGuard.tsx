@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useBlocker } from 'react-router-dom';
 
 interface UnsavedChangesGuardProps {
+  confirmOnLeave?: boolean;
   isDirty: boolean;
   message: string;
   onAutoSave?: () => Promise<boolean>;
@@ -13,11 +14,11 @@ interface UnsavedChangesGuardProps {
 }
 
 const UnsavedChangesGuard = memo<UnsavedChangesGuardProps>(
-  ({ isDirty, message, onAutoSave, title: _title }) => {
-    void _title;
+  ({ confirmOnLeave, isDirty, message, onAutoSave, title }) => {
     const { t } = useTranslation('file');
     const { message: messageApi } = App.useApp();
     const blocker = useBlocker(isDirty);
+    const shouldConfirmOnLeave = confirmOnLeave ?? !onAutoSave;
 
     const blockerRef = useRef(blocker);
     const isSavingRef = useRef(false);
@@ -26,6 +27,19 @@ const UnsavedChangesGuard = memo<UnsavedChangesGuardProps>(
     useEffect(() => {
       if (blocker.state !== 'blocked') return;
       if (isSavingRef.current) return;
+
+      if (!onAutoSave) {
+        const shouldLeave =
+          !shouldConfirmOnLeave || window.confirm(title ? `${title}\n\n${message}` : message);
+
+        if (shouldLeave) {
+          blockerRef.current?.proceed?.();
+        } else {
+          blockerRef.current?.reset?.();
+        }
+
+        return;
+      }
 
       isSavingRef.current = true;
       const messageKey = `editor-leave-auto-save-${Date.now()}`;
@@ -68,7 +82,7 @@ const UnsavedChangesGuard = memo<UnsavedChangesGuardProps>(
       };
 
       void leaveWithAutoSave();
-    }, [blocker.state, message, messageApi, onAutoSave, t]);
+    }, [blocker.state, message, messageApi, onAutoSave, shouldConfirmOnLeave, t, title]);
 
     useEffect(() => {
       if (!isDirty) return;

@@ -128,7 +128,7 @@ const MainMenu = memo(() => {
                 : route.path;
           const isCurrentRoute =
             route.id === 'resource'
-              ? isWorkspaceFilesSurfacePath(pathname, { includeLegacySpecialRoutes: true })
+              ? isWorkspaceFilesSurfacePath(pathname)
               : route.id === 'page'
                 ? /^\/spaces\/[^/]+\/docs(?:\/|$|\?)/.test(pathname || '')
                 : pathname?.startsWith(route.pathPrefix);

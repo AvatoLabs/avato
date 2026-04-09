@@ -72,6 +72,8 @@ export default {
   'agentCronJobs.interval.daily': 'Daily',
   'agentCronJobs.interval.weekly': 'Weekly',
   'agentCronJobs.lastExecuted': 'Last Executed',
+  'agentCronJobs.loadFailed': 'Failed to load scheduled tasks',
+  'agentCronJobs.loadStatsFailed': 'Failed to load scheduled task stats',
   'agentCronJobs.maxExecutions': 'Max Executions',
   'agentCronJobs.name': 'Task Name',
   'agentCronJobs.never': 'Never',
@@ -90,6 +92,8 @@ export default {
   'agentCronJobs.title': 'Scheduled Tasks',
   'agentCronJobs.unlimited': 'Unlimited',
   'agentCronJobs.unnamedTask': 'Unnamed Task',
+  'agentCronJobs.resetExecutionsFailed': 'Failed to reset execution counts',
+  'agentCronJobs.resetExecutionsSuccess': 'Execution counts reset successfully',
   'agentCronJobs.updateFailed': 'Failed to update scheduled task',
   'agentCronJobs.updateSuccess': 'Scheduled task updated successfully',
   'agentCronJobs.weekday.friday': 'Friday',
@@ -216,6 +220,7 @@ export default {
   'settingSources.section.files': 'Files',
   'settingSources.section.sourceSets': 'Reference Sets',
   'settingSources.title': 'Long-term Sources',
+  'settingHotkey.saveFailed': 'Failed to save hotkey settings',
   'settingSources.emptyDescInWorkspace':
     'Attach files or reference sets from {{name}} for long-term reuse across conversations.',
   'checking': 'Checking...',
@@ -224,6 +229,7 @@ export default {
   'danger.clear.confirm': "Clear all chat data? This can't be undone.",
   'danger.clear.desc':
     'Delete all data, including agents, files, messages, and skills. Your account will NOT be deleted.',
+  'danger.clear.error': 'Failed to clear application data. Please try again.',
   'danger.clear.success': 'All session messages have been cleared',
   'danger.clear.title': 'Wipe Data',
   'danger.reset.action': 'Reset Now',
@@ -711,8 +717,12 @@ export default {
   'myAgents.empty.description': "You haven't published any agents to the market yet",
   'myAgents.empty.title': 'No Published Agents',
   'myAgents.errors.editFailed': 'Failed to edit agent, please try again later',
+  'myAgents.errors.duplicateFailed': 'Failed to duplicate agent',
+  'myAgents.errors.deleteFailed': 'Failed to delete agent',
   'myAgents.errors.fetchFailed': 'Failed to fetch agent details',
   'myAgents.errors.notAuthenticated': 'Please sign in to your market account first',
+  'myAgents.actions.deleteSuccess': 'Agent deleted successfully',
+  'myAgents.actions.duplicateSuccess': 'Agent duplicated successfully',
   'myAgents.loginRequired.button': 'Sign in to Market',
   'myAgents.loginRequired.description':
     'Please sign in to your market account to view your published agents',
@@ -758,6 +768,7 @@ export default {
   'settingAgent.capability.desc': 'Configure model, tools, and sources for the agent',
   'settingAgent.capability.title': 'Capabilities',
   'settingAgent.model.title': 'Model',
+  'settingAgent.model.updateError': 'Failed to update the model. Please try again.',
   'settingAgent.sources.desc': 'Manage long-term sources available to the agent',
   'settingAgent.sources.title': 'Sources',
   'settingAgent.submit': 'Update Agent',
@@ -766,6 +777,7 @@ export default {
   'settingAgent.tag.title': 'Tag',
   'settingAgent.tools.desc': 'Enable or disable tools available to the agent',
   'settingAgent.tools.title': 'Tools',
+  'settingAgent.tools.updateError': 'Failed to update the tools. Please try again.',
   'settingAgent.title': 'Agent info',
   'settingAppearance.animationMode.agile': 'Agile',
   'settingAppearance.animationMode.desc':
@@ -805,6 +817,7 @@ export default {
   'settingAppearance.themePreset.options.velvet.desc': 'Rich and expressive',
   'settingAppearance.themePreset.options.velvet.title': 'Velvet',
   'settingAppearance.themePreset.title': 'Color Scheme',
+  'settingAppearance.saveFailed': 'Failed to save appearance settings',
   'settingAppearance.title': 'Application Appearance',
   'settingChat.autoCreateTopicThreshold.desc':
     'Automatically create a topic when the current message count exceeds this value',
@@ -1002,6 +1015,7 @@ export default {
   'settingSystemTools.category.contentSearch.desc': 'Tools for searching text content within files',
   'settingSystemTools.category.fileSearch': 'File Search',
   'settingSystemTools.category.fileSearch.desc': 'Tools for finding files by name or pattern',
+  'settingSystemTools.detectFailed': 'Failed to detect system tools',
   'settingSystemTools.detecting': 'Detecting...',
   'settingSystemTools.redetect': 'Re-detect',
   'settingSystemTools.status.available': 'Available',
@@ -1032,6 +1046,7 @@ export default {
   'settingTTS.sttService.desc':
     "Where 'browser' is the native speech recognition service of the browser",
   'settingTTS.sttService.title': 'Speech Recognition Service',
+  'settingTTS.saveFailed': 'Failed to save speech settings',
   'settingTTS.submit': 'Update Voice Service',
   'settingTTS.title': 'Speech Service',
   'settingTTS.tts': 'Text-to-Speech Settings',
@@ -1254,8 +1269,10 @@ When I am ___, I need ___
   'tools.klavis.authFailed': 'Authentication Failed',
   'tools.klavis.authRequired': 'Authentication Required',
   'tools.klavis.connect': 'Connect',
+  'tools.klavis.connectFailed': 'Failed to connect. Please try again.',
   'tools.klavis.connected': 'Connected',
   'tools.klavis.disconnect': 'Disconnect',
+  'tools.klavis.disconnectFailed': 'Failed to disconnect. Please try again.',
   'tools.klavis.disconnected': 'Disconnected',
   'tools.klavis.error': 'Error',
   'tools.klavis.groupName': 'Klavis Tools',
@@ -1265,6 +1282,7 @@ When I am ___, I need ___
   'tools.klavis.notEnabled': 'Klavis service not enabled',
   'tools.klavis.oauthRequired': 'Please complete OAuth authentication in the new window',
   'tools.klavis.pendingAuth': 'Pending Authentication',
+  'tools.klavis.togglePluginFailed': 'Failed to update the skill state. Please try again.',
   'tools.klavis.serverCreated': 'Server created successfully',
   'tools.klavis.serverCreatedFailed': 'Failed to create server',
   'tools.klavis.serverRemoved': 'Server removed',
@@ -1411,10 +1429,12 @@ When I am ___, I need ___
   'tools.avatohubSkill.authorize': 'Authorize',
 
   'tools.avatohubSkill.connect': 'Connect',
+  'tools.avatohubSkill.connectError': 'Failed to connect. Please try again.',
 
   'tools.avatohubSkill.connected': 'Connected',
 
   'tools.avatohubSkill.disconnect': 'Disconnect',
+  'tools.avatohubSkill.disconnectError': 'Failed to disconnect. Please try again.',
 
   'tools.avatohubSkill.disconnectConfirm.desc':
     "You can still continue previous chats that reference {{name}} content. However, the assistant won't be able to access new content or perform new tasks.",
@@ -1424,6 +1444,8 @@ When I am ___, I need ___
   'tools.avatohubSkill.disconnected': 'Disconnected',
 
   'tools.avatohubSkill.error': 'Error',
+  'tools.avatohubSkill.togglePluginFailed':
+    'Failed to update the skill state. Please try again.',
   // Avato Skill Providers i18n
   'tools.avatohubSkill.providers.linear.description':
     'Linear is a modern issue tracking and project management tool designed for high-performance teams to build better software faster',

@@ -11,7 +11,7 @@ import useSWR from 'swr';
 import Loading from '@/components/Loading/BrandTextLoading';
 import { lambdaClient } from '@/libs/trpc/client';
 
-import { buildSpaceRootPath } from './paths';
+import { buildFilesRootPath } from './paths';
 
 const SpaceMembersPage = memo(() => {
   const { t } = useTranslation('file');
@@ -225,7 +225,7 @@ const SpaceMembersPage = memo(() => {
         </Block>
       ) : null}
 
-      <Button onClick={() => navigate(buildSpaceRootPath(space.id))}>
+      <Button onClick={() => navigate(buildFilesRootPath(space.id))}>
         {t('space.settings.back')}
       </Button>
     </Flexbox>

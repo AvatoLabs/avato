@@ -4,14 +4,14 @@ import { getSkillZipProxyUrl } from './getSkillZipProxyUrl';
 import { createSkillZipProxyToken } from './skillZipProxyToken';
 
 interface ResolveAccessibleSkillZipProxyUrlParams {
-  fileModel: Pick<FileModel, 'canAccessGlobalFileByHash'>;
+  fileModel: Pick<FileModel, 'canAccessGlobalFileBySha256'>;
   internal?: boolean;
   skillId: string;
-  zipFileHash?: string | null;
+  zipSha256?: string | null;
 }
 
 /**
- * Returns a stable skill ZIP proxy URL when the caller can read the backing hash.
+ * Returns a stable skill ZIP proxy URL when the caller can read the backing blob digest.
  *
  * This intentionally does not preflight object existence. Existence checks belong to
  * the stable `/skills/:id/zip` proxy at request time so server-side callers do not
@@ -21,11 +21,11 @@ export const resolveAccessibleSkillZipProxyUrl = async ({
   fileModel,
   internal,
   skillId,
-  zipFileHash,
+  zipSha256,
 }: ResolveAccessibleSkillZipProxyUrlParams) => {
-  if (!zipFileHash) return;
+  if (!zipSha256) return;
 
-  const canAccess = await fileModel.canAccessGlobalFileByHash(zipFileHash);
+  const canAccess = await fileModel.canAccessGlobalFileBySha256(zipSha256);
   if (!canAccess) return;
 
   const url = new URL(getSkillZipProxyUrl(skillId, { internal }));

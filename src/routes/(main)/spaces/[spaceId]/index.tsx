@@ -1,3 +1,3 @@
 'use client';
 
-export { default } from '@/features/ResourceSpaces/SpaceHomePage';
+export { default } from '@/features/ResourceSpaces/SpaceRootRedirectPage';

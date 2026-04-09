@@ -58,7 +58,9 @@ const ForkAndChat = memo<{ mobile?: boolean }>(({ mobile }) => {
     if (!isAuthenticated) {
       try {
         await signIn();
-      } catch {
+      } catch (error) {
+        console.error('Fork sign-in failed:', error);
+        message.error(t('fork.failed'));
         return;
       }
     }

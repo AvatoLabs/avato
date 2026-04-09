@@ -10,7 +10,6 @@ import {
   insertEvalEvaluationSchema,
 } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
-import dayjs from 'dayjs';
 import JSONL from 'jsonl-parse-stringify';
 import pMap from 'p-map';
 import { z } from 'zod';
@@ -23,6 +22,7 @@ import {
   EvalEvaluationModel,
   EvaluationRecordModel,
 } from '@/database/models/ragEval';
+import { SourceSetModel } from '@/database/models/sourceSet';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { keyVaults, serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { createAsyncCaller } from '@/server/routers/async';
@@ -45,6 +45,7 @@ const ragEvalProcedure = authedProcedure
         evaluationModel: new EvalEvaluationModel(ctx.serverDB, ctx.userId),
         evaluationRecordModel: new EvaluationRecordModel(ctx.serverDB, ctx.userId),
         fileService: new FileService(ctx.serverDB, ctx.userId),
+        sourceSetModel: new SourceSetModel(ctx.serverDB, ctx.userId),
       },
     });
   });
@@ -263,9 +264,14 @@ export const ragEvalRouter = router({
           answer: record.answer,
           ground_truth: record.ideal,
         }));
-        const date = dayjs().format('YYYY-MM-DD-HH-mm');
-        const filename = `${date}-eval_${evaluation.id}-${evaluation.name}.jsonl`;
-        const path = `rag_eval_records/${filename}`;
+        const sourceSet = evaluation.sourceSetId
+          ? await ctx.sourceSetModel.findByIdAny(evaluation.sourceSetId)
+          : null;
+        const { key: path } = await ctx.fileService.createOpaqueUserBlobPath(
+          'rag-eval-records',
+          'jsonl',
+          sourceSet?.spaceId ?? undefined,
+        );
 
         await ctx.fileService.uploadContent(path, JSONL.stringify(evalRecords));
 

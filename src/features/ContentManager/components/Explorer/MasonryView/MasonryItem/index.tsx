@@ -8,6 +8,7 @@ import { shallow } from 'zustand/shallow';
 import InlineRename from '@/components/InlineRename';
 import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree/treeState';
 import { buildFileAssetBadges } from '@/features/ContentManager/utils/buildFileAssetBadges';
+import { buildFileGovernanceActivity } from '@/features/ContentManager/utils/buildFileGovernanceActivity';
 import { resolveResourceKind } from '@/features/ContentManager/utils/resolveResourceKind';
 import {
   getTransparentDragImage,
@@ -89,7 +90,10 @@ const styles = createStaticStyles(({ css }) => ({
 
     background: ${cssVar.colorBgContainer};
 
-    transition: all ${cssVar.motionDurationMid};
+    transition:
+      border-color ${cssVar.motionDurationMid},
+      box-shadow ${cssVar.motionDurationMid},
+      background-color ${cssVar.motionDurationMid};
 
     &:hover {
       border-color: ${cssVar.colorPrimary};
@@ -199,6 +203,12 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
     finishEmbedding,
     chunkCount,
     assetClassification,
+    assetLatestGovernanceAuditAction,
+    assetLatestGovernanceAuditActorDisplayName,
+    assetLatestGovernanceAuditAt,
+    assetLatestGovernanceAuditAfter,
+    assetLatestGovernanceAuditBefore,
+    assetLatestGovernanceAuditChangedFields,
     assetPrimaryRenditionKind,
     assetPrimaryRenditionLabel,
     assetReviewStatus,
@@ -263,6 +273,7 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
         buildFileAssetBadges({
           assetClassification,
           compact: true,
+          maxVisible: 3,
           assetPrimaryRenditionKind,
           assetPrimaryRenditionLabel,
           assetReviewStatus,
@@ -270,7 +281,7 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
           assetUsagePolicy,
           assetVersionLabel,
           t,
-        }).slice(0, 2),
+        }),
       [
         assetClassification,
         assetPrimaryRenditionKind,
@@ -279,6 +290,27 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
         assetRenditionCount,
         assetUsagePolicy,
         assetVersionLabel,
+        t,
+      ],
+    );
+    const governanceActivity = useMemo(
+      () =>
+        buildFileGovernanceActivity({
+          action: assetLatestGovernanceAuditAction,
+          actorDisplayName: assetLatestGovernanceAuditActorDisplayName,
+          after: assetLatestGovernanceAuditAfter,
+          before: assetLatestGovernanceAuditBefore,
+          changedFields: assetLatestGovernanceAuditChangedFields,
+          createdAt: assetLatestGovernanceAuditAt,
+          t,
+        }),
+      [
+        assetLatestGovernanceAuditAction,
+        assetLatestGovernanceAuditActorDisplayName,
+        assetLatestGovernanceAuditAt,
+        assetLatestGovernanceAuditAfter,
+        assetLatestGovernanceAuditBefore,
+        assetLatestGovernanceAuditChangedFields,
         t,
       ],
     );
@@ -291,6 +323,7 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
       isPage,
       sourceSetId,
       onOpen,
+      sourceType,
       slug,
     });
 
@@ -632,6 +665,13 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
                 {badge.label}
               </Tag>
             ))}
+          </div>
+        )}
+        {governanceActivity && (
+          <div className={styles.governanceBadges} style={{ paddingTop: 0 }}>
+            <Text ellipsis fontSize={12} title={governanceActivity.title} type={'secondary'}>
+              {governanceActivity.label}
+            </Text>
           </div>
         )}
       </div>

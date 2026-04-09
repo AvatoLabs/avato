@@ -4,6 +4,7 @@ import { ArrowUpIcon, PlusIcon } from 'lucide-react';
 import { type ChangeEvent, type KeyboardEvent, memo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { message } from '@/components/AntdStaticMethods';
 import { usePageStore } from '@/store/docs';
 import { useFileStore } from '@/store/file';
 import { DocumentSourceType } from '@/types/document';
@@ -137,13 +138,23 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
 
     const handleCreateDocument = async (content: string, title: string) => {
       if (isTablePage) {
-        await createNewTable(title, { sourceSetId, spaceId });
+        try {
+          await createNewTable(title, { sourceSetId, spaceId });
+        } catch (error) {
+          console.error('Failed to create page:', error);
+          message.error(t('docEditor.empty.createError'));
+        }
         return;
       }
 
       if (!content) {
-        // For empty pages, use createNewPage which handles optimistic updates
-        await createNewPage(title, { sourceSetId, spaceId });
+        try {
+          // For empty pages, use createNewPage which handles optimistic updates
+          await createNewPage(title, { sourceSetId, spaceId });
+        } catch (error) {
+          console.error('Failed to create page:', error);
+          message.error(t('docEditor.empty.createError'));
+        }
         return;
       }
 
@@ -193,7 +204,7 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
         // Remove temp document on error
         usePageStore.getState().removeTempPage(tempPageId);
         setSelectedPageId(null);
-        throw error;
+        message.error(t('docEditor.empty.createError'));
       }
     };
 
@@ -263,11 +274,12 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
             console.error('Failed to upload and parse file:', error);
             // Remove temp document on error
             usePageStore.getState().removeTempPage(tempPageId);
-            throw error;
+            message.error(t('docEditor.empty.importError'));
           }
         }
       } catch (error) {
         console.error('Failed to upload file:', error);
+        message.error(t('docEditor.empty.uploadError'));
       } finally {
         setIsUploading(false);
       }

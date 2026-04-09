@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { FileAssetClassification, FileAssetReviewStatus, FilesTabs, SortType } from '@/types/files';
+import {
+  FileAssetClassification,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+  FilesTabs,
+  SortType,
+} from '@/types/files';
 
 import { buildExplorerQueryParams, isSpaceLevelContentFilter } from './queryParams';
 
@@ -62,14 +68,26 @@ describe('buildExplorerQueryParams', () => {
 
   it('passes through asset usage policy filters', () => {
     const params = buildExplorerQueryParams({
-      assetUsagePolicy: 'restricted',
+      assetUsagePolicy: FileAssetUsagePolicy.Restricted,
       category: FilesTabs.Home,
       sorter: 'createdAt',
       sortType: SortType.Desc,
       spaceId: 'spc_1',
     });
 
-    expect(params.assetUsagePolicy).toBe('restricted');
+    expect(params.assetUsagePolicy).toBe(FileAssetUsagePolicy.Restricted);
+  });
+
+  it('passes through asset rights owner filters', () => {
+    const params = buildExplorerQueryParams({
+      assetRightsOwner: 'Brand Team',
+      category: FilesTabs.Home,
+      sorter: 'createdAt',
+      sortType: SortType.Desc,
+      spaceId: 'spc_1',
+    });
+
+    expect(params.assetRightsOwner).toBe('Brand Team');
   });
 
   it('passes through asset review status filters', () => {

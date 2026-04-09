@@ -221,7 +221,7 @@ const Home: FC = () => {
                   >
                     <Flexbox align={'flex-start'} gap={6}>
                       <Text strong>{item.title}</Text>
-                      <Text size={'small'} type={'secondary'}>
+                      <Text fontSize={12} type={'secondary'}>
                         {item.description}
                       </Text>
                     </Flexbox>

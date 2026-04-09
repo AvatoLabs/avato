@@ -1,5 +1,4 @@
-import { getCanonicalContentKind } from '@lobechat/types';
-
+import { getCanonicalContentKind } from '@/types/content';
 import {
   type ContentItem,
   type ContentQueryParams,
@@ -47,6 +46,7 @@ const mapToContentItem = (item: FileListItem & { sourceSetId?: string | null }):
     size: item.size,
     slug: item.slug,
     sourceType,
+    spaceId: item.spaceId ?? undefined,
     updatedAt: item.updatedAt,
     url: item.url,
   };

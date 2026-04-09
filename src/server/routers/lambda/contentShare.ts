@@ -1,5 +1,4 @@
 import { documents } from '@lobechat/database/schemas';
-import { getCanonicalContentKind } from '@lobechat/types';
 import { nanoid } from '@lobechat/utils';
 import { TRPCError } from '@trpc/server';
 import bcrypt from 'bcryptjs';
@@ -18,6 +17,7 @@ import {
   resolveContentShareAccess,
   resolveContentShareExpiresAt,
 } from '@/server/services/content/sharePolicy';
+import { getCanonicalContentKind } from '@/types/content';
 
 const resolveTargetContent = async (
   model: ContentModel,
@@ -174,6 +174,10 @@ export const contentShareRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'SHARE_NOT_FOUND' });
       }
 
+      if (access.status !== 'ok') {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'SHARE_NOT_FOUND' });
+      }
+
       const { link } = access;
 
       const summary = await contentModel.getContentSummary(link.contentUid);
@@ -290,6 +294,10 @@ export const contentShareRouter = router({
       }
 
       if (access.status === 'not_found') {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'SHARE_NOT_FOUND' });
+      }
+
+      if (access.status !== 'ok') {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'SHARE_NOT_FOUND' });
       }
 

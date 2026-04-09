@@ -1,6 +1,5 @@
-import { getCanonicalContentKind } from '@lobechat/types';
-
 import { lambdaClient } from '@/libs/trpc/client';
+import { getCanonicalContentKind } from '@/types/content';
 import {
   type CheckSpaceBlobResult,
   type FileAssetClassification,

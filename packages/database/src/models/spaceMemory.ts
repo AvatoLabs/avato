@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gt, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 
 import { spaceMemoryEntries, users } from '../schemas';
 import type { LobeChatDatabase } from '../type';
@@ -7,6 +7,7 @@ type SpaceMemorySection = 'inbox' | 'playbooks' | 'policies' | 'published';
 type SpaceMemoryCategory = 'general' | 'playbook' | 'policy';
 type SpaceMemorySourceKind = 'document' | 'file' | 'message' | 'source_set' | 'topic';
 type SpaceMemoryRecallBlockedReason = 'disabled' | 'expired' | 'stale';
+type SpaceMemoryRecallFilter = 'active' | 'all' | 'disabled' | 'expired' | 'stale';
 type SpaceMemorySurface = 'personal' | 'reviewer' | 'viewer';
 const DEFAULT_RECALL_LIMITS: Record<SpaceMemoryCategory, number> = {
   general: 4,
@@ -343,6 +344,10 @@ interface SpaceMemorySummary {
   canPublish: boolean;
   canReview: boolean;
   contract?: {
+    canAccessAudit: boolean;
+    canCreate: boolean;
+    canManageRecall: boolean;
+    canViewInbox: boolean;
     detailViews: ('audit' | 'overview')[];
     recallFilters: ('active' | 'all' | 'disabled' | 'expired' | 'stale')[];
     sections: SpaceMemorySection[];
@@ -459,6 +464,19 @@ interface SpaceMemoryEntryDetailRow {
   summary?: string | null;
   title?: string | null;
   updatedAt?: Date | string | null;
+}
+
+interface DuplicatePublishedMatch {
+  content?: string | null;
+  id: string;
+  publishedAt?: string | null;
+  sourceRefs?: {
+    id: string;
+    kind: SpaceMemorySourceKind;
+    title?: string;
+  }[];
+  summary?: string | null;
+  title: string;
 }
 
 export class SpaceMemoryModel {
@@ -651,6 +669,38 @@ export class SpaceMemoryModel {
     }
   };
 
+  private buildRecallFilterWhere = (recallFilter: SpaceMemoryRecallFilter, now: Date) => {
+    if (recallFilter === 'all') return undefined;
+
+    const recallEnabledWhere = or(
+      eq(spaceMemoryEntries.recallEnabled, true),
+      isNull(spaceMemoryEntries.recallEnabled),
+    );
+
+    switch (recallFilter) {
+      case 'active': {
+        return and(
+          recallEnabledWhere,
+          isNull(spaceMemoryEntries.staleAt),
+          or(isNull(spaceMemoryEntries.expiresAt), gt(spaceMemoryEntries.expiresAt, now)),
+        );
+      }
+      case 'disabled': {
+        return eq(spaceMemoryEntries.recallEnabled, false);
+      }
+      case 'expired': {
+        return and(
+          recallEnabledWhere,
+          isNull(spaceMemoryEntries.staleAt),
+          lte(spaceMemoryEntries.expiresAt, now),
+        );
+      }
+      case 'stale': {
+        return and(recallEnabledWhere, sql`${spaceMemoryEntries.staleAt} is not null`);
+      }
+    }
+  };
+
   private buildEntryDetailWhere = (spaceId: string, ids: string[]) =>
     and(
       eq(spaceMemoryEntries.spaceId, spaceId),
@@ -658,7 +708,10 @@ export class SpaceMemoryModel {
       or(eq(spaceMemoryEntries.status, 'candidate'), eq(spaceMemoryEntries.status, 'published')),
     );
 
-  private fetchEntryDetailRows = async (params: { ids: string[]; spaceId: string }) => {
+  private fetchEntryDetailRows = async (params: {
+    ids: string[];
+    spaceId: string;
+  }): Promise<SpaceMemoryEntryDetailRow[]> => {
     if (params.ids.length === 0) return [] as SpaceMemoryEntryDetailRow[];
 
     return this.db
@@ -681,13 +734,15 @@ export class SpaceMemoryModel {
         updatedAt: spaceMemoryEntries.updatedAt,
       })
       .from(spaceMemoryEntries)
-      .where(this.buildEntryDetailWhere(params.spaceId, params.ids));
+      .where(this.buildEntryDetailWhere(params.spaceId, params.ids)) as Promise<
+      SpaceMemoryEntryDetailRow[]
+    >;
   };
 
   private buildDuplicatePublishedMap = async (
     rows: SpaceMemoryEntryDetailRow[],
     spaceId: string,
-  ) => {
+  ): Promise<Map<string, DuplicatePublishedMatch>> => {
     const candidateSummaries = [
       ...new Set(
         rows.flatMap((row) =>
@@ -699,21 +754,7 @@ export class SpaceMemoryModel {
     ];
 
     if (candidateSummaries.length === 0) {
-      return new Map<
-        string,
-        {
-          content?: string | null;
-          id: string;
-          publishedAt?: string | null;
-          sourceRefs?: {
-            id: string;
-            kind: SpaceMemorySourceKind;
-            title?: string;
-          }[];
-          summary?: string | null;
-          title: string;
-        }
-      >();
+      return new Map<string, DuplicatePublishedMatch>();
     }
 
     const summaries = [
@@ -740,21 +781,7 @@ export class SpaceMemoryModel {
       )
       .orderBy(desc(spaceMemoryEntries.publishedAt));
 
-    const duplicateMap = new Map<
-      string,
-      {
-        content?: string | null;
-        id: string;
-        publishedAt?: string | null;
-        sourceRefs?: {
-          id: string;
-          kind: SpaceMemorySourceKind;
-          title?: string;
-        }[];
-        summary?: string | null;
-        title: string;
-      }
-    >();
+    const duplicateMap = new Map<string, DuplicatePublishedMatch>();
 
     for (const match of matches) {
       if (!match.summary?.trim()) continue;
@@ -863,10 +890,7 @@ export class SpaceMemoryModel {
   };
 
   getSummary = async (params: {
-    canCreate: boolean;
-    canPublish: boolean;
-    canReview: boolean;
-    contract?: SpaceMemorySummary['contract'];
+    contract: NonNullable<SpaceMemorySummary['contract']>;
     id: string;
     kind?: SpaceMemorySummary['kind'];
     membershipRole?: SpaceMemorySummary['membershipRole'];
@@ -902,9 +926,9 @@ export class SpaceMemoryModel {
     ]);
 
     return {
-      canCreate: params.canCreate,
-      canPublish: params.canPublish,
-      canReview: params.canReview,
+      canCreate: params.contract.canCreate,
+      canPublish: params.contract.canManageRecall,
+      canReview: params.contract.canManageRecall,
       contract: params.contract,
       id: params.id,
       kind: params.kind,
@@ -945,9 +969,15 @@ export class SpaceMemoryModel {
   };
 
   listEntries = async (params: {
+    recallFilter?: SpaceMemoryRecallFilter;
     section: SpaceMemorySection;
     spaceId: string;
   }): Promise<SpaceMemorySectionResult> => {
+    const recallFilter = params.section === 'inbox' ? 'all' : (params.recallFilter ?? 'all');
+    const now = new Date();
+    const sectionWhere = this.buildSectionWhere(params.spaceId, params.section);
+    const recallWhere = this.buildRecallFilterWhere(recallFilter, now);
+    const listWhere = recallWhere ? and(sectionWhere, recallWhere) : sectionWhere;
     const rows =
       params.section === 'inbox'
         ? await this.db
@@ -971,7 +1001,7 @@ export class SpaceMemoryModel {
             })
             .from(spaceMemoryEntries)
             .leftJoin(users, eq(spaceMemoryEntries.createdBy, users.id))
-            .where(this.buildSectionWhere(params.spaceId, params.section))
+            .where(listWhere)
             .orderBy(desc(spaceMemoryEntries.updatedAt))
             .limit(50)
         : await this.db
@@ -995,7 +1025,7 @@ export class SpaceMemoryModel {
             })
             .from(spaceMemoryEntries)
             .leftJoin(users, eq(spaceMemoryEntries.reviewedBy, users.id))
-            .where(this.buildSectionWhere(params.spaceId, params.section))
+            .where(listWhere)
             .orderBy(
               sql<number>`case when ${spaceMemoryEntries.staleAt} is not null then 0 else 1 end`,
               desc(spaceMemoryEntries.publishedAt),
@@ -1004,14 +1034,7 @@ export class SpaceMemoryModel {
 
     const duplicatePublishedByKey =
       params.section !== 'inbox'
-        ? new Map<
-            string,
-            {
-              id: string;
-              publishedAt?: string | null;
-              title: string;
-            }
-          >()
+        ? new Map<string, DuplicatePublishedMatch>()
         : await (async () => {
             const candidateSummaries = [
               ...new Set(
@@ -1022,14 +1045,7 @@ export class SpaceMemoryModel {
             ];
 
             if (!candidateSummaries.length) {
-              return new Map<
-                string,
-                {
-                  id: string;
-                  publishedAt?: string | null;
-                  title: string;
-                }
-              >();
+              return new Map<string, DuplicatePublishedMatch>();
             }
 
             const summaries = [
@@ -1056,21 +1072,7 @@ export class SpaceMemoryModel {
               )
               .orderBy(desc(spaceMemoryEntries.publishedAt));
 
-            const duplicateMap = new Map<
-              string,
-              {
-                content?: string | null;
-                id: string;
-                publishedAt?: string | null;
-                sourceRefs?: {
-                  id: string;
-                  kind: SpaceMemorySourceKind;
-                  title?: string;
-                }[];
-                summary?: string | null;
-                title: string;
-              }
-            >();
+            const duplicateMap = new Map<string, DuplicatePublishedMatch>();
 
             for (const match of matches) {
               if (!match.summary?.trim()) continue;
@@ -1149,7 +1151,8 @@ export class SpaceMemoryModel {
                             row.sourceRefs?.filter(
                               (item) =>
                                 !match.sourceRefs?.some(
-                                  (target) => target.kind === item.kind && target.id === item.id,
+                                  (target: { id: string; kind: SpaceMemorySourceKind }) =>
+                                    target.kind === item.kind && target.id === item.id,
                                 ),
                             ).length ?? 0,
                           updatesContent:

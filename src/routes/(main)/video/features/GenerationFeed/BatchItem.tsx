@@ -54,8 +54,9 @@ export const VideoGenerationBatchItem = memo<VideoGenerationBatchItemProps>(({ b
       await removeGeneration(generation.id);
     } catch (error) {
       console.error('Failed to delete generation:', error);
+      message.error(t('generation.actions.deleteFailed'));
     }
-  }, [removeGeneration, generation?.id]);
+  }, [message, removeGeneration, generation?.id, t]);
 
   const handleDownload = useCallback(async () => {
     if (!generation?.asset?.url) return;
@@ -70,8 +71,9 @@ export const VideoGenerationBatchItem = memo<VideoGenerationBatchItemProps>(({ b
       await downloadFile(generation.asset.url, fileName, false);
     } catch (error) {
       console.error('Failed to download video:', error);
+      message.error(t('generation.actions.downloadFailed'));
     }
-  }, [generation?.asset?.url, generation?.createdAt, batch.prompt]);
+  }, [generation?.asset?.url, generation?.createdAt, batch.prompt, message, t]);
 
   const handleCopyError = useCallback(async () => {
     if (!generation?.task.error) return;

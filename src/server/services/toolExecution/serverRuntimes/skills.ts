@@ -9,16 +9,17 @@ import type { LobeChatDatabase } from '@lobechat/database';
 import type { SkillItem, SkillListItem, SkillResourceContent } from '@lobechat/types';
 import type { CodeInterpreterToolName } from '@lobehub/market-sdk';
 import debug from 'debug';
-import { sha256 } from 'js-sha256';
 
 import { AgentSkillModel } from '@/database/models/agentSkill';
 import { FileModel } from '@/database/models/file';
-import { SpaceModel } from '@/database/models/space';
 import { UserModel } from '@/database/models/user';
 import { filterBuiltinSkills } from '@/helpers/skillFilters';
 import { getBlobProvider } from '@/server/modules/BlobProvider';
 import { FileService } from '@/server/services/file';
-import { resolveSpaceIdForSandboxExport } from '@/server/services/file/resolveSpaceIdForSandboxExport';
+import {
+  generateSandboxExportStorageKey,
+  resolveTargetSpaceIdForSandboxExport,
+} from '@/server/services/file/sandboxExport';
 import { MarketService } from '@/server/services/market';
 import { resolveAccessibleSkillZipProxyUrl } from '@/server/services/skill/resolveAccessibleSkillZipProxyUrl';
 import { SkillResourceService } from '@/server/services/skill/resource';
@@ -123,12 +124,12 @@ class SkillServerRuntimeService implements SkillRuntimeService {
           };
         }
 
-        if (skill.zipFileHash) {
+        if (skill.zipSha256) {
           const zipUrl = await resolveAccessibleSkillZipProxyUrl({
             fileModel: this.fileModel,
             internal: true,
             skillId: skill.id,
-            zipFileHash: skill.zipFileHash,
+            zipSha256: skill.zipSha256,
           });
           if (zipUrl) {
             enhancedParams.zipUrl = zipUrl;
@@ -185,11 +186,15 @@ class SkillServerRuntimeService implements SkillRuntimeService {
     }
 
     try {
-      const blobProvider = getBlobProvider();
+      const exportSpaceId = await resolveTargetSpaceIdForSandboxExport({
+        db: this.serverDB,
+        ...(this.spaceId ? { spaceId: this.spaceId } : {}),
+        topicId: this.topicId,
+        userId: this.userId,
+      });
 
-      // Use date-based sharding (same as market.ts)
-      const today = new Date().toISOString().split('T')[0];
-      const key = `code-interpreter-exports/${today}/${this.topicId}/${filename}`;
+      const blobProvider = getBlobProvider();
+      const key = generateSandboxExportStorageKey(exportSpaceId);
 
       // Step 1: Generate pre-signed upload URL
       const uploadUrl = await blobProvider.createUploadUrl(key);
@@ -222,36 +227,16 @@ class SkillServerRuntimeService implements SkillRuntimeService {
         };
       }
 
-      // Step 3: Get file metadata from S3
+      // Step 3: Resolve content type from storage metadata / sandbox response
       const metadata = await blobProvider.getObjectMetadata(key);
-      const fileSize = metadata.contentLength;
       const mimeType = metadata.contentType || result?.mimeType || 'application/octet-stream';
 
-      // Step 4: Create persistent file record
-      const fileHash = sha256(key + Date.now().toString());
-
-      let exportSpaceId: string | undefined;
-      if (this.spaceId) {
-        const space = await new SpaceModel(this.serverDB, this.userId).findAccessibleSpaceById(
-          this.spaceId,
-        );
-        exportSpaceId = space?.id;
-      }
-      if (exportSpaceId === undefined) {
-        exportSpaceId = await resolveSpaceIdForSandboxExport(
-          this.serverDB,
-          this.userId,
-          this.topicId,
-        );
-      }
-
-      const { fileId, url } = await this.fileService.createFileRecord({
-        fileHash,
+      // Step 4: Create a persistent file record using the real stored-object sha256
+      const { fileId, size: fileSize, url } = await this.fileService.createFileRecordFromStorageObject({
         fileType: mimeType,
         name: filename,
-        size: fileSize,
-        ...(exportSpaceId !== undefined ? { spaceId: exportSpaceId } : {}),
-        url: key, // Store S3 key
+        spaceId: exportSpaceId,
+        storageKey: key, // Store S3 key
       });
 
       log('Created file record: fileId=%s, url=%s', fileId, url);

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
+import {
+  FileAssetClassification,
+  FileAssetRenditionKind,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+} from '@/types/files';
+
 import { buildFileAssetBadges } from './buildFileAssetBadges';
 
 const t = (key: string) => key;
@@ -8,12 +15,12 @@ describe('buildFileAssetBadges', () => {
   it('should render compact governance badges for non-default states', () => {
     expect(
       buildFileAssetBadges({
-        assetClassification: 'brand',
-        assetPrimaryRenditionKind: 'preview',
+        assetClassification: FileAssetClassification.Brand,
+        assetPrimaryRenditionKind: FileAssetRenditionKind.Preview,
         assetPrimaryRenditionLabel: 'Homepage',
-        assetReviewStatus: 'approved',
+        assetReviewStatus: FileAssetReviewStatus.Approved,
         assetRenditionCount: 3,
-        assetUsagePolicy: 'restricted',
+        assetUsagePolicy: FileAssetUsagePolicy.Restricted,
         assetVersionLabel: 'v2',
         t: t as any,
       }),
@@ -55,12 +62,12 @@ describe('buildFileAssetBadges', () => {
   it('should surface archived review status in compact governance badges', () => {
     expect(
       buildFileAssetBadges({
-        assetClassification: 'general',
+        assetClassification: FileAssetClassification.General,
         assetPrimaryRenditionKind: null,
         assetPrimaryRenditionLabel: null,
-        assetReviewStatus: 'archived',
+        assetReviewStatus: FileAssetReviewStatus.Archived,
         assetRenditionCount: null,
-        assetUsagePolicy: 'internal',
+        assetUsagePolicy: FileAssetUsagePolicy.Internal,
         assetVersionLabel: null,
         t: t as any,
       }),
@@ -77,12 +84,12 @@ describe('buildFileAssetBadges', () => {
   it('should hide default governance badges in list surfaces', () => {
     expect(
       buildFileAssetBadges({
-        assetClassification: 'general',
+        assetClassification: FileAssetClassification.General,
         assetPrimaryRenditionKind: null,
         assetPrimaryRenditionLabel: null,
-        assetReviewStatus: 'draft',
+        assetReviewStatus: FileAssetReviewStatus.Draft,
         assetRenditionCount: null,
-        assetUsagePolicy: 'internal',
+        assetUsagePolicy: FileAssetUsagePolicy.Internal,
         assetVersionLabel: null,
         t: t as any,
       }),
@@ -92,13 +99,13 @@ describe('buildFileAssetBadges', () => {
   it('should keep approved review state visible alongside the primary rendition summary', () => {
     expect(
       buildFileAssetBadges({
-        assetClassification: 'general',
+        assetClassification: FileAssetClassification.General,
         compact: true,
-        assetPrimaryRenditionKind: 'preview',
+        assetPrimaryRenditionKind: FileAssetRenditionKind.Preview,
         assetPrimaryRenditionLabel: 'Homepage',
-        assetReviewStatus: 'approved',
+        assetReviewStatus: FileAssetReviewStatus.Approved,
         assetRenditionCount: 2,
-        assetUsagePolicy: 'internal',
+        assetUsagePolicy: FileAssetUsagePolicy.Internal,
         assetVersionLabel: null,
         t: t as any,
       }),
@@ -114,6 +121,42 @@ describe('buildFileAssetBadges', () => {
         key: 'rendition:preview:Homepage:1',
         label: 'detail.asset.rendition.preview · +1',
         title: 'detail.asset.rendition.preview · Homepage · +1',
+        variant: 'outlined',
+      },
+    ]);
+  });
+
+  it('should collapse hidden compact badges into an overflow badge', () => {
+    expect(
+      buildFileAssetBadges({
+        assetClassification: FileAssetClassification.Brand,
+        compact: true,
+        maxVisible: 3,
+        assetPrimaryRenditionKind: null,
+        assetPrimaryRenditionLabel: null,
+        assetReviewStatus: FileAssetReviewStatus.Archived,
+        assetRenditionCount: null,
+        assetUsagePolicy: FileAssetUsagePolicy.Restricted,
+        assetVersionLabel: 'Version 2026 Launch Candidate',
+        t: t as any,
+      }),
+    ).toEqual([
+      {
+        color: 'gold',
+        key: 'usage:restricted',
+        label: 'detail.asset.usagePolicy.restricted',
+        variant: 'outlined',
+      },
+      {
+        color: 'gold',
+        key: 'review:archived',
+        label: 'detail.asset.reviewStatus.archived',
+        variant: 'filled',
+      },
+      {
+        key: 'overflow:version:Version 2026 Launch Candidate|classification:brand',
+        label: '+2',
+        title: 'Version 2026 Launch Candidate · detail.asset.classification.brand',
         variant: 'outlined',
       },
     ]);

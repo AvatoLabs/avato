@@ -6,7 +6,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   buildFilesFolderPath,
   buildFilesRootPath,
-  buildSpaceRootPath,
   SurfaceBreadcrumb,
 } from '@/features/ResourceSpaces';
 import { useSpaceName } from '@/features/ResourceSpaces/useSpaceName';
@@ -63,7 +62,6 @@ const Breadcrumb = memo<BreadcrumbProps>(({ fileName }) => {
   const buildPreservedQueryString = (clearScope = false) => {
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('file');
-    newParams.delete('files');
     if (clearScope) newParams.delete('scope');
 
     return newParams.toString();
@@ -71,7 +69,7 @@ const Breadcrumb = memo<BreadcrumbProps>(({ fileName }) => {
 
   const handleSpaceNavigate = () => {
     clearViewAndSelection();
-    const basePath = buildSpaceRootPath(spaceId);
+    const basePath = buildFilesRootPath(spaceId);
     navigate(basePath);
   };
 

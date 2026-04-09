@@ -211,13 +211,19 @@ const UserFavoritePlugins = memo<UserFavoritePluginsProps>(({ rows = 4 }) => {
   const removeFavorite = useDiscoverStore((s) => s.removeFavorite);
 
   const { data, mutate } = useFavoritePlugins(user.id);
+  const rawData = data?.items ?? (data as any)?.data ?? [];
 
   const handleUnfavorite = useCallback(
     async (identifier: string) => {
       try {
-        const plugin = data?.items.find((p) => p.identifier === identifier);
-        if (plugin) {
-          await removeFavorite('plugin', (plugin as any).id);
+        const favoriteItem = rawData.find((item: any) => {
+          const plugin = item.plugin || item;
+          return plugin.identifier === identifier;
+        });
+        const plugin = favoriteItem?.plugin || favoriteItem;
+
+        if (plugin?.id) {
+          await removeFavorite('plugin', plugin.id);
           await mutate();
           message.success(t('user.unfavoriteSuccess'));
         }
@@ -226,11 +232,10 @@ const UserFavoritePlugins = memo<UserFavoritePluginsProps>(({ rows = 4 }) => {
         message.error(t('user.unfavoriteFailed'));
       }
     },
-    [data, removeFavorite, mutate, message, t],
+    [rawData, removeFavorite, mutate, message, t],
   );
 
   // SDK returns { data: [{ plugin: {...}, favoritedAt: string }] } or flat array
-  const rawData = data?.items ?? (data as any)?.data ?? [];
   const plugins: FavoritePluginItem[] = rawData.map((item: any) => {
     const plugin = item.plugin || item;
     return {

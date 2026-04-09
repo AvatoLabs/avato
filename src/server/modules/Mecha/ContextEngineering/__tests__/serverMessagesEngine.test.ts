@@ -292,9 +292,7 @@ describe('serverMessagesEngine', () => {
       const messages = createBasicMessages();
 
       const result = await serverMessagesEngine({
-        messages,
-        model: 'gpt-4',
-        pageContentContext: {
+        docContentContext: {
           markdown: '# Test Document\n\nPage content',
           metadata: {
             charCount: 30,
@@ -303,6 +301,8 @@ describe('serverMessagesEngine', () => {
           },
           xml: '<doc><h1 id="1">Test Document</h1><p id="2">Page content</p></doc>',
         },
+        messages,
+        model: 'gpt-4',
         provider: 'openai',
       });
 
@@ -512,17 +512,17 @@ describe('serverMessagesEngine', () => {
           config: { model: 'gpt-4', systemRole: 'Test role' },
           meta: { description: 'Test agent', title: 'Test' },
         },
+        docContentContext: {
+          markdown: '# Doc',
+          metadata: { charCount: 5, lineCount: 1, title: 'Doc' },
+          xml: '<doc><h1 id="1">Doc</h1></doc>',
+        },
         discordContext: {
           channel: { id: 'ch-1', name: 'general' },
           guild: { id: 'guild-1', name: 'Test Guild' },
         },
         messages,
         model: 'gpt-4',
-        pageContentContext: {
-          markdown: '# Doc',
-          metadata: { charCount: 5, lineCount: 1, title: 'Doc' },
-          xml: '<doc><h1 id="1">Doc</h1></doc>',
-        },
         provider: 'openai',
       });
 

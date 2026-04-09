@@ -227,7 +227,9 @@ describe('PublicSharePage', () => {
   });
 
   it('shows an inline validation message when a protected share is submitted without a password', () => {
-    swrState.error = new TRPCClientError('SHARE_PASSWORD_REQUIRED', { code: 'UNAUTHORIZED' });
+    const error = new TRPCClientError('SHARE_PASSWORD_REQUIRED');
+    Object.assign(error, { data: { code: 'UNAUTHORIZED' } });
+    swrState.error = error;
 
     render(<PublicSharePage />);
 
@@ -238,7 +240,9 @@ describe('PublicSharePage', () => {
   });
 
   it('shows an inline error when the submitted password is invalid', async () => {
-    swrState.error = new TRPCClientError('SHARE_PASSWORD_REQUIRED', { code: 'UNAUTHORIZED' });
+    const error = new TRPCClientError('SHARE_PASSWORD_REQUIRED');
+    Object.assign(error, { data: { code: 'UNAUTHORIZED' } });
+    swrState.error = error;
 
     render(<PublicSharePage />);
 

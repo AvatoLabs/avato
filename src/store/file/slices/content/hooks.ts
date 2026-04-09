@@ -5,12 +5,14 @@ import { shallow } from 'zustand/shallow';
 import { mutate, useClientDataSWR } from '@/libs/swr';
 import { contentService } from '@/services/content';
 import { type ContentItem, type ContentQueryParams } from '@/types/content';
+import { type FileAssetCapabilities } from '@/types/files';
 
 import { useFileStore } from '../../store';
 
 const SWR_KEY_CONTENT_ITEMS = 'SWR_CONTENT_ITEMS';
 
 interface ResourceQueryResponse {
+  governanceCapabilities?: FileAssetCapabilities;
   hasMore: boolean;
   items: ContentItem[];
   total?: number;
@@ -49,7 +51,7 @@ const syncResourceStore = (
   data: ResourceQueryResponse,
   actionName: string,
 ) => {
-  const { hasMore, offset, queryParams, resourceList, resourceMap, total } =
+  const { governanceCapabilities, hasMore, offset, queryParams, resourceList, resourceMap, total } =
     useFileStore.getState();
   const isActiveQuery = isSameResourceQueryParams(queryParams, params);
   const nextState = isActiveQuery
@@ -61,6 +63,7 @@ const syncResourceStore = (
     isActiveQuery &&
     isEqual(nextState.items, resourceList) &&
     isEqual(newResourceMap, resourceMap) &&
+    isEqual(governanceCapabilities, data.governanceCapabilities) &&
     hasMore === data.hasMore &&
     offset === nextState.offset &&
     total === data.total
@@ -70,6 +73,7 @@ const syncResourceStore = (
 
   useFileStore.setState(
     {
+      governanceCapabilities: data.governanceCapabilities,
       hasMore: data.hasMore,
       offset: nextState.offset,
       queryParams: params,
@@ -128,8 +132,9 @@ export const useFetchResources = (params: ContentQueryParams | null, enable: any
  */
 export const useVisibleResources = (params: ContentQueryParams | null, enable: any = true) => {
   const swr = useFetchResources(params, enable);
-  const { hasMore, queryParams, resourceList, total } = useFileStore(
+  const { governanceCapabilities, hasMore, queryParams, resourceList, total } = useFileStore(
     (s) => ({
+      governanceCapabilities: s.governanceCapabilities,
       hasMore: s.hasMore,
       queryParams: s.queryParams,
       resourceList: s.resourceList,
@@ -148,6 +153,9 @@ export const useVisibleResources = (params: ContentQueryParams | null, enable: a
 
   return {
     ...swr,
+    governanceCapabilities: isStoreActive
+      ? governanceCapabilities
+      : swr.data?.governanceCapabilities,
     hasMore: isStoreActive ? hasMore : (swr.data?.hasMore ?? false),
     hasResolvedData: isStoreActive || swr.data !== undefined,
     isStoreActive,
@@ -162,6 +170,7 @@ export const useVisibleResources = (params: ContentQueryParams | null, enable: a
 export const useResourceStore = () => {
   return useFileStore(
     (s) => ({
+      governanceCapabilities: s.governanceCapabilities,
       hasMore: s.hasMore,
       queryParams: s.queryParams,
       resourceList: s.resourceList,

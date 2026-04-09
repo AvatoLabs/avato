@@ -201,14 +201,14 @@ export default class McpCtr extends ControllerModule {
 
         const base64 = block.data;
         const buffer = Buffer.from(base64, 'base64');
-        const hash = createHash('sha256').update(buffer).digest('hex');
+        const sha256 = createHash('sha256').update(buffer).digest('hex');
         const id = randomUUID();
         const filePath = path.posix.join('mcp', `${block.type}s`, todayShard(), `${id}.${ext}`);
 
         const { metadata } = await this.fileService.uploadFile({
           content: base64,
           filename: `${id}.${ext}`,
-          hash,
+          sha256,
           path: filePath,
           type: block.mimeType,
         });

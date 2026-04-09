@@ -770,11 +770,13 @@ describe('lobehubSkillStore actions', () => {
         new Error('Revoke failed'),
       );
 
+      let success;
       await act(async () => {
-        await result.current.revokeLobehubSkill('linear');
+        success = await result.current.revokeLobehubSkill('linear');
       });
 
       // Server should still be in state after error
+      expect(success).toBe(false);
       expect(result.current.lobehubSkillServers).toHaveLength(1);
       expect(result.current.lobehubSkillLoadingIds.has('linear')).toBe(false);
     });

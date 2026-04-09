@@ -8,7 +8,7 @@ import useSWR from 'swr';
 import Loading from '@/components/Loading/BrandTextLoading';
 import { lambdaClient } from '@/libs/trpc/client';
 
-import { buildSpaceRootPath } from './paths';
+import { buildFilesRootPath } from './paths';
 import { SPACE_LIST_KEY } from './SpaceList';
 import {
   buildPendingGovernancePath,
@@ -67,7 +67,7 @@ const SpaceRedirectPage = memo(() => {
   }
 
   return (
-    <Navigate replace to={appendSearch(buildSpaceRootPath(targetSpace.id), location.search)} />
+    <Navigate replace to={appendSearch(buildFilesRootPath(targetSpace.id), location.search)} />
   );
 });
 

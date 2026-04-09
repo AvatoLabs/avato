@@ -31,6 +31,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useShallow } from 'zustand/shallow';
 
 import ChatDetailHeader from '../components/ChatDetailHeader';
 import AttachmentSheet from '../components/ui/AttachmentSheet';
@@ -96,6 +97,9 @@ import type {
 const EMPTY_CHAT_CONTEXT_SELECTIONS: ChatContextSelection[] = [];
 const EMPTY_MESSAGES: ChatMessage[] = [];
 const MESSAGE_ESTIMATE_SAMPLE_SIZE = 12;
+const AUTO_SCROLL_LOCK_OFFSET = 24;
+const SCROLL_TO_LATEST_OFFSET = 200;
+const SCROLL_TO_LATEST_BOTTOM_THRESHOLD = 100;
 const extractPersistedMessageIds = (messages: ChatMessage[]) =>
   messages
     .map((message) => message.id)
@@ -181,6 +185,9 @@ export default function ChatDetailScreen({
   );
   const fetchingMessages = useChatStore((s) => s.fetchingMessagesBySession[sessionKey] ?? false);
   const generating = useChatStore((s) => s.generating && s.activeStreamingSessionId === sessionKey);
+  const activeStreamingMessageId = useChatStore((s) =>
+    s.activeStreamingSessionId === sessionKey ? s.activeStreamingMessageId : null,
+  );
   const activeOperationId = useChatStore((s) => s.activeOperationId);
   const activeStreamingSessionId = useChatStore((s) => s.activeStreamingSessionId);
   const isReasoning = useChatStore((s) => s.isReasoning);
@@ -198,13 +205,15 @@ export default function ChatDetailScreen({
     [activeTopic, topics],
   );
 
-  const pendingFiles = useFileStore((s) => s.pendingFiles);
-  const addFile = useFileStore((s) => s.addFile);
-  const chatContextSelections = useFileStore((s) =>
-    sessionId
-      ? (s.sessionChatContextSelections[sessionId] ?? EMPTY_CHAT_CONTEXT_SELECTIONS)
-      : EMPTY_CHAT_CONTEXT_SELECTIONS,
+  const { chatContextSelectionCount, pendingFilesCount } = useFileStore(
+    useShallow((s) => ({
+      chatContextSelectionCount: sessionId
+        ? (s.sessionChatContextSelections[sessionId]?.length ?? 0)
+        : 0,
+      pendingFilesCount: s.pendingFiles.length,
+    })),
   );
+  const addFile = useFileStore((s) => s.addFile);
   const addSessionChatContextSelection = useFileStore((s) => s.addSessionChatContextSelection);
 
   const [inputText, setInputText] = useState('');
@@ -226,6 +235,10 @@ export default function ChatDetailScreen({
   /** Tracks generating across renders so we only refetch when a stream ends, not on every deps churn */
   const prevGenForMessageSyncRef = useRef<boolean | null>(null);
   const prevTopicForMessageSyncRef = useRef<string | null | undefined>(undefined);
+  const rawMessagesRef = useRef(rawMessages);
+  const activeTopicRef = useRef(activeTopic);
+  const sessionTypeRef = useRef(session?.type);
+  const showScrollToTopRef = useRef(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const animatedKeyboard = useAnimatedKeyboard();
@@ -289,6 +302,8 @@ export default function ChatDetailScreen({
     isScrolledToBottom.current = true;
     autoScrollLocked.current = false;
     lastAutoScrollAt.current = 0;
+    showScrollToTopRef.current = false;
+    setShowScrollToTop(false);
   }, [activeTopic, sessionId]);
 
   // Sync route topicId to store immediately (useLayoutEffect so it runs before useFocusEffect)
@@ -783,11 +798,23 @@ export default function ChatDetailScreen({
     setProviderLogoError(false);
   }, [toolbarProviderLogo, sessionProvider]);
 
+  useEffect(() => {
+    rawMessagesRef.current = rawMessages;
+  }, [rawMessages]);
+
+  useEffect(() => {
+    activeTopicRef.current = activeTopic;
+  }, [activeTopic]);
+
+  useEffect(() => {
+    sessionTypeRef.current = session?.type;
+  }, [session?.type]);
+
   const sendScale = useSharedValue(1);
   const sendAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: sendScale.value }],
   }));
-  const composerAttachmentCount = pendingFiles.length + chatContextSelections.length;
+  const composerAttachmentCount = pendingFilesCount + chatContextSelectionCount;
   const composerPreviewCount = composerAttachmentCount + conversationFiles.length;
   const composerPreviewVisible = composerPreviewCount > 0;
   const composerActive =
@@ -821,6 +848,11 @@ export default function ChatDetailScreen({
 
   const handleSend = useCallback(async () => {
     if (!sessionId || (!inputText.trim() && composerAttachmentCount === 0) || generating) return;
+
+    const chatContextSelections =
+      useFileStore.getState().sessionChatContextSelections[sessionId] ??
+      EMPTY_CHAT_CONTEXT_SELECTIONS;
+
     haptics.light();
     autoScrollLocked.current = false;
     isScrolledToBottom.current = true;
@@ -847,7 +879,6 @@ export default function ChatDetailScreen({
     sessionId,
     enabledPlugins,
     activeTopic,
-    chatContextSelections,
     composerAttachmentCount,
     memoryEffort,
     memoryEnabled,
@@ -1076,14 +1107,14 @@ export default function ChatDetailScreen({
 
   const handleSaveToTopic = useCallback(async () => {
     if (!sessionId) return;
-    if (activeTopic) {
+    if (activeTopicRef.current) {
       return;
     }
     try {
-      const messageIds = extractPersistedMessageIds(rawMessages);
+      const messageIds = extractPersistedMessageIds(rawMessagesRef.current);
       const topicId = await topicApi.create(sessionId, t.topicTitle, {
         ...(messageIds.length > 0 ? { messageIds } : {}),
-        sessionType: session?.type ?? 'agent',
+        sessionType: sessionTypeRef.current ?? 'agent',
       });
       if (topicId) {
         haptics.success();
@@ -1093,17 +1124,7 @@ export default function ChatDetailScreen({
     } catch {
       toast.show('error', t.errorNetwork);
     }
-  }, [
-    session?.type,
-    sessionId,
-    activeTopic,
-    rawMessages,
-    t,
-    toast,
-    fetchMessages,
-    fetchTopics,
-    switchTopic,
-  ]);
+  }, [sessionId, t, toast, fetchMessages, fetchTopics, switchTopic]);
 
   const handleOpenNotebook = useCallback(async () => {
     if (!sessionId) return;
@@ -1160,21 +1181,26 @@ export default function ChatDetailScreen({
   }, [activeTopic, initialTopicId, navigation, route.name, route.params, sessionId]);
 
   const renderMessage = useCallback(
-    ({ item }: { item: ChatMessage }) => (
-      <MessageBubble
-        generating={generating}
-        groupMembersById={groupMembersById}
-        groupSupervisorId={groupDetail?.supervisorAgentId}
-        isGroupSession={isGroupSession}
-        isReasoning={isReasoning}
-        message={item}
-        sessionId={sessionId || sessionKey}
-        topicId={activeTopic ?? null}
-        onSaveToTopic={handleSaveToTopic}
-      />
-    ),
+    ({ item }: { item: ChatMessage }) => {
+      const isStreamingMessage = item.id === activeStreamingMessageId;
+
+      return (
+        <MessageBubble
+          generating={generating && isStreamingMessage}
+          groupMembersById={groupMembersById}
+          groupSupervisorId={groupDetail?.supervisorAgentId}
+          isGroupSession={isGroupSession}
+          isReasoning={isReasoning && isStreamingMessage}
+          message={item}
+          sessionId={sessionId || sessionKey}
+          topicId={activeTopic ?? null}
+          onSaveToTopic={activeTopic ? undefined : handleSaveToTopic}
+        />
+      );
+    },
     [
       activeTopic,
+      activeStreamingMessageId,
       generating,
       groupDetail?.supervisorAgentId,
       groupMembersById,
@@ -1213,6 +1239,22 @@ export default function ChatDetailScreen({
     loadGroupDetail,
     sessionId,
   ]);
+
+  const handleListScroll = useCallback(
+    (contentOffsetY: number, contentHeight: number, layoutHeight: number) => {
+      const atBottom =
+        layoutHeight + contentOffsetY >= contentHeight - SCROLL_TO_LATEST_BOTTOM_THRESHOLD;
+      isScrolledToBottom.current = atBottom;
+      autoScrollLocked.current = !atBottom && contentOffsetY > AUTO_SCROLL_LOCK_OFFSET;
+
+      const nextShowScrollToTop = !atBottom && contentOffsetY > SCROLL_TO_LATEST_OFFSET;
+      if (nextShowScrollToTop === showScrollToTopRef.current) return;
+
+      showScrollToTopRef.current = nextShowScrollToTop;
+      setShowScrollToTop(nextShowScrollToTop);
+    },
+    [],
+  );
 
   if (!sessionId) {
     return (
@@ -1312,11 +1354,7 @@ export default function ChatDetailScreen({
             onLayout={autoScrollToEnd}
             onScroll={(e) => {
               const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
-              const atBottom =
-                layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
-              isScrolledToBottom.current = atBottom;
-              autoScrollLocked.current = !atBottom && contentOffset.y > 24;
-              setShowScrollToTop(!atBottom && contentOffset.y > 200);
+              handleListScroll(contentOffset.y, contentSize.height, layoutMeasurement.height);
             }}
           />
         )}

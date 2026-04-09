@@ -8,7 +8,13 @@ import { useAssistantActions } from './useAssistantActions';
 
 const mockOpenCreateSpaceMemoryCandidateModal = vi.hoisted(() => vi.fn());
 let mockResolvedSpaceId = 'spc_team';
-let mockSpaceMemoryTargets = {
+interface TopicSpaceMemoryTargets {
+  defaultSpaceId?: string;
+  isLoading: boolean;
+  teamSpaces: Array<{ id: string }>;
+}
+
+let mockSpaceMemoryTargets: TopicSpaceMemoryTargets = {
   defaultSpaceId: 'spc_team',
   isLoading: false,
   teamSpaces: [{ id: 'spc_team' }],

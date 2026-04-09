@@ -1,8 +1,4 @@
 import type OpenAI from 'openai';
-import type {
-  ChatCompletionContentPart,
-  ChatCompletionContentPartText,
-} from 'openai/contents/index.mjs';
 import type { Stream } from 'openai/streaming';
 
 import type { ChatStreamCallbacks } from '../../types';
@@ -47,7 +43,9 @@ export const transformQwenStream = (
 
   if (Array.isArray(item.delta?.content)) {
     const part = item.delta.content[0];
-    const process = (part: ChatCompletionContentPart): ChatCompletionContentPartText => {
+    const process = (
+      part: OpenAI.ChatCompletionContentPart,
+    ): OpenAI.ChatCompletionContentPartText => {
       const [key, value] = Object.entries(part)[0];
       if (key === 'image') {
         return {

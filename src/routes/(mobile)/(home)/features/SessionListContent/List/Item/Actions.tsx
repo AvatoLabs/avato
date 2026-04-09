@@ -161,12 +161,23 @@ const Actions = memo<ActionProps>(({ group, id, openCreateGroupModal, parentType
                 },
                 okButtonProps: { danger: true },
                 onOk: async () => {
-                  if (parentType === 'group') {
-                    await removeAgentGroup(id);
-                    message.success(t('confirmRemoveGroupSuccess'));
-                  } else {
-                    await removeSession(id);
-                    message.success(t('confirmRemoveSessionSuccess'));
+                  try {
+                    if (parentType === 'group') {
+                      await removeAgentGroup(id);
+                      message.success(t('confirmRemoveGroupSuccess'));
+                    } else {
+                      await removeSession(id);
+                      message.success(t('confirmRemoveSessionSuccess'));
+                    }
+                  } catch (error) {
+                    console.error('Failed to delete mobile session list item:', error);
+                    message.error(
+                      t(
+                        parentType === 'group'
+                          ? 'confirmRemoveGroupError'
+                          : 'confirmRemoveSessionError',
+                      ),
+                    );
                   }
                 },
                 title:

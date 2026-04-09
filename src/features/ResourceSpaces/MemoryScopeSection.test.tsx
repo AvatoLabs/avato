@@ -1,6 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
+import { getSpaceMemorySurfaceContract } from '@lobechat/types';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -134,6 +135,10 @@ const makeSummary = (recall?: {
   canCreate: true,
   canPublish: true,
   canReview: options?.canReview ?? true,
+  contract: getSpaceMemorySurfaceContract(
+    options?.canReview === false ? 'viewer' : 'reviewer',
+    { canCreate: true },
+  ),
   id: 'spc_team',
   kind: 'team',
   membershipRole: 'editor',
@@ -179,10 +184,12 @@ describe('MemoryScopeSection', () => {
   it('shows a compact pending governance badge only for spaces with recall backlog', () => {
     render(<MemoryScopeSection currentScope={'personal'} />);
 
+    expect(screen.getByText('Personal Memory')).toBeInTheDocument();
     expect(screen.getByText('Ops Space')).toBeInTheDocument();
     expect(screen.getByText('Clean Space')).toBeInTheDocument();
     expect(screen.getByText('3 pending')).toBeInTheDocument();
     expect(screen.queryByText('0 pending')).not.toBeInTheDocument();
+    expect(screen.queryByText('Team Spaces')).not.toBeInTheDocument();
   });
 
   it('navigates to the selected team space memory page', () => {
@@ -242,7 +249,8 @@ describe('MemoryScopeSection', () => {
 
     render(<MemoryScopeSection currentScope={'personal'} />);
 
-    const action = screen.getByRole('button', { name: 'Open Memory' });
+    const action = screen.getAllByRole('button', { name: 'Open Memory' })[0];
+    expect(action).toBeDefined();
     expect(action).toHaveAttribute(
       'title',
       'Open published workspace memory. Review access requires editor or admin role.',

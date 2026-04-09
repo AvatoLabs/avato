@@ -1,4 +1,3 @@
-import { getCanonicalContentKind } from '@lobechat/types';
 import { z } from 'zod';
 
 import { SearchRepo } from '@/database/repositories/search';
@@ -6,6 +5,7 @@ import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { ContentAuthorizer } from '@/server/services/content';
 import { DiscoverService } from '@/server/services/discover';
+import { getCanonicalContentKind } from '@/types/content';
 
 /**
  * Calculate relevance score for marketplace items

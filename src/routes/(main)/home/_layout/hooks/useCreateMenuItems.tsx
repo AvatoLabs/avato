@@ -17,7 +17,6 @@ import { useAgentStore } from '@/store/agent/store';
 import { useAgentGroupStore } from '@/store/agentGroup';
 import { usePageStore } from '@/store/docs';
 import { useHomeStore } from '@/store/home/store';
-import { getPageDetailPath } from '@/utils/docs';
 
 interface CreateAgentOptions {
   groupId?: string;
@@ -47,6 +46,22 @@ export const useCreateMenuItems = () => {
 
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [isCreatingSessionGroup, setIsCreatingSessionGroup] = useState(false);
+
+  const handleCreateAgentError = useCallback(
+    (error: unknown) => {
+      console.error('Failed to create agent:', error);
+      message.error({ content: t('createAgentFailed') });
+    },
+    [message, t],
+  );
+
+  const handleCreateGroupError = useCallback(
+    (error: unknown) => {
+      console.error('Failed to create group:', error);
+      message.error({ content: t('createGroupFailed') });
+    },
+    [message, t],
+  );
 
   // SWR-based agent creation with auto navigation to profile
   const { trigger: mutateAgent, isMutating: isMutatingAgent } = useSWRMutation(
@@ -92,10 +107,14 @@ export const useCreateMenuItems = () => {
    */
   const createAgent = useCallback(
     async (options?: CreateAgentOptions) => {
-      await mutateAgent({ groupId: options?.groupId });
-      options?.onSuccess?.();
+      try {
+        await mutateAgent({ groupId: options?.groupId });
+        options?.onSuccess?.();
+      } catch (error) {
+        handleCreateAgentError(error);
+      }
     },
-    [mutateAgent],
+    [handleCreateAgentError, mutateAgent],
   );
 
   /**
@@ -202,9 +221,13 @@ export const useCreateMenuItems = () => {
    */
   const createEmptyGroup = useCallback(
     async (options?: CreateAgentOptions) => {
-      await mutateGroup(options);
+      try {
+        await mutateGroup(options);
+      } catch (error) {
+        handleCreateGroupError(error);
+      }
     },
-    [mutateGroup],
+    [handleCreateGroupError, mutateGroup],
   );
 
   /**
@@ -235,11 +258,17 @@ export const useCreateMenuItems = () => {
       onClick: async (info) => {
         info.domEvent?.stopPropagation();
         setIsCreatingSessionGroup(true);
-        await addGroup(t('sessionGroup.newGroup'));
-        setIsCreatingSessionGroup(false);
+        try {
+          await addGroup(t('sessionGroup.newGroup'));
+        } catch (error) {
+          console.error('Failed to create session group:', error);
+          message.error({ content: t('createGroupFailed') });
+        } finally {
+          setIsCreatingSessionGroup(false);
+        }
       },
     }),
-    [t, addGroup],
+    [t, addGroup, message],
   );
 
   /**
@@ -266,13 +295,12 @@ export const useCreateMenuItems = () => {
     const activeSpaceId = resolveWorkspaceSpaceId();
 
     try {
-      const newPageId = await createNewPage(untitledTitle, { spaceId: activeSpaceId });
-      navigate(getPageDetailPath(newPageId, 'doc', activeSpaceId));
+      await createNewPage(untitledTitle, { spaceId: activeSpaceId });
     } catch (error) {
       console.error('Failed to create page:', error);
       message.error(tFile('pageList.createFailed'));
     }
-  }, [createNewPage, tFile, navigate, message]);
+  }, [createNewPage, tFile, message]);
 
   /**
    * Create page menu item

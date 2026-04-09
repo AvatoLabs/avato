@@ -41,6 +41,26 @@ import {
 import { agentSkills } from '../schemas/agentSkill';
 import type { LobeChatDatabase, Transaction } from '../type';
 
+interface FileListRow {
+  chunkTaskId?: string | null;
+  createdAt: Date;
+  embeddingTaskId?: string | null;
+  fileType: string;
+  id: string;
+  name: string;
+  size: number;
+  spaceId?: string | null;
+  updatedAt: Date;
+  url: string;
+}
+
+interface FileGovernanceRow {
+  assetClassification?: FileAssetClassification | null;
+  assetReviewStatus?: FileAssetReviewStatus | null;
+  assetUsagePolicy?: FileAssetUsagePolicy | null;
+  id: string;
+}
+
 export class FileModel {
   private readonly userId: string;
   private db: LobeChatDatabase;
@@ -137,6 +157,15 @@ export class FileModel {
     };
   };
 
+  hasFilesForBlob = async (blobId: string) => {
+    const [result] = await this.db
+      .select({ count: count() })
+      .from(files)
+      .where(eq(files.blobId, blobId));
+
+    return Number(result?.count ?? 0) > 0;
+  };
+
   private buildFileListWhereClause = ({
     assetClassification,
     assetRightsOwner,
@@ -227,8 +256,8 @@ export class FileModel {
     };
   };
 
-  private applyFileListScope = <T extends { where: (clause: unknown) => unknown }>(
-    queryBuilder: T,
+  private applyFileListScope = (
+    queryBuilder: { innerJoin: (...args: any[]) => any; where: (clause: unknown) => any },
     {
       showFilesInSourceSet,
       sourceSetId,
@@ -239,7 +268,7 @@ export class FileModel {
       whereClause: unknown;
     },
   ) => {
-    let query: any = queryBuilder;
+    let query = queryBuilder;
 
     if (sourceSetId) {
       query = query.innerJoin(
@@ -263,11 +292,11 @@ export class FileModel {
    * Allows: creator, a `files` row owned by this user pointing at the hash, or a skill
    * owned by this user whose zip or embedded resources reference the hash.
    */
-  canAccessGlobalFileByHash = async (hash: string): Promise<boolean> => {
+  canAccessGlobalFileBySha256 = async (sha256: string): Promise<boolean> => {
     const [globalFile] = await this.db
       .select({ creator: globalFiles.creator })
       .from(globalFiles)
-      .where(eq(globalFiles.hashId, hash))
+      .where(eq(globalFiles.hashId, sha256))
       .limit(1);
 
     if (!globalFile) return false;
@@ -276,7 +305,7 @@ export class FileModel {
     const [ownedFile] = await this.db
       .select({ id: files.id })
       .from(files)
-      .where(and(eq(files.fileHash, hash), eq(files.userId, this.userId)))
+      .where(and(eq(files.fileHash, sha256), eq(files.userId, this.userId)))
       .limit(1);
 
     if (ownedFile) return true;
@@ -288,10 +317,10 @@ export class FileModel {
         and(
           eq(agentSkills.userId, this.userId),
           or(
-            eq(agentSkills.zipFileHash, hash),
+            eq(agentSkills.zipFileHash, sha256),
             sql`exists (
               select 1 from jsonb_each(${agentSkills.resources}) as _je
-              where _je.value->>'fileHash' = ${hash}
+              where coalesce(_je.value->>'sha256', _je.value->>'fileHash') = ${sha256}
             )`,
           ),
         ),
@@ -633,7 +662,7 @@ export class FileModel {
     sourceSetId,
     showFilesInSourceSet,
     spaceId,
-  }: QueryFileListParams = {}) => {
+  }: QueryFileListParams = {}): Promise<FileListRow[]> => {
     const {
       orderByClause,
       shouldJoinFileAssets,
@@ -654,7 +683,7 @@ export class FileModel {
       spaceId,
     });
 
-    let query = this.db
+    let query: any = this.db
       .select({
         chunkTaskId: files.chunkTaskId,
         createdAt: files.createdAt,
@@ -677,14 +706,14 @@ export class FileModel {
       showFilesInSourceSet: scopedShowFilesInSourceSet,
       sourceSetId: scopedSourceSetId,
       whereClause,
-    }).orderBy(orderByClause);
+    }).orderBy(orderByClause) as Promise<FileListRow[]>;
   };
 
-  queryGovernanceRows = async (params: QueryFileListParams = {}) => {
+  queryGovernanceRows = async (params: QueryFileListParams = {}): Promise<FileGovernanceRow[]> => {
     const { showFilesInSourceSet, sourceSetId, whereClause } =
       this.buildFileListWhereClause(params);
 
-    const query = this.db
+    const query: any = this.db
       .select({
         assetClassification: fileAssets.classification,
         assetReviewStatus: fileAssets.reviewStatus,
@@ -698,7 +727,7 @@ export class FileModel {
       showFilesInSourceSet,
       sourceSetId,
       whereClause,
-    });
+    }) as Promise<FileGovernanceRow[]>;
   };
 
   findByIds = async (ids: string[]) => {

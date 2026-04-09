@@ -21,7 +21,7 @@ interface PromptSectionProps {
 
 const PromptSection = memo<PromptSectionProps>(
   ({ editor, editorData, entityId, placeholder, onContentChange }) => {
-    const { t } = useTranslation('setting');
+    const { t } = useTranslation(['setting', 'file']);
     const theme = useTheme();
 
     return (
@@ -61,7 +61,7 @@ const PromptSection = memo<PromptSectionProps>(
           >
             <Icon icon={SparklesIcon} size={{ size: 12 }} style={{ color: theme.colorPrimary }} />
             <span style={{ fontSize: 12, color: theme.colorPrimary }}>
-              {t('settingAgent.markdown.support')}
+              {t('docEditor.mode.markdown', { ns: 'file' })}
             </span>
           </Flexbox>
         </Flexbox>

@@ -55,6 +55,10 @@ export class DocumentActionImpl {
     title: string;
   }): Promise<{ [key: string]: any; id: string }> => {
     const now = Date.now();
+    const activeSpaceId = resolveFileStoreSpaceId({
+      queryFilterSpaceId: this.#get().documentQueryFilter?.spaceId,
+      spaceId,
+    });
 
     // Create page with markdown content, leave editorData as empty JSON object
     const newPage = await documentService.createDocument({
@@ -66,7 +70,7 @@ export class DocumentActionImpl {
         createdAt: now,
       },
       parentId,
-      spaceId,
+      spaceId: activeSpaceId,
       title,
     });
 
@@ -84,6 +88,10 @@ export class DocumentActionImpl {
     spaceId?: string,
   ): Promise<string> => {
     const now = Date.now();
+    const activeSpaceId = resolveFileStoreSpaceId({
+      queryFilterSpaceId: this.#get().documentQueryFilter?.spaceId,
+      spaceId,
+    });
 
     // Generate random 8-character slug (A-Z, a-z, 0-9)
     const generateSlug = createNanoId(8);
@@ -98,7 +106,7 @@ export class DocumentActionImpl {
         createdAt: now,
       },
       parentId,
-      spaceId,
+      spaceId: activeSpaceId,
       slug,
       title: name,
     });

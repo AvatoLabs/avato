@@ -12,7 +12,7 @@ import { lambdaClient } from '@/libs/trpc/client';
 import { useUserStore } from '@/store/user';
 import { userProfileSelectors } from '@/store/user/slices/auth/selectors';
 
-import { buildSpaceRootPath } from './paths';
+import { buildFilesRootPath } from './paths';
 import { resolveSpaceDisplayName } from './resolveSpaceDisplayName';
 
 const SpaceSettingsPage = memo(() => {
@@ -140,7 +140,7 @@ const SpaceSettingsPage = memo(() => {
         </Block>
       )}
 
-      <Button onClick={() => navigate(buildSpaceRootPath(space.id))}>
+      <Button onClick={() => navigate(buildFilesRootPath(space.id))}>
         {t('space.settings.back')}
       </Button>
     </Flexbox>

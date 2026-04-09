@@ -48,8 +48,9 @@ const SpaceList = memo<SpaceListProps>(({ currentSpaceId, onSelectSpace }) => {
   if (isLoading) return <SkeletonList rows={4} />;
 
   return spaces?.map((space) => {
+    const isCurrentSpace = currentSpaceId === space.id;
     const isCurrentSettings =
-      currentSpaceId === space.id && location.pathname.endsWith('/settings');
+      isCurrentSpace && location.pathname.endsWith('/settings');
     const displayName = resolveSpaceDisplayName(space, t, { fullName, username });
     const canReviewSpaceMemory = canReviewSpaceMemorySummary(spaceSummaryMap.get(space.id));
     const pendingCount = pendingGovernanceCountBySpaceId.get(space.id) ?? 0;
@@ -58,7 +59,7 @@ const SpaceList = memo<SpaceListProps>(({ currentSpaceId, onSelectSpace }) => {
 
     return (
       <NavItem
-        active={currentSpaceId === space.id}
+        active={isCurrentSpace}
         icon={space.kind === 'personal' ? HouseIcon : Users2Icon}
         key={space.id}
         title={displayName}
@@ -101,20 +102,22 @@ const SpaceList = memo<SpaceListProps>(({ currentSpaceId, onSelectSpace }) => {
                     navigate(buildSpaceMemoryPath(space.id));
                   }}
                 >
-                  {t('scope.open', { ns: 'memory' })}
-                </Button>
+                    {t('scope.open', { ns: 'memory' })}
+                  </Button>
+                )}
+              {isCurrentSpace && (
+                <ActionIcon
+                  active={isCurrentSettings}
+                  icon={Settings2Icon}
+                  size={'small'}
+                  title={t('space.settings.title')}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    navigate(buildSpaceSettingsPath(space.id));
+                  }}
+                />
               )}
-              <ActionIcon
-                active={isCurrentSettings}
-                icon={Settings2Icon}
-                size={'small'}
-                title={t('space.settings.title')}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  navigate(buildSpaceSettingsPath(space.id));
-                }}
-              />
             </Flexbox>
           ) : undefined
         }

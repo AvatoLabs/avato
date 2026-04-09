@@ -30,6 +30,8 @@ export default {
   'generation.actions.copyPrompt': 'Copy Prompt',
   'generation.actions.copySeed': 'Copy Seed',
   'generation.actions.delete': 'Delete',
+  'generation.actions.deleteBatchFailed': 'Failed to delete batch. Please try again.',
+  'generation.actions.deleteFailed': 'Failed to delete image. Please try again.',
   'generation.actions.deleteBatch': 'Delete Batch',
   'generation.actions.download': 'Download',
   'generation.actions.downloadFailed':

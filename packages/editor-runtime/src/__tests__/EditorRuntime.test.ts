@@ -25,19 +25,19 @@ describe('EditorRuntime', () => {
     runtime.setTitleHandlers(mockTitleSetter, mockTitleGetter);
   });
 
-  describe('initPage', () => {
+  describe('initDoc', () => {
     it('should initialize document from markdown and verify editor state', async () => {
       const inputMarkdown = 'Hello world\n\nThis is a paragraph.';
-      const result = await runtime.initPage({ markdown: inputMarkdown });
+      const result = await runtime.initDoc({ markdown: inputMarkdown });
       await moment();
 
       // Verify result
       expect(result.nodeCount).toBeGreaterThanOrEqual(0);
       expect(result.extractedTitle).toBeUndefined();
 
-      // Verify editor state - full text match (editor adds trailing space)
+      // Verify editor state - current editor serialization keeps a single trailing newline
       const editorMarkdown = editor.getDocument('markdown') as unknown as string;
-      expect(editorMarkdown).toBe('Hello world\n\nThis is a paragraph. \n\n');
+      expect(editorMarkdown).toBe('Hello world\n\nThis is a paragraph.\n');
 
       // Verify XML structure
       const editorXml = editor.getDocument('litexml') as unknown as string;
@@ -45,7 +45,7 @@ describe('EditorRuntime', () => {
     });
 
     it('should extract title from markdown heading and set content without title', async () => {
-      const result = await runtime.initPage({
+      const result = await runtime.initDoc({
         markdown: '# My Document Title\n\nThis is the content.',
       });
       await moment();
@@ -54,13 +54,13 @@ describe('EditorRuntime', () => {
       expect(result.extractedTitle).toBe('My Document Title');
       expect(mockTitleSetter).toHaveBeenCalledWith('My Document Title');
 
-      // Verify editor state - only content without title (editor adds trailing space)
+      // Verify editor state - title is stripped and content is serialized with a trailing newline
       const editorMarkdown = editor.getDocument('markdown') as unknown as string;
-      expect(editorMarkdown).toBe('This is the content. \n\n');
+      expect(editorMarkdown).toBe('This is the content.\n');
     });
 
     it('should handle markdown with multiple headings', async () => {
-      const result = await runtime.initPage({
+      const result = await runtime.initDoc({
         markdown: '# Main Title\n\n## Section 1\n\nContent here.\n\n## Section 2\n\nMore content.',
       });
       await moment();
@@ -68,17 +68,15 @@ describe('EditorRuntime', () => {
       // Verify title extraction (only first h1)
       expect(result.extractedTitle).toBe('Main Title');
 
-      // Verify editor state - content after title extraction (editor adds trailing space)
+      // Verify editor state after title extraction
       const editorMarkdown = editor.getDocument('markdown') as unknown as string;
-      expect(editorMarkdown).toBe(
-        '## Section 1\n\nContent here. \n\n## Section 2\n\nMore content. \n\n',
-      );
+      expect(editorMarkdown).toBe('## Section 1\n\nContent here.\n\n## Section 2\n\nMore content.\n');
     });
 
     it('should throw error when editor is not initialized', async () => {
       runtime.setEditor(null);
 
-      await expect(runtime.initPage({ markdown: 'Test' })).rejects.toThrow(
+      await expect(runtime.initDoc({ markdown: 'Test' })).rejects.toThrow(
         'Editor not initialized',
       );
     });
@@ -102,16 +100,16 @@ describe('EditorRuntime', () => {
     });
   });
 
-  describe('getPageContent', () => {
+  describe('getDocContent', () => {
     beforeEach(async () => {
-      await runtime.initPage({
+      await runtime.initDoc({
         markdown: '# Test Document\n\nThis is **bold** and *italic* text.',
       });
       await moment();
     });
 
     it('should return markdown content', async () => {
-      const result = await runtime.getPageContent({ format: 'markdown' });
+      const result = await runtime.getDocContent({ format: 'markdown' });
 
       expect(result.markdown).toBeDefined();
       expect(result.markdown).toContain('bold');
@@ -119,7 +117,7 @@ describe('EditorRuntime', () => {
     });
 
     it('should return xml content', async () => {
-      const result = await runtime.getPageContent({ format: 'xml' });
+      const result = await runtime.getDocContent({ format: 'xml' });
 
       expect(result.xml).toBeDefined();
       expect(result.xml).toContain('id=');
@@ -127,14 +125,14 @@ describe('EditorRuntime', () => {
     });
 
     it('should return both formats by default', async () => {
-      const result = await runtime.getPageContent({ format: 'both' });
+      const result = await runtime.getDocContent({ format: 'both' });
 
       expect(result.markdown).toBeDefined();
       expect(result.xml).toBeDefined();
     });
 
     it('should include metadata', async () => {
-      const result = await runtime.getPageContent({ format: 'both' });
+      const result = await runtime.getDocContent({ format: 'both' });
 
       expect(result.title).toBe('Test Title');
       expect(result.charCount).toBeGreaterThan(0);
@@ -513,24 +511,24 @@ describe('EditorRuntime', () => {
       expect(newRuntime.getCurrentDocId()).toBeUndefined();
     });
 
-    it('should include document ID in getPageContent result', async () => {
+    it('should include document ID in getDocContent result', async () => {
       runtime.setCurrentDocId('my-doc-id');
-      await runtime.initPage({ markdown: 'Test content' });
+      await runtime.initDoc({ markdown: 'Test content' });
       await moment();
 
-      const result = await runtime.getPageContent({ format: 'markdown' });
+      const result = await runtime.getDocContent({ format: 'markdown' });
       expect(result.documentId).toBe('my-doc-id');
     });
   });
 
-  describe('getPageContentContext', () => {
+  describe('getDocContentContext', () => {
     beforeEach(async () => {
-      await runtime.initPage({ markdown: 'Test content for context' });
+      await runtime.initDoc({ markdown: 'Test content for context' });
       await moment();
     });
 
     it('should return context with markdown only', () => {
-      const context = runtime.getPageContentContext('markdown');
+      const context = runtime.getDocContentContext('markdown');
 
       expect(context.markdown).toBeDefined();
       expect(context.xml).toBeUndefined();
@@ -538,14 +536,14 @@ describe('EditorRuntime', () => {
     });
 
     it('should return context with xml only', () => {
-      const context = runtime.getPageContentContext('xml');
+      const context = runtime.getDocContentContext('xml');
 
       expect(context.xml).toBeDefined();
       expect(context.markdown).toBeUndefined();
     });
 
     it('should return context with both formats', () => {
-      const context = runtime.getPageContentContext('both');
+      const context = runtime.getDocContentContext('both');
 
       expect(context.markdown).toBeDefined();
       expect(context.xml).toBeDefined();
@@ -554,7 +552,7 @@ describe('EditorRuntime', () => {
     });
 
     it('should default to both formats', () => {
-      const context = runtime.getPageContentContext();
+      const context = runtime.getDocContentContext();
 
       expect(context.markdown).toBeDefined();
       expect(context.xml).toBeDefined();

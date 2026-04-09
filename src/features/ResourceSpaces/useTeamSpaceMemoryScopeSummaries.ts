@@ -2,7 +2,6 @@
 
 import {
   canManageSpaceMemoryFromContract,
-  getSpaceMemorySurfaceContract,
   type SpaceMemorySummary,
 } from '@lobechat/types';
 import { useMemo } from 'react';
@@ -25,9 +24,7 @@ export interface PendingGovernanceTarget {
 }
 
 export const canReviewSpaceMemorySummary = (summary?: SpaceMemorySummary | null) =>
-  canManageSpaceMemoryFromContract(
-    summary ? (summary.contract ?? getSpaceMemorySurfaceContract(summary.surface)) : undefined,
-  );
+  canManageSpaceMemoryFromContract(summary?.contract);
 
 export const buildPendingGovernancePath = (spaceId: string, target: PendingGovernanceTarget) =>
   `${buildSpaceMemoryPath(spaceId, target.section)}&recallFilter=${encodeURIComponent(target.recallFilter)}`;

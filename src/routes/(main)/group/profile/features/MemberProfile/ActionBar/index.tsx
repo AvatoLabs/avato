@@ -36,7 +36,7 @@ const ActionBar = memo(() => {
         >
             <Flexbox horizontal align={'center'} gap={12}>
                 <Button icon={PlayIcon} size={'large'} type={'primary'} onClick={handleStartChat}>
-                    {t('settingAgent.action.startConversation')}
+                    {t('startConversation')}
                 </Button>
             </Flexbox>
         </Flexbox>

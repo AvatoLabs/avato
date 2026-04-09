@@ -26,7 +26,8 @@ export interface ImageGenerationAsset extends BaseGenerationAsset {
    */
   thumbnailUrl?: string;
   /**
-   * URL stored in own OSS, only the key is stored. The full URL needs to be obtained using FileService.getFullFileUrl
+   * Stored in own OSS. Database records usually persist the storage key; read paths may resolve it to
+   * a stable proxy URL (`/f/:id`) or a provider-readable URL when no file record exists.
    */
   url?: string;
   /**

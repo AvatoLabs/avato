@@ -1,10 +1,10 @@
 'use client';
 
 import { Button, Flexbox, Icon, Segmented, type SegmentedProps } from '@lobehub/ui';
-import { Popover, Select } from 'antd';
+import { Drawer, Input, Popover, Select } from 'antd';
 import { createStaticStyles } from 'antd-style';
-import { SlidersHorizontal, X } from 'lucide-react';
-import { memo, useMemo } from 'react';
+import { SlidersHorizontal } from 'lucide-react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
@@ -27,6 +27,9 @@ import {
   FileAssetUsagePolicy,
   FilesTabs,
 } from '@/types/files';
+
+const GOVERNANCE_PANEL_QUERY_KEY = 'openGovernance';
+const GOVERNANCE_PANEL_FOCUS_QUERY_KEY = 'focusGovernance';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   containerMobile: css`
@@ -93,16 +96,74 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   governanceButton: css`
     flex-shrink: 0;
   `,
-  governanceFilters: css`
-    flex-wrap: wrap;
+  governanceButtonMobile: css`
+    border-radius: 999px !important;
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, white 45%, transparent),
+      0 10px 24px -24px color-mix(in srgb, ${cssVar.colorText} 24%, transparent);
   `,
-  governanceFilterChip: css`
+  governanceToolbar: css`
+    flex-wrap: nowrap;
+    min-width: 0;
+  `,
+  governanceToolbarMobile: css`
+    flex-wrap: wrap;
+    gap: 6px;
+  `,
+  governanceSummaryBar: css`
+    flex-wrap: wrap;
+    align-items: center;
+    min-width: 0;
+  `,
+  governanceSummaryBarMobile: css`
+    padding: 8px 10px;
+    border: 1px solid ${cssVar.colorBorderSecondary};
+    border-radius: 16px;
+
+    background: color-mix(in srgb, ${cssVar.colorFillQuaternary} 76%, transparent);
+  `,
+  governanceSummaryActions: css`
     flex-shrink: 0;
+  `,
+  governanceSummaryActionsMobile: css`
+    width: 100%;
+
+    :global(button) {
+      flex: 1;
+    }
+  `,
+  governanceSummaryMeta: css`
+    min-width: 0;
+  `,
+  governanceSummaryMetaMobile: css`
+    gap: 6px;
+    width: 100%;
+  `,
+  governanceSummaryLabels: css`
+    overflow: hidden;
+    flex: 1;
+    min-width: 160px;
+
+    font-size: 12px;
+    color: ${cssVar.colorTextSecondary};
+    text-overflow: ellipsis;
+    white-space: nowrap;
   `,
   governanceSummaryText: css`
     flex-shrink: 0;
     font-size: 12px;
     color: ${cssVar.colorTextSecondary};
+    white-space: nowrap;
+  `,
+  governanceSummaryTextMobile: css`
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+  `,
+  mobileSummaryLead: css`
+    color: ${cssVar.colorText};
+    font-size: 12px;
+    font-weight: 600;
     white-space: nowrap;
   `,
   governancePopover: css`
@@ -113,6 +174,15 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
   governanceSection: css`
     gap: 6px;
+  `,
+  governanceSectionFocused: css`
+    padding: 8px;
+    border: 1px solid ${cssVar.colorPrimaryBorder};
+    border-radius: ${cssVar.borderRadius}px;
+    background: color-mix(in srgb, ${cssVar.colorPrimaryBg} 52%, ${cssVar.colorBgContainer} 48%);
+  `,
+  governanceSectionActions: css`
+    justify-content: flex-end;
   `,
 }));
 
@@ -128,6 +198,7 @@ const CategoryMenu = memo(() => {
     s.setMode,
   ]);
   const isMobile = useServerConfigStore((s) => s.isMobile);
+  const [governanceOpen, setGovernanceOpen] = useState(false);
   const navigate = useNavigate();
   const rootPath = buildFilesRootPath(spaceId);
   const basePath = useMemo(() => {
@@ -137,20 +208,25 @@ const CategoryMenu = memo(() => {
   }, [location.pathname, rootPath]);
   const classificationParam =
     (searchParams.get('assetClassification') as FileAssetClassification | null) || undefined;
+  const rightsOwnerParam = searchParams.get('assetRightsOwner')?.trim() || undefined;
   const reviewStatusParam =
     (searchParams.get('assetReviewStatus') as FileAssetReviewStatus | null) || undefined;
   const usagePolicyParam =
     (searchParams.get('assetUsagePolicy') as FileAssetUsagePolicy | null) || undefined;
+  const focusedGovernanceFilter = searchParams.get(GOVERNANCE_PANEL_FOCUS_QUERY_KEY) || undefined;
   const showCategoryTabs = !sourceSetId;
   const activeGovernanceFilterCount =
     Number(Boolean(classificationParam)) +
+    Number(Boolean(rightsOwnerParam)) +
     Number(Boolean(reviewStatusParam)) +
     Number(Boolean(usagePolicyParam));
+  const [draftRightsOwner, setDraftRightsOwner] = useState(rightsOwnerParam ?? '');
   const fileScope = getFileScope(searchParams);
   const governanceSummaryParams = useMemo(
     () =>
       buildExplorerQueryParams({
         assetClassification: classificationParam,
+        assetRightsOwner: rightsOwnerParam,
         assetReviewStatus: reviewStatusParam,
         assetUsagePolicy: usagePolicyParam,
         category: getExplorerCategoryFilter(activeKey, sourceSetId),
@@ -164,6 +240,7 @@ const CategoryMenu = memo(() => {
       classificationParam,
       currentFolderId,
       fileScope,
+      rightsOwnerParam,
       reviewStatusParam,
       sourceSetId,
       spaceId,
@@ -175,6 +252,16 @@ const CategoryMenu = memo(() => {
 
   const withGovernanceCount = (label: string, count?: number) =>
     governanceSummary ? `${label} (${count ?? 0})` : label;
+
+  useEffect(() => {
+    setDraftRightsOwner(rightsOwnerParam ?? '');
+  }, [rightsOwnerParam]);
+
+  useEffect(() => {
+    if (searchParams.get(GOVERNANCE_PANEL_QUERY_KEY) === '1') {
+      setGovernanceOpen(true);
+    }
+  }, [searchParams]);
 
   const items = useMemo<SegmentedProps['options']>(
     () => [
@@ -225,7 +312,8 @@ const CategoryMenu = memo(() => {
   const getCategoryUrl = (value: FilesTabs) => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('file');
-    nextParams.delete('files');
+    nextParams.delete(GOVERNANCE_PANEL_QUERY_KEY);
+    nextParams.delete(GOVERNANCE_PANEL_FOCUS_QUERY_KEY);
 
     if (value === FilesTabs.Home) {
       nextParams.delete('category');
@@ -308,7 +396,8 @@ const CategoryMenu = memo(() => {
   const getClassificationUrl = (value?: string) => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('file');
-    nextParams.delete('files');
+    nextParams.delete(GOVERNANCE_PANEL_QUERY_KEY);
+    nextParams.delete(GOVERNANCE_PANEL_FOCUS_QUERY_KEY);
 
     if (!value || value === 'all') {
       nextParams.delete('assetClassification');
@@ -320,8 +409,6 @@ const CategoryMenu = memo(() => {
 
     return queryString ? `${basePath}?${queryString}` : basePath;
   };
-
-  const getClearedClassificationUrl = () => getClassificationUrl('all');
 
   const usagePolicyOptions = useMemo(
     () => [
@@ -412,7 +499,8 @@ const CategoryMenu = memo(() => {
   const getUsagePolicyUrl = (value?: string) => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('file');
-    nextParams.delete('files');
+    nextParams.delete(GOVERNANCE_PANEL_QUERY_KEY);
+    nextParams.delete(GOVERNANCE_PANEL_FOCUS_QUERY_KEY);
 
     if (!value || value === 'all') {
       nextParams.delete('assetUsagePolicy');
@@ -425,12 +513,30 @@ const CategoryMenu = memo(() => {
     return queryString ? `${basePath}?${queryString}` : basePath;
   };
 
-  const getClearedUsagePolicyUrl = () => getUsagePolicyUrl('all');
+  const getRightsOwnerUrl = (value?: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('file');
+    nextParams.delete(GOVERNANCE_PANEL_QUERY_KEY);
+    nextParams.delete(GOVERNANCE_PANEL_FOCUS_QUERY_KEY);
+
+    const normalizedValue = value?.trim();
+
+    if (!normalizedValue) {
+      nextParams.delete('assetRightsOwner');
+    } else {
+      nextParams.set('assetRightsOwner', normalizedValue);
+    }
+
+    const queryString = nextParams.toString();
+
+    return queryString ? `${basePath}?${queryString}` : basePath;
+  };
 
   const getReviewStatusUrl = (value?: string) => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('file');
-    nextParams.delete('files');
+    nextParams.delete(GOVERNANCE_PANEL_QUERY_KEY);
+    nextParams.delete(GOVERNANCE_PANEL_FOCUS_QUERY_KEY);
 
     if (!value || value === 'all') {
       nextParams.delete('assetReviewStatus');
@@ -443,13 +549,13 @@ const CategoryMenu = memo(() => {
     return queryString ? `${basePath}?${queryString}` : basePath;
   };
 
-  const getClearedReviewStatusUrl = () => getReviewStatusUrl('all');
-
   const getClearedGovernanceUrl = () => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('file');
-    nextParams.delete('files');
+    nextParams.delete(GOVERNANCE_PANEL_QUERY_KEY);
+    nextParams.delete(GOVERNANCE_PANEL_FOCUS_QUERY_KEY);
     nextParams.delete('assetClassification');
+    nextParams.delete('assetRightsOwner');
     nextParams.delete('assetReviewStatus');
     nextParams.delete('assetUsagePolicy');
 
@@ -463,22 +569,30 @@ const CategoryMenu = memo(() => {
       ? t('filters.governanceActive', { count: activeGovernanceFilterCount })
       : t('filters.governance');
   const matchingFilesCount = useFileStore((s) => s.total);
+  const hasPendingRightsOwnerDraft = draftRightsOwner.trim() !== (rightsOwnerParam ?? '');
 
   const activeGovernanceFilters = useMemo(
     () =>
       [
         classificationParam
           ? {
-              clearUrl: getClearedClassificationUrl(),
+              focusKey: 'assetClassification',
               key: 'classification',
               label: `${t('detail.asset.classification.label')}: ${
                 classificationLabels[classificationParam] ?? classificationParam
               }`,
             }
           : null,
+        rightsOwnerParam
+          ? {
+              focusKey: 'assetRightsOwner',
+              key: 'rightsOwner',
+              label: `${t('detail.asset.rightsOwner.label')}: ${rightsOwnerParam}`,
+            }
+          : null,
         reviewStatusParam
           ? {
-              clearUrl: getClearedReviewStatusUrl(),
+              focusKey: 'assetReviewStatus',
               key: 'reviewStatus',
               label: `${t('detail.asset.reviewStatus.label')}: ${
                 reviewStatusLabels[reviewStatusParam] ?? reviewStatusParam
@@ -487,17 +601,22 @@ const CategoryMenu = memo(() => {
           : null,
         usagePolicyParam
           ? {
-              clearUrl: getClearedUsagePolicyUrl(),
+              focusKey: 'assetUsagePolicy',
               key: 'usagePolicy',
               label: `${t('detail.asset.usagePolicy.label')}: ${
                 usagePolicyLabels[usagePolicyParam] ?? usagePolicyParam
               }`,
             }
           : null,
-      ].filter(Boolean) as Array<{ clearUrl: string; key: string; label: string }>,
+      ].filter(Boolean) as Array<{
+        focusKey: string;
+        key: string;
+        label: string;
+      }>,
     [
       classificationLabels,
       classificationParam,
+      rightsOwnerParam,
       reviewStatusLabels,
       reviewStatusParam,
       t,
@@ -505,124 +624,427 @@ const CategoryMenu = memo(() => {
       usagePolicyParam,
     ],
   );
+  const activeGovernanceSummary = activeGovernanceFilters.map((filter) => filter.label).join(' · ');
+
+  const applyRightsOwnerFilter = (value = draftRightsOwner, options?: { close?: boolean }) => {
+    setMode('explorer');
+    if (options?.close) setGovernanceOpen(false);
+    navigate(getRightsOwnerUrl(value), { replace: true });
+  };
+
+  const resetDraftRightsOwner = () => {
+    setDraftRightsOwner(rightsOwnerParam ?? '');
+  };
+
+  const closeGovernancePanel = () => {
+    resetDraftRightsOwner();
+    setGovernanceOpen(false);
+
+    if (searchParams.get(GOVERNANCE_PANEL_QUERY_KEY) !== '1') return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete(GOVERNANCE_PANEL_QUERY_KEY);
+    nextParams.delete(GOVERNANCE_PANEL_FOCUS_QUERY_KEY);
+    const queryString = nextParams.toString();
+    navigate(queryString ? `${basePath}?${queryString}` : basePath, { replace: true });
+  };
+
+  const getFocusedGovernanceUrl = (focusFilter: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('file');
+    nextParams.set(GOVERNANCE_PANEL_QUERY_KEY, '1');
+    nextParams.set(GOVERNANCE_PANEL_FOCUS_QUERY_KEY, focusFilter);
+
+    const queryString = nextParams.toString();
+
+    return queryString ? `${basePath}?${queryString}` : basePath;
+  };
 
   return (
-    <Flexbox
-      horizontal
-      align={'center'}
-      className={isMobile ? styles.containerMobile : undefined}
-      gap={8}
-    >
-      {showCategoryTabs && (
-        <Segmented
-          className={`${styles.segmented}${isMobile ? ` ${styles.segmentedMobile}` : ''}`}
-          options={items}
-          size={'small'}
-          value={activeKey}
-          onChange={(value) => {
-            setMode('explorer');
-            navigate(getCategoryUrl(value as FilesTabs), { replace: true });
-          }}
-        />
-      )}
-      <Popover
-        destroyOnHidden
-        placement={'bottomLeft'}
-        trigger={['click']}
-        content={
-          <Flexbox className={styles.governancePopover} gap={12}>
-            <Flexbox className={styles.governanceSection} gap={6}>
-              <span>{t('detail.asset.classification.label')}</span>
-              <Select
-                aria-label={t('detail.asset.classification.label')}
-                className={styles.governanceSelect}
-                options={classificationOptions}
-                size={'small'}
-                value={classificationParam ?? 'all'}
-                onChange={(value) => {
-                  setMode('explorer');
-                  navigate(getClassificationUrl(value), { replace: true });
-                }}
-              />
-            </Flexbox>
-            <Flexbox className={styles.governanceSection} gap={6}>
-              <span>{t('detail.asset.usagePolicy.label')}</span>
-              <Select
-                aria-label={t('detail.asset.usagePolicy.label')}
-                className={styles.governanceSelect}
-                options={usagePolicyOptions}
-                size={'small'}
-                value={usagePolicyParam ?? 'all'}
-                onChange={(value) => {
-                  setMode('explorer');
-                  navigate(getUsagePolicyUrl(value), { replace: true });
-                }}
-              />
-            </Flexbox>
-            <Flexbox className={styles.governanceSection} gap={6}>
-              <span>{t('detail.asset.reviewStatus.label')}</span>
-              <Select
-                aria-label={t('detail.asset.reviewStatus.label')}
-                className={styles.governanceSelect}
-                options={reviewStatusOptions}
-                size={'small'}
-                value={reviewStatusParam ?? 'all'}
-                onChange={(value) => {
-                  setMode('explorer');
-                  navigate(getReviewStatusUrl(value), { replace: true });
-                }}
-              />
-            </Flexbox>
-            {activeGovernanceFilterCount > 0 && (
-              <Flexbox horizontal justify={'flex-end'}>
-                <Button
-                  size={'small'}
-                  type={'text'}
-                  onClick={() => {
-                    setMode('explorer');
-                    navigate(getClearedGovernanceUrl(), { replace: true });
-                  }}
-                >
-                  {t('filters.clearGovernance')}
-                </Button>
-              </Flexbox>
-            )}
-          </Flexbox>
-        }
+    <Flexbox gap={6} style={{ minWidth: 0 }}>
+      <Flexbox
+        horizontal
+        align={'center'}
+        className={`${styles.governanceToolbar}${
+          isMobile ? ` ${styles.governanceToolbarMobile} ${styles.containerMobile}` : ''
+        }`}
+        gap={8}
       >
-        <Button
-          className={styles.governanceButton}
-          color={activeGovernanceFilterCount > 0 ? 'primary' : undefined}
-          icon={SlidersHorizontal}
-          size={'small'}
-          variant={activeGovernanceFilterCount > 0 ? 'filled' : 'borderless'}
-        >
-          {governanceLabel}
-        </Button>
-      </Popover>
-      {activeGovernanceFilters.length > 0 && (
-        <Flexbox horizontal className={styles.governanceFilters} gap={6}>
-          {typeof matchingFilesCount === 'number' && (
-            <span className={styles.governanceSummaryText}>
-              {t('filters.matchingFiles', { count: matchingFilesCount })}
-            </span>
-          )}
-          {activeGovernanceFilters.map((filter) => (
+        {showCategoryTabs && (
+          <Segmented
+            className={`${styles.segmented}${isMobile ? ` ${styles.segmentedMobile}` : ''}`}
+            options={items}
+            size={'small'}
+            value={activeKey}
+            onChange={(value) => {
+              setMode('explorer');
+              navigate(getCategoryUrl(value as FilesTabs), { replace: true });
+            }}
+          />
+        )}
+        {isMobile ? (
+          <>
             <Button
-              aria-label={t('filters.clearGovernanceFilter', { label: filter.label })}
-              className={styles.governanceFilterChip}
-              icon={X}
-              key={filter.key}
+              className={`${styles.governanceButton} ${styles.governanceButtonMobile}`}
+              color={activeGovernanceFilterCount > 0 ? 'primary' : undefined}
+              icon={SlidersHorizontal}
+              size={'small'}
+              variant={activeGovernanceFilterCount > 0 ? 'filled' : 'text'}
+              onClick={() => setGovernanceOpen(true)}
+            >
+              {governanceLabel}
+            </Button>
+            <Drawer
+              destroyOnHidden
+              height={'auto'}
+              open={governanceOpen}
+              placement={'bottom'}
+              title={t('filters.governance')}
+              onClose={closeGovernancePanel}
+            >
+              <Flexbox className={styles.governancePopover} gap={12}>
+                <Flexbox
+                  className={`${styles.governanceSection}${
+                    focusedGovernanceFilter === 'assetClassification'
+                      ? ` ${styles.governanceSectionFocused}`
+                      : ''
+                  }`}
+                  data-focused={focusedGovernanceFilter === 'assetClassification'}
+                  data-testid="governance-section-assetClassification"
+                  gap={6}
+                >
+                  <span>{t('detail.asset.classification.label')}</span>
+                  <Select
+                    aria-label={t('detail.asset.classification.label')}
+                    className={styles.governanceSelect}
+                    options={classificationOptions}
+                    size={'small'}
+                    value={classificationParam ?? 'all'}
+                    onChange={(value) => {
+                      setMode('explorer');
+                      setGovernanceOpen(false);
+                      navigate(getClassificationUrl(value), { replace: true });
+                    }}
+                  />
+                </Flexbox>
+                <Flexbox
+                  className={`${styles.governanceSection}${
+                    focusedGovernanceFilter === 'assetUsagePolicy'
+                      ? ` ${styles.governanceSectionFocused}`
+                      : ''
+                  }`}
+                  data-focused={focusedGovernanceFilter === 'assetUsagePolicy'}
+                  data-testid="governance-section-assetUsagePolicy"
+                  gap={6}
+                >
+                  <span>{t('detail.asset.usagePolicy.label')}</span>
+                  <Select
+                    aria-label={t('detail.asset.usagePolicy.label')}
+                    className={styles.governanceSelect}
+                    options={usagePolicyOptions}
+                    size={'small'}
+                    value={usagePolicyParam ?? 'all'}
+                    onChange={(value) => {
+                      setMode('explorer');
+                      setGovernanceOpen(false);
+                      navigate(getUsagePolicyUrl(value), { replace: true });
+                    }}
+                  />
+                </Flexbox>
+                <Flexbox
+                  className={`${styles.governanceSection}${
+                    focusedGovernanceFilter === 'assetRightsOwner'
+                      ? ` ${styles.governanceSectionFocused}`
+                      : ''
+                  }`}
+                  data-focused={focusedGovernanceFilter === 'assetRightsOwner'}
+                  data-testid="governance-section-assetRightsOwner"
+                  gap={6}
+                >
+                  <span>{t('detail.asset.rightsOwner.label')}</span>
+                  <Input
+                    allowClear
+                    aria-label={t('detail.asset.rightsOwner.label')}
+                    className={styles.governanceSelect}
+                    placeholder={t('detail.asset.rightsOwner.placeholder')}
+                    size={'small'}
+                    value={draftRightsOwner}
+                    onChange={(event) => setDraftRightsOwner(event.target.value)}
+                    onPressEnter={() => {
+                      applyRightsOwnerFilter(draftRightsOwner, { close: true });
+                    }}
+                  />
+                  {hasPendingRightsOwnerDraft && (
+                    <Flexbox className={styles.governanceSectionActions} horizontal>
+                      <Button
+                        size={'small'}
+                        type={'primary'}
+                        onClick={() => applyRightsOwnerFilter(draftRightsOwner, { close: true })}
+                      >
+                        {t('filters.apply')}
+                      </Button>
+                    </Flexbox>
+                  )}
+                </Flexbox>
+                <Flexbox
+                  className={`${styles.governanceSection}${
+                    focusedGovernanceFilter === 'assetReviewStatus'
+                      ? ` ${styles.governanceSectionFocused}`
+                      : ''
+                  }`}
+                  data-focused={focusedGovernanceFilter === 'assetReviewStatus'}
+                  data-testid="governance-section-assetReviewStatus"
+                  gap={6}
+                >
+                  <span>{t('detail.asset.reviewStatus.label')}</span>
+                  <Select
+                    aria-label={t('detail.asset.reviewStatus.label')}
+                    className={styles.governanceSelect}
+                    options={reviewStatusOptions}
+                    size={'small'}
+                    value={reviewStatusParam ?? 'all'}
+                    onChange={(value) => {
+                      setMode('explorer');
+                      setGovernanceOpen(false);
+                      navigate(getReviewStatusUrl(value), { replace: true });
+                    }}
+                  />
+                </Flexbox>
+                {activeGovernanceFilterCount > 0 && (
+                  <Flexbox horizontal justify={'flex-end'}>
+                    <Button
+                      size={'small'}
+                      type={'text'}
+                      onClick={() => {
+                        setMode('explorer');
+                        setGovernanceOpen(false);
+                        navigate(getClearedGovernanceUrl(), { replace: true });
+                      }}
+                    >
+                      {t('filters.clearGovernance')}
+                    </Button>
+                  </Flexbox>
+                )}
+              </Flexbox>
+            </Drawer>
+          </>
+        ) : (
+          <Popover
+            destroyOnHidden
+            open={governanceOpen}
+            placement={'bottomLeft'}
+            trigger={['click']}
+            onOpenChange={(open) => {
+              if (!open) {
+                closeGovernancePanel();
+                return;
+              }
+
+              setGovernanceOpen(true);
+            }}
+            content={
+              <Flexbox className={styles.governancePopover} gap={12}>
+                <Flexbox
+                  className={`${styles.governanceSection}${
+                    focusedGovernanceFilter === 'assetClassification'
+                      ? ` ${styles.governanceSectionFocused}`
+                      : ''
+                  }`}
+                  data-focused={focusedGovernanceFilter === 'assetClassification'}
+                  data-testid="governance-section-assetClassification"
+                  gap={6}
+                >
+                  <span>{t('detail.asset.classification.label')}</span>
+                  <Select
+                    aria-label={t('detail.asset.classification.label')}
+                    className={styles.governanceSelect}
+                    options={classificationOptions}
+                    size={'small'}
+                    value={classificationParam ?? 'all'}
+                    onChange={(value) => {
+                      setMode('explorer');
+                      setGovernanceOpen(false);
+                      navigate(getClassificationUrl(value), { replace: true });
+                    }}
+                  />
+                </Flexbox>
+                <Flexbox
+                  className={`${styles.governanceSection}${
+                    focusedGovernanceFilter === 'assetUsagePolicy'
+                      ? ` ${styles.governanceSectionFocused}`
+                      : ''
+                  }`}
+                  data-focused={focusedGovernanceFilter === 'assetUsagePolicy'}
+                  data-testid="governance-section-assetUsagePolicy"
+                  gap={6}
+                >
+                  <span>{t('detail.asset.usagePolicy.label')}</span>
+                  <Select
+                    aria-label={t('detail.asset.usagePolicy.label')}
+                    className={styles.governanceSelect}
+                    options={usagePolicyOptions}
+                    size={'small'}
+                    value={usagePolicyParam ?? 'all'}
+                    onChange={(value) => {
+                      setMode('explorer');
+                      setGovernanceOpen(false);
+                      navigate(getUsagePolicyUrl(value), { replace: true });
+                    }}
+                  />
+                </Flexbox>
+                <Flexbox
+                  className={`${styles.governanceSection}${
+                    focusedGovernanceFilter === 'assetRightsOwner'
+                      ? ` ${styles.governanceSectionFocused}`
+                      : ''
+                  }`}
+                  data-focused={focusedGovernanceFilter === 'assetRightsOwner'}
+                  data-testid="governance-section-assetRightsOwner"
+                  gap={6}
+                >
+                  <span>{t('detail.asset.rightsOwner.label')}</span>
+                  <Input
+                    allowClear
+                    aria-label={t('detail.asset.rightsOwner.label')}
+                    className={styles.governanceSelect}
+                    placeholder={t('detail.asset.rightsOwner.placeholder')}
+                    size={'small'}
+                    value={draftRightsOwner}
+                    onChange={(event) => setDraftRightsOwner(event.target.value)}
+                    onPressEnter={() => applyRightsOwnerFilter(draftRightsOwner, { close: true })}
+                  />
+                  {hasPendingRightsOwnerDraft && (
+                    <Flexbox className={styles.governanceSectionActions} horizontal>
+                      <Button
+                        size={'small'}
+                        type={'primary'}
+                        onClick={() => applyRightsOwnerFilter(draftRightsOwner, { close: true })}
+                      >
+                        {t('filters.apply')}
+                      </Button>
+                    </Flexbox>
+                  )}
+                </Flexbox>
+                <Flexbox
+                  className={`${styles.governanceSection}${
+                    focusedGovernanceFilter === 'assetReviewStatus'
+                      ? ` ${styles.governanceSectionFocused}`
+                      : ''
+                  }`}
+                  data-focused={focusedGovernanceFilter === 'assetReviewStatus'}
+                  data-testid="governance-section-assetReviewStatus"
+                  gap={6}
+                >
+                  <span>{t('detail.asset.reviewStatus.label')}</span>
+                  <Select
+                    aria-label={t('detail.asset.reviewStatus.label')}
+                    className={styles.governanceSelect}
+                    options={reviewStatusOptions}
+                    size={'small'}
+                    value={reviewStatusParam ?? 'all'}
+                    onChange={(value) => {
+                      setMode('explorer');
+                      setGovernanceOpen(false);
+                      navigate(getReviewStatusUrl(value), { replace: true });
+                    }}
+                  />
+                </Flexbox>
+                {activeGovernanceFilterCount > 0 && (
+                  <Flexbox horizontal justify={'flex-end'}>
+                    <Button
+                      size={'small'}
+                      type={'text'}
+                      onClick={() => {
+                        setMode('explorer');
+                        setGovernanceOpen(false);
+                        navigate(getClearedGovernanceUrl(), { replace: true });
+                      }}
+                    >
+                      {t('filters.clearGovernance')}
+                    </Button>
+                  </Flexbox>
+                )}
+              </Flexbox>
+            }
+          >
+            <Button
+              className={styles.governanceButton}
+              color={activeGovernanceFilterCount > 0 ? 'primary' : undefined}
+              icon={SlidersHorizontal}
+              size={'small'}
+              variant={activeGovernanceFilterCount > 0 ? 'filled' : 'text'}
+            >
+              {governanceLabel}
+            </Button>
+          </Popover>
+        )}
+      </Flexbox>
+      {activeGovernanceFilters.length > 0 && (
+        <Flexbox
+          horizontal={!isMobile}
+          className={`${styles.governanceSummaryBar}${
+            isMobile ? ` ${styles.governanceSummaryBarMobile}` : ''
+          }`}
+          data-testid="governance-summary-bar"
+          gap={8}
+        >
+          <Flexbox
+            className={`${styles.governanceSummaryMeta}${
+              isMobile ? ` ${styles.governanceSummaryMetaMobile}` : ''
+            }`}
+            gap={isMobile ? 6 : 0}
+          >
+            <Flexbox horizontal gap={8} wrap={isMobile ? 'wrap' : undefined}>
+              {typeof matchingFilesCount === 'number' && (
+                <span className={isMobile ? styles.mobileSummaryLead : styles.governanceSummaryText}>
+                  {t('filters.matchingFiles', { count: matchingFilesCount })}
+                </span>
+              )}
+              <span
+                className={`${styles.governanceSummaryText}${
+                  isMobile ? ` ${styles.governanceSummaryTextMobile}` : ''
+                }`}
+              >
+                {governanceLabel}
+              </span>
+            </Flexbox>
+            <span className={styles.governanceSummaryLabels} title={activeGovernanceSummary}>
+              {activeGovernanceSummary}
+            </span>
+          </Flexbox>
+          <Flexbox
+            horizontal
+            className={`${styles.governanceSummaryActions}${
+              isMobile ? ` ${styles.governanceSummaryActionsMobile}` : ''
+            }`}
+            gap={4}
+          >
+            <Button
+              aria-label={t('filters.adjustGovernance')}
+              block={isMobile}
               size={'small'}
               variant={'outlined'}
               onClick={() => {
+                const focusKey = activeGovernanceFilters[0]?.focusKey;
+                if (!focusKey) return;
                 setMode('explorer');
-                navigate(filter.clearUrl, { replace: true });
+                navigate(getFocusedGovernanceUrl(focusKey), { replace: true });
               }}
             >
-              {filter.label}
+              {t('filters.adjustGovernance')}
             </Button>
-          ))}
+            <Button
+              block={isMobile}
+              size={'small'}
+              type={'text'}
+              onClick={() => {
+                setMode('explorer');
+                navigate(getClearedGovernanceUrl(), { replace: true });
+              }}
+            >
+              {t('filters.clearGovernance')}
+            </Button>
+          </Flexbox>
         </Flexbox>
       )}
     </Flexbox>

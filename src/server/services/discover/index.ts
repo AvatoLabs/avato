@@ -1032,7 +1032,7 @@ export class DiscoverService {
 
   getPluginList = async (params: PluginQueryParams = {}): Promise<PluginListResponse> => {
     log('getPluginList: params=%O', params);
-    return this.getMcpList(this.mapPluginQueryToMcpParams(params)) as Promise<PluginListResponse>;
+    return this.getMcpList(this.mapPluginQueryToMcpParams(params)) as unknown as Promise<PluginListResponse>;
   };
 
   // ============================== Providers ==============================

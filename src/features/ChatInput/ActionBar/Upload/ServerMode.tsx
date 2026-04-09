@@ -116,7 +116,7 @@ const FileUpload = memo(() => {
     [uploadSelectedFiles],
   );
 
-  const openFileDialog = useCallback((ref: RefObject<HTMLInputElement>) => {
+  const openFileDialog = useCallback((ref: RefObject<HTMLInputElement | null>) => {
     ref.current?.click();
   }, []);
 

@@ -233,7 +233,7 @@ export class LobehubSkillStoreActionImpl {
     }
   };
 
-  revokeLobehubSkill = async (provider: string): Promise<void> => {
+  revokeLobehubSkill = async (provider: string): Promise<boolean> => {
     this.#set(
       produce((draft: LobehubSkillStoreState) => {
         draft.lobehubSkillLoadingIds.add(provider);
@@ -255,6 +255,7 @@ export class LobehubSkillStoreActionImpl {
         false,
         n('revokeLobehubSkill/success'),
       );
+      return true;
     } catch (error) {
       console.error('[LobehubSkill] Failed to revoke:', error);
 
@@ -265,6 +266,7 @@ export class LobehubSkillStoreActionImpl {
         false,
         n('revokeLobehubSkill/error'),
       );
+      return false;
     }
   };
 

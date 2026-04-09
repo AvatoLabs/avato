@@ -21,7 +21,6 @@ export const useResourceShareModal = () => {
     (params: OpenShareModalParams) => {
       createModal({
         children: <ResourceShareModal {...params} />,
-        focusable: { focusTriggerAfterClose: true },
         footer: null,
         title: t('share.title'),
         width: 760,

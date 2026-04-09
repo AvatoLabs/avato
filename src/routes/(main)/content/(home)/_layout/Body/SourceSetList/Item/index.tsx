@@ -86,7 +86,7 @@ const SourceSetItem = memo<SourceSetItemProps>(
     return (
       <>
         <NavItem
-          actions={<Actions dropdownMenu={dropdownMenu} />}
+          actions={active ? <Actions dropdownMenu={dropdownMenu} /> : undefined}
           active={active}
           className={className}
           contextMenuItems={dropdownMenu}

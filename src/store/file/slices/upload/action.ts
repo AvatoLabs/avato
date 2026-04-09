@@ -72,15 +72,15 @@ export class FileUploadActionImpl {
     // Extract image dimensions from base64 data
     const dimensions = await getImageDimensions(base64);
 
-    const { metadata, fileType, size, hash } = await uploadService.uploadBase64ToS3(base64);
+    const { metadata, fileType, size, sha256 } = await uploadService.uploadBase64ToS3(base64);
 
     const res = await fileService.createFile({
       fileType,
-      hash,
+      sha256,
       metadata,
       name: metadata.filename,
       size,
-      url: metadata.path,
+      storageKey: metadata.path,
     });
     return { ...res, dimensions, filename: metadata.filename };
   };
@@ -96,17 +96,18 @@ export class FileUploadActionImpl {
     abortController,
     uploadId,
   }: UploadWithProgressParams): Promise<UploadWithProgressResult | undefined> => {
+    const statusUpdateId = uploadId ?? file.name;
+
     try {
-      const statusUpdateId = uploadId ?? file.name;
       const fileArrayBuffer = await file.arrayBuffer();
 
       // 1. extract image dimensions if applicable
       const dimensions = await getImageDimensions(file);
 
-      // 2. check file hash
-      const hash = sha256(fileArrayBuffer);
+      // 2. check whether the same space-scoped blob already exists
+      const sha256Hex = sha256(fileArrayBuffer);
 
-      const checkStatus = await fileService.checkFileHash(hash, spaceId);
+      const checkStatus = await fileService.checkSpaceBlob(sha256Hex, spaceId);
       let metadata: FileMetadata;
 
       // 3. if file exist, just skip upload
@@ -142,7 +143,7 @@ export class FileUploadActionImpl {
             });
           },
           parentId,
-          sha256: hash,
+          sha256: sha256Hex,
           skipCheckFileType,
           spaceId,
         });
@@ -162,17 +163,22 @@ export class FileUploadActionImpl {
       }
 
       // 5. create file to db
+      const storageKey = metadata.path ?? checkStatus.storageKey;
+      if (!storageKey) {
+        throw new Error('Missing storage key for uploaded file');
+      }
+
       const data = await fileService.createFile(
         {
           fileType,
-          hash,
+          sha256: sha256Hex,
           metadata,
           name: file.name,
           parentId,
           spaceId,
           size: file.size,
           source,
-          url: metadata.path || checkStatus.url,
+          storageKey,
         },
         sourceSetId,
       );

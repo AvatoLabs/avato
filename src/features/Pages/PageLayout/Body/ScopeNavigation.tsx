@@ -45,7 +45,7 @@ interface SourceSetScopeItemProps {
 const SourceSetScopeItem = memo<SourceSetScopeItemProps>(
   ({ active, count, onClick, sourceSet }) => {
     const { t } = useTranslation(['common', 'file', 'sourceSet']);
-    const { modal } = App.useApp();
+    const { message, modal } = App.useApp();
     const { open } = useCreateSourceSetModal();
     const removeSourceSet = useSourceSetStore((s) => s.removeSourceSet);
     const isLoading = useSourceSetStore((s) => s.sourceSetLoadingIds.includes(sourceSet.id));
@@ -66,11 +66,16 @@ const SourceSetScopeItem = memo<SourceSetScopeItemProps>(
         centered: true,
         okButtonProps: { danger: true },
         onOk: async () => {
-          await removeSourceSet(sourceSet.id);
+          try {
+            await removeSourceSet(sourceSet.id);
+          } catch (error) {
+            console.error('Failed to remove source set:', error);
+            message.error(t('sourceSet.list.removeError', { ns: 'file' }));
+          }
         },
         title: t('sourceSet.list.confirmRemoveSourceSet', { ns: 'file' }),
       });
-    }, [modal, removeSourceSet, sourceSet.id, t]);
+    }, [message, modal, removeSourceSet, sourceSet.id, t]);
 
     const menuItems = useMemo<MenuProps['items']>(
       () => [

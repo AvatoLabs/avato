@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import FileIcon from '@/components/FileIcon';
 import { buildFileAssetBadges } from '@/features/ContentManager/utils/buildFileAssetBadges';
+import { buildFileGovernanceActivity } from '@/features/ContentManager/utils/buildFileGovernanceActivity';
 import Time from '@/routes/(main)/home/features/components/Time';
 import { RECENT_BLOCK_SIZE } from '@/routes/(main)/home/features/const';
 import { type FileListItem } from '@/types/files';
@@ -31,6 +32,7 @@ const RecentResourceItem = memo<RecentResourceItemProps>(({ file }) => {
   const assetBadges = buildFileAssetBadges({
     assetClassification: file.assetClassification,
     compact: true,
+    maxVisible: 3,
     assetPrimaryRenditionKind: file.assetPrimaryRenditionKind,
     assetPrimaryRenditionLabel: file.assetPrimaryRenditionLabel,
     assetReviewStatus: file.assetReviewStatus,
@@ -38,7 +40,16 @@ const RecentResourceItem = memo<RecentResourceItemProps>(({ file }) => {
     assetUsagePolicy: file.assetUsagePolicy,
     assetVersionLabel: file.assetVersionLabel,
     t,
-  }).slice(0, 2);
+  });
+  const governanceActivity = buildFileGovernanceActivity({
+    action: file.assetLatestGovernanceAuditAction,
+    actorDisplayName: file.assetLatestGovernanceAuditActorDisplayName,
+    after: file.assetLatestGovernanceAuditAfter,
+    before: file.assetLatestGovernanceAuditBefore,
+    changedFields: file.assetLatestGovernanceAuditChangedFields,
+    createdAt: file.assetLatestGovernanceAuditAt,
+    t,
+  });
 
   return (
     <Block
@@ -101,6 +112,11 @@ const RecentResourceItem = memo<RecentResourceItemProps>(({ file }) => {
               </Tag>
             ))}
           </Flexbox>
+        )}
+        {governanceActivity && (
+          <Text ellipsis fontSize={12} title={governanceActivity.title} type={'secondary'}>
+            {governanceActivity.label}
+          </Text>
         )}
         <Flexbox horizontal align={'center'} gap={8} style={{ minHeight: 18 }}>
           <Time date={file.updatedAt} />

@@ -104,7 +104,7 @@ describe('GET /eval/records/[evaluationId]', () => {
 
   it('redirects through a freshly issued file URL', async () => {
     mockFindById.mockResolvedValue({
-      evalRecordsUrl: 'rag_eval_records/2026-eval.jsonl',
+      evalRecordsUrl: 'v2/spaces/spc_eval/blobs/rag-eval-records/2026-eval.jsonl',
       id: 'eval-1',
     });
     mockGetFullFileUrl.mockResolvedValue('https://blob.example.com/eval.jsonl?sig=1');
@@ -116,13 +116,15 @@ describe('GET /eval/records/[evaluationId]', () => {
     expect(res.status).toBe(307);
     expect(res.headers.get('Location')).toBe('https://blob.example.com/eval.jsonl?sig=1');
     expect(mockFindById).toHaveBeenCalledWith('eval-1');
-    expect(mockGetFullFileUrl).toHaveBeenCalledWith('rag_eval_records/2026-eval.jsonl');
+    expect(mockGetFullFileUrl).toHaveBeenCalledWith(
+      'v2/spaces/spc_eval/blobs/rag-eval-records/2026-eval.jsonl',
+    );
     expect(mockCreateAccessEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         accessType: 'file_url_issued',
         metadata: expect.objectContaining({
           evaluationId: 'eval-1',
-          fileKey: 'rag_eval_records/2026-eval.jsonl',
+          fileKey: 'v2/spaces/spc_eval/blobs/rag-eval-records/2026-eval.jsonl',
           via: 'rag_eval_records_proxy',
         }),
       }),

@@ -1,6 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
+import { getSpaceMemorySurfaceContract } from '@lobechat/types';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -57,14 +58,20 @@ vi.mock('@/libs/trpc/client', () => ({
   },
 }));
 
-const makeSummary = (recall?: {
-  playbooks?: { active: number; disabled: number; expired: number; stale: number };
-  policies?: { active: number; disabled: number; expired: number; stale: number };
-  published?: { active: number; disabled: number; expired: number; stale: number };
-}, options?: { canReview?: boolean }) => ({
+const makeSummary = (
+  recall?: {
+    playbooks?: { active: number; disabled: number; expired: number; stale: number };
+    policies?: { active: number; disabled: number; expired: number; stale: number };
+    published?: { active: number; disabled: number; expired: number; stale: number };
+  },
+  options?: { canReview?: boolean },
+) => ({
   canCreate: true,
   canPublish: true,
   canReview: options?.canReview ?? true,
+  contract: getSpaceMemorySurfaceContract(options?.canReview === false ? 'viewer' : 'reviewer', {
+    canCreate: true,
+  }),
   id: 'spc_ops',
   kind: 'team',
   membershipRole: 'editor',
@@ -123,7 +130,7 @@ describe('SpaceRedirectPage', () => {
     render(<SpaceRedirectPage />);
 
     expect(screen.getByTestId('redirect-target')).toHaveTextContent(
-      '/spaces/spc_personal?from=legacy',
+      '/spaces/spc_personal/files?from=legacy',
     );
   });
 
@@ -147,7 +154,7 @@ describe('SpaceRedirectPage', () => {
     render(<SpaceRedirectPage />);
 
     expect(screen.getByTestId('redirect-target')).toHaveTextContent(
-      '/spaces/spc_personal?from=legacy',
+      '/spaces/spc_personal/files?from=legacy',
     );
   });
 });

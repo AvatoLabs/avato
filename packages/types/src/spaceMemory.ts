@@ -74,6 +74,7 @@ export const getSpaceMemorySurface = (space?: SpaceMemoryCapabilityTarget): Spac
 
 export interface SpaceMemorySurfaceContract {
   canAccessAudit: boolean;
+  canCreate: boolean;
   canManageRecall: boolean;
   canViewInbox: boolean;
   detailViews: SpaceMemoryDetailView[];
@@ -83,20 +84,27 @@ export interface SpaceMemorySurfaceContract {
 
 export const getSpaceMemorySurfaceContract = (
   surface: SpaceMemorySurface,
+  options?: { canCreate?: boolean },
 ): SpaceMemorySurfaceContract => {
-  if (surface === 'viewer') {
+  const canCreate = options?.canCreate ?? surface === 'reviewer';
+
+  if (surface === 'viewer' || surface === 'personal') {
     return {
       canAccessAudit: false,
+      canCreate,
       canManageRecall: false,
-      canViewInbox: false,
+      canViewInbox: canCreate,
       detailViews: ['overview'],
       recallFilters: ['all'],
-      sections: ['published', 'playbooks', 'policies'],
+      sections: canCreate
+        ? ['inbox', 'published', 'playbooks', 'policies']
+        : ['published', 'playbooks', 'policies'],
     };
   }
 
   return {
     canAccessAudit: true,
+    canCreate,
     canManageRecall: true,
     canViewInbox: true,
     detailViews: [...spaceMemoryDetailViews],
@@ -107,6 +115,27 @@ export const getSpaceMemorySurfaceContract = (
 
 export const canManageSpaceMemoryFromContract = (contract?: SpaceMemorySurfaceContract | null) =>
   Boolean(contract?.canManageRecall);
+
+export interface ResolvedSpaceMemorySurfaceState {
+  canCreate: boolean;
+  canReview: boolean;
+  contract: SpaceMemorySurfaceContract;
+  surface: SpaceMemorySurface;
+}
+
+export const resolveSpaceMemorySurfaceState = (
+  space?: SpaceMemoryCapabilityTarget,
+): ResolvedSpaceMemorySurfaceState => {
+  const { canCreate, canReview } = getSpaceMemoryCapabilities(space);
+  const surface = getSpaceMemorySurface(space);
+
+  return {
+    canCreate,
+    canReview,
+    contract: getSpaceMemorySurfaceContract(surface, { canCreate }),
+    surface,
+  };
+};
 
 export interface SpaceMemorySourceRefPreview {
   id: string;
@@ -252,14 +281,14 @@ export interface SpaceMemoryEntryPreview {
 }
 
 export interface SpaceMemorySectionResult {
-  contract?: SpaceMemorySurfaceContract;
+  contract: SpaceMemorySurfaceContract;
   items: SpaceMemoryEntryPreview[];
   section: SpaceMemorySection;
   surface: SpaceMemorySurface;
 }
 
 export interface SpaceMemoryEntryResult {
-  contract?: SpaceMemorySurfaceContract;
+  contract: SpaceMemorySurfaceContract;
   entry: SpaceMemoryEntryPreview;
   surface: SpaceMemorySurface;
 }
@@ -278,7 +307,7 @@ export interface SpaceMemorySummary {
   canCreate: boolean;
   canPublish: boolean;
   canReview: boolean;
-  contract?: SpaceMemorySurfaceContract;
+  contract: SpaceMemorySurfaceContract;
   id: string;
   kind?: 'personal' | 'team' | string | null;
   membershipRole?: string | null;

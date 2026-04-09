@@ -223,8 +223,7 @@ export class ContentAuthorizer {
     const link = await this.contentModel.resolveShareLinkByToken(shareToken);
     if (!link || link.contentUid !== resource.contentUid) return null;
 
-    const capabilities = RESOURCE_ROLE_CAPABILITIES.viewer;
-    if (!hasCapability(capabilities, 'read_content')) return null;
+    if (!shareViewerAllowsCapability('read_content')) return null;
 
     return {
       authzEpoch: Math.max(resource.authzEpoch, resource.spaceAuthzEpoch),

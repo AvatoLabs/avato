@@ -6,14 +6,16 @@ import {
   type FilesTabs,
   type SortType,
 } from '@/types/files';
+import { getSourceSetScopeId, type FileScope } from '@/features/ContentManager/useFileScope';
 
 interface BuildExplorerQueryParamsOptions {
   assetClassification?: FileAssetClassification;
+  assetRightsOwner?: string;
   assetReviewStatus?: FileAssetReviewStatus;
   assetUsagePolicy?: FileAssetUsagePolicy;
   category?: FilesTabs;
   currentFolderSlug?: string | null;
-  scope?: 'all' | 'unassigned';
+  scope?: FileScope;
   sorter?: 'createdAt' | 'name' | 'size';
   sortType?: SortType;
   sourceSetId?: string;
@@ -26,8 +28,9 @@ export const getExplorerCategoryFilter = (category?: FilesTabs, sourceSetId?: st
 export const isSpaceLevelContentFilter = (category?: FilesTabs) =>
   !!category && category !== 'all' && category !== 'home';
 
-export const buildExplorerQueryParams = ({
+export function buildExplorerQueryParams({
   assetClassification,
+  assetRightsOwner,
   assetReviewStatus,
   assetUsagePolicy,
   category,
@@ -37,16 +40,23 @@ export const buildExplorerQueryParams = ({
   sorter,
   sortType,
   spaceId,
-}: BuildExplorerQueryParamsOptions): ContentQueryParams => ({
-  assetClassification,
-  assetReviewStatus,
-  assetUsagePolicy,
-  category: getExplorerCategoryFilter(category, sourceSetId),
-  parentId:
-    !sourceSetId && isSpaceLevelContentFilter(category) ? undefined : currentFolderSlug || null,
-  showFilesInSourceSet: sourceSetId ? false : scope === 'all',
-  sourceSetId,
-  spaceId,
-  sortType,
-  sorter,
-});
+}: BuildExplorerQueryParamsOptions): ContentQueryParams {
+  const effectiveSourceSetId = sourceSetId ?? getSourceSetScopeId(scope);
+
+  return {
+    assetClassification,
+    assetRightsOwner,
+    assetReviewStatus,
+    assetUsagePolicy,
+    category: getExplorerCategoryFilter(category, effectiveSourceSetId ?? undefined),
+    parentId:
+      !effectiveSourceSetId && isSpaceLevelContentFilter(category)
+        ? undefined
+        : currentFolderSlug || null,
+    showFilesInSourceSet: effectiveSourceSetId ? false : scope !== 'unassigned',
+    sourceSetId: effectiveSourceSetId ?? undefined,
+    spaceId,
+    sortType,
+    sorter,
+  };
+}
