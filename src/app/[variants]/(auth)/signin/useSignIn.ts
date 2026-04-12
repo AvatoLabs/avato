@@ -51,6 +51,7 @@ export const useSignIn = () => {
     }
   });
   const socialAutoRedirectedRef = useRef(false);
+  const socialSignInInFlightRef = useRef<string | null>(null);
   const serverConfigInit = useAuthServerConfigStore((s) => s.serverConfigInit);
   const oAuthSSOProviders = useAuthServerConfigStore((s) => s.serverConfig.oAuthSSOProviders) || [];
   const { ssoProviders, preSocialSigninCheck, getAdditionalData } = useBusinessSignin();
@@ -210,11 +211,13 @@ export const useSignIn = () => {
   };
 
   const handleSocialSignIn = async (provider: string) => {
+    if (socialSignInInFlightRef.current) return;
+
+    socialSignInInFlightRef.current = provider;
     setSocialLoading(provider);
     const normalizedProvider = normalizeProviderId(provider);
     try {
       if (ENABLE_BUSINESS_FEATURES && !(await preSocialSigninCheck())) {
-        setSocialLoading(null);
         return;
       }
 
@@ -242,6 +245,7 @@ export const useSignIn = () => {
       console.error(`${normalizedProvider} sign in error:`, error);
       message.error(t('betterAuth.signin.socialError'));
     } finally {
+      socialSignInInFlightRef.current = null;
       setSocialLoading(null);
     }
   };

@@ -118,6 +118,7 @@ export const SignInEmailStep = ({
             const button = (
               <Button
                 block
+                disabled={!!socialLoading}
                 key={provider}
                 loading={socialLoading === provider}
                 size="large"
