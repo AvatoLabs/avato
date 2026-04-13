@@ -154,12 +154,15 @@ function buildProviderModelTree(
     .filter((p) => p.children.length > 0);
 }
 
-function getAbilityTags(m: RuntimeEnabledModel): string[] {
+function getAbilityTags(
+  m: RuntimeEnabledModel,
+  labels: { reasoning: string; search: string; tools: string; vision: string },
+): string[] {
   const tags: string[] = [];
-  if (m.abilities?.vision) tags.push('Vision');
-  if (m.abilities?.functionCall) tags.push('Tools');
-  if (m.abilities?.reasoning) tags.push('Reasoning');
-  if (m.abilities?.search) tags.push('Search');
+  if (m.abilities?.vision) tags.push(labels.vision);
+  if (m.abilities?.functionCall) tags.push(labels.tools);
+  if (m.abilities?.reasoning) tags.push(labels.reasoning);
+  if (m.abilities?.search) tags.push(labels.search);
   if (m.contextWindowTokens) {
     const k = Math.round(m.contextWindowTokens / 1000);
     tags.push(k >= 1000 ? `${Math.round(k / 1000)}M` : `${k}K`);
@@ -234,6 +237,15 @@ export default function ModelPickerScreen({ navigation, route }: any) {
   const sessionId: string | undefined = route.params?.sessionId;
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const abilityLabels = useMemo(
+    () => ({
+      reasoning: t.memoryReasoning,
+      search: t.search,
+      tools: t.badgeTools,
+      vision: t.badgeVision,
+    }),
+    [t.badgeTools, t.badgeVision, t.memoryReasoning, t.search],
+  );
   const colors = useThemeColors();
   const sessionType = useSessionStore(
     (s) => s.sessions.find((item) => item.id === sessionId)?.type,
@@ -417,7 +429,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
 
   const renderServerItem = useCallback(
     ({ item, section }: { item: RuntimeEnabledModel; section: ServerModelSection }) => {
-      const tags = getAbilityTags(item);
+      const tags = getAbilityTags(item, abilityLabels);
       return (
         <SelectionListItem
           accessibilityLabel={item.displayName || item.id}
@@ -432,7 +444,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
         />
       );
     },
-    [handleSelect, selected],
+    [abilityLabels, handleSelect, selected],
   );
 
   const renderFallbackItem = useCallback(

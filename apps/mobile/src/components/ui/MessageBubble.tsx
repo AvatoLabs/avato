@@ -33,6 +33,7 @@ import {
   Alert,
   FlatList,
   Image as RNImage,
+  type ImageSourcePropType,
   Linking,
   Modal,
   Platform,
@@ -55,14 +56,16 @@ import {
   getMobileBuiltinRender,
   getMobileBuiltinStreaming,
 } from '../../features/BuiltinTools';
-import { fileApi } from '../../lib/api';
+import { fileApi, getApiUrl } from '../../lib/api';
+import { getAuthHeaders } from '../../lib/auth';
 import { haptics } from '../../lib/haptics';
 import type { I18nStore } from '../../lib/i18n';
 import { useI18n } from '../../lib/i18n';
 import { codeInlineRules } from '../../lib/markdownRules';
-import { navigateToNotebook, navigateToResources } from '../../lib/navigation';
+import { navigateToContent, navigateToNotebook } from '../../lib/navigation';
 import { appendCurrentPortalStackWithOrigin } from '../../lib/portalNavigation';
 import { useResolvedRemoteAsset } from '../../lib/remoteAsset';
+import { buildRemoteSource, resolveRemoteFileUrl } from '../../lib/resourcePreviewUrl';
 import { isGroupSessionLike } from '../../lib/session';
 import type { RootStackNavigationProp } from '../../navigation/types';
 import { useChatStore } from '../../store/chat';
@@ -108,6 +111,7 @@ const USER_CONTENT_WIDTH = {
   maxWidth: '82%' as const,
   minWidth: 0,
 };
+const EMPTY_REMOTE_HEADERS: Record<string, string> = {};
 
 const injectCitationLinks = (content: string | undefined, citations?: CitationItem[] | null) => {
   if (!content || !citations?.length) return content ?? '';
@@ -406,8 +410,7 @@ const prepareMessageRenderContent = (
   textContent: string;
 } => {
   const hasSearch =
-    !!message.search &&
-    !!(message.search.citations?.length || message.search.imageResults?.length);
+    !!message.search && !!(message.search.citations?.length || message.search.imageResults?.length);
   const multimodalContentParts = message.metadata?.isMultimodal
     ? parseMessageContentParts(message.metadata?.tempDisplayContent)
     : null;
@@ -663,10 +666,12 @@ const CompareGroupMessageItem = memo<{
         nextSpeaker?.isSupervisor || (speakerId && speakerId === groupSupervisorId),
       );
       const nextSpeakerName =
-        nextSpeaker?.title || (nextIsSupervisor ? t.groupSettingsSupervisor : t.settingsDefaultAgent);
+        nextSpeaker?.title ||
+        (nextIsSupervisor ? t.groupSettingsSupervisor : t.settingsDefaultAgent);
 
       return {
-        childContent: prepareMessageRenderContent(childMessage, t.groupMentionAllMembers).textContent,
+        childContent: prepareMessageRenderContent(childMessage, t.groupMentionAllMembers)
+          .textContent,
         fallbackLabel: (nextSpeakerName || t.settingsDefaultAgent).slice(0, 1).toUpperCase(),
         isSupervisor: nextIsSupervisor,
         speaker: nextSpeaker,
@@ -694,11 +699,7 @@ const CompareGroupMessageItem = memo<{
               {speakerName}
             </Text>
             {childMessage.model ? (
-              <Text
-                className="text-[11px]"
-                numberOfLines={1}
-                style={{ color: colors.foreground }}
-              >
+              <Text className="text-[11px]" numberOfLines={1} style={{ color: colors.foreground }}>
                 {childMessage.model}
               </Text>
             ) : null}
@@ -722,7 +723,7 @@ const CompareGroupMessageItem = memo<{
             {childContent}
           </Markdown>
         ) : childMessage.reasoning?.content ? (
-          <Text className="text-[14px] leading-6 text-foreground/60">
+          <Text className="text-[14px] leading-6" style={{ color: colors.secondaryText }}>
             {childMessage.reasoning.content}
           </Text>
         ) : (
@@ -875,7 +876,11 @@ const GroupTasksBlock = memo<{
             >
               <View className="flex-row items-center gap-2">
                 {agentName ? (
-                  <Text className="text-[11px] font-medium text-foreground/60" numberOfLines={1}>
+                  <Text
+                    className="text-[11px] font-medium"
+                    numberOfLines={1}
+                    style={{ color: colors.secondaryText }}
+                  >
                     {agentName}
                   </Text>
                 ) : null}
@@ -934,6 +939,10 @@ const MessageBubble = memo<MessageBubbleProps>(
     const [showImageViewer, setShowImageViewer] = useState(false);
     const [showStats, setShowStats] = useState(false);
     const [viewerUri, setViewerUri] = useState<string | null>(null);
+    const [viewerSource, setViewerSource] = useState<ImageSourcePropType>({ uri: '' });
+    const [apiBaseUrl, setApiBaseUrl] = useState('');
+    const [remoteHeaders, setRemoteHeaders] =
+      useState<Record<string, string>>(EMPTY_REMOTE_HEADERS);
     const [contentCollapsed, setContentCollapsed] = useState(true);
     const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
     const [downloadingProgress, setDownloadingProgress] = useState(0);
@@ -943,11 +952,33 @@ const MessageBubble = memo<MessageBubbleProps>(
       message.role === 'assistant' && message.children?.length ? message.children : null;
     const messageCopyText = useMemo(
       () =>
-        assistantChainChildren?.length ? getAssistantChainText(assistantChainChildren) : message.content,
+        assistantChainChildren?.length
+          ? getAssistantChainText(assistantChainChildren)
+          : message.content,
       [assistantChainChildren, message.content],
     );
 
     const dismissActions = useCallback(() => {}, []);
+
+    useEffect(() => {
+      let cancelled = false;
+
+      const loadRemotePreviewConfig = async () => {
+        const base = (await getApiUrl())?.replace(/\/$/, '') ?? '';
+        const headers = base ? await getAuthHeaders(base) : EMPTY_REMOTE_HEADERS;
+
+        if (cancelled) return;
+
+        setApiBaseUrl(base);
+        setRemoteHeaders(headers);
+      };
+
+      void loadRemotePreviewConfig();
+
+      return () => {
+        cancelled = true;
+      };
+    }, []);
 
     const handleCopy = useCallback(async () => {
       await Clipboard.setStringAsync(messageCopyText);
@@ -1046,7 +1077,7 @@ const MessageBubble = memo<MessageBubbleProps>(
     const handleOpenResourceFile = useCallback(
       (file: ChatFileItem) => {
         haptics.light();
-        navigateToResources(
+        navigateToContent(
           appendCurrentPortalStackWithOrigin(
             route.name,
             route.params,
@@ -1481,7 +1512,9 @@ const MessageBubble = memo<MessageBubbleProps>(
           message.role === 'compressedGroup' && message.compressedMessages?.length
             ? message.compressedMessages
             : null,
-        contentWithoutArtifacts: hasArtifacts ? fullContent.replace(ARTIFACT_TAG_REGEX, '') : fullContent,
+        contentWithoutArtifacts: hasArtifacts
+          ? fullContent.replace(ARTIFACT_TAG_REGEX, '')
+          : fullContent,
         docSelections: isUser ? getMessageDocSelections(message) : [],
         groupSpeaker: nextGroupSpeaker,
         groupSpeakerFallbackLabel: (nextGroupSpeakerName || t.settingsDefaultAgent)
@@ -1773,15 +1806,18 @@ const MessageBubble = memo<MessageBubbleProps>(
               {showStandaloneUserAttachments ? (
                 <View className="mb-2">
                   <AttachmentBlock
+                    apiBaseUrl={apiBaseUrl}
                     downloadingFileId={downloadingFileId}
                     downloadingProgress={downloadingProgress}
                     fileList={message.fileList}
+                    imageHeaders={remoteHeaders}
                     imageList={message.imageList}
                     isUser={isUser}
                     onDownloadFile={handleDownloadFile}
                     onOpenFile={handleOpenResourceFile}
-                    onOpenImage={(url) => {
-                      setViewerUri(url);
+                    onOpenImage={(source, shareUri) => {
+                      setViewerSource(source);
+                      setViewerUri(shareUri);
                       setShowImageViewer(true);
                     }}
                   />
@@ -1869,15 +1905,18 @@ const MessageBubble = memo<MessageBubbleProps>(
                       {!showStandaloneUserAttachments && hasAttachments ? (
                         <View className="mb-2">
                           <AttachmentBlock
+                            apiBaseUrl={apiBaseUrl}
                             downloadingFileId={downloadingFileId}
                             downloadingProgress={downloadingProgress}
                             fileList={message.fileList}
+                            imageHeaders={remoteHeaders}
                             imageList={message.imageList}
                             isUser={isUser}
                             onDownloadFile={handleDownloadFile}
                             onOpenFile={handleOpenResourceFile}
-                            onOpenImage={(url) => {
-                              setViewerUri(url);
+                            onOpenImage={(source, shareUri) => {
+                              setViewerSource(source);
+                              setViewerUri(shareUri);
                               setShowImageViewer(true);
                             }}
                           />
@@ -2038,11 +2077,9 @@ const MessageBubble = memo<MessageBubbleProps>(
                                   setReadOnlyGroupExpanded(false);
                                   return;
                                 }
-                                useChatStore.getState().toggleMessageCollapsed(
-                                  sessionId,
-                                  message.id,
-                                  false,
-                                );
+                                useChatStore
+                                  .getState()
+                                  .toggleMessageCollapsed(sessionId, message.id, false);
                               }}
                             >
                               <Text
@@ -2086,11 +2123,9 @@ const MessageBubble = memo<MessageBubbleProps>(
                                   setReadOnlyGroupExpanded(true);
                                   return;
                                 }
-                                useChatStore.getState().toggleMessageCollapsed(
-                                  sessionId,
-                                  message.id,
-                                  true,
-                                );
+                                useChatStore
+                                  .getState()
+                                  .toggleMessageCollapsed(sessionId, message.id, true);
                               }}
                             >
                               <Text
@@ -2202,7 +2237,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                     setShowStats(true);
                   }}
                 >
-                  <Text className="text-[11px] text-foreground/35">
+                  <Text className="text-[11px]" style={{ color: colors.tertiaryText }}>
                     {totalTokens.toLocaleString()} {t.msgStatTokens}
                   </Text>
                 </TouchableOpacity>
@@ -2301,11 +2336,13 @@ const MessageBubble = memo<MessageBubbleProps>(
           />
         )}
         <ImageViewer
-          uri={viewerUri ?? ''}
+          shareUri={viewerUri ?? ''}
+          source={viewerSource}
           visible={showImageViewer}
           onClose={() => {
             setShowImageViewer(false);
             setViewerUri(null);
+            setViewerSource({ uri: '' });
           }}
         />
       </Animated.View>
@@ -2529,22 +2566,26 @@ const RichContentPartsBlock = memo<{
 RichContentPartsBlock.displayName = 'RichContentPartsBlock';
 
 const AttachmentBlock = memo<{
+  apiBaseUrl: string;
   downloadingFileId?: string | null;
   downloadingProgress?: number;
   fileList?: ChatMessage['fileList'];
+  imageHeaders?: Record<string, string>;
   imageList?: ChatMessage['imageList'];
   isUser: boolean;
   onDownloadFile: (file: NonNullable<ChatMessage['fileList']>[number]) => void;
   onOpenFile: (file: NonNullable<ChatMessage['fileList']>[number]) => void;
-  onOpenImage: (url: string) => void;
+  onOpenImage: (source: ImageSourcePropType, shareUri: string) => void;
 }>(
   ({
+    apiBaseUrl,
     imageList,
     fileList,
     isUser,
     onDownloadFile,
     onOpenFile,
     onOpenImage,
+    imageHeaders = EMPTY_REMOTE_HEADERS,
     downloadingFileId,
     downloadingProgress = 0,
   }) => {
@@ -2559,20 +2600,37 @@ const AttachmentBlock = memo<{
       [colors],
     );
     const renderImageItem = useCallback(
-      ({ item }: { item: NonNullable<ChatMessage['imageList']>[number] }) => (
-        <TouchableOpacity activeOpacity={0.9} onPress={() => onOpenImage(item.url)}>
-          <RNImage
-            source={{ uri: item.url }}
-            style={{
-              backgroundColor: isUser ? colors.userBubbleSubtleBg : chatAccent.subtleBg,
-              borderRadius: 14,
-              height: 120,
-              width: 120,
-            }}
-          />
-        </TouchableOpacity>
-      ),
-      [chatAccent.subtleBg, colors.userBubbleSubtleBg, isUser, onOpenImage],
+      ({ item }: { item: NonNullable<ChatMessage['imageList']>[number] }) => {
+        const resolvedUrl = resolveRemoteFileUrl(apiBaseUrl, { id: item.id, url: item.url });
+        const source =
+          buildRemoteSource(apiBaseUrl, resolvedUrl, imageHeaders) ||
+          ({ uri: resolvedUrl || item.url } as ImageSourcePropType);
+
+        return (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => onOpenImage(source, resolvedUrl || item.url)}
+          >
+            <RNImage
+              source={source}
+              style={{
+                backgroundColor: isUser ? colors.userBubbleSubtleBg : chatAccent.subtleBg,
+                borderRadius: 14,
+                height: 120,
+                width: 120,
+              }}
+            />
+          </TouchableOpacity>
+        );
+      },
+      [
+        apiBaseUrl,
+        chatAccent.subtleBg,
+        colors.userBubbleSubtleBg,
+        imageHeaders,
+        isUser,
+        onOpenImage,
+      ],
     );
 
     return (
@@ -2681,7 +2739,9 @@ const CitationFootnotesBlock = memo<{
 
   return (
     <View className="mt-3 gap-2">
-      <Text className="text-[11px] font-semibold text-foreground/45">{t.chatSearchSources}</Text>
+      <Text className="text-[11px] font-semibold" style={{ color: colors.tertiaryText }}>
+        {t.chatSearchSources}
+      </Text>
       {visibleCitations.map((citation, index) => {
         const favicon = getCitationFavicon(citation);
         const host = citation.favicon || getUrlHost(citation.url);
@@ -2705,7 +2765,11 @@ const CitationFootnotesBlock = memo<{
               </Text>
             </View>
             <View className="flex-1">
-              <Text className="text-[12px] font-semibold text-foreground/80" numberOfLines={2}>
+              <Text
+                className="text-[12px] font-semibold"
+                numberOfLines={2}
+                style={{ color: colors.foreground }}
+              >
                 {citation.title || citation.url}
               </Text>
               {!!host && (
@@ -2716,7 +2780,11 @@ const CitationFootnotesBlock = memo<{
                       style={{ borderRadius: 6, height: 12, marginRight: 6, width: 12 }}
                     />
                   ) : null}
-                  <Text className="text-[11px] text-foreground/45" numberOfLines={1}>
+                  <Text
+                    className="text-[11px]"
+                    numberOfLines={1}
+                    style={{ color: colors.tertiaryText }}
+                  >
                     {host}
                   </Text>
                 </View>
@@ -2785,7 +2853,11 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
           }}
           onPress={() => handleOpenLink(item.url)}
         >
-          <Text className="text-[13px] font-semibold text-foreground/80" numberOfLines={3}>
+          <Text
+            className="text-[13px] font-semibold"
+            numberOfLines={3}
+            style={{ color: colors.foreground }}
+          >
             {item.title || item.url}
           </Text>
           <View className="mt-3 flex-row items-center">
@@ -2795,7 +2867,11 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
                 style={{ borderRadius: 8, height: 16, marginRight: 8, width: 16 }}
               />
             ) : null}
-            <Text className="flex-1 text-[11px] text-foreground/45" numberOfLines={1}>
+            <Text
+              className="flex-1 text-[11px]"
+              numberOfLines={1}
+              style={{ color: colors.tertiaryText }}
+            >
               {host || item.url}
             </Text>
           </View>
@@ -2825,7 +2901,11 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
           <RNImage source={{ uri: item.imageUri }} style={{ height: 72, width: 124 }} />
         ) : null}
         <View className="px-2 py-2">
-          <Text className="text-[11px] font-medium text-foreground/75" numberOfLines={2}>
+          <Text
+            className="text-[11px] font-medium"
+            numberOfLines={2}
+            style={{ color: colors.secondaryText }}
+          >
             {item.title ? stripHtml(item.title) : item.domain || item.sourceUri || 'Image'}
           </Text>
           {item.domain || item.sourceUri ? (
@@ -2836,7 +2916,11 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
                   style={{ borderRadius: 6, height: 12, marginRight: 6, width: 12 }}
                 />
               ) : null}
-              <Text className="flex-1 text-[10px] text-foreground/45" numberOfLines={1}>
+              <Text
+                className="flex-1 text-[10px]"
+                numberOfLines={1}
+                style={{ color: colors.tertiaryText }}
+              >
                 {item.domain || getUrlHost(item.sourceUri) || item.sourceUri}
               </Text>
             </View>
@@ -2865,7 +2949,7 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
           ) : (
             <Images color={colors.primary} size={14} strokeWidth={2} />
           )}
-          <Text className="ml-2 text-[12px] font-medium text-foreground/65">
+          <Text className="ml-2 text-[12px] font-medium" style={{ color: colors.secondaryText }}>
             {title} {count > 0 ? `(${count})` : ''}
           </Text>
           {previewFavicons.length ? (
@@ -2901,7 +2985,11 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
               className="rounded-xl px-3 py-2"
               style={{ backgroundColor: chatAccent.elevatedBg }}
             >
-              <Text className="text-[12px] font-medium text-foreground/75" numberOfLines={2}>
+              <Text
+                className="text-[12px] font-medium"
+                numberOfLines={2}
+                style={{ color: colors.secondaryText }}
+              >
                 {summaryText}
               </Text>
             </View>
@@ -2909,7 +2997,10 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
 
           {search.searchQueries?.length ? (
             <View>
-              <Text className="text-[11px] font-semibold text-foreground/45 mb-1">
+              <Text
+                className="mb-1 text-[11px] font-semibold"
+                style={{ color: colors.tertiaryText }}
+              >
                 {t.chatSearchQueries}
               </Text>
               <View className="flex-row flex-wrap gap-2">
@@ -2942,7 +3033,10 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
 
           {search.imageSearchQueries?.length ? (
             <View>
-              <Text className="text-[11px] font-semibold text-foreground/45 mb-1">
+              <Text
+                className="mb-1 text-[11px] font-semibold"
+                style={{ color: colors.tertiaryText }}
+              >
                 {t.chatImageSearchQueries}
               </Text>
               <View className="flex-row flex-wrap gap-2">
@@ -3932,12 +4026,14 @@ const ToolResultBlock = memo<{
 
     if (!sessionId) return;
 
-    await useChatStore.getState().rejectAndContinueToolIntervention(
-      sessionId,
-      topicId,
-      targetAssistantMessageId,
-      message.toolCallId || message.id,
-    );
+    await useChatStore
+      .getState()
+      .rejectAndContinueToolIntervention(
+        sessionId,
+        topicId,
+        targetAssistantMessageId,
+        message.toolCallId || message.id,
+      );
     await useChatStore.getState().fetchMessages(sessionId, topicId, { preserveOnEmpty: true });
   }, [
     message.id,
@@ -4031,7 +4127,9 @@ const AssistantChainMessageItem = memo<{
 
     return (
       <View className="gap-2">
-        {hasSearch && childMessage.search ? <SearchGroundingBlock search={childMessage.search} /> : null}
+        {hasSearch && childMessage.search ? (
+          <SearchGroundingBlock search={childMessage.search} />
+        ) : null}
 
         {renderedReasoning ? (
           <ThinkingBlock
@@ -4422,7 +4520,7 @@ const ErrorBlock = memo<{
           {errorTypeLabel}
         </Text>
       </View>
-      <Text selectable className="text-[12px] leading-4 text-foreground/60">
+      <Text selectable className="text-[12px] leading-4" style={{ color: colors.foreground }}>
         {error.message}
       </Text>
       {errorBody && (
@@ -4440,9 +4538,10 @@ const ErrorBlock = memo<{
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <Text
                 selectable
-                className="mt-1 rounded-xl px-3 py-2 text-[11px] leading-4 text-foreground/50"
+                className="mt-1 rounded-xl px-3 py-2 text-[11px] leading-4"
                 style={{
                   backgroundColor: colors.dangerSubtle,
+                  color: colors.foreground,
                   fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
                 }}
               >

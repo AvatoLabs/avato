@@ -436,6 +436,21 @@ export type TranslationKeys = {
   workspaceNotConnected: string;
   workspaceProviders: string;
   workspaceUserId: string;
+  workspaceCreateTitle: string;
+  workspaceCreateNamePlaceholder: string;
+  workspaceCreateDescriptionPlaceholder: string;
+  workspaceCreateConfirm: string;
+  workspaceCreateCreating: string;
+  workspaceCreateCreated: string;
+  workspaceCreateFailed: string;
+  workspaceLoadFailed: string;
+  workspaceQuickAccessTitle: string;
+  workspaceCurrentContext: string;
+  workspaceSpaceLabel: string;
+  workspaceScopeLabel: string;
+  workspaceManageSourceSet: string;
+  workspaceSwitchSpaces: string;
+  workspaceSwitchSourceSets: string;
 
   // Message Actions
   msgActionCopy: string;
@@ -963,6 +978,10 @@ export type TranslationKeys = {
   resourceGovernanceSectionRightsOwner: string;
   resourceGovernanceRightsOwnerPlaceholder: string;
   resourceGovernanceRightsOwnerSummary: string;
+  resourceGovernanceQuickHint: string;
+  resourceGovernanceSelectedFilters: string;
+  resourceGovernanceNoFilters: string;
+  resourceGovernanceAdvanced: string;
   resourceGovernanceCapabilitiesViewerHint: string;
   resourceGovernanceCapabilitiesEditorHint: string;
   resourceGovernanceCapabilitiesManagerHint: string;
@@ -979,6 +998,7 @@ export type TranslationKeys = {
   resourceCreateSourceSet: string;
   resourceCreateSourceSetPlaceholder: string;
   resourceSourceSetCreated: string;
+  resourceSourceSetLoadFailed: string;
   resourceDeleteSourceSetConfirm: string;
   resourceDeleteSourceSetDesc: string;
   resourceSourceSetDeleted: string;
@@ -1013,6 +1033,9 @@ export type TranslationKeys = {
   resourceViewList: string;
   resourceViewGrid: string;
   resourceViewModeToggle: string;
+  resourceScopeTree: string;
+  resourceScopeFiles: string;
+  resourceMoreActions: string;
   resourceSelect: string;
   resourceSelectCount: string;
   resourceBatchDelete: string;
@@ -1236,6 +1259,9 @@ export type TranslationKeys = {
   memorySpaceCreateFailed: string;
   memorySpaceCreateSuccess: string;
   memorySpaceCanReview: string;
+  memorySpaceCategoryGeneral: string;
+  memorySpaceCategoryPlaybook: string;
+  memorySpaceCategoryPolicy: string;
   memorySpaceInboxCount: string;
   memorySpacePublishedCount: string;
   memorySpacePlaybooksCount: string;
@@ -1244,6 +1270,7 @@ export type TranslationKeys = {
   memorySpaceRecallDisabled: string;
   memorySpaceRecallExpired: string;
   memorySpaceRecallStale: string;
+  memorySpacePendingAction: string;
   memorySpaceBrowse: string;
   memorySpaceEntriesEmpty: string;
   memorySpaceEntriesEmptyDesc: string;
@@ -1859,6 +1886,21 @@ export const enUS: TranslationKeys = {
   workspaceNotConnected: 'Not connected',
   workspaceProviders: 'Providers',
   workspaceUserId: 'User ID',
+  workspaceCreateTitle: 'New Team Space',
+  workspaceCreateNamePlaceholder: 'Team Space name',
+  workspaceCreateDescriptionPlaceholder: 'What is this space for?',
+  workspaceCreateConfirm: 'Create Team Space',
+  workspaceCreateCreating: 'Creating...',
+  workspaceCreateCreated: 'Team Space created',
+  workspaceCreateFailed: 'Unable to create team space',
+  workspaceLoadFailed: 'Could not load spaces',
+  workspaceQuickAccessTitle: 'Quick Access',
+  workspaceCurrentContext: 'Current context',
+  workspaceSpaceLabel: 'Space',
+  workspaceScopeLabel: 'Scope',
+  workspaceManageSourceSet: 'Manage source set',
+  workspaceSwitchSpaces: 'Spaces',
+  workspaceSwitchSourceSets: 'Source Sets',
 
   msgActionCopy: 'Copy',
   msgActionEdit: 'Edit',
@@ -2377,6 +2419,10 @@ export const enUS: TranslationKeys = {
   resourceGovernanceSectionRightsOwner: 'Rights owner',
   resourceGovernanceRightsOwnerPlaceholder: 'Enter rights owner',
   resourceGovernanceRightsOwnerSummary: 'Rights owner: {rightsOwner}',
+  resourceGovernanceQuickHint: 'Use common filters here. Open Advanced for classification or rights owner.',
+  resourceGovernanceSelectedFilters: 'Selected filters',
+  resourceGovernanceNoFilters: 'No filters selected',
+  resourceGovernanceAdvanced: 'Advanced',
   resourceGovernanceCapabilitiesViewerHint: 'You can review governance metadata in this scope.',
   resourceGovernanceCapabilitiesEditorHint: 'This scope allows governance editing on supported surfaces.',
   resourceGovernanceCapabilitiesManagerHint: 'This scope allows governance approval and archiving on supported surfaces.',
@@ -2394,6 +2440,7 @@ export const enUS: TranslationKeys = {
   resourceCreateSourceSet: 'Create source set',
   resourceCreateSourceSetPlaceholder: 'Source set name',
   resourceSourceSetCreated: 'Source set created',
+  resourceSourceSetLoadFailed: 'Could not load source sets',
   resourceDeleteSourceSetConfirm: 'Delete source set',
   resourceDeleteSourceSetDesc: 'The source set will be deleted. Files can remain if you choose to keep them.',
   resourceSourceSetDeleted: 'Source set deleted',
@@ -2427,6 +2474,9 @@ export const enUS: TranslationKeys = {
   resourceViewList: 'List',
   resourceViewGrid: 'Grid',
   resourceViewModeToggle: 'Toggle list or grid view',
+  resourceScopeTree: 'Tree',
+  resourceScopeFiles: 'Files',
+  resourceMoreActions: 'More actions',
   resourceSelect: 'Select',
   resourceSelectCount: '{count} selected',
   resourceBatchDelete: 'Delete',
@@ -2648,6 +2698,9 @@ export const enUS: TranslationKeys = {
   memorySpaceCreateFailed: 'Could not add the draft right now.',
   memorySpaceCreateSuccess: 'Draft added to inbox.',
   memorySpaceCanReview: 'Can review',
+  memorySpaceCategoryGeneral: 'General',
+  memorySpaceCategoryPlaybook: 'Playbook',
+  memorySpaceCategoryPolicy: 'Policy',
   memorySpaceInboxCount: '{count} inbox',
   memorySpacePublishedCount: '{count} published',
   memorySpacePlaybooksCount: '{count} playbooks',
@@ -2656,6 +2709,7 @@ export const enUS: TranslationKeys = {
   memorySpaceRecallDisabled: '{count} paused',
   memorySpaceRecallExpired: '{count} expired',
   memorySpaceRecallStale: '{count} stale',
+  memorySpacePendingAction: '{count} pending',
   memorySpaceBrowse: 'Browse memory',
   memorySpaceEntriesEmpty: 'No memory entries in this section yet',
   memorySpaceEntriesEmptyDesc:
@@ -3264,6 +3318,21 @@ const zh_tw: TranslationKeys = {
   workspaceNotConnected: '未連線',
   workspaceProviders: '服務商',
   workspaceUserId: '使用者 ID',
+  workspaceCreateTitle: '新增團隊空間',
+  workspaceCreateNamePlaceholder: '團隊空間名稱',
+  workspaceCreateDescriptionPlaceholder: '這個空間是做什麼用的？',
+  workspaceCreateConfirm: '建立團隊空間',
+  workspaceCreateCreating: '建立中...',
+  workspaceCreateCreated: '團隊空間已建立',
+  workspaceCreateFailed: '無法建立團隊空間',
+  workspaceLoadFailed: '無法載入空間列表',
+  workspaceQuickAccessTitle: '快速入口',
+  workspaceCurrentContext: '當前內容範圍',
+  workspaceSpaceLabel: '空間',
+  workspaceScopeLabel: '範圍',
+  workspaceManageSourceSet: '管理來源集',
+  workspaceSwitchSpaces: '空間',
+  workspaceSwitchSourceSets: '來源集',
 
   msgActionCopy: '複製',
   msgActionEdit: '編輯',
@@ -3779,6 +3848,10 @@ const zh_tw: TranslationKeys = {
   resourceGovernanceSectionRightsOwner: '權利歸屬方',
   resourceGovernanceRightsOwnerPlaceholder: '輸入權利歸屬方',
   resourceGovernanceRightsOwnerSummary: '權利歸屬方：{rightsOwner}',
+  resourceGovernanceQuickHint: '常用條件可直接點選，分類與權利歸屬方請到進階篩選調整。',
+  resourceGovernanceSelectedFilters: '已選條件',
+  resourceGovernanceNoFilters: '尚未選擇篩選條件',
+  resourceGovernanceAdvanced: '進階',
   resourceGovernanceCapabilitiesViewerHint: '你可以在此範圍檢視治理中繼資料。',
   resourceGovernanceCapabilitiesEditorHint: '此範圍允許在支援的介面上編輯治理資料。',
   resourceGovernanceCapabilitiesManagerHint: '此範圍允許在支援的介面上審核與封存治理資料。',
@@ -3796,6 +3869,7 @@ const zh_tw: TranslationKeys = {
   resourceCreateSourceSet: '建立來源集',
   resourceCreateSourceSetPlaceholder: '來源集名稱',
   resourceSourceSetCreated: '來源集已建立',
+  resourceSourceSetLoadFailed: '無法載入來源集列表',
   resourceDeleteSourceSetConfirm: '刪除來源集',
   resourceDeleteSourceSetDesc: '來源集將被刪除；若保留檔案，可稍後重新整理。',
   resourceSourceSetDeleted: '來源集已刪除',
@@ -3829,6 +3903,9 @@ const zh_tw: TranslationKeys = {
   resourceViewList: '列表',
   resourceViewGrid: '網格',
   resourceViewModeToggle: '切換列表或網格檢視',
+  resourceScopeTree: '樹狀',
+  resourceScopeFiles: '檔案',
+  resourceMoreActions: '更多操作',
   resourceSelect: '選擇',
   resourceSelectCount: '已選 {count} 項',
   resourceBatchDelete: '刪除',
@@ -4048,6 +4125,9 @@ const zh_tw: TranslationKeys = {
   memorySpaceCreateFailed: '目前無法新增草稿。',
   memorySpaceCreateSuccess: '草稿已加入待處理。',
   memorySpaceCanReview: '可治理',
+  memorySpaceCategoryGeneral: '一般',
+  memorySpaceCategoryPlaybook: '手冊',
+  memorySpaceCategoryPolicy: '政策',
   memorySpaceInboxCount: '{count} 個待處理',
   memorySpacePublishedCount: '{count} 個已發布',
   memorySpacePlaybooksCount: '{count} 個手冊',
@@ -4056,6 +4136,7 @@ const zh_tw: TranslationKeys = {
   memorySpaceRecallDisabled: '{count} 個暫停',
   memorySpaceRecallExpired: '{count} 個已過期',
   memorySpaceRecallStale: '{count} 個待驗證',
+  memorySpacePendingAction: '{count} 個待處理',
   memorySpaceBrowse: '瀏覽記憶',
   memorySpaceEntriesEmpty: '此區段目前還沒有記憶條目',
   memorySpaceEntriesEmptyDesc: '可切換其他區段，或等團隊發布更多記憶後再查看。',
@@ -4663,6 +4744,21 @@ const zh: TranslationKeys = {
   workspaceNotConnected: '未连接',
   workspaceProviders: '服务商',
   workspaceUserId: '用户 ID',
+  workspaceCreateTitle: '新建团队空间',
+  workspaceCreateNamePlaceholder: '团队空间名称',
+  workspaceCreateDescriptionPlaceholder: '这个空间是做什么用的？',
+  workspaceCreateConfirm: '创建团队空间',
+  workspaceCreateCreating: '创建中...',
+  workspaceCreateCreated: '团队空间已创建',
+  workspaceCreateFailed: '无法创建团队空间',
+  workspaceLoadFailed: '无法加载空间列表',
+  workspaceQuickAccessTitle: '快捷入口',
+  workspaceCurrentContext: '当前内容范围',
+  workspaceSpaceLabel: '空间',
+  workspaceScopeLabel: '范围',
+  workspaceManageSourceSet: '管理来源集',
+  workspaceSwitchSpaces: '空间',
+  workspaceSwitchSourceSets: '来源集',
 
   msgActionCopy: '复制',
   msgActionEdit: '编辑',
@@ -5178,6 +5274,10 @@ const zh: TranslationKeys = {
   resourceGovernanceSectionRightsOwner: '权利归属方',
   resourceGovernanceRightsOwnerPlaceholder: '输入权利归属方',
   resourceGovernanceRightsOwnerSummary: '权利归属方：{rightsOwner}',
+  resourceGovernanceQuickHint: '常用条件可直接点选，分类和权利归属方可在高级筛选中调整。',
+  resourceGovernanceSelectedFilters: '已选条件',
+  resourceGovernanceNoFilters: '还没有筛选条件',
+  resourceGovernanceAdvanced: '高级',
   resourceGovernanceCapabilitiesViewerHint: '你可以在当前范围查看治理元数据。',
   resourceGovernanceCapabilitiesEditorHint: '当前范围允许在受支持的界面上编辑治理数据。',
   resourceGovernanceCapabilitiesManagerHint: '当前范围允许在受支持的界面上审批和归档治理数据。',
@@ -5195,6 +5295,7 @@ const zh: TranslationKeys = {
   resourceCreateSourceSet: '创建来源集',
   resourceCreateSourceSetPlaceholder: '来源集名称',
   resourceSourceSetCreated: '来源集已创建',
+  resourceSourceSetLoadFailed: '无法加载来源集列表',
   resourceDeleteSourceSetConfirm: '删除来源集',
   resourceDeleteSourceSetDesc: '来源集将被删除；如果保留文件，之后仍可重新整理。',
   resourceSourceSetDeleted: '来源集已删除',
@@ -5228,6 +5329,9 @@ const zh: TranslationKeys = {
   resourceViewList: '列表',
   resourceViewGrid: '网格',
   resourceViewModeToggle: '切换列表或网格视图',
+  resourceScopeTree: '树状',
+  resourceScopeFiles: '文件',
+  resourceMoreActions: '更多操作',
   resourceSelect: '选择',
   resourceSelectCount: '已选 {count} 项',
   resourceBatchDelete: '删除',
@@ -5447,6 +5551,9 @@ const zh: TranslationKeys = {
   memorySpaceCreateFailed: '暂时无法新增草稿。',
   memorySpaceCreateSuccess: '草稿已加入待处理。',
   memorySpaceCanReview: '可治理',
+  memorySpaceCategoryGeneral: '通用',
+  memorySpaceCategoryPlaybook: '手册',
+  memorySpaceCategoryPolicy: '策略',
   memorySpaceInboxCount: '{count} 个待处理',
   memorySpacePublishedCount: '{count} 个已发布',
   memorySpacePlaybooksCount: '{count} 个手册',
@@ -5455,6 +5562,7 @@ const zh: TranslationKeys = {
   memorySpaceRecallDisabled: '{count} 个暂停',
   memorySpaceRecallExpired: '{count} 个已过期',
   memorySpaceRecallStale: '{count} 个待验证',
+  memorySpacePendingAction: '{count} 个待处理',
   memorySpaceBrowse: '浏览记忆',
   memorySpaceEntriesEmpty: '这个分区目前还没有记忆条目',
   memorySpaceEntriesEmptyDesc: '可以切换其他分区，或等团队发布更多记忆后再回来查看。',
@@ -5681,8 +5789,8 @@ export const LOCALE_DISPLAY_NAMES: Record<Locale, string> = {
 };
 
 export const useI18n = create<I18nStore>((set) => ({
-  locale: 'en-US',
-  t: enUS,
+  locale: 'zh-CN',
+  t: zh,
   setLocale: async (locale: Locale) => {
     set({ locale, t: translations[locale] || enUS });
 

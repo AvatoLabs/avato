@@ -8,20 +8,17 @@
 import { FlashList } from '@shopify/flash-list';
 import {
   ActivityIndicator,
-  Modal,
-  Pressable,
   Switch,
   Text,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
 
 import type { MobileRecommendedBuiltinIcon } from '../../constants/recommendedBuiltins';
 import { useThemeColors } from '../../theme/colors';
-import { enteringModalContent } from '../../theme/motion';
 import type { AgentSkillItem, InstalledPlugin } from '../../types';
+import { BottomSheetScaffold } from './BottomSheetScaffold';
 import { BuiltinSkillIcon } from './BuiltinSkillIcon';
 
 export type SkillSheetItem =
@@ -90,10 +87,15 @@ export default function SkillsSheet({
   agentConfigOpenStore,
 }: SkillsSheetProps) {
   const colors = useThemeColors();
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  const isFloatingPanel = windowWidth >= 768;
   const items = buildItems(builtinItems, agentSkillItems, installedPlugins);
   const showStoreHint =
     agentSkillItems.length === 0 && installedPlugins.length === 0 && builtinItems.length > 0;
+  const listHeight = Math.min(
+    windowHeight * (isFloatingPanel ? 0.62 : 0.58),
+    isFloatingPanel ? 520 : 440,
+  );
 
   const renderItem = ({ item }: { item: SkillSheetItem }) => {
     if (item.type === 'builtin') {
@@ -108,7 +110,11 @@ export default function SkillsSheet({
               {item.title}
             </Text>
             {item.description ? (
-              <Text className="mt-0.5 text-[12px]" numberOfLines={1} style={{ color: colors.secondaryText }}>
+              <Text
+                className="mt-0.5 text-[12px]"
+                numberOfLines={1}
+                style={{ color: colors.secondaryText }}
+              >
                 {item.description}
               </Text>
             ) : null}
@@ -136,7 +142,11 @@ export default function SkillsSheet({
               {item.skill.name || item.skill.identifier || item.skill.id}
             </Text>
             {item.skill.description ? (
-              <Text className="mt-0.5 text-[12px]" numberOfLines={1} style={{ color: colors.secondaryText }}>
+              <Text
+                className="mt-0.5 text-[12px]"
+                numberOfLines={1}
+                style={{ color: colors.secondaryText }}
+              >
                 {item.skill.description}
               </Text>
             ) : null}
@@ -168,7 +178,11 @@ export default function SkillsSheet({
             {plugin.manifest?.meta?.title || plugin.identifier}
           </Text>
           {plugin.manifest?.meta?.description ? (
-            <Text className="mt-0.5 text-[12px]" numberOfLines={1} style={{ color: colors.secondaryText }}>
+            <Text
+              className="mt-0.5 text-[12px]"
+              numberOfLines={1}
+              style={{ color: colors.secondaryText }}
+            >
               {plugin.manifest.meta.description}
             </Text>
           ) : null}
@@ -196,8 +210,12 @@ export default function SkillsSheet({
     if (items.length === 0) {
       return (
         <View className="items-center py-10">
-          <Text className="px-4 text-center text-[14px]" style={{ color: colors.secondaryText }}>{skillsEmpty}</Text>
-          <Text className="mt-1 text-center text-[12px]" style={{ color: colors.muted }}>{skillsEmptyDesc}</Text>
+          <Text className="px-4 text-center text-[14px]" style={{ color: colors.secondaryText }}>
+            {skillsEmpty}
+          </Text>
+          <Text className="mt-1 text-center text-[12px]" style={{ color: colors.muted }}>
+            {skillsEmptyDesc}
+          </Text>
         </View>
       );
     }
@@ -205,65 +223,46 @@ export default function SkillsSheet({
   };
 
   return (
-    <Modal
-      accessibilityViewIsModal
-      transparent
-      animationType="slide"
+    <BottomSheetScaffold
+      maxHeight="75%"
+      preferredWidth={680}
+      title={skillsTitle}
       visible={visible}
-      onRequestClose={onClose}
+      onClose={onClose}
     >
-      <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-black/40" onPress={onClose} />
-        {/* Content card: View (not Pressable) so scroll gestures work inside */}
-        <Animated.View
-          className="rounded-t-2xl bg-card"
-          entering={enteringModalContent()}
-          style={{ maxHeight: windowHeight * 0.75 }}
-        >
-          <View className="items-center pt-3 pb-1">
-            <View className="h-1 w-9 rounded-full bg-foreground/10" />
-          </View>
-          <View className="flex-row items-center justify-between px-5 pb-3 pt-2">
-            <Text className="text-foreground text-[18px] font-bold tracking-tight">
-              {skillsTitle}
-            </Text>
-          </View>
-          {/* Fixed-height scroll area: FlatList for reliable scroll */}
-          <View style={{ height: Math.min(windowHeight * 0.55, 400) }}>
-            {loading || items.length === 0 ? (
-              listContent()
-            ) : (
-              <FlashList
-                showsVerticalScrollIndicator
-                contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
-                data={items}
-                estimatedItemSize={64}
-                renderItem={renderItem}
-                keyExtractor={(item) =>
-                  item.type === 'builtin'
-                    ? `builtin-${item.identifier}`
-                    : item.type === 'skill'
-                      ? `skill-${item.skill.id}`
-                      : `plugin-${item.plugin.identifier}`
-                }
-              />
-            )}
-          </View>
-          {showStoreHint && agentConfigOpenStore && onOpenStore ? (
-            <TouchableOpacity
-              className="mx-5 mb-4 mt-2 items-center rounded-xl bg-foreground/5 py-3"
-              onPress={() => {
-                onClose();
-                onOpenStore();
-              }}
-            >
-              <Text className="text-[14px] font-medium" style={{ color: colors.primary }}>
-                {agentConfigOpenStore}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-        </Animated.View>
+      <View style={{ height: listHeight }}>
+        {loading || items.length === 0 ? (
+          listContent()
+        ) : (
+          <FlashList
+            showsVerticalScrollIndicator
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
+            data={items}
+            estimatedItemSize={64}
+            renderItem={renderItem}
+            keyExtractor={(item) =>
+              item.type === 'builtin'
+                ? `builtin-${item.identifier}`
+                : item.type === 'skill'
+                  ? `skill-${item.skill.id}`
+                  : `plugin-${item.plugin.identifier}`
+            }
+          />
+        )}
       </View>
-    </Modal>
+      {showStoreHint && agentConfigOpenStore && onOpenStore ? (
+        <TouchableOpacity
+          className="mx-5 mt-2 items-center rounded-xl bg-foreground/5 py-3"
+          onPress={() => {
+            onClose();
+            onOpenStore();
+          }}
+        >
+          <Text className="text-[14px] font-medium" style={{ color: colors.primary }}>
+            {agentConfigOpenStore}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+    </BottomSheetScaffold>
   );
 }

@@ -3,7 +3,16 @@
  */
 import { Share2, X } from 'lucide-react-native';
 import React, { memo, useCallback } from 'react';
-import { Image, Modal, Platform, Pressable, Share, TouchableOpacity, View } from 'react-native';
+import {
+  Image,
+  type ImageSourcePropType,
+  Modal,
+  Platform,
+  Pressable,
+  Share,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useThemeColors } from '../../theme/colors';
@@ -13,16 +22,38 @@ interface ImageViewerProps {
   accessibilityLabelClose?: string;
   accessibilityLabelShare?: string;
   onClose: () => void;
-  uri: string;
+  shareUri?: string;
+  source?: ImageSourcePropType;
+  uri?: string;
   visible: boolean;
 }
 
 const ImageViewer = memo<ImageViewerProps>(
-  ({ accessibilityLabelClose, accessibilityLabelShare, visible, uri, onClose }) => {
+  ({
+    accessibilityLabelClose,
+    accessibilityLabelShare,
+    visible,
+    source,
+    shareUri,
+    uri,
+    onClose,
+  }) => {
     const insets = useSafeAreaInsets();
     const colors = useThemeColors();
+    const resolvedSource = source || (uri ? { uri } : { uri: '' });
 
     const handleShare = useCallback(async () => {
+      const uri =
+        shareUri ||
+        (!Array.isArray(resolvedSource) &&
+        typeof resolvedSource === 'object' &&
+        resolvedSource !== null &&
+        'uri' in resolvedSource &&
+        typeof resolvedSource.uri === 'string'
+          ? resolvedSource.uri
+          : '');
+      if (!uri) return;
+
       try {
         if (Platform.OS === 'ios') {
           await Share.share({ url: uri });
@@ -32,7 +63,7 @@ const ImageViewer = memo<ImageViewerProps>(
       } catch {
         /* user dismissed */
       }
-    }, [uri]);
+    }, [resolvedSource, shareUri]);
 
     return (
       <Modal
@@ -75,7 +106,7 @@ const ImageViewer = memo<ImageViewerProps>(
             className="flex-1 items-center justify-center"
             onPress={onClose}
           >
-            <Image className="w-full h-full" resizeMode="contain" source={{ uri }} />
+            <Image className="w-full h-full" resizeMode="contain" source={resolvedSource} />
           </Pressable>
         </View>
       </Modal>

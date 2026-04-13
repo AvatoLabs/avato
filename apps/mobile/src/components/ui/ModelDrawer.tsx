@@ -56,12 +56,15 @@ function ProviderLogo({
   );
 }
 
-function getAbilityTags(m: RuntimeEnabledModel): string[] {
+function getAbilityTags(
+  m: RuntimeEnabledModel,
+  labels: { reasoning: string; search: string; tools: string; vision: string },
+): string[] {
   const tags: string[] = [];
-  if (m.abilities?.vision) tags.push('Vision');
-  if (m.abilities?.functionCall) tags.push('Tools');
-  if (m.abilities?.reasoning) tags.push('Reasoning');
-  if (m.abilities?.search) tags.push('Search');
+  if (m.abilities?.vision) tags.push(labels.vision);
+  if (m.abilities?.functionCall) tags.push(labels.tools);
+  if (m.abilities?.reasoning) tags.push(labels.reasoning);
+  if (m.abilities?.search) tags.push(labels.search);
   if (m.contextWindowTokens) {
     const k = Math.round(m.contextWindowTokens / 1000);
     tags.push(k >= 1000 ? `${Math.round(k / 1000)}M` : `${k}K`);
@@ -106,6 +109,15 @@ export function ModelDrawer({
   const storeSelectedProvider = useModelStore((s) => s.selectedProvider);
   const selectModel = useModelStore((s) => s.selectModel);
   const loadSelection = useModelStore((s) => s.loadSelection);
+  const abilityLabels = useMemo(
+    () => ({
+      reasoning: t.memoryReasoning,
+      search: t.search,
+      tools: t.badgeTools,
+      vision: t.badgeVision,
+    }),
+    [t.badgeTools, t.badgeVision, t.memoryReasoning, t.search],
+  );
 
   const selectedModel = initialModel ?? storeSelectedModel;
   const selectedProvider = initialProvider ?? storeSelectedProvider;
@@ -153,7 +165,7 @@ export function ModelDrawer({
       section: ModelSection;
     }) => {
       const isSelected = selectedModel === item.id && selectedProvider === section.providerId;
-      const tags = getAbilityTags(item);
+      const tags = getAbilityTags(item, abilityLabels);
 
       return (
         <SelectionListItem
@@ -168,12 +180,13 @@ export function ModelDrawer({
         />
       );
     },
-    [handleSelect, selectedModel, selectedProvider],
+    [abilityLabels, handleSelect, selectedModel, selectedProvider],
   );
 
   return (
     <BottomSheetScaffold
       maxHeight="75%"
+      preferredWidth={680}
       title={t.modelPickerTitle}
       visible={visible}
       headerRight={
@@ -210,10 +223,10 @@ export function ModelDrawer({
           renderSectionHeader={({ section }) => (
             <View className="mb-3">
               <SelectionSectionLabel
+                title={section.title}
                 leading={
                   <ProviderLogo logo={section.logo} providerId={section.providerId} size={16} />
                 }
-                title={section.title}
               />
             </View>
           )}
