@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  navigateToContent,
   navigateToMessageDetail,
   navigateToNotebook,
-  navigateToResources,
   navigateToThreadDetail,
   navigateToThreadList,
   navigateToToolDetail,
@@ -16,9 +16,9 @@ import {
 
 vi.mock('./navigation', () => ({
   navigateToChatDetail: vi.fn(),
+  navigateToContent: vi.fn(),
   navigateToMessageDetail: vi.fn(),
   navigateToNotebook: vi.fn(),
-  navigateToResources: vi.fn(),
   navigateToToolDetail: vi.fn(),
   navigateToThreadDetail: vi.fn(),
   navigateToThreadList: vi.fn(),
@@ -172,7 +172,7 @@ describe('shareLinkNavigation', () => {
         threadId: 'thread-3',
         topicId: 'topic-2',
       },
-      route: 'Resources',
+      route: 'Content',
     });
   });
 
@@ -233,7 +233,7 @@ describe('shareLinkNavigation', () => {
       'https://example.com/resources?id=file_1&kind=file&sessionId=session-1&topicId=topic-2',
     );
 
-    expect(navigateToResources).toHaveBeenCalledWith({
+    expect(navigateToContent).toHaveBeenCalledWith({
       openItemId: 'file_1',
       openKind: 'file',
       sessionId: 'session-1',

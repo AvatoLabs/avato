@@ -27,10 +27,11 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ContentSkeleton from '../components/ui/ContentSkeleton';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
@@ -39,6 +40,7 @@ import { getProviderIconUrl } from '../constants/cdn';
 import { aiModelApi, aiProviderApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import { useModelStore } from '../store/model';
 import { useThemeStore } from '../store/theme';
 import { useThemeColors } from '../theme/colors';
@@ -97,7 +99,10 @@ function SecureInputRow({
   const [visible, setVisible] = useState(false);
   return (
     <>
-      <Text className="text-[12px] font-medium mb-2 uppercase tracking-wider" style={{ color: colors.secondaryText }}>
+      <Text
+        className="text-[12px] font-medium mb-2 uppercase tracking-wider"
+        style={{ color: colors.secondaryText }}
+      >
         {label}
       </Text>
       <View className="flex-row items-center bg-foreground/[0.04] rounded-xl px-3 h-11 mb-3">
@@ -237,6 +242,9 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const contentWidth = Math.min(Math.max(screenWidth - 40, 0), responsiveMetrics.settingsMaxWidth);
   const refreshModelStore = useModelStore((s) => s.fetchModels);
 
   const [detail, setDetail] = useState<AiProviderDetailItem | null>(null);
@@ -469,7 +477,9 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
           }
           onPressLeft={() => navigation.goBack()}
         />
-        <ContentSkeleton />
+        <View className="flex-1 self-center" style={{ width: contentWidth }}>
+          <ContentSkeleton />
+        </View>
       </View>
     );
   }
@@ -490,7 +500,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ alignItems: 'center', paddingBottom: 40 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -504,7 +514,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
       >
         {/* Provider Header */}
         <Animated.View entering={FadeInDown.duration(250)}>
-          <View className="flex-row items-center px-5 py-5">
+          <View className="flex-row items-center py-5" style={{ width: contentWidth }}>
             <ProviderLogo logo={detail?.logo} providerId={providerId} size={48} />
             <View className="flex-1 ml-4">
               <Text className="text-foreground text-[18px] font-semibold tracking-tight">
@@ -513,14 +523,16 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
               {detail?.description ? (
                 <Text
                   className="text-[12px] font-medium mt-0.5"
-                  style={{ color: colors.secondaryText }}
                   numberOfLines={2}
+                  style={{ color: colors.secondaryText }}
                 >
                   {detail.description}
                 </Text>
               ) : (
-                <Text className="text-[12px] font-medium mt-0.5"
-                  style={{ color: colors.secondaryText }}>
+                <Text
+                  className="text-[12px] font-medium mt-0.5"
+                  style={{ color: colors.secondaryText }}
+                >
                   {enabled ? t.providerDetailEnabled : t.providerDetailDisabled}
                 </Text>
               )}
@@ -537,7 +549,10 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
         {/* Configuration Section — dynamic fields */}
         {visibleFields.length > 0 && (
           <Animated.View entering={FadeInDown.delay(50).duration(250)}>
-            <View className="mx-5 mb-4 bg-foreground/[0.02] rounded-xl p-4">
+            <View
+              className="mb-4 rounded-xl bg-foreground/[0.02] p-4"
+              style={{ width: contentWidth }}
+            >
               {visibleFields.map((fieldKey) => {
                 const meta = vaultFieldMeta[fieldKey] || {
                   label: fieldKey
@@ -565,7 +580,10 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
 
                 return (
                   <View key={fieldKey}>
-                    <Text className="text-[12px] font-medium mb-2 uppercase tracking-wider" style={{ color: colors.secondaryText }}>
+                    <Text
+                      className="text-[12px] font-medium mb-2 uppercase tracking-wider"
+                      style={{ color: colors.secondaryText }}
+                    >
                       {meta.label}
                     </Text>
                     <View className="bg-foreground/[0.04] rounded-xl px-3 h-11 mb-3 justify-center">
@@ -587,8 +605,8 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
               <TouchableOpacity
                 activeOpacity={0.8}
                 className="rounded-xl py-3 items-center flex-row justify-center"
-                style={{ backgroundColor: colors.primary }}
                 disabled={saving}
+                style={{ backgroundColor: colors.primary }}
                 onPress={handleSave}
               >
                 {saving ? (
@@ -601,7 +619,10 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                       strokeWidth={tokens.icon.strokeWidth}
                       style={{ marginRight: 6 }}
                     />
-                    <Text className="font-medium text-[14px]" style={{ color: colors.iconOnPrimary }}>
+                    <Text
+                      className="font-medium text-[14px]"
+                      style={{ color: colors.iconOnPrimary }}
+                    >
                       {t.providerDetailSave}
                     </Text>
                   </>
@@ -614,13 +635,19 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
         {/* Client-side Fetch Toggle */}
         {showFetchOnClient && (
           <Animated.View entering={FadeInDown.delay(75).duration(250)}>
-            <View className="mx-5 mb-4 bg-foreground/[0.02] rounded-xl overflow-hidden">
+            <View
+              className="mb-4 rounded-xl bg-foreground/[0.02] overflow-hidden"
+              style={{ width: contentWidth }}
+            >
               <View className="flex-row items-center px-4 py-3.5">
                 <View className="flex-1">
                   <Text className="text-foreground font-medium text-[15px] tracking-tight">
                     {t.providerDetailFetchOnClient}
                   </Text>
-                  <Text className="text-[11px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                  <Text
+                    className="text-[11px] font-medium mt-0.5"
+                    style={{ color: colors.secondaryText }}
+                  >
                     {t.providerDetailFetchOnClientDesc}
                   </Text>
                 </View>
@@ -638,7 +665,10 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
         {/* Connection Checker */}
         {showChecker && (
           <Animated.View entering={FadeInDown.delay(100).duration(250)}>
-            <View className="mx-5 mb-4 bg-foreground/[0.02] rounded-xl overflow-hidden">
+            <View
+              className="mb-4 rounded-xl bg-foreground/[0.02] overflow-hidden"
+              style={{ width: contentWidth }}
+            >
               <TouchableOpacity
                 activeOpacity={0.7}
                 className="flex-row items-center px-4 py-3.5"
@@ -649,7 +679,10 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                   <Text className="text-foreground font-medium text-[15px] tracking-tight">
                     {t.providerDetailChecking}
                   </Text>
-                  <Text className="text-[11px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                  <Text
+                    className="text-[11px] font-medium mt-0.5"
+                    style={{ color: colors.secondaryText }}
+                  >
                     {t.providerDetailDescription}
                   </Text>
                 </View>
@@ -684,7 +717,10 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
 
         {/* Models Section */}
         <Animated.View entering={FadeInDown.delay(125).duration(250)}>
-          <View className="px-5 mb-3 flex-row items-center justify-between">
+          <View
+            className="mb-3 flex-row items-center justify-between"
+            style={{ width: contentWidth }}
+          >
             <Text className="text-foreground text-[16px] font-semibold tracking-tight">
               {t.providerDetailNoModels}
             </Text>
@@ -695,7 +731,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
 
           {/* Model Search */}
           {models.length > 5 && (
-            <View className="px-5 mb-3">
+            <View className="mb-3" style={{ width: contentWidth }}>
               <View className="flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
                 <Search color={colors.muted} size={16} strokeWidth={2} />
                 <TextInput
@@ -711,11 +747,16 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
           )}
 
           {filteredModels.length === 0 ? (
-            <View className="items-center py-10">
-              <Text className="text-[14px]" style={{ color: colors.secondaryText }}>{t.providerDetailNoModels}</Text>
+            <View className="items-center py-10" style={{ width: contentWidth }}>
+              <Text className="text-[14px]" style={{ color: colors.secondaryText }}>
+                {t.providerDetailNoModels}
+              </Text>
             </View>
           ) : (
-            <View className="mx-5 bg-foreground/[0.02] rounded-xl overflow-hidden">
+            <View
+              className="rounded-xl bg-foreground/[0.02] overflow-hidden"
+              style={{ width: contentWidth }}
+            >
               {filteredModels.map((model) => (
                 <View
                   className="flex-row items-center px-4 py-3 border-b border-border"
@@ -724,12 +765,15 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                   <View className="flex-1">
                     <Text
                       className="text-[14px] font-medium tracking-tight"
-                    style={{ color: model.enabled ? colors.foreground : colors.secondaryText }}
                       numberOfLines={1}
+                      style={{ color: model.enabled ? colors.foreground : colors.secondaryText }}
                     >
                       {model.displayName || model.id}
                     </Text>
-                    <Text className="text-[11px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                    <Text
+                      className="text-[11px] font-medium mt-0.5"
+                      style={{ color: colors.secondaryText }}
+                    >
                       {model.id}
                     </Text>
                   </View>

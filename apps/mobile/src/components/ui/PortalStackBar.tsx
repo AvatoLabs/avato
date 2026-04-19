@@ -19,9 +19,9 @@ interface PortalStackBarProps {
 const getPortalEntryLabel = (
   entry: PortalStackEntry,
   labels: {
+    contentTitle: string;
     messageDetailTitle: string;
     notebookTitle: string;
-    resourceTitle: string;
     threadDetailTitle: string;
     threadListTitle: string;
     toolDetailTitle: string;
@@ -40,12 +40,12 @@ const getPortalEntryLabel = (
     case 'Notebook': {
       return (isCurrent ? currentLabel?.trim() : undefined) || labels.notebookTitle;
     }
-    case 'Resources': {
+    case 'Content': {
       return (
         entry.params.openItem?.name ||
         entry.params.openItemId ||
         (isCurrent ? currentLabel?.trim() : undefined) ||
-        labels.resourceTitle
+        labels.contentTitle
       );
     }
     case 'ThreadDetail': {
@@ -78,17 +78,17 @@ const PortalStackBar = memo<PortalStackBarProps>(({ currentLabel, routeName, rou
 
   const labels = useMemo(
     () => ({
+      contentTitle: t.resourceTitle,
       messageDetailTitle: t.messageDetailTitle,
       notebookTitle: t.notebookTitle,
-      resourceTitle: t.resourceTitle,
       threadDetailTitle: t.threadDetailTitle,
       threadListTitle: t.threadListTitle,
       toolDetailTitle: t.toolDetailTitle,
     }),
     [
+      t.resourceTitle,
       t.messageDetailTitle,
       t.notebookTitle,
-      t.resourceTitle,
       t.threadDetailTitle,
       t.threadListTitle,
       t.toolDetailTitle,

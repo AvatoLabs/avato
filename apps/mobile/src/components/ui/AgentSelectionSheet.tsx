@@ -1,13 +1,6 @@
 import { ChevronRight } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { agentApi, type AgentQueryItem } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
@@ -334,6 +327,7 @@ export default function AgentSelectionSheet({
         keyboardAvoiding
         headerRight={submitAction}
         maxHeight="80%"
+        preferredWidth={680}
         title={title}
         visible={visible}
         onClose={onClose}

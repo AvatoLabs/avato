@@ -9,7 +9,11 @@ import type {
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
 
-import type { ChatMessage } from '../types';
+import type {
+  ChatMessage,
+  MobileSpaceMemoryRecallFilter,
+  MobileSpaceMemorySection,
+} from '../types';
 
 export interface ResourceNavigationTarget {
   content?: string | null;
@@ -70,7 +74,7 @@ export interface ThreadListRouteParams extends ConversationOriginRouteParams {
   topicId: string;
 }
 
-export interface ResourcesRouteParams extends ConversationOriginRouteParams {
+export interface ContentRouteParams extends ConversationOriginRouteParams {
   openItem?: ResourceNavigationTarget;
   openItemId?: string;
   openKind?: 'document' | 'file' | 'source_set';
@@ -80,7 +84,7 @@ export interface ResourcesRouteParams extends ConversationOriginRouteParams {
 export type PortalRouteName =
   | 'MessageDetail'
   | 'Notebook'
-  | 'Resources'
+  | 'Content'
   | 'ThreadDetail'
   | 'ThreadList'
   | 'ToolDetail';
@@ -88,7 +92,7 @@ export type PortalRouteName =
 export type PortalStackEntry =
   | { params: MessageDetailPortalParams; route: 'MessageDetail' }
   | { params: NotebookRouteParams; route: 'Notebook' }
-  | { params: ResourcesRouteParams; route: 'Resources' }
+  | { params: ContentRouteParams; route: 'Content' }
   | { params: ThreadDetailRouteParams; route: 'ThreadDetail' }
   | { params: ThreadListRouteParams; route: 'ThreadList' }
   | { params: ToolDetailRouteParams; route: 'ToolDetail' };
@@ -99,9 +103,9 @@ export interface PortalRouteParams {
 
 export type MainTabParamList = {
   Chats: undefined;
+  Content: (ContentRouteParams & PortalRouteParams) | undefined;
   Create: undefined;
   Me: undefined;
-  Resources: (ResourcesRouteParams & PortalRouteParams) | undefined;
   Store: undefined;
 };
 
@@ -117,12 +121,17 @@ export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   Memory: undefined;
   MemoryDetail: Record<string, unknown> | undefined;
+  SpaceMemory: {
+    recallFilter?: MobileSpaceMemoryRecallFilter;
+    section?: MobileSpaceMemorySection;
+    spaceId: string;
+  };
   MessageDetail: MessageDetailRouteParams & PortalRouteParams;
   ModelPicker: { sessionId?: string } | undefined;
   /** Standalone: no params. From chat/thread: pass source route params. */
   Notebook: (NotebookRouteParams & PortalRouteParams) | undefined;
   OnboardingWelcome: undefined;
-  PortalResources: (ResourcesRouteParams & PortalRouteParams) | undefined;
+  PortalContent: (ContentRouteParams & PortalRouteParams) | undefined;
   ProfileEdit: undefined;
   /** Public share link `/share/r/:token` (deep link or in-app). */
   PublicResourceShare: { initialPassword?: string; token: string };

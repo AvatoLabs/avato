@@ -9,7 +9,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 
 import { haptics } from '../../../lib/haptics';
 import { useI18n } from '../../../lib/i18n';
-import { navigateToResources } from '../../../lib/navigation';
+import { navigateToContent } from '../../../lib/navigation';
 import {
   appendCurrentPortalStackWithOrigin,
   createConversationOrigin,
@@ -81,7 +81,7 @@ const SearchSourceSetRender = memo<MobileBuiltinRenderProps>(
                 if (!file.fileId) return;
 
                 haptics.light();
-                navigateToResources(
+                navigateToContent(
                   appendCurrentPortalStackWithOrigin(
                     route.name,
                     route.params,

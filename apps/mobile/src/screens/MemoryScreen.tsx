@@ -36,6 +36,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -44,6 +45,7 @@ import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { memoryApi, type MemoryExtractionTask } from '../lib/api';
 import { useI18n } from '../lib/i18n';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type {
@@ -149,7 +151,7 @@ function formatDate(dateStr?: string): string {
 }
 
 // ── Home Tab Component ──────────────────────────────────────────────
-function HomeTab() {
+function HomeTab({ contentWidth }: { contentWidth: number }) {
   const { t } = useI18n();
   const colors = useThemeColors();
   const toast = useToast();
@@ -228,7 +230,11 @@ function HomeTab() {
       setRoles(r.roles || []);
 
       setExtractionTask(task);
-      if (canPollRef.current && task && (task.status === 'Pending' || task.status === 'Processing')) {
+      if (
+        canPollRef.current &&
+        task &&
+        (task.status === 'Pending' || task.status === 'Processing')
+      ) {
         scheduleTaskPoll(task.id);
       } else {
         stopPolling();
@@ -364,12 +370,12 @@ function HomeTab() {
   return (
     <ScrollView
       className="flex-1"
-      contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 20, paddingTop: 24 }}
+      contentContainerStyle={{ alignItems: 'center', paddingBottom: 100, paddingTop: 24 }}
       showsVerticalScrollIndicator={false}
     >
       {/* Role Tag Cloud */}
       {roles.length > 0 && (
-        <View className="mb-6">
+        <View className="mb-6" style={{ width: contentWidth }}>
           <Text className="text-base font-semibold text-foreground mb-3">{t.memoryRoles}</Text>
           <View className="flex-row flex-wrap gap-2">
             {roles.map((r, i) => (
@@ -389,7 +395,7 @@ function HomeTab() {
       )}
 
       {/* Persona Card */}
-      <View className="mb-6">
+      <View className="mb-6" style={{ width: contentWidth }}>
         <Text className="text-base font-semibold text-foreground mb-3">{t.memoryPersona}</Text>
         {persona?.content || persona?.summary ? (
           <View className="bg-foreground/[0.02] rounded-xl p-4">
@@ -415,7 +421,7 @@ function HomeTab() {
       </View>
 
       {/* Extract Memories card */}
-      <View className="mb-6">
+      <View className="mb-6" style={{ width: contentWidth }}>
         <View className="bg-foreground/[0.02] rounded-xl p-4">
           <Text className="text-base font-semibold text-foreground mb-2">
             {t.memoryExtractTitle}
@@ -459,7 +465,7 @@ function HomeTab() {
 
       {/* Empty state if nothing at all */}
       {!persona?.content && !persona?.summary && roles.length === 0 && (
-        <View className="items-center py-10">
+        <View className="items-center py-10" style={{ width: contentWidth }}>
           <Brain color={colors.secondaryText} size={48} strokeWidth={1.2} />
           <Text className="text-base font-medium mt-4" style={{ color: colors.secondaryText }}>
             {t.memoryEmpty}
@@ -474,10 +480,11 @@ function HomeTab() {
 }
 
 // ── Memory List Tab Component ────────────────────────────────────────
-function MemoryListTab({ layer }: { layer: MemoryLayer }) {
+function MemoryListTab({ layer, contentWidth }: { contentWidth: number; layer: MemoryLayer }) {
   const { t } = useI18n();
   const colors = useThemeColors();
   const nav = useNavigation<any>();
+  const modalWidth = Math.min(contentWidth, 560);
   const [items, setItems] = useState<AnyMemoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -622,67 +629,69 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
       const tags: string[] = (item as any).tags || [];
 
       return (
-        <TouchableOpacity
-          activeOpacity={0.7}
-          className="bg-foreground/[0.02] rounded-xl p-4 mb-3"
-          onLongPress={() => handleDelete(item)}
-          onPress={() => nav.navigate('MemoryDetail', { item, layer })}
-        >
-          <View className="flex-row items-start justify-between">
-            <View className="flex-1 mr-3">
-              <Text
-                className="text-[15px] font-semibold text-foreground leading-5"
-                numberOfLines={2}
-              >
-                {title}
-              </Text>
-              {subtext && title !== subtext ? (
+        <View style={{ width: contentWidth }}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            className="bg-foreground/[0.02] rounded-xl p-4 mb-3"
+            onLongPress={() => handleDelete(item)}
+            onPress={() => nav.navigate('MemoryDetail', { item, layer })}
+          >
+            <View className="flex-row items-start justify-between">
+              <View className="flex-1 mr-3">
                 <Text
-                  className="text-sm mt-1 leading-5"
+                  className="text-[15px] font-semibold text-foreground leading-5"
                   numberOfLines={2}
-                  style={{ color: colors.secondaryText }}
                 >
-                  {subtext}
+                  {title}
+                </Text>
+                {subtext && title !== subtext ? (
+                  <Text
+                    className="text-sm mt-1 leading-5"
+                    numberOfLines={2}
+                    style={{ color: colors.secondaryText }}
+                  >
+                    {subtext}
+                  </Text>
+                ) : null}
+              </View>
+              <TouchableOpacity
+                hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                onPress={() => handleDelete(item)}
+              >
+                <Trash2 color={colors.secondaryText} size={16} strokeWidth={1.5} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Meta row: type badge + tags + date */}
+            <View className="flex-row items-center mt-2.5 flex-wrap gap-1.5">
+              {type ? (
+                <View
+                  className="px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: `${layerColor}15` }}
+                >
+                  <Text className="text-xs font-medium" style={{ color: layerColor }}>
+                    {type}
+                  </Text>
+                </View>
+              ) : null}
+              {tags.slice(0, 3).map((tag, i) => (
+                <View className="px-2 py-0.5 rounded-full bg-foreground/[0.06]" key={`${tag}-${i}`}>
+                  <Text className="text-xs font-medium" style={{ color: colors.secondaryText }}>
+                    {tag}
+                  </Text>
+                </View>
+              ))}
+              {date ? (
+                <Text className="text-xs ml-auto" style={{ color: colors.secondaryText }}>
+                  {date}
                 </Text>
               ) : null}
             </View>
-            <TouchableOpacity
-              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-              onPress={() => handleDelete(item)}
-            >
-              <Trash2 color={colors.secondaryText} size={16} strokeWidth={1.5} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Meta row: type badge + tags + date */}
-          <View className="flex-row items-center mt-2.5 flex-wrap gap-1.5">
-            {type ? (
-              <View
-                className="px-2 py-0.5 rounded-full"
-                style={{ backgroundColor: `${layerColor}15` }}
-              >
-                <Text className="text-xs font-medium" style={{ color: layerColor }}>
-                  {type}
-                </Text>
-              </View>
-            ) : null}
-            {tags.slice(0, 3).map((tag, i) => (
-              <View className="px-2 py-0.5 rounded-full bg-foreground/[0.06]" key={`${tag}-${i}`}>
-                <Text className="text-xs font-medium" style={{ color: colors.secondaryText }}>
-                  {tag}
-                </Text>
-              </View>
-            ))}
-            {date ? (
-              <Text className="text-xs ml-auto" style={{ color: colors.secondaryText }}>
-                {date}
-              </Text>
-            ) : null}
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
       );
     },
-    [colors.secondaryText, layer, handleDelete, layerColor, nav],
+    [colors.secondaryText, contentWidth, layer, handleDelete, layerColor, nav],
   );
 
   if (loading) {
@@ -696,19 +705,21 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
   return (
     <View className="flex-1">
       {/* Search toggle + count + Create Identity (when identity tab) */}
-      <View className="flex-row items-center justify-between px-5 py-2">
-        <Text className="text-sm" style={{ color: colors.secondaryText }}>
-          {t.memoryTotalCount.replace('{count}', String(filtered.length))}
-        </Text>
-        <View className="flex-row items-center gap-3">
-          {layer === 'identity' ? (
-            <TouchableOpacity onPress={() => setShowCreateModal(true)}>
-              <Plus color={layerColor} size={20} strokeWidth={2} />
+      <View style={{ alignSelf: 'center', width: contentWidth }}>
+        <View className="flex-row items-center justify-between py-2">
+          <Text className="text-sm" style={{ color: colors.secondaryText }}>
+            {t.memoryTotalCount.replace('{count}', String(filtered.length))}
+          </Text>
+          <View className="flex-row items-center gap-3">
+            {layer === 'identity' ? (
+              <TouchableOpacity onPress={() => setShowCreateModal(true)}>
+                <Plus color={layerColor} size={20} strokeWidth={2} />
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity onPress={() => setShowSearch((prev) => !prev)}>
+              <Search color={colors.secondaryText} size={18} strokeWidth={1.5} />
             </TouchableOpacity>
-          ) : null}
-          <TouchableOpacity onPress={() => setShowSearch((prev) => !prev)}>
-            <Search color={colors.secondaryText} size={18} strokeWidth={1.5} />
-          </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -729,6 +740,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
             <TouchableOpacity
               activeOpacity={1}
               className="bg-background rounded-xl p-5"
+              style={{ alignSelf: 'center', maxWidth: modalWidth, width: '100%' }}
               onPress={(e) => e.stopPropagation()}
             >
               <View className="flex-row items-center justify-between mb-4">
@@ -782,21 +794,23 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
 
       {/* Search bar */}
       {showSearch && (
-        <View className="flex-row items-center mx-5 mb-2 bg-foreground/[0.04] rounded-xl px-3 py-2">
-          <Search color={colors.secondaryText} size={16} strokeWidth={1.5} />
-          <TextInput
-            autoFocus
-            className="flex-1 ml-2 text-sm text-foreground"
-            placeholder={t.memorySearch}
-            placeholderTextColor={colors.muted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <X color={colors.secondaryText} size={16} strokeWidth={1.5} />
-            </TouchableOpacity>
-          ) : null}
+        <View style={{ alignSelf: 'center', width: contentWidth }}>
+          <View className="mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3 py-2">
+            <Search color={colors.secondaryText} size={16} strokeWidth={1.5} />
+            <TextInput
+              autoFocus
+              className="flex-1 ml-2 text-sm text-foreground"
+              placeholder={t.memorySearch}
+              placeholderTextColor={colors.muted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <X color={colors.secondaryText} size={16} strokeWidth={1.5} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
       )}
 
@@ -807,18 +821,24 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <EmptyState description={t.memoryEmptyDesc} iconVariant="memory" title={t.memoryEmpty} />
+          <View style={{ width: contentWidth }}>
+            <EmptyState
+              description={t.memoryEmptyDesc}
+              iconVariant="memory"
+              title={t.memoryEmpty}
+            />
+          </View>
         }
         contentContainerStyle={
           filtered.length === 0
             ? {
+                alignItems: 'center',
                 flexGrow: 1,
                 justifyContent: 'center',
                 paddingBottom: 100,
-                paddingHorizontal: 20,
                 paddingTop: 8,
               }
-            : { paddingBottom: 100, paddingHorizontal: 20, paddingTop: 8 }
+            : { alignItems: 'center', paddingBottom: 100, paddingTop: 8 }
         }
         refreshControl={
           <RefreshControl refreshing={refreshing} tintColor={layerColor} onRefresh={onRefresh} />
@@ -833,6 +853,9 @@ export default function MemoryScreen() {
   const { t } = useI18n();
   const nav = useNavigation<any>();
   const colors = useThemeColors();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const contentWidth = Math.min(Math.max(screenWidth - 40, 0), responsiveMetrics.settingsMaxWidth);
   const [activeTab, setActiveTab] = useState<MemoryLayer | 'home'>('home');
   const scrollRef = useRef<ScrollView>(null);
 
@@ -886,7 +909,11 @@ export default function MemoryScreen() {
       </ScreenHeader>
 
       {/* Tab Content */}
-      {activeTab === 'home' ? <HomeTab /> : <MemoryListTab layer={activeTab} />}
+      {activeTab === 'home' ? (
+        <HomeTab contentWidth={contentWidth} />
+      ) : (
+        <MemoryListTab contentWidth={contentWidth} layer={activeTab} />
+      )}
     </View>
   );
 }

@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { ArrowLeft, Copy, RotateCcw, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, RefreshControl, Text, View } from 'react-native';
+import { FlatList, RefreshControl, Text, useWindowDimensions, View } from 'react-native';
 
 import EmptyState from '../components/ui/EmptyState';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
@@ -10,6 +10,7 @@ import { useToast } from '../components/ui/Toast';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { type AppLogEntry, clearAppLogs, formatAppLogs, getAppLogs } from '../lib/logger';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
@@ -17,6 +18,9 @@ export default function AppLogsScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const contentWidth = Math.min(Math.max(screenWidth - 40, 0), responsiveMetrics.settingsMaxWidth);
   const [logs, setLogs] = useState<AppLogEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -98,14 +102,14 @@ export default function AppLogsScreen({ navigation }: any) {
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View className="flex-1 justify-center px-5 pb-10 pt-6">
+          <View className="flex-1 justify-center pb-10 pt-6" style={{ width: contentWidth }}>
             <EmptyState iconVariant="logs" title={t.logsEmpty} />
           </View>
         }
         contentContainerStyle={
           logs.length === 0
-            ? { flexGrow: 1, paddingBottom: 40 }
-            : { paddingBottom: 40, paddingTop: 8 }
+            ? { alignItems: 'center', flexGrow: 1, paddingBottom: 40 }
+            : { alignItems: 'center', paddingBottom: 40, paddingTop: 8 }
         }
         refreshControl={
           <RefreshControl
@@ -115,11 +119,13 @@ export default function AppLogsScreen({ navigation }: any) {
           />
         }
         renderItem={({ item: entry }) => (
-          <View className="mb-3 mx-5 rounded-2xl bg-foreground/[0.03] px-4 py-3">
-            <Text className="text-[11px] font-semibold uppercase tracking-wider text-secondary/55">
-              {entry.level} · {entry.timestamp}
-            </Text>
-            <Text className="mt-2 text-[13px] leading-5 text-foreground">{entry.message}</Text>
+          <View style={{ width: contentWidth }}>
+            <View className="mb-3 rounded-2xl bg-foreground/[0.03] px-4 py-3">
+              <Text className="text-[11px] font-semibold uppercase tracking-wider text-secondary/55">
+                {entry.level} · {entry.timestamp}
+              </Text>
+              <Text className="mt-2 text-[13px] leading-5 text-foreground">{entry.message}</Text>
+            </View>
           </View>
         )}
       />

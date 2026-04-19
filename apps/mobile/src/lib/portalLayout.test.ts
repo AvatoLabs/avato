@@ -12,10 +12,29 @@ describe('getPortalSurfaceMetrics', () => {
     });
   });
 
+  it('keeps wide phones on the full-width branch before the floating-panel breakpoint', () => {
+    expect(getPortalSurfaceMetrics(699, 'android')).toEqual({
+      alignItems: 'stretch',
+      paddingBottom: 4,
+      paddingHorizontal: 4,
+      paddingTop: 4,
+    });
+  });
+
   it('centers medium-width layouts as floating panels', () => {
     expect(getPortalSurfaceMetrics(820, 'android')).toEqual({
       alignItems: 'center',
       panelWidth: 680,
+      paddingBottom: 8,
+      paddingHorizontal: 16,
+      paddingTop: 8,
+    });
+  });
+
+  it('only enables floating panels starting at the medium-width breakpoint', () => {
+    expect(getPortalSurfaceMetrics(700, 'android')).toEqual({
+      alignItems: 'center',
+      panelWidth: 636,
       paddingBottom: 8,
       paddingHorizontal: 16,
       paddingTop: 8,

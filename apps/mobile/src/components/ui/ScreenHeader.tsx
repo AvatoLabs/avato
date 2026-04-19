@@ -1,10 +1,17 @@
 import { BlurView } from 'expo-blur';
 import React from 'react';
-import { Platform, Text, type TouchableOpacityProps, View } from 'react-native';
+import {
+  Platform,
+  Text,
+  type TouchableOpacityProps,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useI18n } from '../../lib/i18n';
+import { getResponsiveLayoutMetrics } from '../../lib/responsiveLayout';
 import { useThemeStore } from '../../store/theme';
 import { useThemeColors } from '../../theme/colors';
 import { enteringSection } from '../../theme/motion';
@@ -117,6 +124,11 @@ export function ScreenHeader({
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const blurTint = effectiveTheme === 'dark' ? 'dark' : 'light';
   const useFlat = headerStyle === 'flat' || Platform.OS === 'android';
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const headerMaxWidth = isRootHeader
+    ? responsiveMetrics.rootHeaderMaxWidth
+    : responsiveMetrics.headerMaxWidth;
   const portalChrome = portalRouteName ? (
     <PortalChromeBar
       currentLabel={portalCurrentLabel}
@@ -149,9 +161,12 @@ export function ScreenHeader({
         <View
           className="flex-row items-center justify-between"
           style={{
+            alignSelf: 'center',
+            maxWidth: headerMaxWidth,
             minHeight: HEADER_SUB_CONTENT_HEIGHT,
             paddingHorizontal: HEADER_SIDE_PADDING,
             paddingVertical: tokens.spacing.sm + 4,
+            width: '100%',
           }}
         >
           <PressableScale
@@ -218,10 +233,13 @@ export function ScreenHeader({
       <Animated.View entering={enteringSection()}>
         <View
           style={{
+            alignSelf: 'center',
+            maxWidth: headerMaxWidth,
             minHeight: HEADER_CONTENT_HEIGHT,
             paddingBottom: tokens.spacing.md,
             paddingHorizontal: HEADER_ROOT_HORIZONTAL_PADDING,
             paddingTop: tokens.spacing.md + tokens.spacing.xs,
+            width: '100%',
           }}
         >
           <View
@@ -306,10 +324,13 @@ export function ScreenHeader({
       <Animated.View entering={enteringSection()}>
         <View
           style={{
+            alignSelf: 'center',
+            maxWidth: headerMaxWidth,
             minHeight: HEADER_CONTENT_HEIGHT,
             paddingBottom: tokens.spacing.sm,
             paddingHorizontal: HEADER_SIDE_PADDING,
             paddingTop: tokens.spacing.sm + 4,
+            width: '100%',
           }}
         >
           <View className="flex-row items-center justify-between">

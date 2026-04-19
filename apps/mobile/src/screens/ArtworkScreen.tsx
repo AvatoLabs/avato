@@ -24,7 +24,6 @@ import {
   Alert,
   AppState,
   Image as RNImage,
-  Keyboard,
   Platform,
   Pressable,
   ScrollView,
@@ -56,7 +55,8 @@ import { aiProviderApi, artworkApi, fileApi, getApiUrl } from '../lib/api';
 import { useMainTabBottomInsets } from '../lib/bottomChrome';
 import { haptics } from '../lib/haptics';
 import { type TranslationKeys, useI18n } from '../lib/i18n';
-import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
+import { createComposerKeyboardSubscriptions, resolveComposerLift } from '../lib/keyboard';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import { useArtworkStore } from '../store/artwork';
 import { useConnectionStore } from '../store/connection';
 import { useThemeColors } from '../theme/colors';
@@ -560,7 +560,9 @@ export default function ArtworkScreen({
   const toast = useToast();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const hasPersistentSidebar = responsiveMetrics.isWideTablet;
   const isConnected = useConnectionStore((s) => s.isConnected);
   const isScreenFocused = useIsFocused();
 
@@ -583,13 +585,12 @@ export default function ArtworkScreen({
   const bottomChrome = useMainTabBottomInsets(keyboardOffset);
   const animatedKeyboard = useAnimatedKeyboard();
   const composerLiftStyle = useAnimatedStyle(() => {
-    const lift =
-      Platform.OS === 'android'
-        ? Math.max(
-            0,
-            animatedKeyboard.height.value - insets.bottom - ANDROID_COMPOSER_LIFT_ADJUSTMENT,
-          )
-        : keyboardOffset;
+    const lift = resolveComposerLift({
+      animatedKeyboardHeight: animatedKeyboard.height.value,
+      bottomInset: insets.bottom,
+      keyboardOffset,
+      platform: Platform.OS,
+    });
 
     return {
       transform: [{ translateY: -lift }],
@@ -645,10 +646,16 @@ export default function ArtworkScreen({
     [],
   );
 
+  const closeSidebar = useCallback(() => {
+    setShowPicker(false);
+    setShowSidebar(false);
+  }, []);
+
   const openSidebar = useCallback(() => {
+    if (hasPersistentSidebar) return;
     haptics.selection();
     setShowSidebar(true);
-  }, []);
+  }, [hasPersistentSidebar]);
 
   useEffect(() => {
     if (configOpenVersion <= lastConfigOpenVersionRef.current) return;
@@ -656,6 +663,11 @@ export default function ArtworkScreen({
     lastConfigOpenVersionRef.current = configOpenVersion;
     openSidebar();
   }, [configOpenVersion, openSidebar]);
+
+  useEffect(() => {
+    if (!hasPersistentSidebar || !showSidebar) return;
+    setShowSidebar(false);
+  }, [hasPersistentSidebar, showSidebar]);
 
   // ── Load image models ──
   const loadModels = useCallback(
@@ -818,30 +830,11 @@ export default function ArtworkScreen({
 
   // ── Keyboard lift: keep composer close to keyboard without double-counting bottom inset ──
   useEffect(() => {
-    const handleKeyboardShow = (event: any) => {
-      setKeyboardOffset(getKeyboardOffset(event, insets.bottom));
-    };
-    const handleKeyboardHide = () => {
-      setKeyboardOffset(0);
-    };
-
-    const subscriptions =
-      Platform.OS === 'ios'
-        ? [
-            Keyboard.addListener('keyboardWillShow', handleKeyboardShow),
-            Keyboard.addListener('keyboardWillHide', handleKeyboardHide),
-            Keyboard.addListener('keyboardWillChangeFrame', (event) => {
-              if (getKeyboardOffset(event, insets.bottom) <= 0) {
-                handleKeyboardHide();
-              } else {
-                handleKeyboardShow(event);
-              }
-            }),
-          ]
-        : [
-            Keyboard.addListener('keyboardDidShow', handleKeyboardShow),
-            Keyboard.addListener('keyboardDidHide', handleKeyboardHide),
-          ];
+    const subscriptions = createComposerKeyboardSubscriptions({
+      bottomInset: insets.bottom,
+      onKeyboardOffsetChange: setKeyboardOffset,
+      platform: Platform.OS,
+    });
 
     return () => {
       for (const subscription of subscriptions) {
@@ -1137,9 +1130,16 @@ export default function ArtworkScreen({
   );
 
   // ── Render ──
-  const containerPad = 20;
-  const sidebarWidth = Math.round(screenWidth * 0.85);
-  const sidebarPad = 20;
+  const containerPad = hasPersistentSidebar ? 24 : 20;
+  const layoutGap = hasPersistentSidebar ? 24 : 0;
+  const sidebarWidth = responsiveMetrics.createSidebarWidth;
+  const sidebarPad = hasPersistentSidebar ? 24 : 20;
+  const feedAvailableWidth = hasPersistentSidebar
+    ? Math.max(320, screenWidth - sidebarWidth - layoutGap - containerPad * 2)
+    : Math.max(320, screenWidth - containerPad * 2);
+  const feedContentWidth = Math.min(feedAvailableWidth, responsiveMetrics.createFeedMaxWidth);
+  const composerMaxWidth = feedContentWidth + 32;
+  const sidebarVisible = hasPersistentSidebar || showSidebar;
   const allModels = imageProviders.flatMap((p) =>
     p.children.map((m) => ({ ...m, providerId: p.id, providerName: p.name })),
   );
@@ -1179,6 +1179,410 @@ export default function ArtworkScreen({
     editingParamKey && generationParams[editingParamKey] != null
       ? String(generationParams[editingParamKey])
       : '';
+  const sidebarPanel = (
+    <View
+      style={
+        hasPersistentSidebar
+          ? {
+              backgroundColor: colors.surface,
+              borderColor: colors.borderSubtle,
+              borderRadius: 24,
+              borderWidth: 1,
+              overflow: 'hidden',
+              width: sidebarWidth,
+            }
+          : {
+              backgroundColor: colors.surface,
+              borderBottomLeftRadius: 20,
+              borderTopLeftRadius: 20,
+              bottom: 0,
+              elevation: 12,
+              position: 'absolute',
+              right: 0,
+              shadowColor: colors.shadow,
+              shadowOffset: { height: 0, width: -4 },
+              shadowOpacity: 0.08,
+              shadowRadius: 16,
+              top: 0,
+              width: sidebarWidth,
+            }
+      }
+    >
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingBottom: Math.max(bottomChrome.overlayListPaddingBottom, 40),
+          paddingHorizontal: sidebarPad,
+          paddingTop: hasPersistentSidebar ? 20 : Math.max(insets.top + 16, 52),
+        }}
+      >
+        {/* Sidebar header */}
+        <View className="mb-2 flex-row items-center justify-between">
+          <Text
+            style={{
+              color: colors.foreground,
+              fontSize: 18,
+              fontWeight: '700',
+              letterSpacing: -0.3,
+            }}
+          >
+            {t.artworkTitle}
+          </Text>
+          {!hasPersistentSidebar ? (
+            <TouchableOpacity hitSlop={8} onPress={closeSidebar}>
+              <X color={colors.iconMuted} size={20} strokeWidth={tokens.icon.strokeWidth} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {/* Model Selector */}
+        <SidebarLabel text={t.artworkModel} />
+        <TouchableOpacity
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: colors.fillTertiary,
+            borderRadius: 16,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+          }}
+          onPress={() => setShowPicker(!showPicker)}
+        >
+          <Sparkles color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+          <Text
+            numberOfLines={1}
+            style={{
+              color: colors.foreground,
+              fontSize: 14,
+              fontWeight: '600',
+              marginLeft: 8,
+              flex: 1,
+            }}
+          >
+            {modelName || t.artworkSelectModel}
+          </Text>
+          <ChevronDown color={colors.iconMuted} size={16} strokeWidth={tokens.icon.strokeWidth} />
+        </TouchableOpacity>
+        {showPicker && (
+          <Animated.View
+            entering={FadeInDown.duration(350)}
+            style={{
+              backgroundColor: colors.fillTertiary,
+              borderRadius: 12,
+              marginTop: 8,
+              maxHeight: 208,
+              overflow: 'hidden',
+            }}
+          >
+            <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
+              {allModels.length === 0 ? (
+                <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                  <Text style={{ color: colors.muted, fontSize: 14 }}>{t.artworkNoModels}</Text>
+                  <Text style={{ color: colors.secondaryText, fontSize: 12, marginTop: 4 }}>
+                    {t.artworkNoModelsDesc}
+                  </Text>
+                </View>
+              ) : (
+                allModels.map((m) => (
+                  <TouchableOpacity
+                    key={`${m.providerId}-${m.id}`}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: model === m.id ? colors.fillTertiary : 'transparent',
+                    }}
+                    onPress={() => {
+                      haptics.selection();
+                      applyModelSelection(m, m.providerId, m.providerName);
+                      setShowPicker(false);
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: '500' }}>
+                        {m.displayName || m.id}
+                      </Text>
+                      <Text style={{ color: colors.muted, fontSize: 10 }}>{m.providerName}</Text>
+                    </View>
+                    {model === m.id && (
+                      <View
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
+                          backgroundColor: colors.primary,
+                        }}
+                      />
+                    )}
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          </Animated.View>
+        )}
+
+        {referenceEnabled && (
+          <>
+            <SidebarLabel
+              text={supportsImageUrls ? t.artworkReferenceImages : t.artworkReferenceImage}
+            />
+            <TouchableOpacity
+              style={{
+                backgroundColor: colors.fillTertiary,
+                borderRadius: 16,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 20,
+              }}
+              onPress={handlePickRef}
+            >
+              {refImages.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
+                  showsHorizontalScrollIndicator={false}
+                >
+                  {refImages.map((img, i) => (
+                    <View key={i} style={{ position: 'relative' }}>
+                      <RNImage
+                        source={{ uri: img.uri }}
+                        style={{ width: 64, height: 64, borderRadius: 10 }}
+                      />
+                      <TouchableOpacity
+                        style={{
+                          position: 'absolute',
+                          top: -5,
+                          right: -5,
+                          backgroundColor: colors.sliderTrack,
+                          borderRadius: 10,
+                          padding: 2,
+                        }}
+                        onPress={() => setRefImages((p) => p.filter((_, idx) => idx !== i))}
+                      >
+                        <X color={colors.iconMuted} size={10} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              ) : (
+                <>
+                  <ImageIcon color={colors.secondaryText} size={28} strokeWidth={1.5} />
+                  <Text
+                    style={{
+                      color: colors.muted,
+                      fontSize: 12,
+                      marginTop: 6,
+                      textAlign: 'center',
+                    }}
+                  >
+                    {t.artworkReferenceImagesDesc}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
+
+        {resolutionOptions.length > 0 && (
+          <>
+            <SidebarLabel text={artworkParamLabel('resolution', t)} />
+            <SidebarOptionStrip
+              getKey={(option) => String(option)}
+              itemWidth={116}
+              items={resolutionOptions}
+              selectedValue={generationParams.resolution as string | undefined}
+              renderContent={(option, active) => (
+                <Text
+                  style={{
+                    color: active ? colors.iconOnPrimary : colors.muted,
+                    fontSize: 12,
+                    fontWeight: '500',
+                  }}
+                >
+                  {option}
+                </Text>
+              )}
+              onSelect={(option) => {
+                haptics.selection();
+                setGenerationParams((state) => ({ ...state, resolution: option }));
+              }}
+            />
+          </>
+        )}
+
+        {sizeOptions.length > 0 && (
+          <>
+            <SidebarLabel text={artworkParamLabel('size', t)} />
+            <SidebarOptionGrid
+              columns={2}
+              containerWidth={sidebarWidth - sidebarPad * 2}
+              getKey={(option) => String(option)}
+              items={sizeOptions}
+              selectedValue={generationParams.size as string | undefined}
+              renderContent={(option, active) => (
+                <Text
+                  style={{
+                    color: active ? colors.iconOnPrimary : colors.muted,
+                    fontSize: 12,
+                    fontWeight: '500',
+                  }}
+                >
+                  {option}
+                </Text>
+              )}
+              onSelect={(option) => {
+                haptics.selection();
+                setGenerationParams((state) => ({ ...state, size: option }));
+              }}
+            />
+          </>
+        )}
+
+        {qualityOptions.length > 0 && (
+          <>
+            <SidebarLabel text={artworkParamLabel('quality', t)} />
+            <SidebarOptionGrid
+              columns={2}
+              containerWidth={sidebarWidth - sidebarPad * 2}
+              getKey={(option) => String(option)}
+              items={qualityOptions}
+              selectedValue={generationParams.quality as string | undefined}
+              renderContent={(option, active) => (
+                <Text
+                  style={{
+                    color: active ? colors.iconOnPrimary : colors.muted,
+                    fontSize: 12,
+                    fontWeight: '500',
+                  }}
+                >
+                  {option}
+                </Text>
+              )}
+              onSelect={(option) => {
+                haptics.selection();
+                setGenerationParams((state) => ({ ...state, quality: option }));
+              }}
+            />
+          </>
+        )}
+
+        {effectiveAspectRatioOptions.length > 0 && (
+          <>
+            <SidebarLabel text={artworkParamLabel('aspectRatio', t)} />
+            <SidebarOptionStrip
+              getKey={(option) => String(option)}
+              itemWidth={86}
+              items={effectiveAspectRatioOptions}
+              selectedValue={currentAspectRatio}
+              renderContent={(option, active) => (
+                <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                  <View style={{ marginBottom: 2 }}>
+                    <RatioIcon active={active} ratio={option} />
+                  </View>
+                  <Text
+                    style={{
+                      color: active ? colors.iconOnPrimary : colors.muted,
+                      fontSize: 10,
+                      fontWeight: '500',
+                    }}
+                  >
+                    {option}
+                  </Text>
+                </View>
+              )}
+              onSelect={(option) => {
+                haptics.selection();
+                if (supportsNativeAspectRatio) {
+                  setGenerationParams((state) => ({ ...state, aspectRatio: option }));
+                  return;
+                }
+
+                if (supportsWidthHeight) {
+                  const widthItem = getParamDefinition(paramsSchema, 'width');
+                  const heightItem = getParamDefinition(paramsSchema, 'height');
+                  const base =
+                    Number(generationParams.width) || Number(generationParams.height) || 1024;
+                  const dims = applyRatioToDimensions(option, base);
+
+                  setGenerationParams((state) => {
+                    const next = {
+                      ...state,
+                      width: clampNumericValue(dims.width, widthItem),
+                      height: clampNumericValue(dims.height, heightItem),
+                    };
+                    delete next.aspectRatio;
+                    return next;
+                  });
+                }
+              }}
+            />
+          </>
+        )}
+
+        {EDITABLE_NUMERIC_PARAM_KEYS.filter((key) => getParamDefinition(paramsSchema, key)).map(
+          (key) => (
+            <View key={key}>
+              <SidebarLabel text={artworkParamLabel(key, t)} />
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: colors.fillTertiary,
+                  borderRadius: 14,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                }}
+                onPress={() => setEditingParamKey(key)}
+              >
+                <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600' }}>
+                  {generationParams[key] === null || generationParams[key] === undefined
+                    ? t.artworkParamAuto
+                    : String(generationParams[key])}
+                </Text>
+                <Text style={{ color: colors.muted, fontSize: 12 }}>
+                  {typeof getParamDefinition(paramsSchema, key)?.min === 'number' &&
+                  typeof getParamDefinition(paramsSchema, key)?.max === 'number'
+                    ? `${getParamDefinition(paramsSchema, key)?.min}-${getParamDefinition(paramsSchema, key)?.max}`
+                    : ''}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ),
+        )}
+
+        {/* Number of Images */}
+        <SidebarLabel text={t.artworkImageCount} />
+        <SidebarOptionStrip
+          getKey={(item) => String(item)}
+          itemWidth={68}
+          items={[...IMAGE_COUNTS, 'custom']}
+          selectedValue={imageCountSelection}
+          renderContent={(item, active) => (
+            <Text
+              style={{
+                color: active ? colors.iconOnPrimary : colors.muted,
+                fontSize: item === 'custom' ? 11 : 12,
+                fontWeight: '500',
+              }}
+            >
+              {item === 'custom' ? t.artworkImageCountCustomShort : item}
+            </Text>
+          )}
+          onSelect={(item) => {
+            haptics.selection();
+            if (item === 'custom') {
+              setCustomCountVisible(true);
+              return;
+            }
+
+            setImgCount(Number(item));
+          }}
+        />
+      </ScrollView>
+    </View>
+  );
 
   return (
     <View className="flex-1 bg-background">
@@ -1192,7 +1596,7 @@ export default function ArtworkScreen({
         />
       ) : null}
 
-      {!hideHeader ? (
+      {!hideHeader && !hasPersistentSidebar ? (
         <CreateConfigBar
           label={modelName || t.artworkSelectModel}
           summary={summaryParts.join(' · ')}
@@ -1200,161 +1604,194 @@ export default function ArtworkScreen({
         />
       ) : null}
 
-      {/* ── Generation Feed ── */}
-      <ScrollView
+      <View
         className="flex-1"
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={
-          batches.length === 0
+        style={
+          hasPersistentSidebar
             ? {
-                flexGrow: 1,
-                justifyContent: 'center',
-                alignItems: 'center',
-                paddingBottom: 20,
+                flexDirection: 'row',
+                gap: layoutGap,
+                paddingBottom: 12,
                 paddingHorizontal: containerPad,
               }
-            : { paddingBottom: 20, paddingHorizontal: containerPad }
+            : undefined
         }
       >
-        {batches.length > 0 ? (
-          <>
+        <View className="flex-1">
+          {/* ── Generation Feed ── */}
+          <ScrollView
+            className="flex-1"
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              flexGrow: 1,
+              paddingBottom: 20,
+              paddingHorizontal: hasPersistentSidebar ? 0 : containerPad,
+            }}
+          >
             <View
               style={{
-                alignItems: 'center',
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                marginBottom: 12,
+                alignSelf: 'center',
+                flexGrow: batches.length === 0 ? 1 : 0,
+                width: '100%',
+                maxWidth: feedContentWidth,
               }}
             >
-              <Text
-                style={{
-                  color: colors.foreground,
-                  fontSize: 17,
-                  fontWeight: '700',
-                  letterSpacing: -0.3,
-                }}
-              >
-                {t.artworkTopics}
-              </Text>
-              <TouchableOpacity
-                hitSlop={8}
-                onPress={() => {
-                  haptics.selection();
-                  setTopicId(null);
-                  toast.show('info', t.artworkNewTopicToast);
-                }}
-              >
-                <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '600' }}>
-                  {t.artworkNewTopic}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {batches.map((batch) => (
-              <BatchCard
-                availableWidth={screenWidth - containerPad * 2}
-                batch={batch}
-                key={batch.id}
-                resolveUrl={resolveUrl}
-                onCopyPrompt={async () => {
-                  await Clipboard.setStringAsync(batch.prompt);
-                  toast.show('success', t.artworkPromptCopied);
-                }}
-                onDelete={async () => {
-                  Alert.alert(t.artworkDeleteBatch, t.artworkDeleteBatchConfirm, [
-                    { text: t.cancel, style: 'cancel' },
-                    {
-                      text: t.delete,
-                      style: 'destructive',
-                      onPress: () => {
-                        removeBatch(batch.id);
-                      },
-                    },
-                  ]);
-                }}
-                onReuseSettings={() => {
-                  const nextProvider = imageProviders.find((item) => item.id === batch.provider);
-                  const nextModel = nextProvider?.children.find((item) => item.id === batch.model);
-                  if (!nextProvider || !nextModel) return;
+              {batches.length > 0 ? (
+                <>
+                  <View
+                    style={{
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.foreground,
+                        fontSize: 17,
+                        fontWeight: '700',
+                        letterSpacing: -0.3,
+                      }}
+                    >
+                      {t.artworkTopics}
+                    </Text>
+                    <TouchableOpacity
+                      hitSlop={8}
+                      onPress={() => {
+                        haptics.selection();
+                        setTopicId(null);
+                        toast.show('info', t.artworkNewTopicToast);
+                      }}
+                    >
+                      <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '600' }}>
+                        {t.artworkNewTopic}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  {batches.map((batch) => (
+                    <BatchCard
+                      availableWidth={feedContentWidth}
+                      batch={batch}
+                      key={batch.id}
+                      resolveUrl={resolveUrl}
+                      onCopyPrompt={async () => {
+                        await Clipboard.setStringAsync(batch.prompt);
+                        toast.show('success', t.artworkPromptCopied);
+                      }}
+                      onDelete={async () => {
+                        Alert.alert(t.artworkDeleteBatch, t.artworkDeleteBatchConfirm, [
+                          { text: t.cancel, style: 'cancel' },
+                          {
+                            text: t.delete,
+                            style: 'destructive',
+                            onPress: () => {
+                              removeBatch(batch.id);
+                            },
+                          },
+                        ]);
+                      }}
+                      onReuseSettings={() => {
+                        const nextProvider = imageProviders.find(
+                          (item) => item.id === batch.provider,
+                        );
+                        const nextModel = nextProvider?.children.find(
+                          (item) => item.id === batch.model,
+                        );
+                        if (!nextProvider || !nextModel) return;
 
-                  const { seed, ...configWithoutSeed } = (batch.config ||
-                    {}) as ImageGenerationParams;
-                  void seed;
+                        const { seed, ...configWithoutSeed } = (batch.config ||
+                          {}) as ImageGenerationParams;
+                        void seed;
 
-                  applyModelSelection(
-                    nextModel,
-                    nextProvider.id,
-                    nextProvider.name,
-                    configWithoutSeed,
-                  );
-                  setPrompt(batch.prompt);
-                  setRefImages([]);
-                  setImgCount(batch.generations.length);
-                  setShowSidebar(true);
-                }}
-              />
-            ))}
-          </>
-        ) : (
-          <View className="flex-1 items-center justify-center px-8">
-            <EmptyState
-              description={`${t.artworkEmptyDesc}\n\n${t.artworkTopicsEmpty}`}
-              iconVariant="artwork"
-              title={t.artworkEmpty}
-            />
-          </View>
-        )}
-      </ScrollView>
-
-      {/* ── Sticky Prompt Bar — aligned with ChatDetail input pill, lifts with keyboard ── */}
-      <Animated.View
-        className="px-4 pt-1"
-        style={[{ paddingBottom: bottomChrome.composerPaddingBottom }, composerLiftStyle]}
-      >
-        <ComposerShell active={composerActive}>
-          <View className="flex-row items-end gap-2 px-3 pt-2 pb-2">
-            <TextInput
-              multiline
-              className="flex-1 min-h-[36px]"
-              maxLength={2000}
-              placeholder={t.artworkPromptPlaceholder}
-              placeholderTextColor={colors.secondaryText}
-              underlineColorAndroid="transparent"
-              value={prompt}
-              style={{
-                color: colors.foreground,
-                fontSize: 16,
-                lineHeight: 22,
-                maxHeight: 112,
-                paddingVertical: 0,
-                textAlignVertical: 'top',
-              }}
-              onChangeText={setPrompt}
-            />
-            <ComposerPrimaryAction
-              accessibilityLabel={generating ? t.artworkGenerating : t.artworkA11yGenerate}
-              accessibilityState={{ disabled: !prompt.trim() || !model || generating }}
-              active={!!prompt.trim() && !!model}
-              disabled={!prompt.trim() || !model || generating}
-              label={generating ? undefined : t.artworkGenerate}
-              onPress={handleGenerate}
-            >
-              {generating ? (
-                <ActivityIndicator color={colors.iconOnPrimary} size="small" />
+                        applyModelSelection(
+                          nextModel,
+                          nextProvider.id,
+                          nextProvider.name,
+                          configWithoutSeed,
+                        );
+                        setPrompt(batch.prompt);
+                        setRefImages([]);
+                        setImgCount(batch.generations.length);
+                        if (!hasPersistentSidebar) {
+                          setShowSidebar(true);
+                        }
+                      }}
+                    />
+                  ))}
+                </>
               ) : (
-                <Sparkles
-                  color={prompt.trim() && model ? colors.iconOnPrimary : colors.muted}
-                  size={18}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
+                <View className="flex-1 items-center justify-center px-8">
+                  <EmptyState
+                    description={`${t.artworkEmptyDesc}\n\n${t.artworkTopicsEmpty}`}
+                    iconVariant="artwork"
+                    title={t.artworkEmpty}
+                  />
+                </View>
               )}
-            </ComposerPrimaryAction>
-          </View>
-        </ComposerShell>
-      </Animated.View>
+            </View>
+          </ScrollView>
+
+          {/* ── Sticky Prompt Bar — aligned with ChatDetail input pill, lifts with keyboard ── */}
+          <Animated.View
+            className="px-4 pt-1"
+            style={[
+              { paddingBottom: bottomChrome.composerPaddingBottom },
+              hasPersistentSidebar
+                ? { alignSelf: 'center', maxWidth: composerMaxWidth, width: '100%' }
+                : null,
+              composerLiftStyle,
+            ]}
+          >
+            <ComposerShell active={composerActive}>
+              <View className="flex-row items-end gap-2 px-3 pt-2 pb-2">
+                <TextInput
+                  multiline
+                  className="flex-1 min-h-[36px]"
+                  maxLength={2000}
+                  placeholder={t.artworkPromptPlaceholder}
+                  placeholderTextColor={colors.secondaryText}
+                  underlineColorAndroid="transparent"
+                  value={prompt}
+                  style={{
+                    color: colors.foreground,
+                    fontSize: 16,
+                    lineHeight: 22,
+                    maxHeight: 112,
+                    paddingVertical: 0,
+                    textAlignVertical: 'top',
+                  }}
+                  onChangeText={setPrompt}
+                />
+                <ComposerPrimaryAction
+                  accessibilityLabel={generating ? t.artworkGenerating : t.artworkA11yGenerate}
+                  accessibilityState={{ disabled: !prompt.trim() || !model || generating }}
+                  active={!!prompt.trim() && !!model}
+                  disabled={!prompt.trim() || !model || generating}
+                  label={generating ? undefined : t.artworkGenerate}
+                  onPress={handleGenerate}
+                >
+                  {generating ? (
+                    <ActivityIndicator color={colors.iconOnPrimary} size="small" />
+                  ) : (
+                    <Sparkles
+                      color={prompt.trim() && model ? colors.iconOnPrimary : colors.muted}
+                      size={18}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                  )}
+                </ComposerPrimaryAction>
+              </View>
+            </ComposerShell>
+          </Animated.View>
+        </View>
+
+        {hasPersistentSidebar ? sidebarPanel : null}
+      </View>
 
       {/* ── Config Sidebar Overlay ── */}
-      {showSidebar && (
+      {!hasPersistentSidebar && sidebarVisible ? (
         <>
           <Animated.View
             entering={FadeIn.duration(250)}
@@ -1364,412 +1801,17 @@ export default function ArtworkScreen({
             <TouchableOpacity
               activeOpacity={1}
               style={{ flex: 1, backgroundColor: colors.overlayDark }}
-              onPress={() => setShowSidebar(false)}
+              onPress={closeSidebar}
             />
           </Animated.View>
           <Animated.View
             entering={SlideInRight.duration(300)}
             exiting={SlideOutRight.duration(300)}
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              bottom: 0,
-              width: sidebarWidth,
-              backgroundColor: colors.surface,
-              borderTopLeftRadius: 20,
-              borderBottomLeftRadius: 20,
-              shadowColor: colors.shadow,
-              shadowOffset: { width: -4, height: 0 },
-              shadowOpacity: 0.08,
-              shadowRadius: 16,
-              elevation: 12,
-            }}
           >
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingHorizontal: sidebarPad,
-                paddingTop: Math.max(insets.top + 16, 52),
-                paddingBottom: Math.max(bottomChrome.overlayListPaddingBottom, 40),
-              }}
-            >
-              {/* Sidebar header */}
-              <View className="flex-row items-center justify-between mb-2">
-                <Text
-                  style={{
-                    color: colors.foreground,
-                    fontSize: 18,
-                    fontWeight: '700',
-                    letterSpacing: -0.3,
-                  }}
-                >
-                  {t.artworkTitle}
-                </Text>
-                <TouchableOpacity hitSlop={8} onPress={() => setShowSidebar(false)}>
-                  <X color={colors.iconMuted} size={20} strokeWidth={tokens.icon.strokeWidth} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Model Selector */}
-              <SidebarLabel text={t.artworkModel} />
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: colors.fillTertiary,
-                  borderRadius: 16,
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                }}
-                onPress={() => setShowPicker(!showPicker)}
-              >
-                <Sparkles color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    color: colors.foreground,
-                    fontSize: 14,
-                    fontWeight: '600',
-                    marginLeft: 8,
-                    flex: 1,
-                  }}
-                >
-                  {modelName || t.artworkSelectModel}
-                </Text>
-                <ChevronDown
-                  color={colors.iconMuted}
-                  size={16}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-              </TouchableOpacity>
-              {showPicker && (
-                <Animated.View
-                  entering={FadeInDown.duration(350)}
-                  style={{
-                    backgroundColor: colors.fillTertiary,
-                    borderRadius: 12,
-                    marginTop: 8,
-                    maxHeight: 208,
-                    overflow: 'hidden',
-                  }}
-                >
-                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
-                    {allModels.length === 0 ? (
-                      <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-                        <Text style={{ color: colors.muted, fontSize: 14 }}>
-                          {t.artworkNoModels}
-                        </Text>
-                        <Text style={{ color: colors.secondaryText, fontSize: 12, marginTop: 4 }}>
-                          {t.artworkNoModelsDesc}
-                        </Text>
-                      </View>
-                    ) : (
-                      allModels.map((m) => (
-                        <TouchableOpacity
-                          key={`${m.providerId}-${m.id}`}
-                          style={{
-                            paddingHorizontal: 16,
-                            paddingVertical: 10,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            backgroundColor: model === m.id ? colors.fillTertiary : 'transparent',
-                          }}
-                          onPress={() => {
-                            haptics.selection();
-                            applyModelSelection(m, m.providerId, m.providerName);
-                            setShowPicker(false);
-                          }}
-                        >
-                          <View style={{ flex: 1 }}>
-                            <Text
-                              style={{ color: colors.foreground, fontSize: 13, fontWeight: '500' }}
-                            >
-                              {m.displayName || m.id}
-                            </Text>
-                            <Text style={{ color: colors.muted, fontSize: 10 }}>
-                              {m.providerName}
-                            </Text>
-                          </View>
-                          {model === m.id && (
-                            <View
-                              style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: 4,
-                                backgroundColor: colors.primary,
-                              }}
-                            />
-                          )}
-                        </TouchableOpacity>
-                      ))
-                    )}
-                  </ScrollView>
-                </Animated.View>
-              )}
-
-              {referenceEnabled && (
-                <>
-                  <SidebarLabel
-                    text={supportsImageUrls ? t.artworkReferenceImages : t.artworkReferenceImage}
-                  />
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: colors.fillTertiary,
-                      borderRadius: 16,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      paddingVertical: 20,
-                    }}
-                    onPress={handlePickRef}
-                  >
-                    {refImages.length > 0 ? (
-                      <ScrollView
-                        horizontal
-                        contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
-                        showsHorizontalScrollIndicator={false}
-                      >
-                        {refImages.map((img, i) => (
-                          <View key={i} style={{ position: 'relative' }}>
-                            <RNImage
-                              source={{ uri: img.uri }}
-                              style={{ width: 64, height: 64, borderRadius: 10 }}
-                            />
-                            <TouchableOpacity
-                              style={{
-                                position: 'absolute',
-                                top: -5,
-                                right: -5,
-                                backgroundColor: colors.sliderTrack,
-                                borderRadius: 10,
-                                padding: 2,
-                              }}
-                              onPress={() => setRefImages((p) => p.filter((_, idx) => idx !== i))}
-                            >
-                              <X color={colors.iconMuted} size={10} />
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-                      </ScrollView>
-                    ) : (
-                      <>
-                        <ImageIcon color={colors.secondaryText} size={28} strokeWidth={1.5} />
-                        <Text
-                          style={{
-                            color: colors.muted,
-                            fontSize: 12,
-                            marginTop: 6,
-                            textAlign: 'center',
-                          }}
-                        >
-                          {t.artworkReferenceImagesDesc}
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </>
-              )}
-
-              {resolutionOptions.length > 0 && (
-                <>
-                  <SidebarLabel text={artworkParamLabel('resolution', t)} />
-                  <SidebarOptionStrip
-                    getKey={(option) => String(option)}
-                    itemWidth={116}
-                    items={resolutionOptions}
-                    selectedValue={generationParams.resolution as string | undefined}
-                    renderContent={(option, active) => (
-                      <Text
-                        style={{
-                          color: active ? colors.iconOnPrimary : colors.muted,
-                          fontSize: 12,
-                          fontWeight: '500',
-                        }}
-                      >
-                        {option}
-                      </Text>
-                    )}
-                    onSelect={(option) => {
-                      haptics.selection();
-                      setGenerationParams((state) => ({ ...state, resolution: option }));
-                    }}
-                  />
-                </>
-              )}
-
-              {sizeOptions.length > 0 && (
-                <>
-                  <SidebarLabel text={artworkParamLabel('size', t)} />
-                  <SidebarOptionGrid
-                    columns={2}
-                    containerWidth={sidebarWidth - sidebarPad * 2}
-                    getKey={(option) => String(option)}
-                    items={sizeOptions}
-                    selectedValue={generationParams.size as string | undefined}
-                    renderContent={(option, active) => (
-                      <Text
-                        style={{
-                          color: active ? colors.iconOnPrimary : colors.muted,
-                          fontSize: 12,
-                          fontWeight: '500',
-                        }}
-                      >
-                        {option}
-                      </Text>
-                    )}
-                    onSelect={(option) => {
-                      haptics.selection();
-                      setGenerationParams((state) => ({ ...state, size: option }));
-                    }}
-                  />
-                </>
-              )}
-
-              {qualityOptions.length > 0 && (
-                <>
-                  <SidebarLabel text={artworkParamLabel('quality', t)} />
-                  <SidebarOptionGrid
-                    columns={2}
-                    containerWidth={sidebarWidth - sidebarPad * 2}
-                    getKey={(option) => String(option)}
-                    items={qualityOptions}
-                    selectedValue={generationParams.quality as string | undefined}
-                    renderContent={(option, active) => (
-                      <Text
-                        style={{
-                          color: active ? colors.iconOnPrimary : colors.muted,
-                          fontSize: 12,
-                          fontWeight: '500',
-                        }}
-                      >
-                        {option}
-                      </Text>
-                    )}
-                    onSelect={(option) => {
-                      haptics.selection();
-                      setGenerationParams((state) => ({ ...state, quality: option }));
-                    }}
-                  />
-                </>
-              )}
-
-              {effectiveAspectRatioOptions.length > 0 && (
-                <>
-                  <SidebarLabel text={artworkParamLabel('aspectRatio', t)} />
-                  <SidebarOptionStrip
-                    getKey={(option) => String(option)}
-                    itemWidth={86}
-                    items={effectiveAspectRatioOptions}
-                    selectedValue={currentAspectRatio}
-                    renderContent={(option, active) => (
-                      <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-                        <View style={{ marginBottom: 2 }}>
-                          <RatioIcon active={active} ratio={option} />
-                        </View>
-                        <Text
-                          style={{
-                            color: active ? colors.iconOnPrimary : colors.muted,
-                            fontSize: 10,
-                            fontWeight: '500',
-                          }}
-                        >
-                          {option}
-                        </Text>
-                      </View>
-                    )}
-                    onSelect={(option) => {
-                      haptics.selection();
-                      if (supportsNativeAspectRatio) {
-                        setGenerationParams((state) => ({ ...state, aspectRatio: option }));
-                        return;
-                      }
-
-                      if (supportsWidthHeight) {
-                        const widthItem = getParamDefinition(paramsSchema, 'width');
-                        const heightItem = getParamDefinition(paramsSchema, 'height');
-                        const base =
-                          Number(generationParams.width) || Number(generationParams.height) || 1024;
-                        const dims = applyRatioToDimensions(option, base);
-
-                        setGenerationParams((state) => {
-                          const next = {
-                            ...state,
-                            width: clampNumericValue(dims.width, widthItem),
-                            height: clampNumericValue(dims.height, heightItem),
-                          };
-                          delete next.aspectRatio;
-                          return next;
-                        });
-                      }
-                    }}
-                  />
-                </>
-              )}
-
-              {EDITABLE_NUMERIC_PARAM_KEYS.filter((key) =>
-                getParamDefinition(paramsSchema, key),
-              ).map((key) => (
-                <View key={key}>
-                  <SidebarLabel text={artworkParamLabel(key, t)} />
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      backgroundColor: colors.fillTertiary,
-                      borderRadius: 14,
-                      paddingHorizontal: 14,
-                      paddingVertical: 12,
-                    }}
-                    onPress={() => setEditingParamKey(key)}
-                  >
-                    <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600' }}>
-                      {generationParams[key] === null || generationParams[key] === undefined
-                        ? t.artworkParamAuto
-                        : String(generationParams[key])}
-                    </Text>
-                    <Text style={{ color: colors.muted, fontSize: 12 }}>
-                      {typeof getParamDefinition(paramsSchema, key)?.min === 'number' &&
-                      typeof getParamDefinition(paramsSchema, key)?.max === 'number'
-                        ? `${getParamDefinition(paramsSchema, key)?.min}-${getParamDefinition(paramsSchema, key)?.max}`
-                        : ''}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-
-              {/* Number of Images */}
-              <SidebarLabel text={t.artworkImageCount} />
-              <SidebarOptionStrip
-                getKey={(item) => String(item)}
-                itemWidth={68}
-                items={[...IMAGE_COUNTS, 'custom']}
-                selectedValue={imageCountSelection}
-                renderContent={(item, active) => (
-                  <Text
-                    style={{
-                      color: active ? colors.iconOnPrimary : colors.muted,
-                      fontSize: item === 'custom' ? 11 : 12,
-                      fontWeight: '500',
-                    }}
-                  >
-                    {item === 'custom' ? t.artworkImageCountCustomShort : item}
-                  </Text>
-                )}
-                onSelect={(item) => {
-                  haptics.selection();
-                  if (item === 'custom') {
-                    setCustomCountVisible(true);
-                    return;
-                  }
-
-                  setImgCount(Number(item));
-                }}
-              />
-            </ScrollView>
+            {sidebarPanel}
           </Animated.View>
         </>
-      )}
+      ) : null}
 
       <PromptModal
         defaultValue={String(imgCount)}

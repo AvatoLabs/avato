@@ -74,9 +74,9 @@ export function navigateToNotebook(params?: RootStackParamList['Notebook']): voi
   navigationRef.navigate('Notebook', params);
 }
 
-export function navigateToResources(params?: MainTabParamList['Resources']): void {
+export function navigateToContent(params?: MainTabParamList['Content']): void {
   if (!navigationRef.isReady()) return;
-  const shouldOpenPortalResources =
+  const shouldOpenPortalContent =
     !!params &&
     !!(
       params.openItem ||
@@ -86,12 +86,12 @@ export function navigateToResources(params?: MainTabParamList['Resources']): voi
       (params.portalStack && params.portalStack.length > 0)
     );
 
-  if (shouldOpenPortalResources) {
-    navigationRef.navigate('PortalResources', params);
+  if (shouldOpenPortalContent) {
+    navigationRef.navigate('PortalContent', params);
     return;
   }
 
-  navigationRef.navigate('MainTabs', { params, screen: 'Resources' });
+  navigationRef.navigate('MainTabs', { params, screen: 'Content' });
 }
 
 export function navigateToPortalEntry(
@@ -103,8 +103,8 @@ export function navigateToPortalEntry(
   const portalParams =
     remainingStack && remainingStack.length > 0 ? { portalStack: remainingStack } : {};
 
-  if (entry.route === 'Resources') {
-    navigationRef.navigate('PortalResources', {
+  if (entry.route === 'Content') {
+    navigationRef.navigate('PortalContent', {
       ...entry.params,
       ...portalParams,
     });

@@ -1,11 +1,10 @@
 /**
- * Resources shared with the current user (resourceShare.listSharedWithMe).
+ * Content shared with the current user (resourceShare.listSharedWithMe).
  */
 import { ChevronRight, Link2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   FlatList,
   type ListRenderItemInfo,
   Modal,
@@ -13,6 +12,7 @@ import {
   RefreshControl,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -23,6 +23,7 @@ import { formatMobileDateTime } from '../../lib/dateTime';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
 import { getCanonicalSharedResourceKind } from '../../lib/resourceShare';
+import { getResponsiveLayoutMetrics } from '../../lib/responsiveLayout';
 import { useThemeColors } from '../../theme/colors';
 import { enteringModalContent } from '../../theme/motion';
 
@@ -96,16 +97,28 @@ function roleLabelUi(
   return t.resourceShareRoleViewer;
 }
 
-const SHARED_LIST_MAX_H = Math.min(420, Math.round(Dimensions.get('window').height * 0.52));
-
 export default function SharedWithMeSheet({ visible, onClose, onPick }: SharedWithMeSheetProps) {
   const colors = useThemeColors();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
   const [rows, setRows] = useState<SharedWithMeRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [failed, setFailed] = useState(false);
+  const isFloatingPanel = responsiveMetrics.isTablet;
+  const sheetWidth = Math.min(
+    Math.max(screenWidth - 32, 0),
+    responsiveMetrics.isWideTablet ? 720 : 640,
+  );
+  const sheetMaxHeight = isFloatingPanel
+    ? Math.min(Math.round(screenHeight * 0.78), 760)
+    : Math.round(screenHeight * 0.85);
+  const sharedListMaxHeight = Math.min(
+    isFloatingPanel ? 520 : 420,
+    Math.round(screenHeight * (isFloatingPanel ? 0.58 : 0.52)),
+  );
 
   const load = useCallback(async () => {
     setFailed(false);
@@ -174,13 +187,32 @@ export default function SharedWithMeSheet({ visible, onClose, onPick }: SharedWi
       visible={visible}
       onRequestClose={onClose}
     >
-      <Pressable className="flex-1 justify-end bg-black/45" onPress={onClose}>
+      <Pressable
+        className="flex-1 bg-black/45"
+        style={{
+          justifyContent: isFloatingPanel ? 'center' : 'flex-end',
+          paddingHorizontal: isFloatingPanel ? 16 : 0,
+          paddingVertical: isFloatingPanel ? 24 : 0,
+        }}
+        onPress={onClose}
+      >
         <Animated.View
           entering={enteringModalContent()}
-          style={{ maxHeight: '85%', paddingBottom: Math.max(insets.bottom, 12) }}
+          style={{
+            alignSelf: 'center',
+            maxHeight: sheetMaxHeight,
+            paddingBottom: isFloatingPanel
+              ? Math.max(insets.bottom, 16)
+              : Math.max(insets.bottom, 12),
+            width: isFloatingPanel ? sheetWidth : undefined,
+          }}
         >
           <Pressable
-            className="bg-card rounded-t-2xl overflow-hidden"
+            className={
+              isFloatingPanel
+                ? 'bg-card rounded-3xl overflow-hidden'
+                : 'bg-card rounded-t-2xl overflow-hidden'
+            }
             onPress={(e) => e.stopPropagation()}
           >
             <View className="items-center pt-3 pb-2">
@@ -226,7 +258,7 @@ export default function SharedWithMeSheet({ visible, onClose, onPick }: SharedWi
                 keyExtractor={(item) => `${item.kind}:${item.localId}`}
                 renderItem={renderSharedRow}
                 showsVerticalScrollIndicator={false}
-                style={{ maxHeight: SHARED_LIST_MAX_H }}
+                style={{ maxHeight: sharedListMaxHeight }}
                 ListHeaderComponent={
                   <View
                     className="mb-4 rounded-2xl border px-4 py-4"

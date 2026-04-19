@@ -13,18 +13,19 @@ import { tokens } from '../../theme/tokens';
 import type { Tag } from '../../types';
 
 interface TagSectionProps {
+  contentWidth?: number;
   currentTag?: Tag | null;
   delay?: number;
   onPress: () => void;
 }
 
-export function TagSection({ currentTag, delay = 90, onPress }: TagSectionProps) {
+export function TagSection({ contentWidth, currentTag, delay = 90, onPress }: TagSectionProps) {
   const colors = useThemeColors();
   const { t } = useI18n();
 
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
-      <View className="mx-5 mb-5">
+      <View className="mb-5 self-center" style={contentWidth ? { width: contentWidth } : undefined}>
         <Text className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
           {t.chatSettingsTag}
         </Text>

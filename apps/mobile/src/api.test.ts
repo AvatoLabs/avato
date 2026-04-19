@@ -16,6 +16,8 @@ const mockUploadAsync = vi.fn();
 const mockCreateUploadTask = vi.fn(() => ({
   uploadAsync: mockUploadAsync,
 }));
+const mockGetAuthHeaders = vi.fn().mockResolvedValue({ 'X-lobe-chat-auth': 'token' });
+const mockGetApiUrl = vi.fn().mockResolvedValue('https://example.com');
 
 vi.mock('@lobechat/fetch-sse/sseParser', () => ({
   createSSEChunkParser: vi.fn(() => {
@@ -52,7 +54,7 @@ vi.mock('expo-file-system/legacy', () => ({
 
 vi.mock('./lib/auth', () => ({
   clearStoredAuthSession: vi.fn(),
-  getAuthHeaders: vi.fn().mockResolvedValue({ 'X-lobe-chat-auth': 'token' }),
+  getAuthHeaders: mockGetAuthHeaders,
 }));
 
 vi.mock('./lib/i18n', () => ({
@@ -70,7 +72,7 @@ vi.mock('./lib/i18n', () => ({
 }));
 
 vi.mock('./lib/server', () => ({
-  getApiUrl: vi.fn().mockResolvedValue('https://example.com'),
+  getApiUrl: mockGetApiUrl,
   hasConfiguredUrl: vi.fn(),
   setApiUrl: vi.fn(),
   testConnection: vi.fn(),
@@ -124,6 +126,8 @@ describe('aiChatApi', () => {
     vi.clearAllMocks();
     mockCopyAsync.mockReset();
     mockCreateUploadTask.mockClear();
+    mockGetApiUrl.mockResolvedValue('https://example.com');
+    mockGetAuthHeaders.mockResolvedValue({ 'X-lobe-chat-auth': 'token' });
     mockGetInfoAsync.mockReset();
     mockMakeDirectoryAsync.mockReset();
     mockReadAsStringAsync.mockReset();
@@ -789,6 +793,63 @@ describe('threadApi', () => {
   });
 });
 
+describe('spaceApi', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('queries spaces through the lambda router', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          result: {
+            data: {
+              json: [{ id: 'space-1', kind: 'personal', name: 'Personal' }],
+            },
+          },
+        }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { spaceApi } = await import('./lib/api');
+    const result = await spaceApi.list();
+
+    expect(result).toEqual([{ id: 'space-1', kind: 'personal', name: 'Personal' }]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('/trpc/lambda/space.listSpaces');
+  });
+
+  it('creates spaces through the lambda router', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          result: {
+            data: {
+              json: { id: 'space-2', kind: 'team', name: 'Design Ops' },
+            },
+          },
+        }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { spaceApi } = await import('./lib/api');
+    const result = await spaceApi.create({ name: 'Design Ops' });
+
+    expect(result).toEqual({ id: 'space-2', kind: 'team', name: 'Design Ops' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('/trpc/lambda/space.createTeamSpace');
+  });
+});
+
 describe('resourceApi recent content wrappers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -939,6 +1000,8 @@ describe('fileApi upload flow', () => {
     vi.clearAllMocks();
     mockCopyAsync.mockReset();
     mockCreateUploadTask.mockClear();
+    mockGetApiUrl.mockResolvedValue('https://example.com');
+    mockGetAuthHeaders.mockResolvedValue({ 'X-lobe-chat-auth': 'token' });
     mockGetInfoAsync.mockReset();
     mockMakeDirectoryAsync.mockReset();
     mockReadAsStringAsync.mockReset();
@@ -1027,15 +1090,204 @@ describe('fileApi upload flow', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(4);
-    expect(fetchMock.mock.calls[0]?.[0]).toContain('/trpc/mobile/file.checkSpaceBlob');
-    expect(fetchMock.mock.calls[1]?.[0]).toContain('/trpc/mobile/upload.prepareResourceUpload');
-    expect(fetchMock.mock.calls[2]?.[0]).toContain('/trpc/mobile/upload.completeResourceUpload');
-    expect(fetchMock.mock.calls[3]?.[0]).toContain('/trpc/mobile/file.createFile');
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('/trpc/lambda/file.checkSpaceBlob');
+    expect(fetchMock.mock.calls[1]?.[0]).toContain('/trpc/lambda/upload.prepareResourceUpload');
+    expect(fetchMock.mock.calls[2]?.[0]).toContain('/trpc/lambda/upload.completeResourceUpload');
+    expect(fetchMock.mock.calls[3]?.[0]).toContain('/trpc/lambda/file.createFile');
+    const [, createFileOptions] = fetchMock.mock.calls[3] as [
+      string,
+      { body: string; method: string },
+    ];
+    expect(JSON.parse(createFileOptions.body)).toMatchObject({
+      json: {
+        sha256: expect.any(String),
+        storageKey: 'v2/files/2026/roadmap.pdf',
+      },
+    });
 
     expect(mockCreateUploadTask).toHaveBeenCalledTimes(1);
     const firstUploadTaskCall = mockCreateUploadTask.mock.calls[0] as unknown[] | undefined;
     expect(firstUploadTaskCall?.[0]).toBe('https://upload.example.com/presigned');
     expect(firstUploadTaskCall?.[1]).toBe('file:///tmp/roadmap.pdf');
     expect(onProgress).toHaveBeenCalledWith(5);
+  });
+
+  it('falls back to same-origin raw upload session when presigned PUT fails', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            result: {
+              data: {
+                json: {
+                  isExist: false,
+                },
+              },
+            },
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            result: {
+              data: {
+                json: {
+                  presignedUrl: 'https://upload.example.com/presigned',
+                  sessionId: 'upload-session-2',
+                  storageKey: 'v2/files/2026/fallback.pdf',
+                },
+              },
+            },
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ result: { data: { json: null } } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            result: {
+              data: {
+                json: {
+                  id: 'file-2',
+                  url: 'https://example.com/f/file-2',
+                },
+              },
+            },
+          }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    mockGetInfoAsync.mockResolvedValue({ exists: true, size: 3 });
+    mockReadAsStringAsync.mockResolvedValue('YWJj');
+    mockUploadAsync.mockResolvedValueOnce({ status: 500 }).mockResolvedValueOnce({ status: 200 });
+
+    const { fileApi } = await import('./lib/api');
+    const result = await fileApi.upload(
+      'file:///tmp/fallback.pdf',
+      'fallback.pdf',
+      'application/pdf',
+      {
+        spaceId: 'space-1',
+      },
+    );
+
+    expect(result).toEqual({
+      id: 'file-2',
+      url: 'https://example.com/f/file-2',
+    });
+
+    expect(mockCreateUploadTask).toHaveBeenCalledTimes(2);
+
+    const presignedCall = mockCreateUploadTask.mock.calls[0] as unknown[] | undefined;
+    expect(presignedCall?.[0]).toBe('https://upload.example.com/presigned');
+    expect(presignedCall?.[1]).toBe('file:///tmp/fallback.pdf');
+
+    const fallbackCall = mockCreateUploadTask.mock.calls[1] as unknown[] | undefined;
+    expect(fallbackCall?.[0]).toBe('https://example.com/api/file/upload-session');
+    expect(fallbackCall?.[1]).toBe('file:///tmp/fallback.pdf');
+    expect(fallbackCall?.[2]).toMatchObject({
+      headers: {
+        'Content-Type': 'application/pdf',
+        'X-lobe-chat-auth': 'token',
+        'x-lobe-upload-session-id': 'upload-session-2',
+      },
+      httpMethod: 'POST',
+      uploadType: 'binary',
+    });
+  });
+
+  it('continues upload when the deduplication lookup is unavailable', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: async () =>
+          JSON.stringify({
+            error: {
+              json: {
+                message: 'temporary lookup failure',
+              },
+            },
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            result: {
+              data: {
+                json: {
+                  presignedUrl: 'https://upload.example.com/presigned-2',
+                  sessionId: 'upload-session-3',
+                  storageKey: 'v2/files/2026/no-dedup.pdf',
+                },
+              },
+            },
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ result: { data: { json: null } } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            result: {
+              data: {
+                json: {
+                  id: 'file-3',
+                  url: 'https://example.com/f/file-3',
+                },
+              },
+            },
+          }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    mockGetInfoAsync.mockResolvedValue({ exists: true, size: 3 });
+    mockReadAsStringAsync.mockResolvedValue('YWJj');
+    mockUploadAsync.mockResolvedValue({ status: 200 });
+
+    const { fileApi } = await import('./lib/api');
+    const result = await fileApi.upload(
+      'file:///tmp/no-dedup.pdf',
+      'no-dedup.pdf',
+      'application/pdf',
+    );
+
+    expect(result).toEqual({
+      id: 'file-3',
+      url: 'https://example.com/f/file-3',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls[1]?.[0]).toContain('/trpc/lambda/upload.prepareResourceUpload');
+    expect(fetchMock.mock.calls[2]?.[0]).toContain('/trpc/lambda/upload.completeResourceUpload');
+    expect(fetchMock.mock.calls[3]?.[0]).toContain('/trpc/lambda/file.createFile');
+    const [, createFileOptions] = fetchMock.mock.calls[3] as [
+      string,
+      { body: string; method: string },
+    ];
+    expect(JSON.parse(createFileOptions.body)).toMatchObject({
+      json: {
+        sha256: expect.any(String),
+        storageKey: 'v2/files/2026/no-dedup.pdf',
+      },
+    });
   });
 });

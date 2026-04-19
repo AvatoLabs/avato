@@ -262,6 +262,8 @@ const toIsoString = (value: unknown): string => {
 };
 
 const sanitizeFilename = (name: string) => name.replaceAll(/[^\w.-]+/g, '_');
+const joinBaseUrlPath = (baseUrl: string, path: `/${string}`) =>
+  `${baseUrl.replace(/\/+$/, '')}${path}`;
 
 const ensureDirectoryAsync = async (uri: string) => {
   if (!uri) throw new Error('filesystem directory unavailable');
@@ -297,6 +299,7 @@ const resolveRemoteFileUrl = (baseUrl: string, id: string, url?: string) => {
 };
 
 const SHA256_CHUNK_BYTES = 4 * 1024 * 1024;
+const UPLOAD_SESSION_ID_HEADER = 'x-lobe-upload-session-id';
 
 const base64ToUint8Array = (base64: string): Uint8Array => {
   const binaryString = globalThis.atob(base64);
@@ -376,25 +379,26 @@ const putLocalFileToPresignedUrl = async (
   }
 };
 
-/** Same-origin multipart fallback when PUT to the presigned URL is not viable. */
+/** Same-origin raw binary fallback when PUT to the presigned URL is not viable. */
 const uploadLocalFileViaUploadSession = async (
   baseUrl: string,
   fileUri: string,
-  name: string,
   fileType: string,
   uploadSessionId: string,
   onProgress?: (progress: number) => void,
 ): Promise<void> => {
+  const headers = await getAuthHeaders(baseUrl);
   const uploadTask = FileSystem.createUploadTask(
-    new URL('/api/file/upload-session', `${baseUrl}/`).toString(),
+    joinBaseUrlPath(baseUrl, '/api/file/upload-session'),
     fileUri,
     {
-      fieldName: 'file',
-      headers: await getAuthHeaders(baseUrl),
+      headers: {
+        ...headers,
+        'Content-Type': fileType,
+        [UPLOAD_SESSION_ID_HEADER]: uploadSessionId,
+      },
       httpMethod: 'POST',
-      mimeType: fileType,
-      parameters: { uploadSessionId },
-      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
     },
     (progressData) => {
       const { totalBytesExpectedToSend, totalBytesSent } = progressData;
@@ -705,6 +709,8 @@ async function trpcMutate<T = any>(
 ): Promise<T> {
   return requestTrpc<T>({ action: 'mutation', input, namespace: options?.namespace, procedure });
 }
+
+const LAMBDA_TRPC_OPTIONS = { namespace: 'lambda' } as const;
 
 const pickFirstNonEmptyString = (...values: Array<string | null | undefined>) => {
   for (const value of values) {
@@ -2243,8 +2249,10 @@ export const sourceSetApi = {
 };
 
 export const spaceApi = {
-  getById: (id: string) => trpcQuery<MobileSpaceItem>('space.getSpace', { id }),
-  list: () => trpcQuery<MobileSpaceItem[]>('space.listSpaces'),
+  create: (value: { description?: string; name: string }) =>
+    trpcMutate<MobileSpaceItem>('space.createTeamSpace', value, LAMBDA_TRPC_OPTIONS),
+  getById: (id: string) => trpcQuery<MobileSpaceItem>('space.getSpace', { id }, LAMBDA_TRPC_OPTIONS),
+  list: () => trpcQuery<MobileSpaceItem[]>('space.listSpaces', undefined, LAMBDA_TRPC_OPTIONS),
 };
 
 // ── Resource API (unified files + documents with folder support) ─────
@@ -2324,8 +2332,11 @@ export const resourceApi = {
       ...params,
     }),
 
-  getFolderBreadcrumb: (slug: string) =>
-    trpcQuery<FolderCrumb[]>('document.getFolderBreadcrumb', { slug }),
+  getFolderBreadcrumb: (slug: string, spaceId?: string) =>
+    trpcQuery<FolderCrumb[]>(
+      'document.getFolderBreadcrumb',
+      spaceId ? { slug, spaceId } : { slug },
+    ),
 
   getDocument: (id: string) =>
     trpcQuery<{
@@ -2398,12 +2409,14 @@ export const resourceApi = {
     current?: number;
     sourceSetId?: string;
     pageSize?: number;
+    spaceId?: string;
   }) =>
     trpcQuery<{ items: TrashedDocumentItem[]; total: number }>('document.queryDocuments', {
       current: params?.current ?? 0,
       pageSize: params?.pageSize ?? 100,
       trash: true,
       ...(params?.sourceSetId ? { sourceSetId: params.sourceSetId } : {}),
+      ...(params?.spaceId ? { spaceId: params.spaceId } : {}),
     }),
 
   restoreDocument: (id: string) => trpcMutate('document.restoreDocument', { id }),
@@ -2570,7 +2583,6 @@ export const fileApi = {
       sourceSetId?: string;
       onProgress?: (progress: number) => void;
       parentId?: string;
-      sessionId?: string;
       skipCheckFileType?: boolean;
       skipDeduplication?: boolean;
       spaceId?: string;
@@ -2578,25 +2590,34 @@ export const fileApi = {
   ): Promise<{ id: string; url: string }> => {
     const baseUrl = await getBaseUrl();
     const uploadUri = await ensureUploadableUri(uri, name);
-    const size = await getLocalFileSize(uploadUri);
     const fileType = type || 'application/octet-stream';
+    const size = await getLocalFileSize(uploadUri);
     const sha256Hex = await computeSha256HexFromFileUri(uploadUri, size);
 
     let storagePath: string | undefined;
     let metadata: ReturnType<typeof fileMetadataFromStorageKey> | undefined;
 
     if (!options?.skipDeduplication) {
-      const hashCheck = await trpcMutate<{
-        isExist: boolean;
-        metadata?: { path?: string };
-        storageKey?: string;
-      }>('file.checkSpaceBlob', { sha256: sha256Hex, spaceId: options?.spaceId });
+      try {
+        const hashCheck = await trpcMutate<{
+          isExist: boolean;
+          metadata?: { path?: string };
+          storageKey?: string;
+        }>(
+          'file.checkSpaceBlob',
+          { sha256: sha256Hex, spaceId: options?.spaceId },
+          LAMBDA_TRPC_OPTIONS,
+        );
 
-      if (hashCheck.isExist) {
-        storagePath = hashCheck.metadata?.path || hashCheck.storageKey;
-        if (storagePath) {
-          metadata = fileMetadataFromStorageKey(storagePath, name);
+        if (hashCheck.isExist) {
+          storagePath = hashCheck.metadata?.path || hashCheck.storageKey;
+          if (storagePath) {
+            metadata = fileMetadataFromStorageKey(storagePath, name);
+          }
         }
+      } catch {
+        // Space-level deduplication is an optimization. Fall through to a normal upload if the
+        // lookup is temporarily unavailable.
       }
     }
 
@@ -2614,7 +2635,7 @@ export const fileApi = {
         sha256: sha256Hex,
         size,
         spaceId: options?.spaceId,
-      });
+      }, LAMBDA_TRPC_OPTIONS);
 
       metadata = fileMetadataFromStorageKey(prep.storageKey, name);
 
@@ -2629,14 +2650,17 @@ export const fileApi = {
         await uploadLocalFileViaUploadSession(
           baseUrl,
           uploadUri,
-          name,
           fileType,
           prep.sessionId,
           options?.onProgress,
         );
       }
 
-      await trpcMutate('upload.completeResourceUpload', { uploadSessionId: prep.sessionId });
+      await trpcMutate(
+        'upload.completeResourceUpload',
+        { uploadSessionId: prep.sessionId },
+        LAMBDA_TRPC_OPTIONS,
+      );
       storagePath = prep.storageKey;
     }
 
@@ -2647,17 +2671,21 @@ export const fileApi = {
     const fileMetadata =
       metadata ?? fileMetadataFromStorageKey(storagePath, name);
 
-    const created = await trpcMutate<{ id: string; url: string }>('file.createFile', {
-      fileType,
-      sha256: sha256Hex,
-      sourceSetId: options?.sourceSetId,
-      metadata: fileMetadata,
-      name,
-      parentId: options?.parentId,
-      size,
-      spaceId: options?.spaceId,
-      storageKey: storagePath,
-    });
+    const created = await trpcMutate<{ id: string; url: string }>(
+      'file.createFile',
+      {
+        fileType,
+        sha256: sha256Hex,
+        sourceSetId: options?.sourceSetId,
+        metadata: fileMetadata,
+        name,
+        parentId: options?.parentId,
+        size,
+        spaceId: options?.spaceId,
+        storageKey: storagePath,
+      },
+      LAMBDA_TRPC_OPTIONS,
+    );
 
     const resolvedUrl = resolveRemoteFileUrl(baseUrl, created.id, created.url);
 

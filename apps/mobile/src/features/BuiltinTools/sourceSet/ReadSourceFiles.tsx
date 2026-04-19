@@ -1,6 +1,6 @@
 /**
  * Source-set read-file render for React Native.
- * Displays retrieved source files with quick-open actions into Resources.
+ * Displays retrieved source files with quick-open actions into Content.
  */
 import { useRoute } from '@react-navigation/native';
 import { AlertTriangle, FileText } from 'lucide-react-native';
@@ -9,7 +9,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 
 import { haptics } from '../../../lib/haptics';
 import { useI18n } from '../../../lib/i18n';
-import { navigateToResources } from '../../../lib/navigation';
+import { navigateToContent } from '../../../lib/navigation';
 import {
   appendCurrentPortalStackWithOrigin,
   createConversationOrigin,
@@ -58,7 +58,7 @@ const ReadSourceFilesRender = memo<MobileBuiltinRenderProps>(
         {files.map((file) => {
           const handleOpen = () => {
             haptics.light();
-            navigateToResources(
+            navigateToContent(
               appendCurrentPortalStackWithOrigin(
                 route.name,
                 route.params,

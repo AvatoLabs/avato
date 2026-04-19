@@ -1,0 +1,90 @@
+import { useI18n } from '../lib/i18n';
+
+export function useResourceContentMessages() {
+  const { t } = useI18n();
+
+  return {
+    entryFlowMessages: {
+      resourceSharedFolderHint: t.resourceSharedFolderHint,
+    },
+    folderActionMessages: {
+      done: t.done,
+      newFolder: t.resourceNewFolder,
+      uploadFailed: t.resourceUploadFailed,
+    },
+    governanceFilterMessages: {
+      resourceGovernanceAny: t.resourceGovernanceAny,
+      resourceGovernanceClassificationBrand: t.resourceGovernanceClassificationBrand,
+      resourceGovernanceClassificationFinance: t.resourceGovernanceClassificationFinance,
+      resourceGovernanceClassificationGeneral: t.resourceGovernanceClassificationGeneral,
+      resourceGovernanceClassificationHr: t.resourceGovernanceClassificationHr,
+      resourceGovernanceClassificationLegal: t.resourceGovernanceClassificationLegal,
+      resourceGovernanceClassificationProduct: t.resourceGovernanceClassificationProduct,
+      resourceGovernanceReviewApproved: t.resourceGovernanceReviewApproved,
+      resourceGovernanceReviewArchived: t.resourceGovernanceReviewArchived,
+      resourceGovernanceReviewDraft: t.resourceGovernanceReviewDraft,
+      resourceGovernanceRightsOwnerSummary: t.resourceGovernanceRightsOwnerSummary,
+      resourceGovernanceSectionClassification: t.resourceGovernanceSectionClassification,
+      resourceGovernanceSectionReview: t.resourceGovernanceSectionReview,
+      resourceGovernanceSectionUsage: t.resourceGovernanceSectionUsage,
+      resourceGovernanceUsageInternal: t.resourceGovernanceUsageInternal,
+      resourceGovernanceUsagePublic: t.resourceGovernanceUsagePublic,
+      resourceGovernanceUsageRestricted: t.resourceGovernanceUsageRestricted,
+    },
+    selectionMessages: {
+      cancel: t.cancel,
+      delete: t.delete,
+      errorNetwork: t.errorNetwork,
+      fileAddToChatContextSuccess: t.fileAddToChatContextSuccess,
+      fileEditAsDocumentSuccess: t.fileEditAsDocumentSuccess,
+      fileUploadFailed: t.fileUploadFailed,
+      resourceDeleteConfirm: t.resourceDeleteConfirm,
+      resourceDeleteDesc: t.resourceDeleteDesc,
+      resourceDeleteFailed: t.resourceDeleteFailed,
+      resourceFolderDeleteConfirm: t.resourceFolderDeleteConfirm,
+      resourceFolderDeleteDesc: t.resourceFolderDeleteDesc,
+      resourceRenameFailed: t.resourceRenameFailed,
+      resourceRenamed: t.resourceRenamed,
+    },
+    sourceSetActionMessages: {
+      addToSourceSetExists: t.resourceAddToSourceSetExists,
+      addToSourceSetFailed: t.resourceAddToSourceSetFailed,
+      addToSourceSetSuccess: t.resourceAddToSourceSetSuccess,
+      cancel: t.cancel,
+      delete: t.delete,
+      deleteFailed: t.resourceDeleteFailed,
+      errorNetwork: t.errorNetwork,
+      moveToSourceSetFailed: t.resourceMoveToSourceSetFailed,
+      moveToSourceSetSuccess: t.resourceMoveToSourceSetSuccess,
+      removeFromSourceSetConfirm: t.resourceRemoveFromSourceSetConfirm,
+      removeFromSourceSetDesc: t.resourceRemoveFromSourceSetDesc,
+      removeFromSourceSetFailed: t.resourceRemoveFromSourceSetFailed,
+      removeFromSourceSetSuccess: t.resourceRemoveFromSourceSetSuccess,
+      renameFailed: t.resourceRenameFailed,
+      renamed: t.resourceRenamed,
+      sourceSetCreated: t.resourceSourceSetCreated,
+      sourceSetDeleteConfirm: t.resourceDeleteSourceSetConfirm,
+      sourceSetDeleteDesc: t.resourceDeleteSourceSetDesc,
+      sourceSetDeleted: t.resourceSourceSetDeleted,
+    },
+    sortMessages: {
+      resourceSortName: t.resourceSortName,
+      resourceSortNewest: t.resourceSortNewest,
+      resourceSortOldest: t.resourceSortOldest,
+      resourceSortSize: t.resourceSortSize,
+    },
+    spaceCreateMessages: {
+      workspaceCreateCreated: t.workspaceCreateCreated,
+      workspaceCreateFailed: t.workspaceCreateFailed,
+    },
+    trashMessages: {
+      loadFailed: t.resourceTrashLoadFailed,
+      restoreFailed: t.resourceTrashRestoreFailed,
+      restored: t.resourceTrashRestored,
+    },
+    uploadMessages: {
+      resourceUploadFailed: t.resourceUploadFailed,
+      resourceUploaded: t.resourceUploaded,
+    },
+  };
+}

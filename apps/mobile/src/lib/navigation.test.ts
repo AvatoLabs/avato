@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { navigateBackFromPortal, navigateToPortalEntry, navigateToResources } from './navigation';
+import { navigateBackFromPortal, navigateToContent, navigateToPortalEntry } from './navigation';
 
 const { mockedIsReady, mockedNavigate } = vi.hoisted(() => ({
   mockedIsReady: vi.fn(),
@@ -24,22 +24,22 @@ describe('navigation', () => {
   });
 
   it('keeps resource browsing on the resources tab root', () => {
-    navigateToResources();
+    navigateToContent();
 
     expect(mockedNavigate).toHaveBeenCalledWith('MainTabs', {
       params: undefined,
-      screen: 'Resources',
+      screen: 'Content',
     });
   });
 
   it('routes resource object opens through the portal resources stack screen', () => {
-    navigateToResources({
+    navigateToContent({
       openItemId: 'file-1',
       openKind: 'file',
       sessionId: 'session-1',
     });
 
-    expect(mockedNavigate).toHaveBeenCalledWith('PortalResources', {
+    expect(mockedNavigate).toHaveBeenCalledWith('PortalContent', {
       openItemId: 'file-1',
       openKind: 'file',
       sessionId: 'session-1',
@@ -54,7 +54,7 @@ describe('navigation', () => {
           openKind: 'file',
           sessionId: 'session-1',
         },
-        route: 'Resources',
+        route: 'Content',
       },
       [
         {
@@ -67,7 +67,7 @@ describe('navigation', () => {
       ],
     );
 
-    expect(mockedNavigate).toHaveBeenCalledWith('PortalResources', {
+    expect(mockedNavigate).toHaveBeenCalledWith('PortalContent', {
       openItemId: 'file-1',
       openKind: 'file',
       portalStack: [

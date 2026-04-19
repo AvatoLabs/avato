@@ -10,6 +10,7 @@ import { useI18n } from '../../lib/i18n';
 import { useThemeColors } from '../../theme/colors';
 
 interface SessionHeaderSectionProps {
+  contentWidth?: number;
   delay?: number;
   description?: string;
   isGroupSession: boolean;
@@ -19,6 +20,7 @@ interface SessionHeaderSectionProps {
 }
 
 export function SessionHeaderSection({
+  contentWidth,
   delay = 50,
   description = '',
   isGroupSession,
@@ -31,7 +33,10 @@ export function SessionHeaderSection({
 
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
-      <View className="mx-5 mb-5 mt-5">
+      <View
+        className="mb-5 mt-5 self-center"
+        style={contentWidth ? { width: contentWidth } : undefined}
+      >
         <Text className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
           {t.chatSettingsSessionInfo}
         </Text>

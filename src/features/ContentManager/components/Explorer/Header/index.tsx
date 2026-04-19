@@ -1,7 +1,7 @@
 'use client';
 
-import { ActionIcon, Flexbox, Text } from '@lobehub/ui';
 import { type FileAssetCapabilities } from '@lobechat/types';
+import { ActionIcon, Flexbox, Text } from '@lobehub/ui';
 import { createStaticStyles, cssVar } from 'antd-style';
 import { XIcon } from 'lucide-react';
 import { memo } from 'react';
@@ -15,58 +15,46 @@ import { useServerConfigStore } from '@/store/serverConfig';
 
 import AddButton from '../../Header/AddButton';
 import BatchActionsDropdown from '../ToolBar/BatchActionsDropdown';
-import SortDropdown from '../ToolBar/SortDropdown';
-import ViewSwitcher from '../ToolBar/ViewSwitcher';
+import DisplayDropdown from '../ToolBar/DisplayDropdown';
 import Breadcrumb from './Breadcrumb';
 import SearchInput from './SearchInput';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
-  actionTray: css`
-    gap: 8px;
-    align-items: center;
-    padding: 4px;
-    border: 1px solid ${cssVar.colorBorderSecondary};
-    border-radius: 999px;
-
-    background: color-mix(in srgb, ${cssVar.colorFillQuaternary} 74%, transparent);
-    box-shadow:
-      inset 0 1px 0 color-mix(in srgb, white 50%, transparent),
-      0 12px 28px -24px color-mix(in srgb, ${cssVar.colorText} 24%, transparent);
-  `,
-  addButtonWrap: css`
-    margin-inline-start: 4px;
-    padding-inline-start: 4px;
-    border-inline-start: 1px solid ${cssVar.colorBorderSecondary};
-  `,
   breadcrumbWrap: css`
     overflow: hidden;
     min-width: 0;
     padding-inline-start: 8px;
   `,
   headerBar: css`
-    border-bottom: 1px solid ${cssVar.colorBorderSecondary};
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, ${cssVar.colorBgContainer} 96%, ${cssVar.colorBgElevated}) 0%,
-        color-mix(in srgb, ${cssVar.colorBgContainer} 92%, ${cssVar.colorBgLayout}) 100%
-      );
+    border-block-end: 1px solid ${cssVar.colorBorderSecondary};
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, ${cssVar.colorBgContainer} 96%, ${cssVar.colorBgElevated}) 0%,
+      color-mix(in srgb, ${cssVar.colorBgContainer} 92%, ${cssVar.colorBgLayout}) 100%
+    );
     backdrop-filter: blur(14px);
+  `,
+  rightActions: css`
+    gap: 6px;
+    align-items: center;
+    min-width: 0;
+    padding-inline-start: 8px;
   `,
   selectionBar: css`
     gap: 12px;
     align-items: center;
+
     min-width: 0;
-    padding: 6px 8px;
+    padding-block: 6px;
+    padding-inline: 8px;
     border: 1px solid ${cssVar.colorBorderSecondary};
     border-radius: 999px;
 
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, ${cssVar.colorFillQuaternary} 88%, ${cssVar.colorBgContainer}) 0%,
-        color-mix(in srgb, ${cssVar.colorFillSecondary} 76%, ${cssVar.colorBgContainer}) 100%
-      );
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, ${cssVar.colorFillQuaternary} 88%, ${cssVar.colorBgContainer}) 0%,
+      color-mix(in srgb, ${cssVar.colorFillSecondary} 76%, ${cssVar.colorBgContainer}) 100%
+    );
     box-shadow:
       inset 0 1px 0 color-mix(in srgb, white 50%, transparent),
       0 12px 28px -24px color-mix(in srgb, ${cssVar.colorText} 24%, transparent);
@@ -74,6 +62,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   selectionActions: css`
     gap: 8px;
     align-items: center;
+
     padding: 4px;
     border: 1px solid ${cssVar.colorBorderSecondary};
     border-radius: 999px;
@@ -84,18 +73,18 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
       0 12px 28px -24px color-mix(in srgb, ${cssVar.colorText} 24%, transparent);
   `,
   selectionCount: css`
-    color: ${cssVar.colorText};
     font-size: 14px;
     font-weight: 600;
+    color: ${cssVar.colorText};
     white-space: nowrap;
   `,
   selectionEyebrow: css`
-    color: ${cssVar.colorTextTertiary};
     font-size: 11px;
     font-weight: 600;
-    letter-spacing: 0.08em;
     line-height: 1;
+    color: ${cssVar.colorTextTertiary};
     text-transform: uppercase;
+    letter-spacing: 0.08em;
     white-space: nowrap;
   `,
   selectionMeta: css`
@@ -108,91 +97,96 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 /**
  * Toolbar for the resource explorer
  */
-const Header = memo<{ governanceCapabilities?: FileAssetCapabilities }>(({ governanceCapabilities }) => {
-  const { t } = useTranslation(['components', 'common', 'file', 'sourceSet']);
-  const { currentFolderSlug } = useFolderPath();
+const Header = memo<{ governanceCapabilities?: FileAssetCapabilities }>(
+  ({ governanceCapabilities }) => {
+    const { t } = useTranslation(['components', 'common', 'file', 'sourceSet']);
+    const { currentFolderSlug } = useFolderPath();
 
-  // Get state and actions from store
-  const [sourceSetId, currentViewItemId, onActionClick, selectFileIds, setSelectedFileIds] =
-    useContentManagerStore((s) => [
-      s.sourceSetId,
-      s.currentViewItemId,
-      s.onActionClick,
-      s.selectedFileIds,
-      s.setSelectedFileIds,
-    ]);
-  const currentFile = useContentManagerStore(selectors.getCurrentFile);
-  const selectCount = selectFileIds.length;
-  const isMultiSelected = selectCount > 1;
-  const isMobile = useServerConfigStore((s) => s.isMobile);
-  const showHeaderFilters = !isMultiSelected;
-  const shouldShowBreadcrumb = Boolean(currentFolderSlug || currentViewItemId || sourceSetId);
+    // Get state and actions from store
+    const [sourceSetId, currentViewItemId, onActionClick, selectFileIds, setSelectedFileIds] =
+      useContentManagerStore((s) => [
+        s.sourceSetId,
+        s.currentViewItemId,
+        s.onActionClick,
+        s.selectedFileIds,
+        s.setSelectedFileIds,
+      ]);
+    const currentFile = useContentManagerStore(selectors.getCurrentFile);
+    const selectCount = selectFileIds.length;
+    const isMultiSelected = selectCount > 1;
+    const isMobile = useServerConfigStore((s) => s.isMobile);
+    const showHeaderFilters = !isMultiSelected;
+    const shouldShowBreadcrumb = Boolean(currentFolderSlug || currentViewItemId || sourceSetId);
+    const showIdleBatchActions = !isMultiSelected && Boolean(sourceSetId);
 
-  // Scope-first navigation lives in the sidebar. The header shows workspace-aware
-  // breadcrumb context once users drill into a file, folder, or source set.
-  const leftContent = isMultiSelected ? (
-    <Flexbox className={styles.selectionBar} horizontal>
-      <Flexbox className={styles.selectionMeta}>
-        <Text className={styles.selectionEyebrow}>
-          {t('FileManager.actions.batchActions', 'Batch actions')}
-        </Text>
-        <Text className={styles.selectionCount} weight={600}>
-          {t('FileManager.total.selectedCount', { count: selectCount, ns: 'components' })}
-        </Text>
+    // Scope-first navigation lives in the sidebar. The header shows workspace-aware
+    // breadcrumb context once users drill into a file, folder, or source set.
+    const leftContent = isMultiSelected ? (
+      <Flexbox horizontal className={styles.selectionBar}>
+        <Flexbox className={styles.selectionMeta}>
+          <Text className={styles.selectionEyebrow}>
+            {t('FileManager.actions.batchActions', 'Batch actions')}
+          </Text>
+          <Text className={styles.selectionCount} weight={600}>
+            {t('FileManager.total.selectedCount', { count: selectCount, ns: 'components' })}
+          </Text>
+        </Flexbox>
       </Flexbox>
-    </Flexbox>
-  ) : shouldShowBreadcrumb ? (
-    <Flexbox className={styles.breadcrumbWrap}>
-      <Breadcrumb fileName={currentViewItemId ? currentFile?.name : undefined} />
-    </Flexbox>
-  ) : null;
+    ) : shouldShowBreadcrumb ? (
+      <Flexbox className={styles.breadcrumbWrap}>
+        <Breadcrumb fileName={currentViewItemId ? currentFile?.name : undefined} />
+      </Flexbox>
+    ) : null;
 
-  const rightContent = isMultiSelected ? (
-    <Flexbox className={styles.selectionActions} horizontal>
-      <BatchActionsDropdown
-        governanceCapabilities={governanceCapabilities}
-        selectCount={selectCount}
-        onActionClick={onActionClick}
-      />
-      <ActionIcon
-        icon={XIcon}
-        title={t('close', { ns: 'common' })}
-        onClick={() => setSelectedFileIds([])}
-      />
-    </Flexbox>
-  ) : (
-    <Flexbox className={styles.actionTray} horizontal>
-      <SearchInput />
-      <SortDropdown />
-      <BatchActionsDropdown
-        governanceCapabilities={governanceCapabilities}
-        selectCount={selectCount}
-        onActionClick={onActionClick}
-      />
-      <ViewSwitcher />
-      <Flexbox className={styles.addButtonWrap}>
+    const rightContent = isMultiSelected ? (
+      <Flexbox horizontal className={styles.selectionActions}>
+        <BatchActionsDropdown
+          governanceCapabilities={governanceCapabilities}
+          selectCount={selectCount}
+          onActionClick={onActionClick}
+        />
+        <ActionIcon
+          icon={XIcon}
+          title={t('close', { ns: 'common' })}
+          onClick={() => setSelectedFileIds([])}
+        />
+      </Flexbox>
+    ) : (
+      <Flexbox horizontal className={styles.rightActions}>
+        <SearchInput />
+        <DisplayDropdown />
+        {showIdleBatchActions && (
+          <BatchActionsDropdown
+            governanceCapabilities={governanceCapabilities}
+            selectCount={selectCount}
+            onActionClick={onActionClick}
+          />
+        )}
         <AddButton />
       </Flexbox>
-    </Flexbox>
-  );
+    );
 
-  return (
-    <NavHeader
-      children={showHeaderFilters ? <CategoryMenu /> : null}
-      left={leftContent}
-      showTogglePanelButton={!isMobile}
-      right={rightContent}
-      style={{ background: cssVar.colorBgContainer, borderBottom: `1px solid ${cssVar.colorBorderSecondary}` }}
-      className={styles.headerBar}
-      styles={{
-        center: showHeaderFilters ? { flex: 'none', minWidth: 0 } : undefined,
-        left: { flex: 1, minWidth: 0 },
-        right: showHeaderFilters
-          ? { flex: 1, justifyContent: 'flex-end', minWidth: 0 }
-          : { flex: 'none' },
-      }}
-    />
-  );
-});
+    return (
+      <NavHeader
+        children={showHeaderFilters ? <CategoryMenu /> : null}
+        className={styles.headerBar}
+        left={leftContent}
+        right={rightContent}
+        showTogglePanelButton={!isMobile}
+        style={{
+          background: cssVar.colorBgContainer,
+          borderBottom: `1px solid ${cssVar.colorBorderSecondary}`,
+        }}
+        styles={{
+          center: showHeaderFilters
+            ? { alignItems: 'flex-start', flex: 1, minWidth: 0 }
+            : undefined,
+          left: { flex: 'none', minWidth: 0 },
+          right: { flex: 'none', justifyContent: 'flex-end', minWidth: 0 },
+        }}
+      />
+    );
+  },
+);
 
 export default Header;

@@ -38,10 +38,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   FlatList,
   Image as RNImage,
-  Keyboard,
   LayoutAnimation,
   type ListRenderItemInfo,
   Modal,
@@ -53,6 +51,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -78,7 +77,6 @@ import PromptModal from '../components/ui/PromptModal';
 import { QuickActionChip } from '../components/ui/QuickActionChip';
 import ResourcePickerSheet from '../components/ui/ResourcePickerSheet';
 import { HeaderIconButton, ScreenHeader } from '../components/ui/ScreenHeader';
-import { SectionBlock } from '../components/ui/SectionBlock';
 import SkillsSheet from '../components/ui/SkillsSheet';
 import { TagEditorSheet } from '../components/ui/TagEditorSheet';
 import { useToast } from '../components/ui/Toast';
@@ -100,7 +98,6 @@ import {
   messageApi,
   type MessageSearchResult,
   pluginApi,
-  resourceApi,
   sessionApi,
   tagApi,
   topicApi,
@@ -114,14 +111,15 @@ import {
 import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
-import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
-import { navigateToLogin, navigateToNotebook } from '../lib/navigation';
+import { createComposerKeyboardSubscriptions, resolveComposerLift } from '../lib/keyboard';
+import { navigateToLogin } from '../lib/navigation';
 import {
   PERSONAL_NOTEBOOK_SESSION_STORAGE_KEY,
   shouldHidePersonalNotebookSession,
 } from '../lib/personalNotebookSession';
 import { useResolvedRemoteAsset } from '../lib/remoteAsset';
 import { getCanonicalResourceKind } from '../lib/resourceList';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import { loadSkillPickerSelection, saveSkillPickerSelection } from '../lib/skillPicker';
 import { recordUsage } from '../lib/streak';
 import { generateBestTitle } from '../lib/titleGeneration';
@@ -194,7 +192,6 @@ const trimSearchSnippet = (value: string, maxLength = 88) => {
   return `${normalized.slice(0, maxLength - 1)}…`;
 };
 
-const DIRECTORY_DRAWER_WIDTH = Math.min(Dimensions.get('window').width * 0.88, 390);
 /** Max `absoluteX` from screen left to allow edge-swipe open (avoid a full-height hit overlay). */
 const DIRECTORY_EDGE_OPEN_MAX_X = 28;
 /** Collapsed recents in directory drawer before "Show all". */
@@ -402,6 +399,16 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   const toast = useToast();
   const colors = useThemeColors();
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const hasPersistentDirectory = responsiveMetrics.isWideTablet;
+  const directoryPanelWidth = responsiveMetrics.chatDirectoryWidth;
+  const mainPanePad = hasPersistentDirectory ? 24 : 0;
+  const mainPaneGap = hasPersistentDirectory ? 24 : 0;
+  const availableHomeWidth = hasPersistentDirectory
+    ? Math.max(360, screenWidth - directoryPanelWidth - mainPaneGap - mainPanePad * 2)
+    : screenWidth;
+  const homeContentMaxWidth = Math.min(availableHomeWidth, responsiveMetrics.chatHomeMaxWidth);
 
   const {
     sessions,
@@ -500,8 +507,6 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   const [tagDraftColor, setTagDraftColor] = useState<string | null>(null);
   const [tagEditingTarget, setTagEditingTarget] = useState<TagItem | null>(null);
   const [expandedSessionIds, setExpandedSessionIds] = useState<Set<string>>(() => new Set());
-  const [recentFiles, setRecentFiles] = useState<FileListItem[]>([]);
-  const [recentPages, setRecentPages] = useState<FileListItem[]>([]);
   const [recentTopics, setRecentTopics] = useState<RecentTopic[]>([]);
   const [topicRenameTarget, setTopicRenameTarget] = useState<{
     sessionId: string;
@@ -524,11 +529,10 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   const hasBootstrappedRef = useRef(false);
   const inboxSessionPromiseRef = useRef<Promise<ChatSession | null> | null>(null);
   const lastHomeRefreshAtRef = useRef(0);
-  const lastRecentContentRefreshAtRef = useRef(0);
   const lastRecentTopicsRefreshAtRef = useRef(0);
   const hydratedTopicSessionIdsRef = useRef<Set<string>>(new Set());
   const [persistedSkillIdentifiers, setPersistedSkillIdentifiers] = useState<string[]>([]);
-  const drawerTranslateX = useSharedValue(-DIRECTORY_DRAWER_WIDTH);
+  const drawerTranslateX = useSharedValue(-directoryPanelWidth);
   const drawerBackdropOpacity = useSharedValue(0);
   const hints = useMemo(
     () => [t.chatAskAnything, t.chatHint1, t.chatHint2, t.chatHint3, t.chatHint4],
@@ -721,40 +725,13 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     }
   }, []);
 
-  const refreshRecentContent = useCallback(async (force = false) => {
-    const now = Date.now();
-    if (!force && now - lastRecentContentRefreshAtRef.current < 30_000) return;
-
-    lastRecentContentRefreshAtRef.current = now;
-
-    try {
-      const [files, pages] = await Promise.all([
-        resourceApi.getRecentFiles(6).catch(() => []),
-        resourceApi.getRecentPages(6).catch(() => []),
-      ]);
-      setRecentFiles(files ?? []);
-      setRecentPages(pages ?? []);
-    } catch {
-      setRecentFiles([]);
-      setRecentPages([]);
-    }
-  }, []);
-
   const refreshHomeData = useCallback(
-    async (options?: {
-      force?: boolean;
-      includeRecentContent?: boolean;
-      includeRecentTopics?: boolean;
-    }) => {
+    async (options?: { force?: boolean; includeRecentTopics?: boolean }) => {
       const force = options?.force ?? false;
-      const includeRecentContent = options?.includeRecentContent ?? false;
       const includeRecentTopics = options?.includeRecentTopics ?? false;
       const now = Date.now();
 
       if (!force && now - lastHomeRefreshAtRef.current < 45_000) {
-        if (includeRecentContent) {
-          void refreshRecentContent(false);
-        }
         if (includeRecentTopics) {
           void refreshRecentTopics(false);
         }
@@ -776,10 +753,6 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
       tasks.push(loadSkillPickerSelection().then(setPersistedSkillIdentifiers));
       tasks.push(loadGlobalMemorySettings());
 
-      if (includeRecentContent) {
-        tasks.push(refreshRecentContent(force));
-      }
-
       if (includeRecentTopics) {
         tasks.push(refreshRecentTopics(force));
       }
@@ -794,7 +767,6 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
       initialized,
       loadGlobalMemorySettings,
       loadSelection,
-      refreshRecentContent,
       refreshRecentTopics,
     ],
   );
@@ -803,14 +775,14 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     if (hasBootstrappedRef.current) return;
 
     hasBootstrappedRef.current = true;
-    void refreshHomeData({ force: true, includeRecentContent: true, includeRecentTopics: true });
+    void refreshHomeData({ force: true, includeRecentTopics: true });
     void recordUsage();
   }, [refreshHomeData]);
 
   // Re-read sessions (with AsyncStorage provider overlay) whenever the screen gains focus
   useFocusEffect(
     useCallback(() => {
-      void refreshHomeData({ includeRecentContent: true, includeRecentTopics: true });
+      void refreshHomeData({ includeRecentTopics: true });
     }, [refreshHomeData]),
   );
 
@@ -828,33 +800,14 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   }, [toolbarProviderLogo, selectedProvider]);
 
   useEffect(() => {
-    const handleKeyboardShow = (event: any) => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setKeyboardOffset(getKeyboardOffset(event, insets.bottom));
-    };
-
-    const handleKeyboardHide = () => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setKeyboardOffset(0);
-    };
-
-    const subscriptions =
-      Platform.OS === 'ios'
-        ? [
-            Keyboard.addListener('keyboardWillShow', handleKeyboardShow),
-            Keyboard.addListener('keyboardWillHide', handleKeyboardHide),
-            Keyboard.addListener('keyboardWillChangeFrame', (event) => {
-              if (getKeyboardOffset(event, insets.bottom) <= 0) {
-                handleKeyboardHide();
-              } else {
-                handleKeyboardShow(event);
-              }
-            }),
-          ]
-        : [
-            Keyboard.addListener('keyboardDidShow', handleKeyboardShow),
-            Keyboard.addListener('keyboardDidHide', handleKeyboardHide),
-          ];
+    const subscriptions = createComposerKeyboardSubscriptions({
+      bottomInset: insets.bottom,
+      onBeforeChange: () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      },
+      onKeyboardOffsetChange: setKeyboardOffset,
+      platform: Platform.OS,
+    });
 
     return () => {
       for (const subscription of subscriptions) {
@@ -864,6 +817,14 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   }, [insets.bottom]);
 
   useEffect(() => {
+    if (hasPersistentDirectory) {
+      drawerBackdropOpacity.value = 0;
+      drawerTranslateX.value = 0;
+      if (directoryMounted) setDirectoryMounted(false);
+      if (directoryVisible) setDirectoryVisible(false);
+      return;
+    }
+
     if (directoryVisible) {
       setDirectoryMounted(true);
       drawerTranslateX.value = withTiming(0, { duration: 260 });
@@ -874,16 +835,28 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     if (!directoryMounted) return;
 
     drawerBackdropOpacity.value = withTiming(0, { duration: 180 });
-    drawerTranslateX.value = withTiming(-DIRECTORY_DRAWER_WIDTH, { duration: 220 }, (finished) => {
+    drawerTranslateX.value = withTiming(-directoryPanelWidth, { duration: 220 }, (finished) => {
       if (finished) {
         runOnJS(setDirectoryMounted)(false);
       }
     });
-  }, [directoryMounted, directoryVisible, drawerBackdropOpacity, drawerTranslateX]);
+  }, [
+    directoryMounted,
+    directoryPanelWidth,
+    directoryVisible,
+    drawerBackdropOpacity,
+    drawerTranslateX,
+    hasPersistentDirectory,
+  ]);
 
   useEffect(() => {
-    if (!directoryVisible) setSidebarRecentsExpanded(false);
-  }, [directoryVisible]);
+    if (hasPersistentDirectory || directoryMounted) return;
+    drawerTranslateX.value = -directoryPanelWidth;
+  }, [directoryMounted, directoryPanelWidth, drawerTranslateX, hasPersistentDirectory]);
+
+  useEffect(() => {
+    if (!directoryVisible && !hasPersistentDirectory) setSidebarRecentsExpanded(false);
+  }, [directoryVisible, hasPersistentDirectory]);
 
   useEffect(() => {
     void refreshRecentTopics();
@@ -990,7 +963,7 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await refreshHomeData({ force: true, includeRecentContent: true, includeRecentTopics: true });
+      await refreshHomeData({ force: true, includeRecentTopics: true });
       haptics.success();
     } catch {
       toast.show('error', t.errorNetwork);
@@ -1096,6 +1069,9 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     if (!prompt && !hasAttachment) return;
 
     try {
+      const fileState = useFileStore.getState();
+      const pendingFiles = fileState.pendingFiles;
+      const chatContextSelections = fileState.chatContextSelections;
       const nextPlugins = [...enabledSkills];
       const sessionId = await createQuickChatSession({
         includeComposerConfig: true,
@@ -1134,8 +1110,10 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
       }));
 
       void sendMessage(sessionId, prompt, topicId ?? undefined, {
+        chatContextSelections,
         memoryEffort,
         memoryEnabled,
+        pendingFiles,
         plugins: nextPlugins.length > 0 ? nextPlugins : undefined,
         searchEnabled: webSearchEnabled,
       });
@@ -1296,53 +1274,6 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
       }
     },
     [addChatContextSelection, addFile, t.fileUploadFailed, toast],
-  );
-
-  const handleAddRecentResourceToChatContext = useCallback(
-    async (item: FileListItem) => {
-      if (!isChatContextEligibleResource(item)) return;
-
-      try {
-        const context = await createChatContextSelectionFromResource(item);
-        if (!context) {
-          toast.show('error', t.fileUploadFailed);
-          return;
-        }
-
-        addChatContextSelection(context);
-        haptics.success();
-        toast.show('success', t.fileAddToChatContextSuccess);
-      } catch {
-        toast.show('error', t.fileUploadFailed);
-      }
-    },
-    [addChatContextSelection, t.fileAddToChatContextSuccess, t.fileUploadFailed, toast],
-  );
-
-  const handleOpenRecentResource = useCallback(
-    (item: FileListItem) => {
-      const openKind = getCanonicalResourceKind(item);
-      haptics.light();
-
-      if (openKind === 'document') {
-        navigateToNotebook({ documentId: item.id });
-        return;
-      }
-
-      navigation.navigate('Resources', {
-        openItem: {
-          content: item.content ?? null,
-          fileType: item.fileType,
-          id: item.id,
-          name: item.name,
-          sourceType: openKind,
-          url: item.url,
-        },
-        openItemId: item.id,
-        openKind,
-      });
-    },
-    [navigation],
   );
 
   const handlePluginsPress = useCallback(() => {
@@ -2701,16 +2632,15 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     ],
     [t],
   );
-  const homeHeroMinHeight = Math.max(Dimensions.get('window').height * 0.36, 320);
+  const homeHeroMinHeight = Math.max(screenHeight * 0.36, 320);
   const animatedKeyboard = useAnimatedKeyboard();
   const composerLiftStyle = useAnimatedStyle(() => {
-    const lift =
-      Platform.OS === 'android'
-        ? Math.max(
-            0,
-            animatedKeyboard.height.value - insets.bottom - ANDROID_COMPOSER_LIFT_ADJUSTMENT,
-          )
-        : keyboardOffset;
+    const lift = resolveComposerLift({
+      animatedKeyboardHeight: animatedKeyboard.height.value,
+      bottomInset: insets.bottom,
+      keyboardOffset,
+      platform: Platform.OS,
+    });
 
     return {
       transform: [{ translateY: -lift }],
@@ -2721,6 +2651,7 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     keyboardOffset > 0 || Boolean(heroText.trim()) || composerAttachmentCount > 0;
   const actionSessionIsGroup = actionSession?.type === 'group';
   const actionSessionIsInbox = isInboxSession(actionSession);
+  const sidebarActive = hasPersistentDirectory || directoryVisible;
   const drawerBackdropStyle = useAnimatedStyle(() => ({
     opacity: drawerBackdropOpacity.value,
   }));
@@ -2730,7 +2661,7 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   const openDrawerGesture = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(!directoryMounted)
+        .enabled(!directoryMounted && !hasPersistentDirectory)
         .manualActivation(true)
         .onTouchesDown((e, stateManager) => {
           'worklet';
@@ -2751,83 +2682,306 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
             runOnJS(setDirectoryVisible)(true);
           }
         }),
-    [directoryMounted],
+    [directoryMounted, hasPersistentDirectory],
   );
 
-  const renderRecentResourceSection = useCallback(
-    (items: FileListItem[], title: string) => {
-      if (items.length === 0) return null;
+  const directoryPanelContent = (
+    <>
+      {!hasPersistentDirectory ? (
+        <View
+          accessible={false}
+          className="items-center pb-2 pt-0.5"
+          importantForAccessibility="no-hide-descendants"
+        >
+          <View
+            style={{
+              backgroundColor: withAlpha(colors.foreground, '16'),
+              borderRadius: 100,
+              height: 5,
+              width: 42,
+            }}
+          />
+        </View>
+      ) : null}
 
-      return (
-        <SectionBlock title={title}>
-          <View className="px-5" style={{ gap: 10 }}>
-            {items.map((item) => (
-              <View
-                className="flex-row items-center rounded-2xl px-3 py-3"
-                key={`${title}-${item.id}`}
-                style={{
-                  backgroundColor: colors.fillQuaternary,
-                  borderColor: colors.borderSubtle,
-                  borderWidth: 1,
-                }}
-              >
-                <TouchableOpacity
-                  activeOpacity={0.78}
-                  className="flex-1 flex-row items-center"
-                  onPress={() => handleOpenRecentResource(item)}
+      <View className="px-4 pb-2">
+        <View
+          className="px-3.5 py-3"
+          style={{
+            backgroundColor: colors.fillQuaternary,
+            borderColor: colors.borderSubtle,
+            borderRadius: 20,
+            borderWidth: 1,
+          }}
+        >
+          <View className="flex-row items-center justify-between">
+            <View className="min-w-0 flex-1 pr-2">
+              <View className="flex-row items-center">
+                <View
+                  className="h-10 w-10 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: withAlpha(colors.primary, '14') }}
                 >
-                  <View
-                    className="h-10 w-10 items-center justify-center rounded-2xl"
-                    style={{ backgroundColor: colors.surfaceElevated }}
+                  <MessageCircle
+                    color={colors.primary}
+                    size={18}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                </View>
+                <View className="ml-3 min-w-0 flex-1">
+                  <Text className="text-[18px] font-semibold tracking-tight text-foreground">
+                    {t.tabChats}
+                  </Text>
+                  <View className="mt-1.5 flex-row flex-wrap items-center" style={{ gap: 6 }}>
+                    <View
+                      className="rounded-full px-2.5 py-1"
+                      style={{
+                        backgroundColor: colors.surfaceElevated,
+                        borderColor: colors.borderSubtle,
+                        borderWidth: 1,
+                      }}
+                    >
+                      <Text
+                        className="text-[11px] font-semibold"
+                        numberOfLines={1}
+                        style={{ color: colors.secondaryText }}
+                      >
+                        {activeTagFilterLabel}
+                      </Text>
+                    </View>
+                    <Text
+                      className="text-[12px] font-medium"
+                      style={{ color: colors.tertiaryText }}
+                    >
+                      {t.activeTopics.replace('{count}', String(activeTagFilterCount))}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+            <View className="flex-row items-center" style={{ gap: 4 }}>
+              <HeaderIconButton
+                accessibilityLabel={t.chatListSearch}
+                active={searchEnabled}
+                onPress={handleToggleSearch}
+              >
+                <Search
+                  color={searchEnabled ? colors.primary : colors.secondaryText}
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </HeaderIconButton>
+              {!hasPersistentDirectory ? (
+                <HeaderIconButton
+                  accessibilityLabel={t.cancel}
+                  onPress={() => {
+                    haptics.light();
+                    setDirectoryVisible(false);
+                  }}
+                >
+                  <X color={colors.secondaryText} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                </HeaderIconButton>
+              ) : null}
+            </View>
+          </View>
+
+          <Text
+            className="mt-3 text-[12px] font-medium leading-[18px]"
+            numberOfLines={2}
+            style={{ color: colors.tertiaryText }}
+          >
+            {`${assistantCount} ${assistantSummaryLabel} · ${groupCount} ${t.chatListViewGroup} · ${t.activeTopics.replace('{count}', String(topicCount))}`}
+          </Text>
+
+          <View className="mt-3" style={{ gap: 10 }}>
+            {(
+              [
+                [
+                  {
+                    accessibilityLabel: t.chatListNewAssistant,
+                    icon: Bot,
+                    label: t.chatListNewAssistant,
+                    onPress: handleCreateAgent,
+                    primary: true,
+                  },
+                  {
+                    accessibilityLabel: t.chatListNewConversation,
+                    icon: MessageSquarePlus,
+                    label: t.chatListNewConversation,
+                    onPress: handleCreateChat,
+                    primary: false,
+                  },
+                ],
+                [
+                  {
+                    accessibilityLabel: t.chatListCreateGroup,
+                    icon: UsersRound,
+                    label: t.chatListCreateGroup,
+                    onPress: handleCreateGroup,
+                    primary: false,
+                  },
+                  {
+                    accessibilityLabel: t.tagCreate,
+                    icon: Tag,
+                    label: t.tagCreate,
+                    onPress: openCreateTagEditor,
+                    primary: false,
+                  },
+                ],
+              ] as const
+            ).map((row, rowIndex) => (
+              <View className="flex-row" key={`dir-row-${rowIndex}`} style={{ gap: 10 }}>
+                {row.map(({ accessibilityLabel, icon: Icon, label, onPress, primary }) => (
+                  <TouchableOpacity
+                    accessibilityLabel={accessibilityLabel}
+                    accessibilityRole="button"
+                    activeOpacity={0.82}
+                    className="flex-1 items-center justify-center rounded-2xl px-2 py-2.5"
+                    key={accessibilityLabel}
+                    style={{
+                      backgroundColor: primary ? colors.primarySubtle : colors.surfaceElevated,
+                      borderColor: primary ? colors.primaryBorder : colors.borderSubtle,
+                      borderWidth: 1,
+                      minHeight: 76,
+                    }}
+                    onPress={() => {
+                      haptics.light();
+                      void onPress();
+                    }}
                   >
-                    <FileText
-                      color={colors.primary}
+                    <Icon
+                      color={primary ? colors.primary : colors.foreground}
                       size={18}
                       strokeWidth={tokens.icon.strokeWidth}
                     />
-                  </View>
-                  <View className="ml-3 min-w-0 flex-1">
-                    <Text className="text-[14px] font-semibold text-foreground" numberOfLines={1}>
-                      {item.name}
-                    </Text>
                     <Text
-                      className="mt-1 text-[12px] font-medium"
-                      numberOfLines={1}
-                      style={{ color: colors.secondaryText }}
+                      className="mt-1.5 text-center text-[11px] font-semibold leading-[14px]"
+                      numberOfLines={2}
+                      style={{ color: primary ? colors.primary : colors.foreground }}
                     >
-                      {formatTimeAgo(item.updatedAt || item.createdAt, t)}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-                {isChatContextEligibleResource(item) ? (
-                  <TouchableOpacity
-                    activeOpacity={0.78}
-                    className="ml-3 rounded-full px-3 py-2"
-                    style={{ backgroundColor: colors.primarySubtle }}
-                    onPress={() => void handleAddRecentResourceToChatContext(item)}
-                  >
-                    <Text className="text-[11px] font-semibold" style={{ color: colors.primary }}>
-                      {t.fileAddToChatContext}
+                      {label}
                     </Text>
                   </TouchableOpacity>
-                ) : null}
+                ))}
               </View>
             ))}
           </View>
-        </SectionBlock>
-      );
-    },
-    [
-      colors.borderSubtle,
-      colors.fillQuaternary,
-      colors.primary,
-      colors.primarySubtle,
-      colors.secondaryText,
-      colors.surfaceElevated,
-      handleAddRecentResourceToChatContext,
-      handleOpenRecentResource,
-      t,
-    ],
+        </View>
+      </View>
+
+      {searchEnabled ? (
+        <Animated.View className="px-4 pb-2" entering={enteringSection()}>
+          <View
+            className="flex-row items-center rounded-2xl px-3.5 py-3"
+            style={{
+              backgroundColor: colors.fillQuaternary,
+              borderColor: colors.borderSubtle,
+              borderWidth: 1,
+            }}
+          >
+            <Search
+              color={colors.secondaryText}
+              size={tokens.icon.size.sm}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
+            <TextInput
+              className="ml-2.5 flex-1 text-[14px] text-foreground"
+              clearButtonMode="while-editing"
+              placeholder={t.chatListSearch}
+              placeholderTextColor={colors.secondaryText}
+              ref={searchInputRef}
+              returnKeyType="search"
+              value={searchText}
+              onChangeText={setSearchText}
+            />
+            <TouchableOpacity
+              accessibilityLabel={t.cancel}
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => {
+                haptics.light();
+                setSearchEnabled(false);
+                setSearchText('');
+              }}
+            >
+              <X
+                color={colors.secondaryText}
+                size={tokens.icon.size.sm}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      ) : null}
+
+      {searchQuery ? (
+        searching ? (
+          <View
+            className="flex-1 items-center justify-center px-6"
+            style={{
+              paddingBottom: bottomChrome.overlayListPaddingBottom,
+              paddingTop: 4,
+            }}
+          >
+            <ActivityIndicator color={colors.primary} size="small" />
+            <Text
+              className="mt-3 text-center text-[14px] font-medium"
+              style={{ color: colors.tertiaryText }}
+            >
+              {t.chatSearchSearching}
+            </Text>
+          </View>
+        ) : filteredSearchResults.length > 0 ? (
+          <FlatList
+            ListHeaderComponent={searchResultsListHeader}
+            className="flex-1"
+            data={filteredSearchResults}
+            keyExtractor={(item) => item.id}
+            keyboardDismissMode="on-drag"
+            keyboardShouldPersistTaps="handled"
+            renderItem={renderSearchResultFlatItem}
+            showsVerticalScrollIndicator={false}
+            windowSize={10}
+            contentContainerStyle={{
+              paddingBottom: bottomChrome.overlayListPaddingBottom,
+              paddingTop: 4,
+            }}
+          />
+        ) : (
+          <View
+            className="flex-1"
+            style={{
+              paddingBottom: bottomChrome.overlayListPaddingBottom,
+              paddingTop: 4,
+            }}
+          >
+            <EmptyState
+              compact
+              description={t.chatSidebarSearchEmptyDesc}
+              iconVariant="discover"
+              style={{ paddingHorizontal: 8, paddingVertical: 24 }}
+              title={t.chatSearchNoResults}
+            />
+          </View>
+        )
+      ) : (
+        <FlatList
+          ListEmptyComponent={renderSidebarDirectoryEmpty}
+          ListHeaderComponent={renderSidebarDirectoryHeader}
+          className="flex-1"
+          data={sidebarDirectoryItems}
+          keyExtractor={(item) => item.id}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          renderItem={renderSidebarDirectoryItem}
+          showsVerticalScrollIndicator={false}
+          windowSize={10}
+          contentContainerStyle={{
+            paddingBottom: bottomChrome.overlayListPaddingBottom,
+            paddingTop: 4,
+          }}
+        />
+      )}
+    </>
   );
 
   return (
@@ -2837,510 +2991,260 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
           headerLevel="root"
           title={t.tabChats}
           leftActions={
-            <HeaderIconButton
-              accessibilityLabel={t.accessibilityChatDirectory}
-              active={directoryVisible}
-              onPress={() => {
-                haptics.light();
-                setDirectoryVisible(true);
-              }}
-            >
-              <Menu
-                color={directoryVisible ? colors.primary : colors.foreground}
-                size={20}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
-            </HeaderIconButton>
+            hasPersistentDirectory ? undefined : (
+              <HeaderIconButton
+                accessibilityLabel={t.accessibilityChatDirectory}
+                active={sidebarActive}
+                onPress={() => {
+                  haptics.light();
+                  setDirectoryVisible(true);
+                }}
+              >
+                <Menu
+                  color={sidebarActive ? colors.primary : colors.foreground}
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </HeaderIconButton>
+            )
           }
         />
 
-        <View className="flex-1">
-          <ScrollView
-            className="flex-1"
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{
-              flexGrow: 1,
-              paddingBottom: bottomChrome.homeScrollPaddingBottom,
-              paddingTop: 18,
-            }}
-            refreshControl={
-              <RefreshControl
-                colors={[colors.primary]}
-                refreshing={refreshing}
-                tintColor={colors.primary}
-                onRefresh={onRefresh}
-              />
-            }
-          >
+        <View
+          className="flex-1"
+          style={
+            hasPersistentDirectory
+              ? {
+                  flexDirection: 'row',
+                  gap: mainPaneGap,
+                  paddingBottom: 12,
+                  paddingHorizontal: mainPanePad,
+                }
+              : undefined
+          }
+        >
+          {hasPersistentDirectory ? (
             <View
+              className="h-full overflow-hidden"
               style={{
-                minHeight: homeHeroMinHeight,
-                paddingTop: 10,
+                backgroundColor: colors.background,
+                borderColor: colors.borderSubtle,
+                borderRadius: 28,
+                borderWidth: StyleSheet.hairlineWidth,
+                shadowColor: colors.shadow,
+                shadowOffset: { height: 12, width: -4 },
+                shadowOpacity: 0.08,
+                shadowRadius: 20,
+                width: directoryPanelWidth,
               }}
             >
-              {sessionErrorMessage ? (
-                <Animated.View entering={enteringSection(180)}>
-                  <View className="px-5 pt-4">
-                    <View
-                      className="rounded-2xl px-4 py-4"
-                      style={{ backgroundColor: colors.fillTertiary }}
-                    >
-                      <Text className="text-[14px] font-semibold text-foreground">
-                        {sessionErrorMessage}
-                      </Text>
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        className="mt-3 rounded-full self-start px-4 py-2"
-                        style={{ backgroundColor: colors.primary }}
-                        onPress={() => void onRefresh()}
-                      >
-                        <Text className="text-[13px] font-semibold text-white">{t.errorRetry}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </Animated.View>
-              ) : (
-                <Animated.View entering={enteringEmptyState()}>
-                  <EmptyState
-                    compact
-                    description={t.chatEmptyDesc}
-                    iconVariant="chat"
-                    style={{ paddingBottom: 8, paddingHorizontal: 20, paddingTop: 24 }}
-                    title={t.chatEmptyWave}
-                    action={
-                      <Animated.View
-                        className="w-full items-center"
-                        entering={enteringSection(200)}
-                        style={{ alignSelf: 'center', maxWidth: 320 }}
-                      >
-                        <View className="mt-3 w-full flex-row flex-wrap justify-between gap-y-3">
-                          {homeSuggestions.map(({ icon: Icon, label }) => (
-                            <QuickActionChip
-                              className="w-[48.5%] justify-center px-4 py-3"
-                              key={label}
-                              label={label}
-                              icon={
-                                <Icon
-                                  color={colors.primary}
-                                  size={15}
-                                  strokeWidth={tokens.icon.strokeWidth}
-                                />
-                              }
-                              onPress={() => {
-                                haptics.light();
-                                setHeroText(label);
-                              }}
-                            />
-                          ))}
-                        </View>
-                      </Animated.View>
-                    }
-                  />
-                </Animated.View>
-              )}
+              {directoryPanelContent}
             </View>
-            {renderRecentResourceSection(recentPages, t.homeRecentDocs)}
-            {renderRecentResourceSection(recentFiles, t.homeRecentFiles)}
-          </ScrollView>
+          ) : null}
 
-          <Animated.View
-            style={[
-              {
-                paddingBottom: bottomChrome.composerPaddingBottom,
-                paddingHorizontal: 16,
-                paddingTop: 4,
-              },
-              composerLiftStyle,
-            ]}
-          >
-            <ChatComposerBody
-              textEditable
-              active={composerActive}
-              canSend={Boolean(heroText.trim()) || composerAttachmentCount > 0}
-              memoryEnabled={memoryEnabled}
-              modelDrawerVisible={modelDrawerVisible}
-              pendingFilesCount={composerAttachmentCount}
-              placeholder={hints[hintIndex]}
-              pluginsEnabled={enabledSkills.size > 0}
-              providerLogoError={providerLogoError}
-              searchEnabled={webSearchEnabled}
-              toolbarProviderLogo={toolbarProviderLogo}
-              value={heroText}
-              variant="home"
-              topSlot={
-                composerAttachmentCount > 0 ? (
-                  <View className="px-3 pt-2">
-                    <FilePreview />
-                  </View>
-                ) : undefined
-              }
-              onAttach={handleAttach}
-              onChangeText={setHeroText}
-              onMemoryPress={handleToggleMemory}
-              onModelPress={handleModelPress}
-              onPluginsPress={handlePluginsPress}
-              onProviderLogoError={() => setProviderLogoError(true)}
-              onSend={handleHeroSubmit}
-              onToggleSearch={handleToggleWebSearch}
-            />
-          </Animated.View>
-        </View>
-
-        <Modal
-          accessibilityViewIsModal
-          transparent
-          accessibilityLabel={t.tabChats}
-          animationType="none"
-          visible={directoryMounted}
-          onRequestClose={() => setDirectoryVisible(false)}
-        >
           <View className="flex-1">
-            <Animated.View
-              style={[
-                {
-                  backgroundColor: colors.modalOverlay,
-                  bottom: 0,
-                  left: 0,
-                  position: 'absolute',
-                  right: 0,
-                  top: 0,
-                },
-                drawerBackdropStyle,
-              ]}
-            >
-              <Pressable
-                accessibilityElementsHidden
-                className="flex-1"
-                importantForAccessibility="no-hide-descendants"
-                onPress={() => {
-                  haptics.light();
-                  setDirectoryVisible(false);
-                }}
-              />
-            </Animated.View>
-            <Animated.View
-              className="h-full overflow-hidden"
-              style={[
-                {
-                  backgroundColor: colors.background,
-                  borderBottomRightRadius: 28,
-                  borderColor: colors.borderSubtle,
-                  borderRightWidth: StyleSheet.hairlineWidth,
-                  borderTopRightRadius: 28,
-                  elevation: 24,
-                  paddingTop: insets.top + 6,
-                  shadowColor: colors.shadow,
-                  shadowOffset: { height: 12, width: -4 },
-                  shadowOpacity: 0.14,
-                  shadowRadius: 20,
-                  width: DIRECTORY_DRAWER_WIDTH,
-                },
-                drawerStyle,
-              ]}
+            <ScrollView
+              className="flex-1"
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{
+                flexGrow: 1,
+                paddingBottom: bottomChrome.homeScrollPaddingBottom,
+                paddingTop: 18,
+              }}
+              refreshControl={
+                <RefreshControl
+                  colors={[colors.primary]}
+                  refreshing={refreshing}
+                  tintColor={colors.primary}
+                  onRefresh={onRefresh}
+                />
+              }
             >
               <View
-                accessible={false}
-                className="items-center pb-2 pt-0.5"
-                importantForAccessibility="no-hide-descendants"
+                style={
+                  hasPersistentDirectory
+                    ? { alignSelf: 'center', maxWidth: homeContentMaxWidth, width: '100%' }
+                    : undefined
+                }
               >
                 <View
                   style={{
-                    backgroundColor: withAlpha(colors.foreground, '16'),
-                    borderRadius: 100,
-                    height: 5,
-                    width: 42,
-                  }}
-                />
-              </View>
-
-              <View className="px-4 pb-2">
-                <View
-                  className="px-3.5 py-3"
-                  style={{
-                    backgroundColor: colors.fillQuaternary,
-                    borderColor: colors.borderSubtle,
-                    borderRadius: 20,
-                    borderWidth: 1,
+                    minHeight: homeHeroMinHeight,
+                    paddingTop: 10,
                   }}
                 >
-                  <View className="flex-row items-center justify-between">
-                    <View className="min-w-0 flex-1 pr-2">
-                      <View className="flex-row items-center">
+                  {sessionErrorMessage ? (
+                    <Animated.View entering={enteringSection(180)}>
+                      <View className="px-5 pt-4">
                         <View
-                          className="h-10 w-10 items-center justify-center rounded-2xl"
-                          style={{ backgroundColor: withAlpha(colors.primary, '14') }}
+                          className="rounded-2xl px-4 py-4"
+                          style={{ backgroundColor: colors.fillTertiary }}
                         >
-                          <MessageCircle
-                            color={colors.primary}
-                            size={18}
-                            strokeWidth={tokens.icon.strokeWidth}
-                          />
-                        </View>
-                        <View className="ml-3 min-w-0 flex-1">
-                          <Text className="text-[18px] font-semibold tracking-tight text-foreground">
-                            {t.tabChats}
+                          <Text className="text-[14px] font-semibold text-foreground">
+                            {sessionErrorMessage}
                           </Text>
-                          <View
-                            className="mt-1.5 flex-row flex-wrap items-center"
-                            style={{ gap: 6 }}
-                          >
-                            <View
-                              className="rounded-full px-2.5 py-1"
-                              style={{
-                                backgroundColor: colors.surfaceElevated,
-                                borderColor: colors.borderSubtle,
-                                borderWidth: 1,
-                              }}
-                            >
-                              <Text
-                                className="text-[11px] font-semibold"
-                                numberOfLines={1}
-                                style={{ color: colors.secondaryText }}
-                              >
-                                {activeTagFilterLabel}
-                              </Text>
-                            </View>
-                            <Text
-                              className="text-[12px] font-medium"
-                              style={{ color: colors.tertiaryText }}
-                            >
-                              {t.activeTopics.replace('{count}', String(activeTagFilterCount))}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                    <View className="flex-row items-center" style={{ gap: 4 }}>
-                      <HeaderIconButton
-                        accessibilityLabel={t.chatListSearch}
-                        active={searchEnabled}
-                        onPress={handleToggleSearch}
-                      >
-                        <Search
-                          color={searchEnabled ? colors.primary : colors.secondaryText}
-                          size={20}
-                          strokeWidth={tokens.icon.strokeWidth}
-                        />
-                      </HeaderIconButton>
-                      <HeaderIconButton
-                        accessibilityLabel={t.cancel}
-                        onPress={() => {
-                          haptics.light();
-                          setDirectoryVisible(false);
-                        }}
-                      >
-                        <X
-                          color={colors.secondaryText}
-                          size={20}
-                          strokeWidth={tokens.icon.strokeWidth}
-                        />
-                      </HeaderIconButton>
-                    </View>
-                  </View>
-
-                  <Text
-                    className="mt-3 text-[12px] font-medium leading-[18px]"
-                    numberOfLines={2}
-                    style={{ color: colors.tertiaryText }}
-                  >
-                    {`${assistantCount} ${assistantSummaryLabel} · ${groupCount} ${t.chatListViewGroup} · ${t.activeTopics.replace('{count}', String(topicCount))}`}
-                  </Text>
-
-                  <View className="mt-3" style={{ gap: 10 }}>
-                    {(
-                      [
-                        [
-                          {
-                            accessibilityLabel: t.chatListNewAssistant,
-                            icon: Bot,
-                            label: t.chatListNewAssistant,
-                            onPress: handleCreateAgent,
-                            primary: true,
-                          },
-                          {
-                            accessibilityLabel: t.chatListNewConversation,
-                            icon: MessageSquarePlus,
-                            label: t.chatListNewConversation,
-                            onPress: handleCreateChat,
-                            primary: false,
-                          },
-                        ],
-                        [
-                          {
-                            accessibilityLabel: t.chatListCreateGroup,
-                            icon: UsersRound,
-                            label: t.chatListCreateGroup,
-                            onPress: handleCreateGroup,
-                            primary: false,
-                          },
-                          {
-                            accessibilityLabel: t.tagCreate,
-                            icon: Tag,
-                            label: t.tagCreate,
-                            onPress: openCreateTagEditor,
-                            primary: false,
-                          },
-                        ],
-                      ] as const
-                    ).map((row, rowIndex) => (
-                      <View className="flex-row" key={`dir-row-${rowIndex}`} style={{ gap: 10 }}>
-                        {row.map(({ accessibilityLabel, icon: Icon, label, onPress, primary }) => (
                           <TouchableOpacity
-                            accessibilityLabel={accessibilityLabel}
-                            accessibilityRole="button"
-                            activeOpacity={0.82}
-                            className="flex-1 items-center justify-center rounded-2xl px-2 py-2.5"
-                            key={accessibilityLabel}
-                            style={{
-                              backgroundColor: primary
-                                ? colors.primarySubtle
-                                : colors.surfaceElevated,
-                              borderColor: primary ? colors.primaryBorder : colors.borderSubtle,
-                              borderWidth: 1,
-                              minHeight: 76,
-                            }}
-                            onPress={() => {
-                              haptics.light();
-                              void onPress();
-                            }}
+                            activeOpacity={0.8}
+                            className="mt-3 rounded-full self-start px-4 py-2"
+                            style={{ backgroundColor: colors.primary }}
+                            onPress={() => void onRefresh()}
                           >
-                            <Icon
-                              color={primary ? colors.primary : colors.foreground}
-                              size={18}
-                              strokeWidth={tokens.icon.strokeWidth}
-                            />
-                            <Text
-                              className="mt-1.5 text-center text-[11px] font-semibold leading-[14px]"
-                              numberOfLines={2}
-                              style={{ color: primary ? colors.primary : colors.foreground }}
-                            >
-                              {label}
+                            <Text className="text-[13px] font-semibold text-white">
+                              {t.errorRetry}
                             </Text>
                           </TouchableOpacity>
-                        ))}
+                        </View>
                       </View>
-                    ))}
-                  </View>
+                    </Animated.View>
+                  ) : (
+                    <Animated.View entering={enteringEmptyState()}>
+                      <EmptyState
+                        compact
+                        description={t.chatEmptyDesc}
+                        iconVariant="chat"
+                        style={{ paddingBottom: 8, paddingHorizontal: 20, paddingTop: 24 }}
+                        title={t.chatEmptyWave}
+                        action={
+                          <Animated.View
+                            className="w-full items-center"
+                            entering={enteringSection(200)}
+                            style={{ alignSelf: 'center', maxWidth: 320 }}
+                          >
+                            <View className="mt-3 w-full flex-row flex-wrap justify-between gap-y-3">
+                              {homeSuggestions.map(({ icon: Icon, label }) => (
+                                <QuickActionChip
+                                  className="w-[48.5%] justify-center px-4 py-3"
+                                  key={label}
+                                  label={label}
+                                  icon={
+                                    <Icon
+                                      color={colors.primary}
+                                      size={15}
+                                      strokeWidth={tokens.icon.strokeWidth}
+                                    />
+                                  }
+                                  onPress={() => {
+                                    haptics.light();
+                                    setHeroText(label);
+                                  }}
+                                />
+                              ))}
+                            </View>
+                          </Animated.View>
+                        }
+                      />
+                    </Animated.View>
+                  )}
                 </View>
               </View>
+            </ScrollView>
 
-              {searchEnabled ? (
-                <Animated.View className="px-4 pb-2" entering={enteringSection()}>
-                  <View
-                    className="flex-row items-center rounded-2xl px-3.5 py-3"
-                    style={{
-                      backgroundColor: colors.fillQuaternary,
-                      borderColor: colors.borderSubtle,
-                      borderWidth: 1,
-                    }}
-                  >
-                    <Search
-                      color={colors.secondaryText}
-                      size={tokens.icon.size.sm}
-                      strokeWidth={tokens.icon.strokeWidth}
-                    />
-                    <TextInput
-                      className="ml-2.5 flex-1 text-[14px] text-foreground"
-                      clearButtonMode="while-editing"
-                      placeholder={t.chatListSearch}
-                      placeholderTextColor={colors.secondaryText}
-                      ref={searchInputRef}
-                      returnKeyType="search"
-                      value={searchText}
-                      onChangeText={setSearchText}
-                    />
-                    <TouchableOpacity
-                      accessibilityLabel={t.cancel}
-                      accessibilityRole="button"
-                      hitSlop={8}
-                      onPress={() => {
-                        haptics.light();
-                        setSearchEnabled(false);
-                        setSearchText('');
-                      }}
-                    >
-                      <X
-                        color={colors.secondaryText}
-                        size={tokens.icon.size.sm}
-                        strokeWidth={tokens.icon.strokeWidth}
-                      />
-                    </TouchableOpacity>
-                  </View>
-                </Animated.View>
-              ) : null}
-
-              {searchQuery ? (
-                searching ? (
-                  <View
-                    className="flex-1 items-center justify-center px-6"
-                    style={{
-                      paddingBottom: bottomChrome.overlayListPaddingBottom,
-                      paddingTop: 4,
-                    }}
-                  >
-                    <ActivityIndicator color={colors.primary} size="small" />
-                    <Text
-                      className="mt-3 text-center text-[14px] font-medium"
-                      style={{ color: colors.tertiaryText }}
-                    >
-                      {t.chatSearchSearching}
-                    </Text>
-                  </View>
-                ) : filteredSearchResults.length > 0 ? (
-                  <FlatList
-                    ListHeaderComponent={searchResultsListHeader}
-                    className="flex-1"
-                    data={filteredSearchResults}
-                    keyExtractor={(item) => item.id}
-                    keyboardDismissMode="on-drag"
-                    keyboardShouldPersistTaps="handled"
-                    renderItem={renderSearchResultFlatItem}
-                    showsVerticalScrollIndicator={false}
-                    windowSize={10}
-                    contentContainerStyle={{
-                      paddingBottom: bottomChrome.overlayListPaddingBottom,
-                      paddingTop: 4,
-                    }}
-                  />
-                ) : (
-                  <View
-                    className="flex-1"
-                    style={{
-                      paddingBottom: bottomChrome.overlayListPaddingBottom,
-                      paddingTop: 4,
-                    }}
-                  >
-                    <EmptyState
-                      compact
-                      description={t.chatSidebarSearchEmptyDesc}
-                      iconVariant="discover"
-                      style={{ paddingHorizontal: 8, paddingVertical: 24 }}
-                      title={t.chatSearchNoResults}
-                    />
-                  </View>
-                )
-              ) : (
-                <FlatList
-                  ListEmptyComponent={renderSidebarDirectoryEmpty}
-                  ListHeaderComponent={renderSidebarDirectoryHeader}
-                  className="flex-1"
-                  data={sidebarDirectoryItems}
-                  keyExtractor={(item) => item.id}
-                  keyboardDismissMode="on-drag"
-                  keyboardShouldPersistTaps="handled"
-                  renderItem={renderSidebarDirectoryItem}
-                  showsVerticalScrollIndicator={false}
-                  windowSize={10}
-                  contentContainerStyle={{
-                    paddingBottom: bottomChrome.overlayListPaddingBottom,
-                    paddingTop: 4,
-                  }}
-                />
-              )}
+            <Animated.View
+              style={[
+                {
+                  paddingBottom: bottomChrome.composerPaddingBottom,
+                  paddingHorizontal: 16,
+                  paddingTop: 4,
+                },
+                hasPersistentDirectory
+                  ? { alignSelf: 'center', maxWidth: homeContentMaxWidth + 32, width: '100%' }
+                  : null,
+                composerLiftStyle,
+              ]}
+            >
+              <ChatComposerBody
+                textEditable
+                active={composerActive}
+                canSend={Boolean(heroText.trim()) || composerAttachmentCount > 0}
+                memoryEnabled={memoryEnabled}
+                modelDrawerVisible={modelDrawerVisible}
+                pendingFilesCount={composerAttachmentCount}
+                placeholder={hints[hintIndex]}
+                pluginsEnabled={enabledSkills.size > 0}
+                providerLogoError={providerLogoError}
+                searchEnabled={webSearchEnabled}
+                toolbarProviderLogo={toolbarProviderLogo}
+                value={heroText}
+                variant="home"
+                topSlot={
+                  composerAttachmentCount > 0 ? (
+                    <View className="px-3 pt-2">
+                      <FilePreview />
+                    </View>
+                  ) : undefined
+                }
+                onAttach={handleAttach}
+                onChangeText={setHeroText}
+                onMemoryPress={handleToggleMemory}
+                onModelPress={handleModelPress}
+                onPluginsPress={handlePluginsPress}
+                onProviderLogoError={() => setProviderLogoError(true)}
+                onSend={handleHeroSubmit}
+                onToggleSearch={handleToggleWebSearch}
+              />
             </Animated.View>
           </View>
-        </Modal>
+        </View>
+
+        {!hasPersistentDirectory ? (
+          <Modal
+            accessibilityViewIsModal
+            transparent
+            accessibilityLabel={t.tabChats}
+            animationType="none"
+            visible={directoryMounted}
+            onRequestClose={() => setDirectoryVisible(false)}
+          >
+            <View className="flex-1">
+              <Animated.View
+                style={[
+                  {
+                    backgroundColor: colors.modalOverlay,
+                    bottom: 0,
+                    left: 0,
+                    position: 'absolute',
+                    right: 0,
+                    top: 0,
+                  },
+                  drawerBackdropStyle,
+                ]}
+              >
+                <Pressable
+                  accessibilityElementsHidden
+                  className="flex-1"
+                  importantForAccessibility="no-hide-descendants"
+                  onPress={() => {
+                    haptics.light();
+                    setDirectoryVisible(false);
+                  }}
+                />
+              </Animated.View>
+              <Animated.View
+                className="h-full overflow-hidden"
+                style={[
+                  {
+                    backgroundColor: colors.background,
+                    borderBottomRightRadius: 28,
+                    borderColor: colors.borderSubtle,
+                    borderRightWidth: StyleSheet.hairlineWidth,
+                    borderTopRightRadius: 28,
+                    elevation: 24,
+                    paddingTop: insets.top + 6,
+                    shadowColor: colors.shadow,
+                    shadowOffset: { height: 12, width: -4 },
+                    shadowOpacity: 0.14,
+                    shadowRadius: 20,
+                    width: directoryPanelWidth,
+                  },
+                  drawerStyle,
+                ]}
+              >
+                {directoryPanelContent}
+              </Animated.View>
+            </View>
+          </Modal>
+        ) : null}
 
         <AgentSelectionSheet
           allowEmptySelection

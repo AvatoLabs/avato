@@ -14,17 +14,23 @@ interface AgentSectionProps {
     description?: string;
     title?: string;
   } | null;
+  contentWidth?: number;
   delay?: number;
   onPress: () => void;
 }
 
-export function AgentSection({ agentSummary, delay = 100, onPress }: AgentSectionProps) {
+export function AgentSection({
+  agentSummary,
+  contentWidth,
+  delay = 100,
+  onPress,
+}: AgentSectionProps) {
   const { t } = useI18n();
   const colors = useThemeColors();
 
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
-      <View className="mx-5 mb-5">
+      <View className="mb-5 self-center" style={contentWidth ? { width: contentWidth } : undefined}>
         <Text className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
           {t.agentConfigTitle}
         </Text>
@@ -47,7 +53,9 @@ export function AgentSection({ agentSummary, delay = 100, onPress }: AgentSectio
             style={{ backgroundColor: colors.primarySubtle }}
             onPress={onPress}
           >
-            <Text className="text-[13px] font-semibold" style={{ color: colors.primary }}>{t.agentConfigTitle}</Text>
+            <Text className="text-[13px] font-semibold" style={{ color: colors.primary }}>
+              {t.agentConfigTitle}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>

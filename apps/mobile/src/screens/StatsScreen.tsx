@@ -41,6 +41,7 @@ import { getProviderIconUrl } from '../constants/cdn';
 import { INBOX_SESSION_ID } from '../constants/session';
 import { statsApi } from '../lib/api';
 import { useI18n } from '../lib/i18n';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import type { RootStackParamList } from '../navigation/types';
 import { useThemeStore } from '../store/theme';
 import { useThemeColors } from '../theme/colors';
@@ -165,12 +166,18 @@ function StatCard({
   );
 }
 
-function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }) {
+function MiniHeatmap({
+  data,
+  loading,
+  availableWidth,
+}: {
+  availableWidth: number;
+  data: HeatmapDay[];
+  loading: boolean;
+}) {
   const { t } = useI18n();
   const colors = useThemeColors();
-  const { width: screenWidth } = useWindowDimensions();
-  const SECTION_PX = 20;
-  const containerWidth = screenWidth - SECTION_PX * 2;
+  const containerWidth = Math.min(Math.max(availableWidth, 0), 420);
   const heatmapColors = [
     colors.fillTertiary,
     colors.primarySubtle,
@@ -443,6 +450,9 @@ type StatsScreenNavigation = NativeStackNavigationProp<RootStackParamList, 'Stat
 export default function StatsScreen({ navigation }: { navigation: StatsScreenNavigation }) {
   const { t } = useI18n();
   const colors = useThemeColors();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const contentWidth = Math.min(Math.max(screenWidth - 40, 0), responsiveMetrics.settingsMaxWidth);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -573,16 +583,16 @@ export default function StatsScreen({ navigation }: { navigation: StatsScreenNav
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        title={t.statsTitle}
         leftElement={
           <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
         }
-        title={t.statsTitle}
         onPressLeft={() => navigation.goBack()}
       />
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 40, paddingTop: 8 }}
+        contentContainerStyle={{ alignItems: 'center', paddingBottom: 40, paddingTop: 8 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -596,8 +606,8 @@ export default function StatsScreen({ navigation }: { navigation: StatsScreenNav
         {loadError && (
           <TouchableOpacity
             activeOpacity={0.85}
-            className="mx-4 mb-3 px-3 py-2.5 rounded-xl flex-row items-center justify-between"
-            style={{ backgroundColor: colors.primarySubtle }}
+            className="mb-3 px-3 py-2.5 rounded-xl flex-row items-center justify-between"
+            style={{ backgroundColor: colors.primarySubtle, width: contentWidth }}
             onPress={() => void handleRetry()}
           >
             <Text
@@ -614,9 +624,12 @@ export default function StatsScreen({ navigation }: { navigation: StatsScreenNav
 
         {/* Welcome Banner — show whenever load succeeded (full or partial) */}
         {!loading && !loadError && (
-          <Animated.View entering={FadeInDown.delay(30).duration(300)}>
+          <Animated.View
+            entering={FadeInDown.delay(30).duration(300)}
+            style={{ width: contentWidth }}
+          >
             <View
-              className="mx-5 mb-5 p-4 rounded-2xl"
+              className="mb-5 rounded-2xl p-4"
               style={{ backgroundColor: colors.primarySubtle }}
             >
               <Text className="text-foreground text-[16px] font-semibold leading-6">
@@ -657,8 +670,11 @@ export default function StatsScreen({ navigation }: { navigation: StatsScreenNav
         )}
 
         {/* Overview Cards — order matches web: Assistants, Topics, Messages, Words */}
-        <Animated.View entering={FadeInDown.delay(60).duration(300)}>
-          <View className="px-4 mb-5">
+        <Animated.View
+          entering={FadeInDown.delay(60).duration(300)}
+          style={{ width: contentWidth }}
+        >
+          <View className="mb-5">
             <View className="flex-row">
               <StatCard
                 iconKey="sessions"
@@ -701,26 +717,34 @@ export default function StatsScreen({ navigation }: { navigation: StatsScreenNav
         </Animated.View>
 
         {/* Activity Heatmap */}
-        <Animated.View entering={FadeInDown.delay(90).duration(300)}>
-          <View className="px-5 mb-6">
-            <MiniHeatmap data={data.heatmap} loading={loading} />
+        <Animated.View
+          entering={FadeInDown.delay(90).duration(300)}
+          style={{ width: contentWidth }}
+        >
+          <View className="mb-6">
+            <MiniHeatmap availableWidth={contentWidth} data={data.heatmap} loading={loading} />
           </View>
         </Animated.View>
 
         {/* Rankings */}
-        <Animated.View entering={FadeInDown.delay(120).duration(300)}>
-          <View className="px-5">
+        <Animated.View
+          entering={FadeInDown.delay(120).duration(300)}
+          style={{ width: contentWidth }}
+        >
+          <View>
             <RankSection
               data={modelRankSectionData}
-              icon={
-                <Trophy color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
-              }
               loading={loading}
               modelLogos={modelRankLogos}
               title={t.statsModelsRank}
+              icon={
+                <Trophy color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
+              }
             />
             <RankSection
               data={sessionRankSectionData}
+              loading={loading}
+              title={t.statsAssistantsRank}
               icon={
                 <MessageSquare
                   color={colors.primary}
@@ -728,16 +752,14 @@ export default function StatsScreen({ navigation }: { navigation: StatsScreenNav
                   strokeWidth={tokens.icon.strokeWidth}
                 />
               }
-              loading={loading}
-              title={t.statsAssistantsRank}
             />
             <RankSection
               data={topicRankSectionData}
+              loading={loading}
+              title={t.statsTopicsRank}
               icon={
                 <BookOpen color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
               }
-              loading={loading}
-              title={t.statsTopicsRank}
               onRowPress={handleTopicRankPress}
             />
           </View>

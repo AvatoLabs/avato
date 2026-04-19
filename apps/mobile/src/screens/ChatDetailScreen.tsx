@@ -3,8 +3,6 @@
  */
 import { useFocusEffect } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
-import * as DocumentPicker from 'expo-document-picker';
-import * as ImagePicker from 'expo-image-picker';
 import { ArrowDown } from 'lucide-react-native';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -46,34 +44,17 @@ import PressableScale from '../components/ui/PressableScale';
 import ResourcePickerSheet from '../components/ui/ResourcePickerSheet';
 import SkillsSheet from '../components/ui/SkillsSheet';
 import { useToast } from '../components/ui/Toast';
-import { getProviderIconUrl } from '../constants/cdn';
-import type { MobileRecommendedBuiltinIcon } from '../constants/recommendedBuiltins';
-import { MOBILE_RECOMMENDED_BUILTIN_SKILLS } from '../constants/recommendedBuiltins';
 import { withAlpha } from '../constants/tags';
-import {
-  agentApi,
-  agentGroupApi,
-  type AgentGroupDetail,
-  agentSkillApi,
-  getApiUrl,
-  messageApi,
-  pluginApi,
-  sessionApi,
-  topicApi,
-  userApi,
-} from '../lib/api';
+import { useChatDetailAttachments } from '../hooks/useChatDetailAttachments';
+import { useChatDetailComposerControls } from '../hooks/useChatDetailComposerControls';
+import { useChatDetailSkills } from '../hooks/useChatDetailSkills';
+import { agentGroupApi, type AgentGroupDetail, messageApi, topicApi } from '../lib/api';
 import { stackScreenComposerPaddingBottom } from '../lib/bottomChrome';
-import {
-  createChatContextSelectionFromResource,
-  isChatContextEligibleResource,
-} from '../lib/chatContext';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
-import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
+import { createComposerKeyboardSubscriptions, resolveComposerLift } from '../lib/keyboard';
 import { appendCurrentPortalStack } from '../lib/portalNavigation';
-import { getCanonicalResourceKind } from '../lib/resourceList';
 import { isGroupSessionLike } from '../lib/session';
-import { loadSkillPickerSelection, saveSkillPickerSelection } from '../lib/skillPicker';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useChatStore } from '../store/chat';
 import { useFileStore } from '../store/file';
@@ -82,19 +63,11 @@ import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
 import { useThemeStore } from '../store/theme';
 import { EMPTY_TOPICS, useTopicStore } from '../store/topic';
-import { getUserMemorySettings } from '../store/user';
 import { useThemeColors } from '../theme/colors';
-import type {
-  AgentSkillItem,
-  ChatContextSelection,
-  ChatMessage,
-  ConversationFileItem,
-  FileListItem,
-  InstalledPlugin,
-  MobileMemoryEffort,
-} from '../types';
+import type { ChatContextSelection, ChatMessage, FileAttachment } from '../types';
 
 const EMPTY_CHAT_CONTEXT_SELECTIONS: ChatContextSelection[] = [];
+const EMPTY_PENDING_FILES: FileAttachment[] = [];
 const EMPTY_MESSAGES: ChatMessage[] = [];
 const MESSAGE_ESTIMATE_SAMPLE_SIZE = 12;
 const AUTO_SCROLL_LOCK_OFFSET = 24;
@@ -210,23 +183,13 @@ export default function ChatDetailScreen({
       chatContextSelectionCount: sessionId
         ? (s.sessionChatContextSelections[sessionId]?.length ?? 0)
         : 0,
-      pendingFilesCount: s.pendingFiles.length,
+      pendingFilesCount: sessionId ? (s.sessionPendingFiles[sessionId]?.length ?? 0) : 0,
     })),
   );
   const addFile = useFileStore((s) => s.addFile);
   const addSessionChatContextSelection = useFileStore((s) => s.addSessionChatContextSelection);
 
   const [inputText, setInputText] = useState('');
-  const [searchEnabled, setSearchEnabled] = useState(false);
-  const [memoryEnabled, setMemoryEnabled] = useState(true);
-  const [memoryEffort, setMemoryEffort] = useState<MobileMemoryEffort>('medium');
-  const [globalMemoryEnabled, setGlobalMemoryEnabled] = useState(true);
-  const [globalMemoryEffort, setGlobalMemoryEffort] = useState<MobileMemoryEffort>('medium');
-  const [memorySheetVisible, setMemorySheetVisible] = useState(false);
-  const [modelDrawerVisible, setModelDrawerVisible] = useState(false);
-  const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
-  const [resourcePickerVisible, setResourcePickerVisible] = useState(false);
-  const [providerLogoError, setProviderLogoError] = useState(false);
   const listRef = useRef<FlashList<ChatMessage>>(null);
   const isScrolledToBottom = useRef(true);
   const autoScrollLocked = useRef(false);
@@ -242,20 +205,8 @@ export default function ChatDetailScreen({
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const animatedKeyboard = useAnimatedKeyboard();
-
-  // Skills drawer
-  const [skillsSheetVisible, setSkillsSheetVisible] = useState(false);
-  const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
-  const [builtinSkillItems, setBuiltinSkillItems] = useState<
-    { description: string; icon: MobileRecommendedBuiltinIcon; identifier: string; title: string }[]
-  >([]);
-  const [agentSkillItems, setAgentSkillItems] = useState<AgentSkillItem[]>([]);
-  const [loadingSkills, setLoadingSkills] = useState(false);
   const [listRefreshing, setListRefreshing] = useState(false);
-  const [enabledPlugins, setEnabledPlugins] = useState<Set<string>>(() => new Set());
-  const [agentId, setAgentId] = useState<string | null>(null);
   const [groupDetail, setGroupDetail] = useState<AgentGroupDetail | null>(null);
-  const [conversationFiles, setConversationFiles] = useState<ConversationFileItem[]>([]);
 
   const sessionModel = useModelStore((s) => s.selectedModel);
   const sessionProvider = useModelStore((s) => s.selectedProvider);
@@ -271,31 +222,78 @@ export default function ChatDetailScreen({
     return true;
   }, [sessionModel, modelProviders]);
 
+  const sessionSearchMode = session?.chatConfig?.searchMode;
+  const sessionMemoryEnabled = session?.chatConfig?.memory?.enabled;
+  const sessionMemoryEffort = session?.chatConfig?.memory?.effort;
+
   useEffect(() => {
     if (!sessionId) return;
     fetchModels();
     loadSelection(sessionId);
   }, [fetchModels, loadSelection, sessionId]);
 
+  const {
+    agentSkillItems,
+    builtinSkillItems,
+    closeSkillsSheet,
+    enabledPlugins,
+    installedPlugins,
+    loadingSkills,
+    openSkillsSheet,
+    skillsSheetVisible,
+    togglePlugin,
+  } = useChatDetailSkills({
+    isGroupSession,
+    sessionId,
+  });
+
+  const {
+    attachmentSheetVisible,
+    closeAttachmentSheet,
+    closeResourcePicker,
+    conversationFiles,
+    handleRemoveConversationFile,
+    handleWorkspaceSelect,
+    openAttachmentSheet,
+    openResourcePicker,
+    pickDocument,
+    pickImage,
+    resourcePickerVisible,
+  } = useChatDetailAttachments({
+    sessionId,
+  });
+
+  const {
+    clearProviderLogoError,
+    closeMemorySheet,
+    closeModelDrawer,
+    handleToggleSearch,
+    markProviderLogoError,
+    memoryEffort,
+    memoryEnabled,
+    memorySheetVisible,
+    modelDrawerVisible,
+    openMemorySheet,
+    openModelDrawer,
+    providerLogoError,
+    searchEnabled,
+    toolbarProviderLogo,
+    updateMemoryConfig,
+  } = useChatDetailComposerControls({
+    effectiveTheme,
+    isGroupSession,
+    modelProviders,
+    sessionId,
+    sessionMemoryEffort,
+    sessionMemoryEnabled,
+    sessionProvider,
+    sessionSearchMode,
+  });
+
   useEffect(() => {
     hasObservedTopicChange.current = false;
     prevGenForMessageSyncRef.current = null;
     prevTopicForMessageSyncRef.current = undefined;
-    setConversationFiles([]);
-  }, [sessionId]);
-
-  const loadConversationFiles = useCallback(async () => {
-    if (!sessionId) {
-      setConversationFiles([]);
-      return;
-    }
-
-    try {
-      const nextFiles = await sessionApi.getConversationFiles({ sessionId });
-      setConversationFiles((nextFiles ?? []).filter((item) => item.enabled));
-    } catch {
-      setConversationFiles([]);
-    }
   }, [sessionId]);
 
   useEffect(() => {
@@ -379,12 +377,6 @@ export default function ChatDetailScreen({
     }, [loadGroupDetail]),
   );
 
-  useFocusEffect(
-    useCallback(() => {
-      void loadConversationFiles();
-    }, [loadConversationFiles]),
-  );
-
   // Refresh messages/topics only when the screen actually gains focus (align with Web revalidateOnFocus).
   // Read chat/topic state via getState() so we do NOT re-run this when generating/activeTopic/etc. change while focused —
   // that was causing repeated full refetches during tool rounds and stream end.
@@ -417,30 +409,14 @@ export default function ChatDetailScreen({
     }, [stopActiveGroupOperation]),
   );
 
-  useEffect(() => {
-    let disposed = false;
-
-    getUserMemorySettings().then((settings) => {
-      if (disposed) return;
-
-      setGlobalMemoryEnabled(settings.enabled);
-      setGlobalMemoryEffort(settings.effort);
-    });
-
-    return () => {
-      disposed = true;
-    };
-  }, []);
-
   const inputPaddingBottom = stackScreenComposerPaddingBottom(insets.bottom);
   const composerLiftStyle = useAnimatedStyle(() => {
-    const lift =
-      Platform.OS === 'android'
-        ? Math.max(
-            0,
-            animatedKeyboard.height.value - insets.bottom - ANDROID_COMPOSER_LIFT_ADJUSTMENT,
-          )
-        : keyboardOffset;
+    const lift = resolveComposerLift({
+      animatedKeyboardHeight: animatedKeyboard.height.value,
+      bottomInset: insets.bottom,
+      keyboardOffset,
+      platform: Platform.OS,
+    });
 
     return {
       transform: [{ translateY: -lift }],
@@ -448,30 +424,11 @@ export default function ChatDetailScreen({
   }, [insets.bottom, keyboardOffset]);
 
   useEffect(() => {
-    const handleKeyboardShow = (event: any) => {
-      setKeyboardOffset(getKeyboardOffset(event, insets.bottom));
-    };
-    const handleKeyboardHide = () => {
-      setKeyboardOffset(0);
-    };
-
-    const subscriptions =
-      Platform.OS === 'ios'
-        ? [
-            Keyboard.addListener('keyboardWillShow', handleKeyboardShow),
-            Keyboard.addListener('keyboardWillHide', handleKeyboardHide),
-            Keyboard.addListener('keyboardWillChangeFrame', (event) => {
-              if (getKeyboardOffset(event, insets.bottom) <= 0) {
-                handleKeyboardHide();
-              } else {
-                handleKeyboardShow(event);
-              }
-            }),
-          ]
-        : [
-            Keyboard.addListener('keyboardDidShow', handleKeyboardShow),
-            Keyboard.addListener('keyboardDidHide', handleKeyboardHide),
-          ];
+    const subscriptions = createComposerKeyboardSubscriptions({
+      bottomInset: insets.bottom,
+      onKeyboardOffsetChange: setKeyboardOffset,
+      platform: Platform.OS,
+    });
 
     return () => {
       for (const subscription of subscriptions) {
@@ -604,155 +561,6 @@ export default function ChatDetailScreen({
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
 
-  useEffect(() => {
-    if (!sessionId || isGroupSession) {
-      setAgentId(null);
-      setEnabledPlugins(new Set());
-      return;
-    }
-    Promise.all([
-      agentApi.getConfigBySession(sessionId).catch(() => null),
-      loadSkillPickerSelection(),
-    ])
-      .then(([config, persistedSelection]) => {
-        if (config) {
-          setAgentId(config.id);
-          setEnabledPlugins(
-            new Set(Array.isArray(config.plugins) ? config.plugins : persistedSelection),
-          );
-        } else {
-          setAgentId(null);
-          setEnabledPlugins(new Set(persistedSelection));
-          console.warn('[ChatDetail] no agent config for session:', sessionId);
-        }
-      })
-      .catch((err) => {
-        console.error('[ChatDetail] failed to load agent config:', err);
-      });
-  }, [isGroupSession, sessionId]);
-
-  const sessionSearchMode = session?.chatConfig?.searchMode;
-  const sessionMemoryEnabled = session?.chatConfig?.memory?.enabled;
-  const sessionMemoryEffort = session?.chatConfig?.memory?.effort;
-
-  useEffect(() => {
-    setSearchEnabled(sessionSearchMode ? sessionSearchMode !== 'off' : false);
-    setMemoryEnabled(sessionMemoryEnabled ?? globalMemoryEnabled);
-    setMemoryEffort(sessionMemoryEffort || globalMemoryEffort);
-  }, [
-    globalMemoryEffort,
-    globalMemoryEnabled,
-    sessionMemoryEffort,
-    sessionMemoryEnabled,
-    sessionSearchMode,
-  ]);
-
-  const handlePluginsPress = useCallback(() => {
-    if (isGroupSession) return;
-    haptics.light();
-    setSkillsSheetVisible(true);
-    // Pre-load builtins immediately so they appear without waiting for API
-    const preloadBuiltins = MOBILE_RECOMMENDED_BUILTIN_SKILLS.map((b) => ({
-      description: (t as any)[b.descriptionKey] ?? '',
-      icon: b.icon,
-      identifier: b.identifier,
-      title: (t as any)[b.titleKey] ?? b.identifier,
-    }));
-    setBuiltinSkillItems(preloadBuiltins);
-    setLoadingSkills(true);
-
-    const loadSkills = async (attempt = 0) => {
-      const maxAttempts = 2;
-      try {
-        const [plugins, skills, userState] = await Promise.all([
-          pluginApi.list().catch((e) => {
-            if (attempt === 0) console.warn('[ChatDetailScreen] pluginApi.list failed:', e);
-            return [];
-          }),
-          agentSkillApi.list().catch((e) => {
-            if (attempt === 0) console.warn('[ChatDetailScreen] agentSkillApi.list failed:', e);
-            return [];
-          }),
-          userApi.getState().catch(() => null),
-        ]);
-        const uninstalled = userState?.settings?.tool?.uninstalledBuiltinTools ?? [];
-        const builtins = MOBILE_RECOMMENDED_BUILTIN_SKILLS.filter(
-          (b) => !uninstalled.includes(b.identifier),
-        ).map((b) => ({
-          description: (t as any)[b.descriptionKey] ?? '',
-          icon: b.icon,
-          identifier: b.identifier,
-          title: (t as any)[b.titleKey] ?? b.identifier,
-        }));
-        setBuiltinSkillItems(builtins);
-
-        const builtinIds = new Set(builtins.map((b) => b.identifier));
-        const filteredSkills = (skills ?? []).filter((s) => {
-          const id = s.identifier ?? s.id;
-          return id && !builtinIds.has(id);
-        });
-        setAgentSkillItems(filteredSkills);
-
-        const skillIds = new Set(filteredSkills.map((s) => s.identifier).filter(Boolean));
-        const filteredPlugins = (plugins ?? []).filter(
-          (p) => !builtinIds.has(p.identifier) && !skillIds.has(p.identifier),
-        );
-        setInstalledPlugins(filteredPlugins);
-      } catch (e) {
-        console.warn('[ChatDetailScreen] loadSkills failed:', e);
-        if (attempt < maxAttempts) {
-          await new Promise((r) => setTimeout(r, 400));
-          return loadSkills(attempt + 1);
-        }
-      }
-    };
-    void loadSkills().finally(() => setLoadingSkills(false));
-  }, [isGroupSession, t]);
-
-  const handleTogglePlugin = useCallback(
-    (identifier: string) => {
-      if (!sessionId) return;
-      haptics.light();
-      setEnabledPlugins((prev) => {
-        const next = new Set(prev);
-        if (next.has(identifier)) {
-          next.delete(identifier);
-        } else {
-          next.add(identifier);
-        }
-        const pluginArr = [...next];
-        void saveSkillPickerSelection(pluginArr);
-        if (agentId) {
-          agentApi.updateConfig(agentId, { plugins: pluginArr }).catch(console.error);
-        } else {
-          agentApi
-            .getConfigBySession(sessionId)
-            .then((config) => {
-              if (config?.id) {
-                setAgentId(config.id);
-                agentApi.updateConfig(config.id, { plugins: pluginArr }).catch(console.error);
-              } else {
-                sessionApi
-                  .updateSessionConfig(sessionId, { plugins: pluginArr })
-                  .catch(console.error);
-              }
-            })
-            .catch(console.error);
-        }
-        return next;
-      });
-    },
-    [agentId, sessionId],
-  );
-
-  const selectedProviderLogo = useMemo(
-    () => modelProviders.find((provider) => provider.id === sessionProvider)?.logo,
-    [modelProviders, sessionProvider],
-  );
-  const toolbarProviderLogo =
-    selectedProviderLogo ||
-    (sessionProvider ? getProviderIconUrl(sessionProvider, effectiveTheme) : undefined);
-
   const groupMembersById = useMemo<Record<string, GroupMessageSpeaker> | undefined>(() => {
     if (!groupDetail?.agents?.length) return undefined;
 
@@ -793,10 +601,6 @@ export default function ChatDetailScreen({
     isGroupSession && groupOpeningQuestions.length > 0
       ? groupOpeningQuestions
       : [t.chatSuggest1, t.chatSuggest2, t.chatSuggest3, t.chatSuggest4];
-
-  useEffect(() => {
-    setProviderLogoError(false);
-  }, [toolbarProviderLogo, sessionProvider]);
 
   useEffect(() => {
     rawMessagesRef.current = rawMessages;
@@ -852,6 +656,8 @@ export default function ChatDetailScreen({
     const chatContextSelections =
       useFileStore.getState().sessionChatContextSelections[sessionId] ??
       EMPTY_CHAT_CONTEXT_SELECTIONS;
+    const pendingFiles =
+      useFileStore.getState().sessionPendingFiles[sessionId] ?? EMPTY_PENDING_FILES;
 
     haptics.light();
     autoScrollLocked.current = false;
@@ -865,6 +671,8 @@ export default function ChatDetailScreen({
       chatContextSelections,
       memoryEffort,
       memoryEnabled,
+      pendingFileSessionId: sessionId,
+      pendingFiles,
       preserveChatContextSelections: true,
       plugins: enabledPlugins.size > 0 ? [...enabledPlugins] : undefined,
       searchEnabled,
@@ -885,203 +693,6 @@ export default function ChatDetailScreen({
     searchEnabled,
     sendScale,
   ]);
-
-  const pickImage = useCallback(
-    async (source: 'camera' | 'gallery') => {
-      try {
-        if (source === 'camera') {
-          const { status } = await ImagePicker.requestCameraPermissionsAsync();
-          if (status !== 'granted') return;
-        } else {
-          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (status !== 'granted') return;
-        }
-
-        const result =
-          source === 'camera'
-            ? await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.8 })
-            : await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: 'images',
-                quality: 0.8,
-                allowsMultipleSelection: true,
-              });
-
-        if (!result.canceled) {
-          for (const asset of result.assets) {
-            addFile({
-              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-              name: asset.fileName || 'image.jpg',
-              type: asset.mimeType || 'image/jpeg',
-              size: asset.fileSize || 0,
-              uri: asset.uri,
-            });
-          }
-        }
-      } catch (err) {
-        if (err && typeof err === 'object' && 'code' in err && err.code === 'ERR_CANCELED') return;
-        toast.show('error', t.fileUploadError);
-      }
-    },
-    [addFile, t, toast],
-  );
-
-  const pickDocument = useCallback(async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        multiple: true,
-        copyToCacheDirectory: true,
-      });
-      if (!result.canceled) {
-        for (const asset of result.assets) {
-          addFile({
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            name: asset.name,
-            type: asset.mimeType || 'application/octet-stream',
-            size: asset.size || 0,
-            uri: asset.uri,
-          });
-        }
-      }
-    } catch (err) {
-      if (err && typeof err === 'object' && 'code' in err && err.code === 'ERR_CANCELED') return;
-      toast.show('error', t.fileUploadError);
-    }
-  }, [addFile, t, toast]);
-
-  const handleAttach = useCallback(() => {
-    haptics.selection();
-    setAttachmentSheetVisible(true);
-  }, []);
-
-  const handleFromWorkspace = useCallback(() => {
-    setResourcePickerVisible(true);
-  }, []);
-
-  const handleRemoveConversationFile = useCallback(
-    async (fileId: string) => {
-      if (!sessionId) return;
-
-      try {
-        await sessionApi.deleteConversationFile(fileId, { sessionId });
-        setConversationFiles((prev) => prev.filter((item) => item.id !== fileId));
-      } catch {
-        toast.show('error', t.fileUploadFailed);
-      }
-    },
-    [sessionId, t.fileUploadFailed, toast],
-  );
-
-  const handleWorkspaceSelect = useCallback(
-    async (items: FileListItem[]) => {
-      const base = await getApiUrl();
-      const baseUrl = base?.replace(/\/$/, '') ?? '';
-      const conversationFileIds = new Set<string>();
-      let failedContextCount = 0;
-
-      for (const item of items) {
-        if (!item.id) continue;
-        const itemKind = getCanonicalResourceKind(item);
-
-        if (isChatContextEligibleResource(item)) {
-          const context = await createChatContextSelectionFromResource(item).catch(() => null);
-          if (context) {
-            if (sessionId) addSessionChatContextSelection(sessionId, context);
-            continue;
-          }
-
-          if (itemKind === 'document') {
-            failedContextCount += 1;
-            continue;
-          }
-        }
-
-        if (itemKind !== 'file') continue;
-
-        if (sessionId) {
-          conversationFileIds.add(item.id);
-          continue;
-        }
-
-        const fileUrl = item.url?.startsWith('http')
-          ? item.url
-          : baseUrl
-            ? `${baseUrl}/f/${item.id}`
-            : item.url;
-        addFile({
-          fileId: item.id,
-          id: `workspace-${item.id}-${Date.now()}`,
-          name: item.name,
-          size: item.size,
-          type: item.fileType,
-          uri: fileUrl || `file://${item.id}`,
-          url: fileUrl,
-        });
-      }
-
-      if (sessionId && conversationFileIds.size > 0) {
-        try {
-          await sessionApi.addConversationFiles([...conversationFileIds], { sessionId });
-          await loadConversationFiles();
-          toast.show('success', t.fileAddToConversationSuccess);
-        } catch {
-          toast.show('error', t.fileUploadFailed);
-        }
-      }
-
-      if (failedContextCount > 0) {
-        toast.show('error', t.fileUploadFailed);
-      }
-    },
-    [
-      addFile,
-      addSessionChatContextSelection,
-      loadConversationFiles,
-      sessionId,
-      t.fileAddToConversationSuccess,
-      t.fileUploadFailed,
-      toast,
-    ],
-  );
-
-  // ── Toolbar: Model ────────────────────────────────────────────────
-  const handleModelPress = useCallback(() => {
-    if (isGroupSession) return;
-    haptics.light();
-    setModelDrawerVisible(true);
-  }, [isGroupSession]);
-
-  // ── Toolbar: Search toggle ────────────────────────────────────────
-  const handleToggleSearch = useCallback(async () => {
-    if (!sessionId || isGroupSession) return;
-    haptics.light();
-    const next = !searchEnabled;
-    setSearchEnabled(next);
-    try {
-      await sessionApi.updateChatConfig(sessionId, { searchMode: next ? 'on' : 'off' });
-    } catch {
-      /* best-effort */
-    }
-  }, [isGroupSession, searchEnabled, sessionId]);
-
-  const updateMemoryConfig = useCallback(
-    async (nextEnabled: boolean, nextEffort: MobileMemoryEffort) => {
-      if (!sessionId || isGroupSession) return;
-      setMemoryEnabled(nextEnabled);
-      setMemoryEffort(nextEffort);
-
-      try {
-        await sessionApi.updateChatConfig(sessionId, {
-          memory: {
-            effort: nextEffort,
-            enabled: nextEnabled,
-          },
-        });
-      } catch {
-        /* best-effort */
-      }
-    },
-    [isGroupSession, sessionId],
-  );
 
   // ── Toolbar: Clear messages ───────────────────────────────────────
   const handleClear = useCallback(() => {
@@ -1429,19 +1040,16 @@ export default function ChatDetailScreen({
                 </View>
               ) : undefined
             }
-            onAttach={handleAttach}
+            onAttach={openAttachmentSheet}
             onChangeText={setInputText}
             onClear={handleClear}
-            onModelPress={handleModelPress}
-            onPluginsPress={handlePluginsPress}
-            onProviderLogoError={() => setProviderLogoError(true)}
+            onMemoryPress={openMemorySheet}
+            onModelPress={openModelDrawer}
+            onPluginsPress={openSkillsSheet}
+            onProviderLogoError={markProviderLogoError}
             onSend={handleSend}
             onStop={handleStop}
             onToggleSearch={handleToggleSearch}
-            onMemoryPress={() => {
-              haptics.light();
-              setMemorySheetVisible(true);
-            }}
           />
         </Animated.View>
       </View>
@@ -1449,27 +1057,27 @@ export default function ChatDetailScreen({
       <ModelDrawer
         sessionId={sessionId}
         visible={modelDrawerVisible && !isGroupSession}
-        onClose={() => setModelDrawerVisible(false)}
-        onSelect={() => setProviderLogoError(false)}
+        onClose={closeModelDrawer}
+        onSelect={clearProviderLogoError}
       />
       <AttachmentSheet
         visible={attachmentSheetVisible}
         onCamera={modelSupportsVision ? () => void pickImage('camera') : undefined}
-        onClose={() => setAttachmentSheetVisible(false)}
+        onClose={closeAttachmentSheet}
         onDocument={() => void pickDocument()}
-        onFromWorkspace={handleFromWorkspace}
+        onFromWorkspace={openResourcePicker}
         onGallery={modelSupportsVision ? () => void pickImage('gallery') : undefined}
       />
       <ResourcePickerSheet
         visible={resourcePickerVisible}
-        onClose={() => setResourcePickerVisible(false)}
+        onClose={closeResourcePicker}
         onSelect={handleWorkspaceSelect}
       />
       <MemoryToolSheet
         effort={memoryEffort}
         enabled={memoryEnabled}
         visible={memorySheetVisible && !isGroupSession}
-        onClose={() => setMemorySheetVisible(false)}
+        onClose={closeMemorySheet}
         onChangeEffort={(value) => {
           void updateMemoryConfig(true, value);
         }}
@@ -1489,9 +1097,9 @@ export default function ChatDetailScreen({
         skillsEmptyDesc={t.skillsEmptyDesc}
         skillsTitle={t.skillsTitle}
         visible={skillsSheetVisible && !isGroupSession}
-        onClose={() => setSkillsSheetVisible(false)}
+        onClose={closeSkillsSheet}
         onOpenStore={() => navigation.navigate('MainTabs', { screen: 'Store' })}
-        onToggle={handleTogglePlugin}
+        onToggle={togglePlugin}
       />
     </View>
   );

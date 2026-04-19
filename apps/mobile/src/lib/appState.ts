@@ -32,15 +32,17 @@ export const syncMobileBootstrapState = async () => {
   let requiresReauth = false;
 
   if (sessionsResult.status === 'rejected') {
-    console.warn('[appState] bootstrap sessions sync failed:', sessionsResult.reason);
     if (requiresReauthForBootstrap(sessionsResult.reason)) {
       requiresReauth = true;
+    } else {
+      console.warn('[appState] bootstrap sessions sync failed:', sessionsResult.reason);
     }
   }
   if (userResult.status === 'rejected') {
-    console.warn('[appState] bootstrap user sync failed:', userResult.reason);
     if (requiresReauthForBootstrap(userResult.reason)) {
       requiresReauth = true;
+    } else {
+      console.warn('[appState] bootstrap user sync failed:', userResult.reason);
     }
   }
 
@@ -77,7 +79,7 @@ export const clearTransientAppState = async (
 ) => {
   await AsyncStorage.removeItem('activeSessionId');
   useChatStore.getState().reset();
-  useFileStore.getState().clearPending();
+  useFileStore.getState().clearPending({ all: true });
   useSessionStore.getState().reset();
 
   if (options?.preserveUserProfile) {

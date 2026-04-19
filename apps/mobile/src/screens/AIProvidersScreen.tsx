@@ -16,6 +16,7 @@ import {
   Image as RNImage,
   RefreshControl,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -28,6 +29,7 @@ import { getProviderIconUrl } from '../constants/cdn';
 import { aiProviderApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import { useThemeStore } from '../store/theme';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
@@ -74,6 +76,9 @@ export default function AIProvidersScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const contentWidth = Math.min(Math.max(screenWidth - 40, 0), responsiveMetrics.settingsMaxWidth);
 
   const [providers, setProviders] = useState<AiProviderListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -121,28 +126,32 @@ export default function AIProvidersScreen({ navigation }: any) {
 
   const renderProviderItem = useCallback(
     ({ item: provider }: { item: AiProviderListItem }) => (
-      <SelectionListItem
-        className="mx-5 mb-2"
-        leading={<ProviderLogo logo={provider.logo} providerId={provider.id} size={36} />}
-        subtitle={provider.source === 'custom' ? t.storeCustom : t.storeBuiltIn}
-        title={provider.name || provider.id}
-        rightAccessory={
-          <View className="flex-row items-center">
-            <View
-              className="mr-2 h-2 w-2 rounded-full"
-              style={{ backgroundColor: provider.enabled ? colors.success : colors.borderDefault }}
-            />
-            <ChevronRight
-              color={colors.secondaryText}
-              size={18}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
-          </View>
-        }
-        onPress={() => navigation.navigate('ProviderDetail', { providerId: provider.id })}
-      />
+      <View style={{ width: contentWidth }}>
+        <SelectionListItem
+          className="mb-2"
+          leading={<ProviderLogo logo={provider.logo} providerId={provider.id} size={36} />}
+          subtitle={provider.source === 'custom' ? t.storeCustom : t.storeBuiltIn}
+          title={provider.name || provider.id}
+          rightAccessory={
+            <View className="flex-row items-center">
+              <View
+                className="mr-2 h-2 w-2 rounded-full"
+                style={{
+                  backgroundColor: provider.enabled ? colors.success : colors.borderDefault,
+                }}
+              />
+              <ChevronRight
+                color={colors.secondaryText}
+                size={18}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            </View>
+          }
+          onPress={() => navigation.navigate('ProviderDetail', { providerId: provider.id })}
+        />
+      </View>
     ),
-    [colors, navigation, t.storeBuiltIn, t.storeCustom],
+    [colors, contentWidth, navigation, t.storeBuiltIn, t.storeCustom],
   );
 
   return (
@@ -156,12 +165,15 @@ export default function AIProvidersScreen({ navigation }: any) {
       />
 
       {/* Search */}
-      <View className="px-5 py-2 bg-background z-10">
+      <View
+        className="bg-background z-10 py-2"
+        style={{ alignSelf: 'center', width: contentWidth }}
+      >
         <SearchField placeholder={t.search} value={searchQuery} onChangeText={setSearchQuery} />
       </View>
 
       {/* Summary */}
-      <View className="px-5 pb-2">
+      <View className="pb-2" style={{ alignSelf: 'center', width: contentWidth }}>
         <Text className="text-[12px] font-medium" style={{ color: colors.secondaryText }}>
           {t.providerCountActive.replace('{count}', String(enabledCount))}
         </Text>
@@ -173,16 +185,20 @@ export default function AIProvidersScreen({ navigation }: any) {
         </View>
       ) : (
         <FlatList
-          ListEmptyComponent={<EmptyState iconVariant="provider" title={t.discoverNoResults} />}
           className="flex-1"
           data={filtered}
           keyExtractor={(item) => item.id}
           renderItem={renderProviderItem}
           showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={{ width: contentWidth }}>
+              <EmptyState iconVariant="provider" title={t.discoverNoResults} />
+            </View>
+          }
           contentContainerStyle={
             filtered.length === 0
-              ? { flexGrow: 1, justifyContent: 'center', paddingBottom: 40 }
-              : { paddingBottom: 40 }
+              ? { alignItems: 'center', flexGrow: 1, justifyContent: 'center', paddingBottom: 40 }
+              : { alignItems: 'center', paddingBottom: 40 }
           }
           refreshControl={
             <RefreshControl

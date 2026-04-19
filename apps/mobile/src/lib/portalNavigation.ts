@@ -1,4 +1,5 @@
 import type {
+  ContentRouteParams,
   ConversationOriginRouteParams,
   MessageDetailPortalParams,
   MessageDetailRouteParams,
@@ -6,14 +7,13 @@ import type {
   PortalRouteName,
   PortalRouteParams,
   PortalStackEntry,
-  ResourcesRouteParams,
   ThreadDetailRouteParams,
   ThreadListRouteParams,
   ToolDetailRouteParams,
 } from '../navigation/types';
 
 const MAX_PORTAL_STACK_DEPTH = 8;
-type PortalScreenRouteName = PortalRouteName | 'PortalResources';
+type PortalScreenRouteName = PortalRouteName | 'PortalContent';
 
 const hasPortalStack = (params: unknown): params is PortalRouteParams =>
   !!params && typeof params === 'object' && 'portalStack' in params;
@@ -30,11 +30,11 @@ const samePortalEntry = (left: PortalStackEntry, right: PortalStackEntry) => {
     case 'Notebook': {
       return left.params.documentId === (right.params as NotebookRouteParams).documentId;
     }
-    case 'Resources': {
+    case 'Content': {
       return (
-        left.params.openItemId === (right.params as ResourcesRouteParams).openItemId &&
-        left.params.openKind === (right.params as ResourcesRouteParams).openKind &&
-        left.params.openSourceSetId === (right.params as ResourcesRouteParams).openSourceSetId
+        left.params.openItemId === (right.params as ContentRouteParams).openItemId &&
+        left.params.openKind === (right.params as ContentRouteParams).openKind &&
+        left.params.openSourceSetId === (right.params as ContentRouteParams).openSourceSetId
       );
     }
     case 'ThreadDetail': {
@@ -67,8 +67,8 @@ const samePortalEntry = (left: PortalStackEntry, right: PortalStackEntry) => {
 export const isPortalRouteName = (name: string): name is PortalScreenRouteName =>
   name === 'MessageDetail' ||
   name === 'Notebook' ||
-  name === 'PortalResources' ||
-  name === 'Resources' ||
+  name === 'PortalContent' ||
+  name === 'Content' ||
   name === 'ThreadDetail' ||
   name === 'ThreadList' ||
   name === 'ToolDetail';
@@ -106,9 +106,9 @@ export const createPortalEntry = (
         route: 'Notebook',
       };
     }
-    case 'PortalResources':
-    case 'Resources': {
-      const params = routeParams as ResourcesRouteParams;
+    case 'PortalContent':
+    case 'Content': {
+      const params = routeParams as ContentRouteParams;
       if (
         !params.openItem &&
         !params.openItemId &&
@@ -126,7 +126,7 @@ export const createPortalEntry = (
           ...(params.threadId ? { threadId: params.threadId } : {}),
           ...(params.topicId ? { topicId: params.topicId } : {}),
         },
-        route: 'Resources',
+        route: 'Content',
       };
     }
     case 'ThreadDetail': {

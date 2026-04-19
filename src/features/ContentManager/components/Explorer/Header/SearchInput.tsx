@@ -94,13 +94,7 @@ const SearchInput = memo(() => {
           onKeyDown={handleKeyDown}
         />
       </div>
-      {showIcon && (
-        <ActionIcon
-          icon={RESOURCE_ENTRY_ICONS.search}
-          style={{ marginRight: 4 }}
-          onClick={handleExpand}
-        />
-      )}
+      {showIcon && <ActionIcon icon={RESOURCE_ENTRY_ICONS.search} onClick={handleExpand} />}
     </>
   );
 });

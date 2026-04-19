@@ -47,9 +47,9 @@ vi.mock('react-i18next', () => ({
           'FileManager.actions.confirmDeleteMultiFiles': `Delete ${options?.count} files?`,
           'FileManager.actions.deleteSuccess': 'Deleted',
           'FileManager.total.selectedCount': `Selected ${options?.count} items`,
-          close: 'Close',
-          delete: 'Delete',
-          tab: options?.defaultValue,
+          'close': 'Close',
+          'delete': 'Delete',
+          'tab': options?.defaultValue,
         }) as Record<string, string | undefined>
       )[key] || key,
   }),
@@ -108,12 +108,8 @@ vi.mock('../ToolBar/BatchActionsDropdown', () => ({
   ),
 }));
 
-vi.mock('../ToolBar/SortDropdown', () => ({
-  default: () => <div>sort-dropdown</div>,
-}));
-
-vi.mock('../ToolBar/ViewSwitcher', () => ({
-  default: () => <div>view-switcher</div>,
+vi.mock('../ToolBar/DisplayDropdown', () => ({
+  default: () => <div>display-dropdown</div>,
 }));
 
 vi.mock('./Breadcrumb', () => ({
@@ -144,9 +140,30 @@ describe('Explorer Header', () => {
     expect(screen.queryByText('breadcrumb')).not.toBeInTheDocument();
     expect(screen.getByTestId('center')).toHaveTextContent('category-menu');
     expect(screen.getByTestId('right')).toHaveTextContent('search-input');
-    expect(screen.getByTestId('right')).toHaveTextContent('sort-dropdown');
-    expect(screen.getByTestId('right')).toHaveTextContent('view-switcher');
+    expect(screen.getByTestId('right')).toHaveTextContent('display-dropdown');
     expect(screen.getByTestId('right')).toHaveTextContent('add-button');
+    expect(screen.queryByTestId('batch-dropdown')).not.toBeInTheDocument();
+  });
+
+  it('keeps the idle batch menu only for source set contexts that still expose source set actions', () => {
+    contentManagerState.selectedFileIds = [];
+    contentManagerState.currentViewItemId = undefined;
+    contentManagerState.sourceSetId = 'source-set-1';
+
+    render(
+      <Header
+        governanceCapabilities={{
+          canApprove: false,
+          canArchive: false,
+          canEditGovernance: true,
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('right')).toHaveTextContent('search-input');
+    expect(screen.getByTestId('right')).toHaveTextContent('display-dropdown');
+    expect(screen.getByTestId('right')).toHaveTextContent('add-button');
+    expect(screen.getByTestId('batch-dropdown')).toBeInTheDocument();
   });
 
   it('hides approve and archive actions when governance capabilities do not allow them', () => {
@@ -205,8 +222,7 @@ describe('Explorer Header', () => {
     expect(screen.getByText('Selected 2 items')).toBeInTheDocument();
     expect(screen.queryByText('category-menu')).not.toBeInTheDocument();
     expect(screen.queryByText('search-input')).not.toBeInTheDocument();
-    expect(screen.queryByText('sort-dropdown')).not.toBeInTheDocument();
-    expect(screen.queryByText('view-switcher')).not.toBeInTheDocument();
+    expect(screen.queryByText('display-dropdown')).not.toBeInTheDocument();
     expect(screen.queryByText('add-button')).not.toBeInTheDocument();
     expect(screen.getByTestId('batch-dropdown')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();

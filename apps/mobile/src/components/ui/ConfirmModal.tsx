@@ -4,9 +4,10 @@
  * "Tried to show an alert while not attached to an Activity" on Android.
  */
 import React from 'react';
-import { Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Pressable, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
+import { getResponsiveLayoutMetrics } from '../../lib/responsiveLayout';
 import { useThemeColors } from '../../theme/colors';
 import { enteringDialogContent } from '../../theme/motion';
 
@@ -32,6 +33,11 @@ export default function ConfirmModal({
   onCancel,
 }: ConfirmModalProps) {
   const colors = useThemeColors();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const dialogWidth = responsiveMetrics.isTablet
+    ? Math.min(Math.max(screenWidth - 32, 0), 420)
+    : 300;
 
   return (
     <Modal
@@ -41,10 +47,17 @@ export default function ConfirmModal({
       visible={visible}
       onRequestClose={onCancel}
     >
-      <Pressable className="flex-1 justify-center items-center bg-black/40" onPress={onCancel}>
-        <Animated.View entering={enteringDialogContent()}>
+      <Pressable
+        className="flex-1 items-center justify-center bg-black/40"
+        style={{
+          paddingHorizontal: responsiveMetrics.isTablet ? 16 : 0,
+          paddingVertical: responsiveMetrics.isTablet ? 24 : 0,
+        }}
+        onPress={onCancel}
+      >
+        <Animated.View entering={enteringDialogContent()} style={{ width: dialogWidth }}>
           <Pressable
-            className="bg-card rounded-2xl mx-10 w-[300px] overflow-hidden"
+            className="bg-card overflow-hidden rounded-2xl"
             onPress={(e) => e.stopPropagation()}
           >
             <View className="px-5 pt-5 pb-3">
@@ -59,7 +72,9 @@ export default function ConfirmModal({
                 className="flex-1 py-3.5 items-center"
                 onPress={onCancel}
               >
-                <Text className="text-[16px] text-foreground/50 font-medium">{cancelLabel}</Text>
+                <Text className="text-[16px] font-medium" style={{ color: colors.secondaryText }}>
+                  {cancelLabel}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 activeOpacity={0.6}

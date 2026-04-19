@@ -14,6 +14,7 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -42,6 +43,7 @@ import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { navigateToLogin } from '../lib/navigation';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import { isGroupSessionLike } from '../lib/session';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useChatStore } from '../store/chat';
@@ -85,9 +87,17 @@ const splitLineList = (value: string) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-function SectionCard({ children, title }: { children: React.ReactNode; title: string }) {
+function SectionCard({
+  children,
+  contentWidth,
+  title,
+}: {
+  children: React.ReactNode;
+  contentWidth: number;
+  title: string;
+}) {
   return (
-    <View className="mx-5 mb-5">
+    <View className="mb-5 self-center" style={{ width: contentWidth }}>
       <Text className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
         {title}
       </Text>
@@ -106,6 +116,10 @@ export default function ChatSettingsScreen({
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const toast = useToast();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const contentWidth = Math.min(Math.max(screenWidth - 40, 0), responsiveMetrics.settingsMaxWidth);
+  const tagSheetWidth = Math.min(contentWidth, 560);
 
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === sessionId));
   const isGroupSession = isGroupSessionLike(sessionId, session?.type);
@@ -548,10 +562,11 @@ export default function ChatSettingsScreen({
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}
+        contentContainerStyle={{ alignItems: 'center', paddingBottom: 40 + insets.bottom }}
         keyboardShouldPersistTaps="handled"
       >
         <SessionHeaderSection
+          contentWidth={contentWidth}
           delay={50}
           description={groupDescription}
           isGroupSession={isGroupSession}
@@ -564,8 +579,8 @@ export default function ChatSettingsScreen({
           <Animated.View entering={FadeInDown.delay(60).duration(300)}>
             <TouchableOpacity
               activeOpacity={0.8}
-              className="mx-5 mt-4 flex-row items-center justify-center rounded-xl py-3"
-              style={{ backgroundColor: colors.primary }}
+              className="mt-4 flex-row items-center justify-center rounded-xl py-3"
+              style={{ backgroundColor: colors.primary, width: contentWidth }}
               onPress={() => {
                 haptics.light();
                 navigation.replace('ChatDetail', { sessionId });
@@ -580,6 +595,7 @@ export default function ChatSettingsScreen({
 
         {!isGroupSession ? (
           <TagSection
+            contentWidth={contentWidth}
             currentTag={currentTag}
             delay={90}
             onPress={() => setTagSelectorVisible(true)}
@@ -589,18 +605,25 @@ export default function ChatSettingsScreen({
         {!isGroupSession ? (
           <AgentSection
             agentSummary={agentSummary}
+            contentWidth={contentWidth}
             delay={100}
             onPress={() => navigation.navigate('AgentConfig', { sessionId })}
           />
         ) : null}
 
         {!isGroupSession ? (
-          <ParamsSection delay={110} params={params} onParamsChange={setParams} />
+          <ParamsSection
+            contentWidth={contentWidth}
+            delay={110}
+            params={params}
+            onParamsChange={setParams}
+          />
         ) : null}
 
         {isGroupSession ? (
           <GroupSettingsSection
             allowDM={groupAllowDM}
+            contentWidth={contentWidth}
             delay={100}
             loading={groupLoading}
             revealDM={groupRevealDM}
@@ -619,7 +642,7 @@ export default function ChatSettingsScreen({
 
         {isGroupSession ? (
           <Animated.View entering={FadeInDown.delay(160).duration(300)}>
-            <SectionCard title={t.groupSettingsMembers}>
+            <SectionCard contentWidth={contentWidth} title={t.groupSettingsMembers}>
               {groupLoading ? (
                 <View className="items-center justify-center py-6">
                   <ActivityIndicator color={colors.primary} />
@@ -750,6 +773,7 @@ export default function ChatSettingsScreen({
         ) : null}
 
         <DangerZoneSection
+          contentWidth={contentWidth}
           delay={150}
           onClearHistory={handleClearHistory}
           onDeleteChat={handleDeleteChat}
@@ -764,12 +788,21 @@ export default function ChatSettingsScreen({
         onRequestClose={() => setTagSelectorVisible(false)}
       >
         <Pressable
-          className="flex-1 justify-end bg-black/40"
+          className="flex-1 bg-black/40"
+          style={{
+            justifyContent: responsiveMetrics.isTablet ? 'center' : 'flex-end',
+            paddingHorizontal: responsiveMetrics.isTablet ? 16 : 0,
+            paddingVertical: responsiveMetrics.isTablet ? 24 : 0,
+          }}
           onPress={() => setTagSelectorVisible(false)}
         >
           <Pressable
-            className="rounded-t-2xl bg-card"
-            style={{ maxHeight: '72%' }}
+            className={responsiveMetrics.isTablet ? 'rounded-3xl bg-card' : 'rounded-t-2xl bg-card'}
+            style={{
+              alignSelf: 'center',
+              maxHeight: '72%',
+              width: responsiveMetrics.isTablet ? tagSheetWidth : undefined,
+            }}
             onPress={(event) => event.stopPropagation()}
           >
             <View className="items-center pt-3 pb-2">

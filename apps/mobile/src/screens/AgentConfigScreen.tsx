@@ -20,6 +20,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,6 +37,7 @@ import { useAgentConfig, useAgentConfigByAgentId } from '../hooks/useAgentConfig
 import { agentApi, agentSkillApi, pluginApi, userApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
 import { useThemeStore } from '../store/theme';
@@ -98,6 +100,12 @@ const splitLineList = (value: string) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
+const getConfigContentWidth = (screenWidth: number, screenHeight: number) =>
+  Math.min(
+    Math.max(screenWidth - 40, 0),
+    getResponsiveLayoutMetrics(screenWidth, screenHeight).settingsMaxWidth,
+  );
+
 const buildDraft = (config: any): AgentDraft => ({
   agentId: config?.id || '',
   autoCreateTopicThreshold: stringifyNumber(config?.chatConfig?.autoCreateTopicThreshold),
@@ -126,9 +134,17 @@ const buildDraft = (config: any): AgentDraft => ({
   topP: stringifyNumber(config?.params?.top_p),
 });
 
-function SectionCard({ children, title }: { children: React.ReactNode; title: string }) {
+function SectionCard({
+  children,
+  contentWidth,
+  title,
+}: {
+  children: React.ReactNode;
+  contentWidth: number;
+  title: string;
+}) {
   return (
-    <View className="mb-5 px-5">
+    <View className="mb-5 self-center" style={{ width: contentWidth }}>
       <Text className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
         {title}
       </Text>
@@ -139,6 +155,7 @@ function SectionCard({ children, title }: { children: React.ReactNode; title: st
 
 function CollapsibleSection({
   children,
+  contentWidth,
   expanded,
   icon: Icon,
   onToggle,
@@ -146,6 +163,7 @@ function CollapsibleSection({
   title,
 }: {
   children: React.ReactNode;
+  contentWidth: number;
   expanded: boolean;
   icon: React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
   onToggle: () => void;
@@ -154,7 +172,7 @@ function CollapsibleSection({
 }) {
   const colors = useThemeColors();
   return (
-    <SectionCard title={title}>
+    <SectionCard contentWidth={contentWidth} title={title}>
       <TouchableOpacity activeOpacity={0.8} className="flex-row items-center" onPress={onToggle}>
         <View
           className="mr-3 h-10 w-10 items-center justify-center rounded-2xl"
@@ -320,15 +338,17 @@ function ProviderBadge({ logo, providerId }: { logo?: string; providerId?: strin
 
 function ConfigFetchErrorPanel({
   colors,
+  contentWidth,
   onRetry,
   t,
 }: {
   colors: ReturnType<typeof useThemeColors>;
+  contentWidth: number;
   onRetry: () => void;
   t: { errorNetwork: string; errorRetry: string };
 }) {
   return (
-    <View className="flex-1 justify-center px-8">
+    <View className="flex-1 justify-center self-center" style={{ width: contentWidth }}>
       <Text className="text-center text-[15px] font-medium" style={{ color: colors.foreground }}>
         {t.errorNetwork}
       </Text>
@@ -356,6 +376,8 @@ function CreateNewAgentConfigScreen({ navigation }: { navigation: any }) {
   const toast = useToast();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const contentWidth = getConfigContentWidth(screenWidth, screenHeight);
   const fetchSessions = useSessionStore((s) => s.fetchSessions);
   const [title, setTitle] = useState('');
   const [saving, setSaving] = useState(false);
@@ -404,10 +426,10 @@ function CreateNewAgentConfigScreen({ navigation }: { navigation: any }) {
       />
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 48, paddingTop: 16, paddingHorizontal: 20 }}
+        contentContainerStyle={{ alignItems: 'center', paddingBottom: 48, paddingTop: 16 }}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="mb-5 px-5">
+        <View className="mb-5" style={{ width: contentWidth }}>
           <Text
             className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider"
             style={{ color: colors.secondaryText }}
@@ -440,6 +462,8 @@ function SessionOnlyAgentConfigScreen({ navigation }: { navigation: any }) {
   const { t } = useI18n();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const contentWidth = getConfigContentWidth(screenWidth, screenHeight);
   const openStore = useCallback(() => {
     const routeNames: string[] = navigation?.getState?.()?.routeNames ?? [];
 
@@ -471,10 +495,10 @@ function SessionOnlyAgentConfigScreen({ navigation }: { navigation: any }) {
       />
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 48, paddingTop: 16 }}
+        contentContainerStyle={{ alignItems: 'center', paddingBottom: 48, paddingTop: 16 }}
         keyboardShouldPersistTaps="handled"
       >
-        <SectionCard title={t.agentConfigSessionOnlyTitle}>
+        <SectionCard contentWidth={contentWidth} title={t.agentConfigSessionOnlyTitle}>
           <Text className="text-[15px] leading-6 text-foreground/78">
             {t.agentConfigSessionOnlyDesc}
           </Text>
@@ -505,6 +529,8 @@ function SessionAgentConfigScreen({
   const toast = useToast();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const contentWidth = getConfigContentWidth(screenWidth, screenHeight);
 
   const fetchSessions = useSessionStore((s) => s.fetchSessions);
   const modelProviders = useModelStore((s) => s.providers);
@@ -758,7 +784,12 @@ function SessionAgentConfigScreen({
           }
           onPressLeft={() => navigation.goBack()}
         />
-        <ConfigFetchErrorPanel colors={colors} t={t} onRetry={() => void refetch()} />
+        <ConfigFetchErrorPanel
+          colors={colors}
+          contentWidth={contentWidth}
+          t={t}
+          onRetry={() => void refetch()}
+        />
       </View>
     );
   }
@@ -773,7 +804,9 @@ function SessionAgentConfigScreen({
           }
           onPressLeft={() => navigation.goBack()}
         />
-        <ContentSkeleton />
+        <View className="flex-1 self-center" style={{ width: contentWidth }}>
+          <ContentSkeleton />
+        </View>
       </View>
     );
   }
@@ -804,10 +837,10 @@ function SessionAgentConfigScreen({
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 56, paddingTop: 16 }}
+        contentContainerStyle={{ alignItems: 'center', paddingBottom: 56, paddingTop: 16 }}
         keyboardShouldPersistTaps="handled"
       >
-        <SectionCard title={t.agentConfigModal}>
+        <SectionCard contentWidth={contentWidth} title={t.agentConfigModal}>
           <TouchableOpacity
             activeOpacity={0.85}
             className="flex-row items-center"
@@ -833,7 +866,7 @@ function SessionAgentConfigScreen({
           </TouchableOpacity>
         </SectionCard>
 
-        <SectionCard title={t.skillsTitle}>
+        <SectionCard contentWidth={contentWidth} title={t.skillsTitle}>
           <TouchableOpacity
             activeOpacity={0.85}
             className="flex-row items-center"
@@ -865,6 +898,7 @@ function SessionAgentConfigScreen({
         </SectionCard>
 
         <CollapsibleSection
+          contentWidth={contentWidth}
           expanded={assistantExpanded}
           icon={Bot}
           subtitle={draft.title || draft.description || t.settingsDefaultAgent}
@@ -893,6 +927,7 @@ function SessionAgentConfigScreen({
         </CollapsibleSection>
 
         <CollapsibleSection
+          contentWidth={contentWidth}
           expanded={conversationExpanded}
           icon={MessageSquare}
           subtitle={conversationSummary}
@@ -965,6 +1000,7 @@ function SessionAgentConfigScreen({
         </CollapsibleSection>
 
         <CollapsibleSection
+          contentWidth={contentWidth}
           expanded={advancedExpanded}
           icon={Settings2}
           subtitle={advancedSummary}
@@ -1079,6 +1115,8 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
   const toast = useToast();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const contentWidth = getConfigContentWidth(screenWidth, screenHeight);
 
   const modelProviders = useModelStore((s) => s.providers);
   const fetchModels = useModelStore((s) => s.fetchModels);
@@ -1319,7 +1357,12 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
           }
           onPressLeft={() => navigation.goBack()}
         />
-        <ConfigFetchErrorPanel colors={colors} t={t} onRetry={() => void refetch()} />
+        <ConfigFetchErrorPanel
+          colors={colors}
+          contentWidth={contentWidth}
+          t={t}
+          onRetry={() => void refetch()}
+        />
       </View>
     );
   }
@@ -1334,7 +1377,9 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
           }
           onPressLeft={() => navigation.goBack()}
         />
-        <ContentSkeleton />
+        <View className="flex-1 self-center" style={{ width: contentWidth }}>
+          <ContentSkeleton />
+        </View>
       </View>
     );
   }
@@ -1365,10 +1410,10 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 56, paddingTop: 16 }}
+        contentContainerStyle={{ alignItems: 'center', paddingBottom: 56, paddingTop: 16 }}
         keyboardShouldPersistTaps="handled"
       >
-        <SectionCard title={t.agentConfigModal}>
+        <SectionCard contentWidth={contentWidth} title={t.agentConfigModal}>
           <TouchableOpacity
             activeOpacity={0.85}
             className="flex-row items-center"
@@ -1394,7 +1439,7 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
           </TouchableOpacity>
         </SectionCard>
 
-        <SectionCard title={t.skillsTitle}>
+        <SectionCard contentWidth={contentWidth} title={t.skillsTitle}>
           <TouchableOpacity
             activeOpacity={0.85}
             className="flex-row items-center"
@@ -1426,6 +1471,7 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
         </SectionCard>
 
         <CollapsibleSection
+          contentWidth={contentWidth}
           expanded={assistantExpanded}
           icon={Bot}
           subtitle={draft.title || draft.description || t.settingsDefaultAgent}
@@ -1454,6 +1500,7 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
         </CollapsibleSection>
 
         <CollapsibleSection
+          contentWidth={contentWidth}
           expanded={conversationExpanded}
           icon={MessageSquare}
           subtitle={conversationSummary}
@@ -1511,6 +1558,7 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
         </CollapsibleSection>
 
         <CollapsibleSection
+          contentWidth={contentWidth}
           expanded={advancedExpanded}
           icon={Cpu}
           subtitle={advancedSummary}

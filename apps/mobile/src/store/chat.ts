@@ -42,6 +42,7 @@ import type {
   ChatMessage,
   ChatToolPayload,
   DocSelection,
+  FileAttachment,
   MobileMemoryEffort,
   Topic,
 } from '../types';
@@ -951,6 +952,8 @@ interface ChatState {
       chatContextSelections?: ChatContextSelection[];
       memoryEffort?: MobileMemoryEffort;
       memoryEnabled?: boolean;
+      pendingFileSessionId?: string;
+      pendingFiles?: FileAttachment[];
       preserveChatContextSelections?: boolean;
       plugins?: string[];
       searchEnabled?: boolean;
@@ -1177,6 +1180,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       chatContextSelections?: ChatContextSelection[];
       memoryEffort?: MobileMemoryEffort;
       memoryEnabled?: boolean;
+      pendingFileSessionId?: string;
+      pendingFiles?: FileAttachment[];
       preserveChatContextSelections?: boolean;
       plugins?: string[];
       searchEnabled?: boolean;
@@ -1186,7 +1191,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const textContent = content.trim();
     const fileState = useFileStore.getState();
-    const attachments = fileState.pendingFiles.filter((f) => f.status !== 'error');
+    const attachments = (options?.pendingFiles ?? fileState.pendingFiles).filter(
+      (file) => file.status !== 'error',
+    );
     const chatContextSelections = options?.chatContextSelections ?? fileState.chatContextSelections;
     const docSelections = toDocSelections(chatContextSelections);
     if (attachments.some((f) => f.status === 'uploading')) {
@@ -1200,7 +1207,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (attachments.length > 0) {
       const uploaded = await Promise.all(
         attachments.map(async (file) => {
-          const result = await useFileStore.getState().uploadFile(file.id, { sessionId });
+          const result = await useFileStore.getState().uploadFile(file.id, {
+            sessionId: options?.pendingFileSessionId,
+          });
           if (!result) return null;
 
           let streamUrl = result.url;
@@ -1359,7 +1368,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
 
         if (uploadedAttachments.length > 0) {
-          useFileStore.getState().clearPending();
+          useFileStore.getState().clearPending({ sessionId: options?.pendingFileSessionId });
         }
         if (chatContextSelections.length > 0 && !options?.preserveChatContextSelections) {
           useFileStore.getState().clearChatContextSelections();
@@ -1840,7 +1849,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
     if (uploadedAttachments.length > 0) {
-      useFileStore.getState().clearPending();
+      useFileStore.getState().clearPending({ sessionId: options?.pendingFileSessionId });
     }
     if (chatContextSelections.length > 0 && !options?.preserveChatContextSelections) {
       useFileStore.getState().clearChatContextSelections();
@@ -2984,8 +2993,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
           },
           onToolExecutions: (executions) => {
             const resolved = mergeResolvedToolPayloads(
-              getSessionMessageById(get().messagesBySession, sessionId, assistantMessageId)?.tools ??
-                undefined,
+              getSessionMessageById(get().messagesBySession, sessionId, assistantMessageId)
+                ?.tools ?? undefined,
               executions,
             );
             if (resolved) {

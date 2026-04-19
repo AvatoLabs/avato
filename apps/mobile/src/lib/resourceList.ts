@@ -1,4 +1,8 @@
 import type { FileListItem } from '../types';
+import { matchesCategory, type ResourceCategory } from './resourceFile';
+
+export type ResourceSortOrder = 'asc' | 'desc';
+export type ResourceSorterType = 'createdAt' | 'name' | 'size';
 
 interface CanonicalResourceCandidate {
   id: string;
@@ -64,4 +68,52 @@ export function areSameFileItems(
   }
 
   return true;
+}
+
+export function sortFileList(
+  list: FileListItem[],
+  sorter: ResourceSorterType,
+  sortOrder: ResourceSortOrder,
+  locale?: string,
+): FileListItem[] {
+  const sorted = [...list];
+  const collator = new Intl.Collator(
+    locale ? [locale, 'zh-Hans-CN', 'en-US'] : ['zh-Hans-CN', 'en-US'],
+    {
+      numeric: true,
+      sensitivity: 'base',
+      usage: 'sort',
+    },
+  );
+
+  sorted.sort((a, b) => {
+    let comparison: number;
+
+    switch (sorter) {
+      case 'name': {
+        comparison = collator.compare(a.name ?? '', b.name ?? '');
+        break;
+      }
+      case 'size': {
+        comparison = (a.size ?? 0) - (b.size ?? 0);
+        break;
+      }
+      default: {
+        comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }
+    }
+
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
+
+  return sorted;
+}
+
+export function filterFileListByCategory(
+  list: FileListItem[],
+  category: ResourceCategory,
+): FileListItem[] {
+  if (category === 'all') return list;
+
+  return list.filter((item) => matchesCategory(item, category));
 }

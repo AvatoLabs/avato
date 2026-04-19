@@ -4,9 +4,9 @@
 import type { MainTabParamList, RootStackParamList } from '../navigation/types';
 import {
   navigateToChatDetail,
+  navigateToContent,
   navigateToMessageDetail,
   navigateToNotebook,
-  navigateToResources,
   navigateToThreadDetail,
   navigateToThreadList,
   navigateToToolDetail,
@@ -18,7 +18,7 @@ const CHAT_PATH = /^\/chat\/?$/;
 const MESSAGE_DETAIL_PATH = /^\/(?:chat\/)?message\/?$/;
 const TOOL_DETAIL_PATH = /^\/(?:chat\/)?tool\/?$/;
 const NOTEBOOK_PATH = /^\/notebook\/?$/;
-const RESOURCES_PATH = /^\/resources\/?$/;
+const CONTENT_PATH = /^\/(?:content|resources)\/?$/;
 const THREAD_LIST_PATH = /^\/(?:chat\/)?threads\/?$/;
 const THREAD_DETAIL_PATH = /^\/(?:chat\/)?thread\/?$/;
 const DOC_DETAIL_PATH = /\/spaces\/[^/]+\/docs\/([^/?#]+)/;
@@ -28,13 +28,13 @@ const NESTED_FILE_ITEM_PATH = /\/spaces\/[^/]+\/files\/.+\/item\/([^/?#]+)/;
 
 type ParsedNavigationTarget =
   | { params: RootStackParamList['ChatDetail']; route: 'ChatDetail' }
+  | { params: MainTabParamList['Content']; route: 'Content' }
   | { params: RootStackParamList['MessageDetail']; route: 'MessageDetail' }
   | { params: RootStackParamList['Notebook']; route: 'Notebook' }
   | { params: RootStackParamList['PublicResourceShare']; route: 'PublicResourceShare' }
   | { params: RootStackParamList['ToolDetail']; route: 'ToolDetail' }
   | { params: RootStackParamList['ThreadDetail']; route: 'ThreadDetail' }
-  | { params: RootStackParamList['ThreadList']; route: 'ThreadList' }
-  | { params: MainTabParamList['Resources']; route: 'Resources' };
+  | { params: RootStackParamList['ThreadList']; route: 'ThreadList' };
 
 const createUrl = (url: string) => {
   try {
@@ -236,11 +236,11 @@ export function parseIncomingNavigationUrl(url: string): ParsedNavigationTarget 
         ...(threadId ? { threadId } : {}),
         ...(topicId ? { topicId } : {}),
       },
-      route: 'Resources',
+      route: 'Content',
     };
   }
 
-  if (RESOURCES_PATH.test(path)) {
+  if (CONTENT_PATH.test(path)) {
     const openItemId = searchParams.get('id') ?? undefined;
     const kind = searchParams.get('kind');
     const openKind =
@@ -258,7 +258,7 @@ export function parseIncomingNavigationUrl(url: string): ParsedNavigationTarget 
         ...(threadId ? { threadId } : {}),
         ...(topicId ? { topicId } : {}),
       },
-      route: 'Resources',
+      route: 'Content',
     };
   }
 
@@ -299,8 +299,8 @@ export function handleIncomingShareUrl(url: string | null | undefined) {
       navigateToThreadDetail(parsed.params);
       return;
     }
-    case 'Resources': {
-      navigateToResources(parsed.params);
+    case 'Content': {
+      navigateToContent(parsed.params);
       return;
     }
   }

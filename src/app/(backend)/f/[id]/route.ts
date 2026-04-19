@@ -1,15 +1,44 @@
+import { getXorPayload } from '@lobechat/utils/server';
 import debug from 'debug';
 
 import { auth } from '@/auth';
 import { FileModel } from '@/database/models/file';
 import { getServerDB } from '@/database/server';
 import { appEnv } from '@/envs/app';
+import { LOBE_CHAT_AUTH_HEADER, LOBE_CHAT_OIDC_AUTH_HEADER } from '@/envs/auth';
+import { validateOIDCJWT } from '@/libs/oidc-provider/jwt';
 import { serveAuthorizedFileDownload } from '@/server/modules/file-proxy/serveAuthorizedFileDownload';
 import { isRawFileContentId } from '@/types/content';
 
 const log = debug('lobe-file:proxy');
 
 type Params = Promise<{ id: string }>;
+
+const resolveRequestUserId = async (req: Request) => {
+  const session =
+    process.env.NOAUTH_MODE === '1'
+      ? { user: { id: process.env.NOAUTH_USER_ID || 'local-user' } }
+      : await auth.api.getSession({ headers: req.headers });
+
+  if (session?.user?.id) return session.user.id;
+
+  const encryptedAuth = req.headers.get(LOBE_CHAT_AUTH_HEADER);
+  if (!encryptedAuth) return undefined;
+
+  try {
+    const jwtPayload = getXorPayload(encryptedAuth);
+    const oidcAuthorization = req.headers.get(LOBE_CHAT_OIDC_AUTH_HEADER);
+
+    if (oidcAuthorization) {
+      const oidc = await validateOIDCJWT(oidcAuthorization);
+      return oidc.userId;
+    }
+
+    return jwtPayload.userId || undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 /**
  * File proxy service
@@ -40,12 +69,7 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
       return new Response('File not found', { status: 404 });
     }
 
-    const session =
-      process.env.NOAUTH_MODE === '1'
-        ? { user: { id: process.env.NOAUTH_USER_ID || 'local-user' } }
-        : await auth.api.getSession({ headers: req.headers });
-
-    const userId = session?.user?.id;
+    const userId = await resolveRequestUserId(req);
 
     if (!userId && !shareToken) {
       return new Response('Unauthorized', { status: 401 });

@@ -155,39 +155,36 @@ const AddButton = ({ compact }: AddButtonProps) => {
     folderUploadInputRef.current?.click();
   }, []);
 
-  const items = useMemo<MenuProps['items']>(
-    () => {
-      const nextItems: NonNullable<MenuProps['items']> = [];
+  const items = useMemo<MenuProps['items']>(() => {
+    const nextItems: NonNullable<MenuProps['items']> = [];
 
-      if (sourceSetId) {
-        nextItems.push({
-          icon: <Icon icon={RESOURCE_ENTRY_ICONS.folder} />,
-          key: 'create-folder',
-          label: t('header.actions.newFolder'),
-          onClick: handleCreateFolder,
-        });
-        nextItems.push({ type: 'divider' });
-      }
+    if (sourceSetId) {
+      nextItems.push({
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.folder} />,
+        key: 'create-folder',
+        label: t('header.actions.newFolder'),
+        onClick: handleCreateFolder,
+      });
+      nextItems.push({ type: 'divider' });
+    }
 
-      nextItems.push(
-        {
-          icon: <Icon icon={RESOURCE_ENTRY_ICONS.fileUpload} />,
-          key: 'upload-file',
-          label: t('header.actions.uploadFile'),
-          onClick: openFileUploadDialog,
-        },
-        {
-          icon: <Icon icon={RESOURCE_ENTRY_ICONS.folderUpload} />,
-          key: 'upload-folder',
-          label: t('header.actions.uploadFolder'),
-          onClick: openFolderUploadDialog,
-        },
-      );
+    nextItems.push(
+      {
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.fileUpload} />,
+        key: 'upload-file',
+        label: t('header.actions.uploadFile'),
+        onClick: openFileUploadDialog,
+      },
+      {
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.folderUpload} />,
+        key: 'upload-folder',
+        label: t('header.actions.uploadFolder'),
+        onClick: openFolderUploadDialog,
+      },
+    );
 
-      return nextItems;
-    },
-    [handleCreateFolder, sourceSetId, openFileUploadDialog, openFolderUploadDialog, t],
-  );
+    return nextItems;
+  }, [handleCreateFolder, sourceSetId, openFileUploadDialog, openFolderUploadDialog, t]);
 
   const trigger = useCompact ? (
     <ActionIcon
@@ -197,7 +194,7 @@ const AddButton = ({ compact }: AddButtonProps) => {
       title={t('addSourceSet')}
     />
   ) : (
-    <Button data-no-highlight icon={RESOURCE_ENTRY_ICONS.plus} type="primary">
+    <Button data-no-highlight icon={RESOURCE_ENTRY_ICONS.plus} size="small" type="primary">
       {t('addSourceSet')}
     </Button>
   );

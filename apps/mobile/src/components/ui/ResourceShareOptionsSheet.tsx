@@ -9,14 +9,16 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { ContentShareKind } from '../../lib/api';
-import { shareResourceWithLink } from '../../lib/resourceShareFlow';
 import { useI18n } from '../../lib/i18n';
+import { shareResourceWithLink } from '../../lib/resourceShareFlow';
+import { getResponsiveLayoutMetrics } from '../../lib/responsiveLayout';
 import { useThemeColors } from '../../theme/colors';
 import { enteringModalContent } from '../../theme/motion';
 
@@ -44,6 +46,13 @@ export default function ResourceShareOptionsSheet({
   const colors = useThemeColors();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const isFloatingPanel = responsiveMetrics.isTablet;
+  const panelWidth = Math.min(
+    Math.max(screenWidth - 32, 0),
+    responsiveMetrics.isWideTablet ? 680 : 560,
+  );
   const [expiresInDays, setExpiresInDays] = useState<1 | 7 | 30>(7);
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -110,13 +119,27 @@ export default function ResourceShareOptionsSheet({
       visible={visible}
       onRequestClose={onClose}
     >
-      <Pressable className="flex-1 justify-end bg-black/45" onPress={onClose}>
+      <Pressable
+        className="flex-1 bg-black/45"
+        style={{
+          justifyContent: isFloatingPanel ? 'center' : 'flex-end',
+          paddingHorizontal: isFloatingPanel ? 16 : 0,
+          paddingVertical: isFloatingPanel ? 24 : 0,
+        }}
+        onPress={onClose}
+      >
         <Animated.View
           entering={enteringModalContent()}
-          style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+          style={{
+            alignSelf: 'center',
+            paddingBottom: isFloatingPanel ? 0 : Math.max(insets.bottom, 16),
+            width: isFloatingPanel ? panelWidth : undefined,
+          }}
         >
           <Pressable
-            className="bg-card rounded-t-2xl px-5 pt-3"
+            className={
+              isFloatingPanel ? 'bg-card rounded-3xl px-5 pt-3' : 'bg-card rounded-t-2xl px-5 pt-3'
+            }
             onPress={(e) => e.stopPropagation()}
           >
             <View className="items-center pb-2">

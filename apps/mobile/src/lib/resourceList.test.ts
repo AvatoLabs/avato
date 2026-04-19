@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 import type { FileListItem } from '../types';
 import {
   areSameFileItems,
+  filterFileListByCategory,
   getCanonicalResourceKind,
   isCanonicalDocumentItem,
   isRawFileResourceId,
+  sortFileList,
 } from './resourceList';
 
 const baseItem: FileListItem = {
@@ -76,5 +78,34 @@ describe('isCanonicalDocumentItem', () => {
     expect(isRawFileResourceId('file_1')).toBe(true);
     expect(isRawFileResourceId('docs_1')).toBe(false);
     expect(isRawFileResourceId(undefined)).toBe(false);
+  });
+});
+
+describe('sortFileList', () => {
+  it('sorts names with numeric awareness', () => {
+    const sorted = sortFileList(
+      [
+        { ...baseItem, id: '2', name: 'file-10' },
+        { ...baseItem, id: '1', name: 'file-2' },
+      ],
+      'name',
+      'asc',
+    );
+
+    expect(sorted.map((item) => item.name)).toEqual(['file-2', 'file-10']);
+  });
+});
+
+describe('filterFileListByCategory', () => {
+  it('filters documents via shared category helpers', () => {
+    const filtered = filterFileListByCategory(
+      [
+        { ...baseItem, id: 'img', fileType: 'image/png', name: 'cover.png' },
+        { ...baseItem, id: 'doc', fileType: 'application/pdf', name: 'spec.pdf' },
+      ],
+      'documents',
+    );
+
+    expect(filtered.map((item) => item.id)).toEqual(['doc']);
   });
 });

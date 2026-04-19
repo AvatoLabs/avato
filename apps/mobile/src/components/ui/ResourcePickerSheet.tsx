@@ -10,6 +10,7 @@ import {
   Pressable,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -18,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { resourceApi, sourceSetApi } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
+import { getResponsiveLayoutMetrics } from '../../lib/responsiveLayout';
 import { useThemeColors } from '../../theme/colors';
 import { enteringModalContent } from '../../theme/motion';
 import type { FileListItem, SourceSetItem } from '../../types';
@@ -42,6 +44,17 @@ export default function ResourcePickerSheet({
   const colors = useThemeColors();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const isFloatingPanel = responsiveMetrics.isTablet;
+  const panelWidth = Math.min(
+    Math.max(screenWidth - 32, 0),
+    responsiveMetrics.isWideTablet ? 760 : 640,
+  );
+  const locationMenuWidth = Math.min(
+    Math.max(screenWidth - 32, 0),
+    responsiveMetrics.isWideTablet ? 560 : 480,
+  );
   const [sourceSets, setSourceSets] = useState<SourceSetItem[]>([]);
   const [activeSourceSet, setActiveSourceSet] = useState<SourceSetItem | null>(null);
   const [folderStack, setFolderStack] = useState<string[]>([]);
@@ -243,12 +256,28 @@ export default function ResourcePickerSheet({
       visible={visible}
       onRequestClose={onClose}
     >
-      <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
+      <Pressable
+        className="flex-1 bg-black/40"
+        style={{
+          justifyContent: isFloatingPanel ? 'center' : 'flex-end',
+          paddingHorizontal: isFloatingPanel ? 16 : 0,
+          paddingVertical: isFloatingPanel ? 24 : 0,
+        }}
+        onPress={onClose}
+      >
         <Animated.View
           entering={enteringModalContent()}
-          style={{ maxHeight: '85%', paddingBottom: Math.max(insets.bottom, 16) }}
+          style={{
+            alignSelf: 'center',
+            maxHeight: '85%',
+            paddingBottom: isFloatingPanel ? 0 : Math.max(insets.bottom, 16),
+            width: isFloatingPanel ? panelWidth : undefined,
+          }}
         >
-          <Pressable className="bg-card rounded-t-2xl" onPress={(e) => e.stopPropagation()}>
+          <Pressable
+            className={isFloatingPanel ? 'bg-card rounded-3xl' : 'bg-card rounded-t-2xl'}
+            onPress={(e) => e.stopPropagation()}
+          >
             <View className="items-center pt-3 pb-1">
               <View className="w-9 h-1 rounded-full bg-foreground/10" />
             </View>
@@ -372,11 +401,25 @@ export default function ResourcePickerSheet({
         onRequestClose={() => setLocationMenuVisible(false)}
       >
         <Pressable
-          className="flex-1 bg-black/50 justify-end"
+          className="flex-1 bg-black/50"
+          style={{
+            justifyContent: isFloatingPanel ? 'center' : 'flex-end',
+            paddingHorizontal: isFloatingPanel ? 16 : 0,
+            paddingVertical: isFloatingPanel ? 24 : 0,
+          }}
           onPress={() => setLocationMenuVisible(false)}
         >
           <Pressable
-            className="bg-card rounded-t-2xl max-h-[60%]"
+            className={
+              isFloatingPanel
+                ? 'bg-card rounded-3xl overflow-hidden'
+                : 'bg-card rounded-t-2xl max-h-[60%]'
+            }
+            style={{
+              alignSelf: 'center',
+              maxHeight: isFloatingPanel ? '72%' : '60%',
+              width: isFloatingPanel ? locationMenuWidth : undefined,
+            }}
             onPress={(e) => e.stopPropagation()}
           >
             <Text className="text-foreground text-[16px] font-bold px-5 pt-4 pb-2">

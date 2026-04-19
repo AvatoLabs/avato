@@ -143,6 +143,35 @@ cleanup_on_exit() {
   cleanup_tmp_build_dir
 }
 
+build_runtime_image() {
+  local image_name="$1"
+  local build_dir="$2"
+  local build_log
+
+  build_log="$(mktemp "${TMP_BUILD_ROOT}.buildx-log.XXXXXX")"
+
+  if docker buildx build --platform linux/amd64 --load -t "${image_name}" "${build_dir}" 2>&1 | tee "${build_log}"; then
+    rm -f "${build_log}"
+    return 0
+  fi
+
+  if ! grep -q 'lease does not exist' "${build_log}"; then
+    rm -f "${build_log}"
+    return 1
+  fi
+
+  echo "BuildKit cache lease is stale; pruning buildx cache and retrying once..." >&2
+  docker buildx prune -af >/dev/null 2>&1 || docker builder prune -af >/dev/null 2>&1 || true
+
+  if docker buildx build --platform linux/amd64 --load -t "${image_name}" "${build_dir}"; then
+    rm -f "${build_log}"
+    return 0
+  fi
+
+  rm -f "${build_log}"
+  return 1
+}
+
 prune_runtime_native_modules() {
   local app_dir="$1"
   local node_modules_dir="${app_dir}/node_modules"
@@ -334,7 +363,7 @@ cp "${ROOT_DIR}/scripts/migrateServerDB/errorHint.js" "${TMP_BUILD_DIR}/errorHin
 rsync -a "${ROOT_DIR}/packages/database/migrations/" "${TMP_BUILD_DIR}/migrations/"
 
 echo "==> Building runtime image ${IMAGE_NAME} (base: ${CANARY_RUNTIME_NODE_IMAGE})"
-docker buildx build --platform linux/amd64 --load -t "${IMAGE_NAME}" "${TMP_BUILD_DIR}"
+build_runtime_image "${IMAGE_NAME}" "${TMP_BUILD_DIR}"
 
 echo "==> Packaging ${ARTIFACT_NAME}"
 docker save "${IMAGE_NAME}" | gzip > "${TMP_ARTIFACT_DIR}/${ARTIFACT_NAME}"

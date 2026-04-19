@@ -4,9 +4,10 @@
  */
 import { ChevronRight } from 'lucide-react-native';
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
+import { getResponsiveLayoutMetrics } from '../../lib/responsiveLayout';
 import { useThemeColors } from '../../theme/colors';
 import { enteringSection } from '../../theme/motion';
 import { tokens } from '../../theme/tokens';
@@ -114,9 +115,19 @@ export interface SettingsSectionProps {
 
 export function SettingsSection({ children, delay = 0, description, title }: SettingsSectionProps) {
   const colors = useThemeColors();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+
   return (
     <Animated.View entering={enteringSection(delay)}>
-      <View className="mb-5 px-5">
+      <View
+        className="mb-5 px-5"
+        style={{
+          alignSelf: 'center',
+          maxWidth: responsiveMetrics.settingsMaxWidth,
+          width: '100%',
+        }}
+      >
         <Text
           className="mb-2 px-2 text-[13px] font-semibold tracking-tight"
           style={{ color: colors.secondaryText }}

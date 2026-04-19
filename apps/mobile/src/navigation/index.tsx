@@ -9,7 +9,14 @@ import {
 import { BlurView } from 'expo-blur';
 import { FolderOpen, MessageCircle, Palette, Store } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Image as RNImage, Keyboard, Platform, StyleSheet, View } from 'react-native';
+import {
+  Image as RNImage,
+  Keyboard,
+  Platform,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -26,6 +33,7 @@ import PressableScale from '../components/ui/PressableScale';
 import { TAB_BAR_FLOAT_GAP, TAB_BAR_HEIGHT, TAB_BAR_HORIZONTAL_INSET } from '../lib/bottomChrome';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import AgentConfigScreen from '../screens/AgentConfigScreen';
 import AgentListScreen from '../screens/AgentListScreen';
 import AIProvidersScreen from '../screens/AIProvidersScreen';
@@ -33,6 +41,7 @@ import AppLogsScreen from '../screens/AppLogsScreen';
 import ChatDetailScreen from '../screens/ChatDetailScreen';
 import ChatListScreen from '../screens/ChatListScreen';
 import ChatSettingsScreen from '../screens/ChatSettingsScreen';
+import ContentScreen from '../screens/ContentScreen';
 import CreateScreen from '../screens/CreateScreen';
 import DataManagementScreen from '../screens/DataManagementScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -42,12 +51,13 @@ import MessageDetailScreen from '../screens/MessageDetailScreen';
 import ModelPickerScreen from '../screens/ModelPickerScreen';
 import NotebookScreen from '../screens/NotebookScreen';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
+import PortalContentScreen from '../screens/PortalContentScreen';
 import ProfileEditScreen from '../screens/ProfileEditScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProviderDetailScreen from '../screens/ProviderDetailScreen';
 import PublicResourceShareScreen from '../screens/PublicResourceShareScreen';
-import ResourceScreen, { PortalResourceScreen } from '../screens/ResourceScreen';
 import ServerConfigScreen from '../screens/ServerConfigScreen';
+import SpaceMemoryScreen from '../screens/SpaceMemoryScreen';
 import StatsScreen from '../screens/StatsScreen';
 import StoreScreen from '../screens/StoreScreen';
 import ThreadDetailScreen from '../screens/ThreadDetailScreen';
@@ -312,6 +322,8 @@ function MainTabBar({ descriptors, navigation, state }: BottomTabBarProps) {
   const themeColors = useThemeColors();
   const insets = useSafeAreaInsets();
   const keyboardVisible = useTabBarKeyboardVisible();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
   const [layoutWidth, setLayoutWidth] = useState(0);
   const tabBarVisibility = useSharedValue(keyboardVisible ? 1 : 0);
   const activeIndicatorX = useSharedValue(0);
@@ -319,6 +331,10 @@ function MainTabBar({ descriptors, navigation, state }: BottomTabBarProps) {
   const tabBarBottomSpacing = Platform.OS === 'ios' ? Math.max(Math.min(insets.bottom, 10), 6) : 0;
   const tabBarVisualHeight = TAB_BAR_HEIGHT;
   const tabBarHeight = tabBarVisualHeight + tabBarBottomSpacing;
+  const tabBarWidth = Math.min(
+    Math.max(screenWidth - TAB_BAR_HORIZONTAL_INSET * 2, 0),
+    responsiveMetrics.tabBarMaxWidth,
+  );
   const tabWidth = layoutWidth > 0 ? layoutWidth / state.routes.length : 0;
   const activeIndicatorWidth =
     tabWidth > 0 ? Math.max(44, tabWidth - TAB_BAR_ACTIVE_INDICATOR_HORIZONTAL_INSET * 2) : 0;
@@ -368,9 +384,9 @@ function MainTabBar({ descriptors, navigation, state }: BottomTabBarProps) {
           bottom: TAB_BAR_FLOAT_GAP,
           elevation: 48,
           height: tabBarHeight,
-          left: TAB_BAR_HORIZONTAL_INSET,
+          left: (screenWidth - tabBarWidth) / 2,
           position: 'absolute',
-          right: TAB_BAR_HORIZONTAL_INSET,
+          width: tabBarWidth,
           zIndex: 48,
         },
         containerAnimatedStyle,
@@ -525,8 +541,8 @@ function BottomTabs() {
         }}
       />
       <Tab.Screen
-        component={ResourceScreen}
-        name="Resources"
+        component={ContentScreen}
+        name="Content"
         options={{
           tabBarIcon: ({ color, focused, size }) => (
             <AnimatedTabIcon focused={focused}>
@@ -622,7 +638,7 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
       />
       <Stack.Group screenOptions={PORTAL_SCREEN_OPTIONS}>
         <Stack.Screen component={MessageDetailScreen} name="MessageDetail" />
-        <Stack.Screen component={PortalResourceScreen} name="PortalResources" />
+        <Stack.Screen component={PortalContentScreen} name="PortalContent" />
         <Stack.Screen component={ToolDetailScreen} name="ToolDetail" />
         <Stack.Screen component={ThreadDetailScreen} name="ThreadDetail" />
         <Stack.Screen component={ThreadListScreen} name="ThreadList" />
@@ -639,6 +655,7 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
       <Stack.Screen component={StatsScreen} name="Stats" />
       <Stack.Screen component={MemoryScreen} name="Memory" />
       <Stack.Screen component={MemoryDetailScreen} name="MemoryDetail" />
+      <Stack.Screen component={SpaceMemoryScreen} name="SpaceMemory" />
 
       <Stack.Screen component={AgentListScreen} name="AgentList" />
       <Stack.Screen component={AgentConfigScreen} name="AgentConfig" />

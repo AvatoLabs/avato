@@ -29,6 +29,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +38,7 @@ import { withAlpha } from '../constants/tags';
 import { memoryApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type {
@@ -314,6 +316,9 @@ export default function MemoryDetailScreen() {
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const contentWidth = Math.min(Math.max(screenWidth - 40, 0), responsiveMetrics.settingsMaxWidth);
 
   const initialItem = route.params?.item as AnyMemoryItem | undefined;
   const layer = route.params?.layer as MemoryLayer | undefined;
@@ -1033,65 +1038,71 @@ export default function MemoryDetailScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 48 : 0}
       style={{ paddingTop: insets.top, backgroundColor: colors.background }}
     >
-      <View className="flex-row items-center justify-between px-5 py-3">
-        <View className="flex-1 flex-row items-center">
-          <TouchableOpacity
-            accessibilityLabel={t.accessibilityGoBack}
-            accessibilityRole="button"
-            className="mr-3"
-            onPress={() => nav.goBack()}
-          >
-            <ChevronLeft color={colors.foreground} size={24} strokeWidth={1.8} />
-          </TouchableOpacity>
-          {editing && (layer === 'identity' || layer === 'context') ? (
-            <TextInput
-              className="flex-1 text-lg font-bold"
-              placeholderTextColor={colors.muted}
-              style={{ color: colors.foreground }}
-              value={editState.title}
-              onChangeText={setField('title')}
-            />
-          ) : (
-            <Text
-              className="flex-1 text-lg font-bold"
-              numberOfLines={1}
-              style={{ color: colors.foreground }}
+      <View style={{ alignSelf: 'center', width: contentWidth }}>
+        <View className="flex-row items-center justify-between py-3">
+          <View className="flex-1 flex-row items-center">
+            <TouchableOpacity
+              accessibilityLabel={t.accessibilityGoBack}
+              accessibilityRole="button"
+              className="mr-3"
+              onPress={() => nav.goBack()}
             >
-              {getHeaderTitle()}
-            </Text>
-          )}
-        </View>
+              <ChevronLeft color={colors.foreground} size={24} strokeWidth={1.8} />
+            </TouchableOpacity>
+            {editing && (layer === 'identity' || layer === 'context') ? (
+              <TextInput
+                className="flex-1 text-lg font-bold"
+                placeholderTextColor={colors.muted}
+                style={{ color: colors.foreground }}
+                value={editState.title}
+                onChangeText={setField('title')}
+              />
+            ) : (
+              <Text
+                className="flex-1 text-lg font-bold"
+                numberOfLines={1}
+                style={{ color: colors.foreground }}
+              >
+                {getHeaderTitle()}
+              </Text>
+            )}
+          </View>
 
-        <View className="flex-row items-center gap-3">
-          {loadingDetail || refreshingDetail ? (
-            <ActivityIndicator color={layerColor} size="small" />
-          ) : null}
-          {editing ? (
-            <>
-              <TouchableOpacity onPress={() => setEditing(false)}>
-                <X color={colors.secondaryText} size={20} strokeWidth={1.8} />
-              </TouchableOpacity>
-              <TouchableOpacity disabled={saving} onPress={handleSave}>
-                <Save color={layerColor} size={20} strokeWidth={1.8} />
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <TouchableOpacity onPress={startEdit}>
-                <Edit3 color={colors.iconMuted} size={18} strokeWidth={1.8} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleDelete}>
-                <Trash2 color={colors.danger} size={18} strokeWidth={1.8} />
-              </TouchableOpacity>
-            </>
-          )}
+          <View className="flex-row items-center gap-3">
+            {loadingDetail || refreshingDetail ? (
+              <ActivityIndicator color={layerColor} size="small" />
+            ) : null}
+            {editing ? (
+              <>
+                <TouchableOpacity onPress={() => setEditing(false)}>
+                  <X color={colors.secondaryText} size={20} strokeWidth={1.8} />
+                </TouchableOpacity>
+                <TouchableOpacity disabled={saving} onPress={handleSave}>
+                  <Save color={layerColor} size={20} strokeWidth={1.8} />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity onPress={startEdit}>
+                  <Edit3 color={colors.iconMuted} size={18} strokeWidth={1.8} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleDelete}>
+                  <Trash2 color={colors.danger} size={18} strokeWidth={1.8} />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         </View>
       </View>
 
       {detailFetchFailed ? (
         <View
           className="flex-row items-center justify-between px-4 py-2.5"
-          style={{ backgroundColor: withAlpha(layerColor, '18') }}
+          style={{
+            backgroundColor: withAlpha(layerColor, '18'),
+            alignSelf: 'center',
+            width: contentWidth,
+          }}
         >
           <Text
             className="flex-1 pr-3 text-[13px] font-medium"
@@ -1117,7 +1128,7 @@ export default function MemoryDetailScreen() {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 20 }}
+        contentContainerStyle={{ alignItems: 'center', paddingBottom: 100 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -1128,7 +1139,7 @@ export default function MemoryDetailScreen() {
           />
         }
       >
-        {renderContent()}
+        <View style={{ width: contentWidth }}>{renderContent()}</View>
       </ScrollView>
     </KeyboardAvoidingView>
   );

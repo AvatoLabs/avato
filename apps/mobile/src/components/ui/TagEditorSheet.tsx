@@ -6,11 +6,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
 import { resolveTagColor, TAG_COLOR_OPTIONS, withAlpha } from '../../constants/tags';
 import { useI18n } from '../../lib/i18n';
+import { getResponsiveLayoutMetrics } from '../../lib/responsiveLayout';
 import { useThemeColors } from '../../theme/colors';
 
 interface TagEditorSheetProps {
@@ -50,6 +52,12 @@ export function TagEditorSheet({
 }: TagEditorSheetProps) {
   const { t } = useI18n();
   const colors = useThemeColors();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const panelWidth = Math.min(
+    Math.max(screenWidth - 32, 0),
+    responsiveMetrics.isTablet ? 560 : screenWidth,
+  );
   return (
     <Modal
       accessibilityViewIsModal
@@ -58,10 +66,23 @@ export function TagEditorSheet({
       visible={visible}
       onRequestClose={onCancel}
     >
-      <Pressable className="flex-1 justify-end bg-black/40" onPress={onCancel}>
+      <Pressable
+        className="flex-1 bg-black/40"
+        style={{
+          justifyContent: responsiveMetrics.isTablet ? 'center' : 'flex-end',
+          paddingHorizontal: responsiveMetrics.isTablet ? 16 : 0,
+          paddingVertical: responsiveMetrics.isTablet ? 24 : 0,
+        }}
+        onPress={onCancel}
+      >
         <Pressable
-          className="rounded-t-2xl"
-          style={{ backgroundColor: colors.card, maxHeight: '78%' }}
+          className={responsiveMetrics.isTablet ? 'rounded-3xl' : 'rounded-t-2xl'}
+          style={{
+            alignSelf: 'center',
+            backgroundColor: colors.card,
+            maxHeight: '78%',
+            width: responsiveMetrics.isTablet ? panelWidth : undefined,
+          }}
           onPress={(event) => event.stopPropagation()}
         >
           <View className="items-center pt-3 pb-2">
@@ -69,7 +90,12 @@ export function TagEditorSheet({
           </View>
 
           <View className="px-5 pb-4 pt-1">
-            <Text className="text-[18px] font-bold tracking-tight" style={{ color: colors.foreground }}>{title}</Text>
+            <Text
+              className="text-[18px] font-bold tracking-tight"
+              style={{ color: colors.foreground }}
+            >
+              {title}
+            </Text>
           </View>
 
           <ScrollView
@@ -78,7 +104,10 @@ export function TagEditorSheet({
             keyboardShouldPersistTaps="handled"
           >
             <View>
-              <Text className="mb-2 px-1 text-[12px] font-medium uppercase tracking-wider" style={{ color: colors.secondaryText }}>
+              <Text
+                className="mb-2 px-1 text-[12px] font-medium uppercase tracking-wider"
+                style={{ color: colors.secondaryText }}
+              >
                 {t.agentConfigName}
               </Text>
               <TextInput
@@ -93,10 +122,16 @@ export function TagEditorSheet({
             </View>
 
             <View>
-              <Text className="mb-2 px-1 text-[12px] font-medium uppercase tracking-wider" style={{ color: colors.secondaryText }}>
+              <Text
+                className="mb-2 px-1 text-[12px] font-medium uppercase tracking-wider"
+                style={{ color: colors.secondaryText }}
+              >
                 {colorLabel}
               </Text>
-              <View className="rounded-2xl px-3 py-3" style={{ backgroundColor: colors.fillQuaternary }}>
+              <View
+                className="rounded-2xl px-3 py-3"
+                style={{ backgroundColor: colors.fillQuaternary }}
+              >
                 <View className="mb-3 flex-row items-center">
                   <View
                     className="mr-3 h-8 rounded-full border"
@@ -149,7 +184,9 @@ export function TagEditorSheet({
                 style={{ backgroundColor: colors.primary }}
                 onPress={onSubmit}
               >
-                <Text className="text-[15px] font-semibold" style={{ color: colors.iconOnPrimary }}>{submitLabel}</Text>
+                <Text className="text-[15px] font-semibold" style={{ color: colors.iconOnPrimary }}>
+                  {submitLabel}
+                </Text>
               </TouchableOpacity>
 
               {onDelete ? (
@@ -175,7 +212,9 @@ export function TagEditorSheet({
                 style={{ backgroundColor: colors.fillTertiary }}
                 onPress={onCancel}
               >
-                <Text className="text-[14px] font-medium" style={{ color: colors.secondaryText }}>{cancelLabel}</Text>
+                <Text className="text-[14px] font-medium" style={{ color: colors.secondaryText }}>
+                  {cancelLabel}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

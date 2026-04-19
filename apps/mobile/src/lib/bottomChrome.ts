@@ -4,8 +4,10 @@
  */
 import { useCallback, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
-import { runOnJS,useAnimatedKeyboard, useAnimatedReaction } from 'react-native-reanimated';
+import { runOnJS, useAnimatedKeyboard, useAnimatedReaction } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { resolveFloatingTabKeyboardVisible } from './bottomChromeMath';
 
 /** Fixed bottom tab bar: no floating gap or horizontal inset */
 export const TAB_BAR_FLOAT_GAP = 0;
@@ -29,7 +31,7 @@ const KEYBOARD_VISIBLE_THRESHOLD = 2;
  * (`keyboardOffset` from RN Keyboard) with `useAnimatedKeyboard` so Android stays correct
  * when composer lift uses animated height instead of JS events.
  */
-function useFloatingTabKeyboardChromeVisible(keyboardOffsetFromEvents = 0) {
+function useFloatingTabKeyboardChromeVisible(keyboardOffsetFromEvents?: number) {
   const keyboard = useAnimatedKeyboard();
   const [animDrivenVisible, setAnimDrivenVisible] = useState(false);
 
@@ -49,7 +51,10 @@ function useFloatingTabKeyboardChromeVisible(keyboardOffsetFromEvents = 0) {
     },
   );
 
-  return keyboardOffsetFromEvents > 0 || animDrivenVisible;
+  return resolveFloatingTabKeyboardVisible({
+    animatedKeyboardVisible: animDrivenVisible,
+    keyboardOffsetFromEvents,
+  });
 }
 
 /** Stack screens (e.g. ChatDetail) — no floating tab */
@@ -98,7 +103,7 @@ export function mainTabOverlayListPaddingBottom(safeBottom: number, keyboardVisi
  * @param keyboardOffset - Pass raw `keyboardOffset` state from `Keyboard` listeners when the
  *   screen uses them for composer lift (iOS); combined with animated keyboard height for Android.
  */
-export function useMainTabBottomInsets(keyboardOffsetFromEvents = 0) {
+export function useMainTabBottomInsets(keyboardOffsetFromEvents?: number) {
   const insets = useSafeAreaInsets();
   const keyboardVisible = useFloatingTabKeyboardChromeVisible(keyboardOffsetFromEvents);
 
@@ -127,7 +132,7 @@ export function mainTabScrollableContentPaddingBottomWhenKeyboard(
   return mainTabScrollableContentPaddingBottom(safeBottom);
 }
 
-export function useMainTabScrollableContentPaddingBottom(keyboardOffsetFromEvents = 0) {
+export function useMainTabScrollableContentPaddingBottom(keyboardOffsetFromEvents?: number) {
   const insets = useSafeAreaInsets();
   const keyboardVisible = useFloatingTabKeyboardChromeVisible(keyboardOffsetFromEvents);
 
