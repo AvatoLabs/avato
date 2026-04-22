@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { zipSync } from 'fflate';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -363,6 +365,160 @@ describe('LocalFileCtr', () => {
       });
       expect(fetchMock).not.toHaveBeenCalled();
       expect(mockFsPromises.writeFile).not.toHaveBeenCalled();
+    });
+
+    it('should verify cached archives for sha256 hashes before reusing them', async () => {
+      const zipped = zipSync({
+        'SKILL.md': new TextEncoder().encode('---\nname: Demo\n---\ncontent'),
+      });
+      const zipBuffer = Buffer.from(zipped);
+      const expectedHash = createHash('sha256').update(zipBuffer).digest('hex');
+
+      vi.mocked(mockFsPromises.access).mockResolvedValue(undefined);
+      vi.mocked(mockFsPromises.readFile).mockResolvedValue(zipBuffer);
+
+      const result = await (localFileCtr as any).handlePrepareSkillDirectory({
+        url: 'https://example.com/demo-skill.zip',
+        zipSha256: expectedHash,
+      });
+
+      expect(result).toEqual({
+        extractedDir: `/mock/app/storage/file-storage/skills/extracted/${expectedHash}`,
+        success: true,
+        zipPath: `/mock/app/storage/file-storage/skills/archives/${expectedHash}.zip`,
+      });
+      expect(mockFsPromises.readFile).toHaveBeenCalledWith(
+        `/mock/app/storage/file-storage/skills/archives/${expectedHash}.zip`,
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('should redownload cached archives when sha256 verification fails', async () => {
+      const zipped = zipSync({
+        'SKILL.md': new TextEncoder().encode('---\nname: Demo\n---\ncontent'),
+      });
+      const zipBuffer = Buffer.from(zipped);
+      const expectedHash = createHash('sha256').update(zipBuffer).digest('hex');
+
+      vi.mocked(mockFsPromises.access).mockResolvedValue(undefined);
+      vi.mocked(mockFsPromises.readFile).mockResolvedValue(Buffer.from('stale archive'));
+      vi.mocked(mockFsPromises.mkdir).mockResolvedValue(undefined);
+      vi.mocked(mockFsPromises.writeFile).mockResolvedValue(undefined);
+      fetchMock.mockResolvedValue({
+        arrayBuffer: vi
+          .fn()
+          .mockResolvedValue(
+            zipBuffer.buffer.slice(
+              zipBuffer.byteOffset,
+              zipBuffer.byteOffset + zipBuffer.byteLength,
+            ),
+          ),
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+      });
+
+      const result = await (localFileCtr as any).handlePrepareSkillDirectory({
+        url: 'https://example.com/demo-skill.zip',
+        zipSha256: expectedHash,
+      });
+
+      expect(result).toEqual({
+        extractedDir: `/mock/app/storage/file-storage/skills/extracted/${expectedHash}`,
+        success: true,
+        zipPath: `/mock/app/storage/file-storage/skills/archives/${expectedHash}.zip`,
+      });
+      expect(fetchMock).toHaveBeenCalledWith('https://example.com/demo-skill.zip');
+    });
+
+    it('should reject unsafe skill archive hashes before reading or writing cache paths', async () => {
+      const result = await (localFileCtr as any).handlePrepareSkillDirectory({
+        url: 'https://example.com/demo-skill.zip',
+        zipSha256: '../escape',
+      });
+
+      expect(result).toEqual({
+        error: 'Invalid skill archive hash',
+        extractedDir: '/mock/app/storage/file-storage/skills/extracted/invalid',
+        success: false,
+        zipPath: '/mock/app/storage/file-storage/skills/archives/invalid.zip',
+      });
+      expect(mockFsPromises.access).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('should reject downloaded skill archives whose sha256 does not match', async () => {
+      const zipped = zipSync({
+        'SKILL.md': new TextEncoder().encode('---\nname: Demo\n---\ncontent'),
+      });
+      const zipBuffer = Buffer.from(zipped);
+      const expectedHash = createHash('sha256').update(Buffer.from('other')).digest('hex');
+
+      fetchMock.mockResolvedValue({
+        arrayBuffer: vi
+          .fn()
+          .mockResolvedValue(
+            zipBuffer.buffer.slice(
+              zipBuffer.byteOffset,
+              zipBuffer.byteOffset + zipBuffer.byteLength,
+            ),
+          ),
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+      });
+
+      vi.mocked(mockFsPromises.access).mockRejectedValue(new Error('missing cache'));
+
+      const result = await (localFileCtr as any).handlePrepareSkillDirectory({
+        url: 'https://example.com/demo-skill.zip',
+        zipSha256: expectedHash,
+      });
+
+      expect(result).toEqual({
+        error: 'Downloaded skill archive hash mismatch',
+        extractedDir: `/mock/app/storage/file-storage/skills/extracted/${expectedHash}`,
+        success: false,
+        zipPath: `/mock/app/storage/file-storage/skills/archives/${expectedHash}.zip`,
+      });
+      expect(mockFsPromises.writeFile).not.toHaveBeenCalled();
+    });
+
+    it('should extract downloaded skill archives whose sha256 matches', async () => {
+      const zipped = zipSync({
+        'SKILL.md': new TextEncoder().encode('---\nname: Demo\n---\ncontent'),
+      });
+      const zipBuffer = Buffer.from(zipped);
+      const expectedHash = createHash('sha256').update(zipBuffer).digest('hex');
+
+      fetchMock.mockResolvedValue({
+        arrayBuffer: vi
+          .fn()
+          .mockResolvedValue(
+            zipBuffer.buffer.slice(
+              zipBuffer.byteOffset,
+              zipBuffer.byteOffset + zipBuffer.byteLength,
+            ),
+          ),
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+      });
+
+      vi.mocked(mockFsPromises.access).mockRejectedValue(new Error('missing cache'));
+      vi.mocked(mockFsPromises.mkdir).mockResolvedValue(undefined);
+      vi.mocked(mockFsPromises.writeFile).mockResolvedValue(undefined);
+
+      const result = await (localFileCtr as any).handlePrepareSkillDirectory({
+        url: 'https://example.com/demo-skill.zip',
+        zipSha256: expectedHash,
+      });
+
+      expect(result).toEqual({
+        extractedDir: `/mock/app/storage/file-storage/skills/extracted/${expectedHash}`,
+        success: true,
+        zipPath: `/mock/app/storage/file-storage/skills/archives/${expectedHash}.zip`,
+      });
     });
   });
 

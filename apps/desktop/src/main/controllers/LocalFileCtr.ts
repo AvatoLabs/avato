@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { access, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -46,6 +47,24 @@ import { ControllerModule, IpcMethod } from './index';
 
 // Create logger
 const logger = createLogger('controllers:LocalFileCtr');
+
+const SKILL_ARCHIVE_HASH_PATTERN = /^[\w-]{1,128}$/;
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
+
+const assertSafeSkillArchiveHash = (zipSha256: string) => {
+  if (!SKILL_ARCHIVE_HASH_PATTERN.test(zipSha256)) {
+    throw new Error('Invalid skill archive hash');
+  }
+};
+
+const verifySkillArchiveHash = (buffer: Buffer, zipSha256: string) => {
+  if (!SHA256_HEX_PATTERN.test(zipSha256)) return;
+
+  const actualHash = createHash('sha256').update(buffer).digest('hex');
+  if (actualHash !== zipSha256.toLowerCase()) {
+    throw new Error('Downloaded skill archive hash mismatch');
+  }
+};
 
 export default class LocalFileCtr extends ControllerModule {
   static override readonly groupName = 'localSystem';
@@ -614,13 +633,30 @@ export default class LocalFileCtr extends ControllerModule {
     zipSha256,
   }: PrepareSkillDirectoryParams): Promise<PrepareSkillDirectoryResult> {
     const cacheRoot = path.join(this.app.appStoragePath, 'file-storage', 'skills');
-    const extractedDir = path.join(cacheRoot, 'extracted', zipSha256);
+    let extractedDir = path.join(cacheRoot, 'extracted', 'invalid');
+    let zipPath = path.join(cacheRoot, 'archives', 'invalid.zip');
+
+    try {
+      assertSafeSkillArchiveHash(zipSha256);
+      extractedDir = path.join(cacheRoot, 'extracted', zipSha256);
+      zipPath = path.join(cacheRoot, 'archives', `${zipSha256}.zip`);
+    } catch (error) {
+      return {
+        error: (error as Error).message,
+        extractedDir,
+        success: false,
+        zipPath,
+      };
+    }
+
     const markerPath = path.join(extractedDir, '.prepared');
-    const zipPath = path.join(cacheRoot, 'archives', `${zipSha256}.zip`);
 
     try {
       if (!forceRefresh) {
         await access(markerPath, constants.F_OK);
+        if (SHA256_HEX_PATTERN.test(zipSha256)) {
+          verifySkillArchiveHash(await readFile(zipPath), zipSha256);
+        }
         return { extractedDir, success: true, zipPath };
       }
     } catch {
@@ -636,6 +672,7 @@ export default class LocalFileCtr extends ControllerModule {
       }
 
       const buffer = Buffer.from(await response.arrayBuffer());
+      verifySkillArchiveHash(buffer, zipSha256);
       const extractedFiles = unzipSync(new Uint8Array(buffer));
 
       await rm(extractedDir, { force: true, recursive: true });
