@@ -8,6 +8,7 @@ import {
   normalizeDeviceRpcResult,
   resolveNextDeviceAlarm,
   resolveRemoteToolTarget,
+  shouldReplaceAuthenticatedDeviceSocket,
   toPublicDeviceAttachment,
 } from './device';
 import {
@@ -130,12 +131,12 @@ export class DeviceGatewayDO extends DurableObject<Env> {
         }
         await this.ctx.storage.put('_userId', verifiedUserId);
 
-        this.closeStaleDeviceSockets(ws, att.deviceId);
-
         // Mark as authenticated
         att.authenticated = true;
         att.authDeadline = undefined;
         ws.serializeAttachment(att);
+
+        this.closeStaleDeviceSockets(ws, att.deviceId);
 
         ws.send(JSON.stringify({ type: 'auth_success' }));
 
@@ -304,7 +305,7 @@ export class DeviceGatewayDO extends DurableObject<Env> {
       if (ws === currentWs) continue;
 
       const att = ws.deserializeAttachment() as DeviceAttachment;
-      if (att.deviceId === deviceId) {
+      if (shouldReplaceAuthenticatedDeviceSocket(att, deviceId)) {
         this.rejectPendingRequestsForSocket(ws, new Error('DEVICE_REPLACED'));
         ws.close(1000, 'Replaced by new connection');
       }

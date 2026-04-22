@@ -96,6 +96,13 @@ export const resolveRemoteToolTarget = <T extends AttachedDeviceSocket>(
     : { type: 'not_found' };
 };
 
+export const shouldReplaceAuthenticatedDeviceSocket = (
+  attachment: DeviceAttachment,
+  deviceId: string,
+): boolean => {
+  return attachment.authenticated && attachment.deviceId === deviceId;
+};
+
 export const decodeWebSocketMessage = (message: string | ArrayBuffer): string | undefined => {
   const byteLength =
     typeof message === 'string' ? new TextEncoder().encode(message).byteLength : message.byteLength;

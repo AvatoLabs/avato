@@ -8,6 +8,7 @@ import {
   normalizeDeviceRpcResult,
   resolveNextDeviceAlarm,
   resolveRemoteToolTarget,
+  shouldReplaceAuthenticatedDeviceSocket,
   toPublicDeviceAttachment,
 } from './device';
 import type { DeviceAttachment } from './types';
@@ -203,6 +204,37 @@ describe('resolveRemoteToolTarget', () => {
       socket,
       type: 'remote_tools_disabled',
     });
+  });
+});
+
+describe('shouldReplaceAuthenticatedDeviceSocket', () => {
+  it('only allows authenticated sockets with the same deviceId to be replaced', () => {
+    const baseAttachment = {
+      allowRemoteTools: true,
+      connectedAt: 1000,
+      hostname: 'desktop',
+      lastHeartbeat: 1000,
+      platform: 'darwin',
+    } satisfies Omit<DeviceAttachment, 'authenticated' | 'deviceId'>;
+
+    expect(
+      shouldReplaceAuthenticatedDeviceSocket(
+        { ...baseAttachment, authenticated: true, deviceId: 'device-1' },
+        'device-1',
+      ),
+    ).toBe(true);
+    expect(
+      shouldReplaceAuthenticatedDeviceSocket(
+        { ...baseAttachment, authenticated: false, deviceId: 'device-1' },
+        'device-1',
+      ),
+    ).toBe(false);
+    expect(
+      shouldReplaceAuthenticatedDeviceSocket(
+        { ...baseAttachment, authenticated: true, deviceId: 'device-2' },
+        'device-1',
+      ),
+    ).toBe(false);
   });
 });
 
