@@ -103,6 +103,54 @@ describe('remoteDeviceRouter', () => {
         arguments: JSON.stringify({ command: 'pwd' }),
         identifier: LocalSystemIdentifier,
       },
+      120_000,
+    );
+  });
+
+  it('derives remote runCommand RPC timeout from tool arguments and clamps it', async () => {
+    executeToolCallMock.mockResolvedValue({
+      content: 'ok',
+      success: true,
+    });
+
+    await caller.executeToolCall({
+      apiName: 'runCommand',
+      arguments: JSON.stringify({ command: 'sleep 600', timeout: 900_000 }),
+      deviceId: 'device-1',
+      identifier: LocalSystemIdentifier,
+    });
+
+    expect(executeToolCallMock).toHaveBeenCalledWith(
+      { deviceId: 'device-1', userId: 'user-1' },
+      {
+        apiName: 'runCommand',
+        arguments: JSON.stringify({ command: 'sleep 600', timeout: 900_000 }),
+        identifier: LocalSystemIdentifier,
+      },
+      600_000,
+    );
+  });
+
+  it('keeps non-command Local System tool calls on the gateway default timeout', async () => {
+    executeToolCallMock.mockResolvedValue({
+      content: 'ok',
+      success: true,
+    });
+
+    await caller.executeToolCall({
+      apiName: 'listLocalFiles',
+      arguments: JSON.stringify({ path: '/tmp' }),
+      deviceId: 'device-1',
+      identifier: LocalSystemIdentifier,
+    });
+
+    expect(executeToolCallMock).toHaveBeenCalledWith(
+      { deviceId: 'device-1', userId: 'user-1' },
+      {
+        apiName: 'listLocalFiles',
+        arguments: JSON.stringify({ path: '/tmp' }),
+        identifier: LocalSystemIdentifier,
+      },
       undefined,
     );
   });
