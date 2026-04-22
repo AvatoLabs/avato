@@ -23,10 +23,94 @@ import {
 import { MarketService } from '@/server/services/market';
 import { resolveAccessibleSkillZipProxyUrl } from '@/server/services/skill/resolveAccessibleSkillZipProxyUrl';
 import { SkillResourceService } from '@/server/services/skill/resource';
+import { deviceProxy } from '@/server/services/toolExecution/deviceProxy';
 
 import { type ServerRuntimeRegistration } from './types';
 
 const log = debug('lobe-server:skills-runtime');
+
+interface ExecScriptDeviceParams {
+  command: string;
+  config?: { description?: string; id?: string; name?: string };
+  description: string;
+  zipHash?: string;
+  zipUrl?: string;
+}
+
+interface RemoteCommandResult {
+  error?: string;
+  exit_code?: number;
+  exitCode?: number;
+  output?: string;
+  shell_id?: string;
+  stderr?: string;
+  stdout?: string;
+  success?: boolean;
+}
+
+const remoteCommandResultKeys = [
+  'error',
+  'exitCode',
+  'exit_code',
+  'output',
+  'shell_id',
+  'stderr',
+  'stdout',
+  'success',
+] as const;
+
+const isRemoteCommandResult = (value: unknown): value is RemoteCommandResult => {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    remoteCommandResultKeys.some((key) => key in value)
+  );
+};
+
+const stringifyRemoteOutput = (value: unknown, fallback: string) => {
+  if (typeof value === 'string') return value;
+  if (value === undefined) return fallback;
+  return JSON.stringify(value);
+};
+
+const parseRemoteCommandResult = (content?: string): RemoteCommandResult => {
+  if (!content) return { output: '', success: true };
+
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    return isRemoteCommandResult(parsed)
+      ? parsed
+      : { output: stringifyRemoteOutput(parsed, content), success: true };
+  } catch {
+    return { output: content, success: true };
+  }
+};
+
+const toCommandResult = (result: RemoteCommandResult): CommandResult => {
+  const exitCode = result.exitCode ?? result.exit_code ?? (result.success === false ? 1 : 0);
+
+  return {
+    exitCode,
+    output: result.stdout || result.output || '',
+    stderr: result.stderr || result.error || '',
+    success: result.success ?? exitCode === 0,
+  };
+};
+
+const toFailedCommandResult = (
+  response: { content: string; error?: string },
+  fallbackError: string,
+): CommandResult => {
+  const parsedResult = toCommandResult(parseRemoteCommandResult(response.content));
+
+  return {
+    exitCode: parsedResult.exitCode === 0 ? 1 : parsedResult.exitCode,
+    output: parsedResult.output || response.content || '',
+    stderr: parsedResult.stderr || response.error || fallbackError,
+    success: false,
+  };
+};
 
 class SkillServerRuntimeService implements SkillRuntimeService {
   private resourceService: SkillResourceService;
@@ -38,8 +122,10 @@ class SkillServerRuntimeService implements SkillRuntimeService {
   private fileModel: FileModel;
   private topicId?: string;
   private userId: string;
+  private activeDeviceId?: string;
 
   constructor(options: {
+    activeDeviceId?: string;
     fileModel: FileModel;
     fileService: FileService;
     marketService: MarketService;
@@ -59,6 +145,7 @@ class SkillServerRuntimeService implements SkillRuntimeService {
     this.fileModel = options.fileModel;
     this.topicId = options.topicId;
     this.userId = options.userId;
+    this.activeDeviceId = options.activeDeviceId;
   }
 
   findAll = (): Promise<{ data: SkillListItem[]; total: number }> => {
@@ -90,13 +177,19 @@ class SkillServerRuntimeService implements SkillRuntimeService {
   ): Promise<CommandResult> => {
     const { config, description } = options;
 
-    if (!this.topicId) {
-      throw new Error('topicId is required for execScript');
+    if (!this.activeDeviceId) {
+      return {
+        exitCode: 1,
+        output: '',
+        stderr:
+          'No active desktop device selected. Start LobeHub Desktop, connect it to Device Gateway, enable Remote Tool Execution, and activate the device before running Skills.',
+        success: false,
+      };
     }
 
     try {
       // Look up skill zipUrl if config is provided (same logic as market.ts)
-      const enhancedParams: any = {
+      const enhancedParams: ExecScriptDeviceParams = {
         command,
         config,
         description,
@@ -133,6 +226,7 @@ class SkillServerRuntimeService implements SkillRuntimeService {
           });
           if (zipUrl) {
             enhancedParams.zipUrl = zipUrl;
+            enhancedParams.zipHash = skill.zipSha256;
             log(
               'Added stable zipUrl to execScript params for skill %s: %s',
               skill.name,
@@ -142,33 +236,7 @@ class SkillServerRuntimeService implements SkillRuntimeService {
         }
       }
 
-      // Call market-sdk's runBuildInTool
-      const market = this.marketService.market;
-      const response = await market.plugins.runBuildInTool(
-        'execScript' as CodeInterpreterToolName,
-        enhancedParams,
-        { topicId: this.topicId, userId: this.userId },
-      );
-
-      log('execScript response: %O', response);
-
-      if (!response.success) {
-        return {
-          exitCode: 1,
-          output: '',
-          stderr: response.error?.message || 'Command execution failed',
-          success: false,
-        };
-      }
-
-      const result = response.data?.result || {};
-
-      return {
-        exitCode: result.exitCode ?? (response.success ? 0 : 1),
-        output: result.stdout || result.output || '',
-        stderr: result.stderr || '',
-        success: response.success && (result.exitCode === 0 || result.exitCode === undefined),
-      };
+      return await this.execScriptOnDevice(enhancedParams);
     } catch (error) {
       log('Error executing script: %O', error);
       return {
@@ -178,6 +246,33 @@ class SkillServerRuntimeService implements SkillRuntimeService {
         success: false,
       };
     }
+  };
+
+  private execScriptOnDevice = async (params: ExecScriptDeviceParams): Promise<CommandResult> => {
+    if (!this.activeDeviceId) {
+      return {
+        exitCode: 1,
+        output: '',
+        stderr: 'No active device selected',
+        success: false,
+      };
+    }
+
+    const response = await deviceProxy.executeToolCall(
+      { deviceId: this.activeDeviceId, userId: this.userId },
+      {
+        apiName: 'execScript',
+        arguments: JSON.stringify(params),
+        identifier: SkillsIdentifier,
+      },
+      120_000,
+    );
+
+    if (!response.success) {
+      return toFailedCommandResult(response, 'Device command execution failed');
+    }
+
+    return toCommandResult(parseRemoteCommandResult(response.content));
   };
 
   exportFile = async (path: string, filename: string): Promise<ExportFileResult> => {
@@ -232,12 +327,13 @@ class SkillServerRuntimeService implements SkillRuntimeService {
       const mimeType = metadata.contentType || result?.mimeType || 'application/octet-stream';
 
       // Step 4: Create a persistent file record using the real stored-object sha256
-      const { fileId, size: fileSize, url } = await this.fileService.createFileRecordFromStorageObject({
-        fileType: mimeType,
-        name: filename,
-        spaceId: exportSpaceId,
-        storageKey: key, // Store S3 key
-      });
+      const { fileId, size: fileSize, url } =
+        await this.fileService.createFileRecordFromStorageObject({
+          fileType: mimeType,
+          name: filename,
+          spaceId: exportSpaceId,
+          storageKey: key, // Store S3 key
+        });
 
       log('Created file record: fileId=%s, url=%s', fileId, url);
 
@@ -272,7 +368,7 @@ export const skillsRuntime: ServerRuntimeRegistration = {
       throw new Error('userId is required for Skills execution');
     }
 
-    // Fetch market access token from user settings
+    // Fetch market access token from user settings for exportFile compatibility.
     let marketAccessToken: string | undefined;
     try {
       const userModel = new UserModel(context.serverDB, context.userId);
@@ -297,6 +393,7 @@ export const skillsRuntime: ServerRuntimeRegistration = {
     const fileModel = new FileModel(context.serverDB, context.userId);
 
     const service = new SkillServerRuntimeService({
+      activeDeviceId: context.activeDeviceId,
       fileModel,
       fileService,
       marketService,

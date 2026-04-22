@@ -68,7 +68,7 @@ export class SkillsExecutionRuntime {
   async execScript(args: ExecScriptParams): Promise<BuiltinServerRuntimeOutput> {
     const { command, description, config } = args;
 
-    // Try new execScript method first (with cloud sandbox support)
+    // Try the runtime-provided execScript method first.
     if (this.service.execScript) {
       try {
         const result = await this.service.execScript(command, {

@@ -64,11 +64,13 @@ describe('localSystemRuntime', () => {
         userId: 'user-1',
       };
 
-      const expectedResult = { content: 'ok', success: true };
-      mockExecuteToolCall.mockResolvedValue(expectedResult);
+      mockExecuteToolCall.mockResolvedValue({
+        content: JSON.stringify({ files: [], totalCount: 0 }),
+        success: true,
+      });
 
       const proxy = localSystemRuntime.factory(context);
-      const apiName = LocalSystemManifest.api[0].name;
+      const apiName = 'listLocalFiles';
       const args = { path: '/tmp/test' };
 
       const result = await proxy[apiName](args);
@@ -81,7 +83,105 @@ describe('localSystemRuntime', () => {
           identifier: LocalSystemIdentifier,
         },
       );
-      expect(result).toEqual(expectedResult);
+      expect(result).toMatchObject({
+        content: 'Directory /tmp/test is empty',
+        state: { listResults: [], totalCount: 0 },
+        success: true,
+      });
+    });
+
+    it('should format and preserve failed device execution results', async () => {
+      const context: ToolExecutionContext = {
+        activeDeviceId: 'device-1',
+        toolManifestMap: {},
+        userId: 'user-1',
+      };
+
+      mockExecuteToolCall.mockResolvedValue({
+        content: JSON.stringify({ stderr: 'command failed', success: false }),
+        success: false,
+      });
+
+      const proxy = localSystemRuntime.factory(context);
+      const result = await proxy.runCommand({ command: 'exit 1' });
+
+      expect(result).toMatchObject({
+        content: 'Command failed: command failed\n\nStderr:\ncommand failed',
+        error: {
+          message: 'command failed',
+          type: 'PluginServerError',
+        },
+        success: false,
+      });
+    });
+
+    it('formats successful command results like the local executor', async () => {
+      const context: ToolExecutionContext = {
+        activeDeviceId: 'device-1',
+        toolManifestMap: {},
+        userId: 'user-1',
+      };
+
+      mockExecuteToolCall.mockResolvedValue({
+        content: JSON.stringify({ exit_code: 0, stdout: 'ok', success: true }),
+        success: true,
+      });
+
+      const proxy = localSystemRuntime.factory(context);
+      const result = await proxy.runCommand({ command: 'echo ok' });
+
+      expect(result).toMatchObject({
+        content: 'Command completed successfully.\n\nOutput:\nok\n\nExit code: 0',
+        state: {
+          message: 'Command completed successfully.',
+          result: { exit_code: 0, stdout: 'ok', success: true },
+        },
+        success: true,
+      });
+    });
+
+    it('formats failed write results with a plugin error', async () => {
+      const context: ToolExecutionContext = {
+        activeDeviceId: 'device-1',
+        toolManifestMap: {},
+        userId: 'user-1',
+      };
+
+      mockExecuteToolCall.mockResolvedValue({
+        content: JSON.stringify({ error: 'permission denied', success: false }),
+        success: false,
+      });
+
+      const proxy = localSystemRuntime.factory(context);
+      const result = await proxy.writeLocalFile({ content: 'data', path: '/root/a.txt' });
+
+      expect(result).toMatchObject({
+        content: 'Failed to write file: permission denied',
+        error: { message: 'permission denied', type: 'PluginServerError' },
+        success: false,
+      });
+    });
+
+    it('preserves failed file operation errors as plugin errors', async () => {
+      const context: ToolExecutionContext = {
+        activeDeviceId: 'device-1',
+        toolManifestMap: {},
+        userId: 'user-1',
+      };
+
+      mockExecuteToolCall.mockResolvedValue({
+        content: JSON.stringify({ error: 'directory not found', success: false }),
+        success: false,
+      });
+
+      const proxy = localSystemRuntime.factory(context);
+      const result = await proxy.listLocalFiles({ path: '/missing' });
+
+      expect(result).toMatchObject({
+        content: 'directory not found',
+        error: { message: 'directory not found', type: 'PluginServerError' },
+        success: false,
+      });
     });
 
     it('should JSON.stringify the arguments passed to the proxy function', async () => {

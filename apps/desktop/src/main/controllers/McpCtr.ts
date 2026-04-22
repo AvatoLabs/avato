@@ -93,8 +93,8 @@ interface GetStreamableMcpServerManifestInput {
 
 interface CallToolInput {
   args: any;
-  env: any;
-  params: GetStdioMcpServerManifestInput;
+  env?: Record<string, string>;
+  params: MCPClientParams;
   toolName: string;
 }
 
@@ -324,13 +324,7 @@ export default class McpCtr extends ControllerModule {
   @IpcMethod()
   async callTool(payload: SuperJSONSerialized<CallToolInput>) {
     const input = deserializePayload<CallToolInput>(payload);
-    const params: MCPClientParams = {
-      args: input.params.args || [],
-      command: input.params.command,
-      env: input.env,
-      name: input.params.name,
-      type: 'stdio',
-    };
+    const params = this.normalizeCallToolParams(input);
 
     let client: MCPClient | undefined;
     try {
@@ -368,6 +362,26 @@ export default class McpCtr extends ControllerModule {
         await client.disconnect();
       }
     }
+  }
+
+  private normalizeCallToolParams(input: CallToolInput): MCPClientParams {
+    if (input.params.type === 'http') {
+      return {
+        auth: input.params.auth,
+        headers: input.params.headers,
+        name: input.params.name,
+        type: 'http',
+        url: input.params.url,
+      };
+    }
+
+    return {
+      args: input.params.args || [],
+      command: input.params.command,
+      env: input.env ?? input.params.env,
+      name: input.params.name,
+      type: 'stdio',
+    };
   }
 
   // ---------- MCP Install Check (local system) ----------

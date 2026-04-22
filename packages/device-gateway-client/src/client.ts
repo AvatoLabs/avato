@@ -8,7 +8,6 @@ import type {
   ClientMessage,
   ConnectionStatus,
   GatewayClientEvents,
-  ServerMessage,
   SystemInfoRequestMessage,
   SystemInfoResponseMessage,
   ToolCallRequestMessage,
@@ -21,6 +20,49 @@ const DEFAULT_GATEWAY_URL = 'https://device-gateway.lobehub.com';
 const HEARTBEAT_INTERVAL = 30_000; // 30s
 const INITIAL_RECONNECT_DELAY = 1000; // 1s
 const MAX_RECONNECT_DELAY = 30_000; // 30s
+const DEFAULT_AUTH_TIMEOUT = 15_000; // 15s
+const normalizeGatewayUrl = (url: string) => url.replace(/\/+$/, '');
+const redactWsUrl = (url: string) => {
+  try {
+    const parsed = new URL(url);
+    parsed.search = '';
+    return parsed.toString();
+  } catch {
+    return '<invalid gateway url>';
+  }
+};
+
+const isRecord = (data: unknown): data is Record<string, unknown> => {
+  return !!data && typeof data === 'object' && !Array.isArray(data);
+};
+
+const isToolCallRequestMessage = (message: unknown): message is ToolCallRequestMessage => {
+  if (!isRecord(message)) return false;
+
+  const toolCall = message.toolCall;
+  if (!isRecord(toolCall)) return false;
+
+  return (
+    message.type === 'tool_call_request' &&
+    typeof message.requestId === 'string' &&
+    message.requestId.length > 0 &&
+    typeof toolCall.apiName === 'string' &&
+    toolCall.apiName.length > 0 &&
+    typeof toolCall.arguments === 'string' &&
+    typeof toolCall.identifier === 'string' &&
+    toolCall.identifier.length > 0
+  );
+};
+
+const isSystemInfoRequestMessage = (message: unknown): message is SystemInfoRequestMessage => {
+  if (!isRecord(message)) return false;
+
+  return (
+    message.type === 'system_info_request' &&
+    typeof message.requestId === 'string' &&
+    message.requestId.length > 0
+  );
+};
 
 // ─── Logger Interface ───
 
@@ -39,6 +81,7 @@ const noopLogger: GatewayClientLogger = {
 };
 
 export interface GatewayClientOptions {
+  allowRemoteTools?: boolean;
   /** Auto-reconnect on disconnection (default: true) */
   autoReconnect?: boolean;
   deviceId?: string;
@@ -46,6 +89,11 @@ export interface GatewayClientOptions {
   logger?: GatewayClientLogger;
   token: string;
   userId?: string;
+}
+
+export interface GatewayClientConnectOptions {
+  timeoutMs?: number;
+  waitForAuth?: boolean;
 }
 
 export class GatewayClient extends EventEmitter {
@@ -61,15 +109,17 @@ export class GatewayClient extends EventEmitter {
   private userId?: string;
   private logger: GatewayClientLogger;
   private autoReconnect: boolean;
+  private allowRemoteTools: boolean;
 
   constructor(options: GatewayClientOptions) {
     super();
     this.token = options.token;
-    this.gatewayUrl = options.gatewayUrl || DEFAULT_GATEWAY_URL;
+    this.gatewayUrl = normalizeGatewayUrl(options.gatewayUrl || DEFAULT_GATEWAY_URL);
     this.deviceId = options.deviceId || randomUUID();
     this.userId = options.userId;
     this.logger = options.logger || noopLogger;
     this.autoReconnect = options.autoReconnect ?? true;
+    this.allowRemoteTools = options.allowRemoteTools === true;
   }
 
   // ─── Public API ───
@@ -96,12 +146,27 @@ export class GatewayClient extends EventEmitter {
     return super.emit(event, ...args);
   }
 
-  async connect(): Promise<void> {
-    if (this.status === 'connected' || this.status === 'connecting') {
+  async connect(options: GatewayClientConnectOptions = {}): Promise<void> {
+    if (this.status === 'connected') {
       return;
     }
+
+    if (this.status === 'connecting' || this.status === 'authenticating') {
+      if (options.waitForAuth) {
+        await this.waitForAuthentication(options.timeoutMs);
+      }
+      return;
+    }
+
     this.intentionalDisconnect = false;
+
+    const authWaiter = options.waitForAuth
+      ? this.waitForAuthentication(options.timeoutMs)
+      : undefined;
+
     this.doConnect();
+
+    await authWaiter;
   }
 
   async disconnect(): Promise<void> {
@@ -124,6 +189,13 @@ export class GatewayClient extends EventEmitter {
     });
   }
 
+  setAllowRemoteTools(allowRemoteTools: boolean): void {
+    this.allowRemoteTools = allowRemoteTools;
+    if (this.status === 'connected') {
+      this.sendHeartbeat();
+    }
+  }
+
   // ─── Connection Logic ───
 
   private doConnect() {
@@ -133,7 +205,7 @@ export class GatewayClient extends EventEmitter {
 
     try {
       const wsUrl = this.buildWsUrl();
-      this.logger.debug(`Connecting to: ${wsUrl}`);
+      this.logger.debug(`Connecting to: ${redactWsUrl(wsUrl)}`);
 
       const ws = new WebSocket(wsUrl);
 
@@ -145,7 +217,9 @@ export class GatewayClient extends EventEmitter {
       this.ws = ws;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
+      const normalizedError = error instanceof Error ? error : new Error(msg);
       this.logger.error('Failed to create WebSocket:', msg);
+      this.emitError(normalizedError);
       this.setStatus('disconnected');
       if (this.autoReconnect) {
         this.scheduleReconnect();
@@ -156,9 +230,13 @@ export class GatewayClient extends EventEmitter {
   }
 
   private buildWsUrl(): string {
-    const wsProtocol = this.gatewayUrl.startsWith('https') ? 'wss' : 'ws';
-    const host = this.gatewayUrl.replace(/^https?:\/\//, '');
+    const url = new URL(this.gatewayUrl);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    url.pathname = `${url.pathname.replace(/\/+$/, '')}/ws`;
+    url.search = '';
+
     const params = new URLSearchParams({
+      allowRemoteTools: String(this.allowRemoteTools),
       deviceId: this.deviceId,
       hostname: os.hostname(),
       platform: process.platform,
@@ -169,7 +247,8 @@ export class GatewayClient extends EventEmitter {
       params.set('userId', this.userId);
     }
 
-    return `${wsProtocol}://${host}/ws?${params.toString()}`;
+    url.search = params.toString();
+    return url.toString();
   }
 
   // ─── WebSocket Event Handlers ───
@@ -185,7 +264,11 @@ export class GatewayClient extends EventEmitter {
 
   private handleMessage = (data: WebSocket.Data) => {
     try {
-      const message = JSON.parse(String(data)) as ServerMessage;
+      const message = JSON.parse(String(data)) as unknown;
+      if (!isRecord(message) || typeof message.type !== 'string') {
+        this.logger.warn('Invalid gateway message shape');
+        return;
+      }
 
       switch (message.type) {
         case 'auth_success': {
@@ -197,7 +280,10 @@ export class GatewayClient extends EventEmitter {
         }
 
         case 'auth_failed': {
-          const reason = (message as any).reason || 'Unknown reason';
+          const reason =
+            typeof message.reason === 'string' && message.reason.length > 0
+              ? message.reason
+              : 'Unknown reason';
           this.logger.error(`Authentication failed: ${reason}`);
           this.emit('auth_failed', reason);
           this.disconnect();
@@ -210,23 +296,32 @@ export class GatewayClient extends EventEmitter {
         }
 
         case 'tool_call_request': {
-          this.emit('tool_call_request', message as ToolCallRequestMessage);
+          if (!isToolCallRequestMessage(message)) {
+            this.logger.warn('Invalid tool_call_request message shape');
+            break;
+          }
+          this.emit('tool_call_request', message);
           break;
         }
 
         case 'system_info_request': {
-          this.emit('system_info_request', message as SystemInfoRequestMessage);
+          if (!isSystemInfoRequestMessage(message)) {
+            this.logger.warn('Invalid system_info_request message shape');
+            break;
+          }
+          this.emit('system_info_request', message);
           break;
         }
 
         case 'auth_expired': {
           this.logger.warn('Received auth_expired from gateway');
           this.emit('auth_expired');
+          void this.disconnect();
           break;
         }
 
         default: {
-          this.logger.warn('Unknown message type:', (message as any).type);
+          this.logger.warn('Unknown message type:', message.type);
         }
       }
     } catch (error) {
@@ -250,16 +345,21 @@ export class GatewayClient extends EventEmitter {
 
   private handleError = (error: Error) => {
     this.logger.error('WebSocket error:', error.message);
-    this.emit('error', error);
+    this.emitError(error);
   };
 
   // ─── Heartbeat ───
 
   private startHeartbeat() {
     this.stopHeartbeat();
+    this.sendHeartbeat();
     this.heartbeatTimer = setInterval(() => {
-      this.sendMessage({ type: 'heartbeat' });
+      this.sendHeartbeat();
     }, HEARTBEAT_INTERVAL);
+  }
+
+  private sendHeartbeat() {
+    this.sendMessage({ allowRemoteTools: this.allowRemoteTools, type: 'heartbeat' });
   }
 
   private stopHeartbeat() {
@@ -308,8 +408,69 @@ export class GatewayClient extends EventEmitter {
 
   private sendMessage(data: ClientMessage) {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(data));
+      try {
+        this.ws.send(JSON.stringify(data));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn('Failed to send WebSocket message:', message);
+        this.emitError(error instanceof Error ? error : new Error(message));
+      }
     }
+  }
+
+  private emitError(error: Error) {
+    if (this.listenerCount('error') === 0) return;
+    this.emit('error', error);
+  }
+
+  private waitForAuthentication(timeoutMs = DEFAULT_AUTH_TIMEOUT): Promise<void> {
+    if (this.status === 'connected') return Promise.resolve();
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        this.removeListener('connected', handleConnected);
+        this.removeListener('auth_failed', handleAuthFailed);
+        this.removeListener('disconnected', handleDisconnected);
+        this.removeListener('error', handleError);
+        this.removeListener('reconnecting', handleReconnecting);
+      };
+
+      const resolveOnce = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve();
+      };
+
+      const rejectOnce = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      };
+
+      const handleConnected = () => resolveOnce();
+      const handleAuthFailed = (reason: string) =>
+        rejectOnce(new Error(reason || 'Device Gateway authentication failed'));
+      const handleDisconnected = () =>
+        rejectOnce(new Error('Device Gateway disconnected before authentication'));
+      const handleError = (error: Error) => rejectOnce(error);
+      const handleReconnecting = () =>
+        rejectOnce(new Error('Device Gateway reconnecting before authentication'));
+
+      const timeout = setTimeout(() => {
+        rejectOnce(new Error(`Device Gateway authentication timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      this.on('connected', handleConnected);
+      this.on('auth_failed', handleAuthFailed);
+      this.on('disconnected', handleDisconnected);
+      this.on('error', handleError);
+      this.on('reconnecting', handleReconnecting);
+    });
   }
 
   private closeWebSocket() {

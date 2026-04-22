@@ -1,6 +1,6 @@
 import { SourceSetApiName, SourceSetIdentifier } from '@lobechat/builtin-tool-source-set';
 import { type ChatToolPayload } from '@lobechat/types';
-import { safeParseJSON } from '@lobechat/utils';
+import { isLocalOrPrivateUrl, safeParseJSON } from '@lobechat/utils';
 import debug from 'debug';
 
 import { type CloudMCPParams, type ToolCallContent } from '@/libs/mcp';
@@ -14,6 +14,7 @@ import { DiscoverService } from '../discover';
 import { type MCPService } from '../mcp';
 import { type PluginGatewayService } from '../pluginGateway';
 import { type BuiltinToolsExecutor } from './builtin';
+import { deviceProxy } from './deviceProxy';
 import {
   type ToolExecutionContext,
   type ToolExecutionResult,
@@ -22,7 +23,17 @@ import {
 
 const log = debug('lobe-server:tool-execution-service');
 const MAX_MCP_RETRIES = 3;
+const REMOTE_MCP_IDENTIFIER = 'lobe-mcp';
 const SOURCE_SET_READ_TOOL_RESULT_MAX_LENGTH = 100_000;
+
+const isLocalOrPrivateHttpUrl = (value: string) => {
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && isLocalOrPrivateUrl(value);
+  } catch {
+    return false;
+  }
+};
 
 interface ToolExecutionServiceDeps {
   builtinToolsExecutor: BuiltinToolsExecutor;
@@ -180,6 +191,22 @@ export class ToolExecutionService {
         return await this.executeCloudMCPTool(payload, context, mcpParams);
       }
 
+      if (this.shouldExecuteMCPOnDesktop(mcpParams)) {
+        if (!context.activeDeviceId || !context.userId) {
+          return {
+            content:
+              'No active desktop device selected. Connect LobeHub Desktop, enable Remote Tool Execution, and select an online device before running this MCP tool.',
+            error: {
+              code: 'MCP_DESKTOP_DEVICE_REQUIRED',
+              message: 'Active desktop device is required for this MCP tool',
+            },
+            success: false,
+          };
+        }
+
+        return await this.executeDesktopMCPTool(payload, context, mcpParams);
+      }
+
       for (let attempt = 1; attempt <= MAX_MCP_RETRIES; attempt += 1) {
         try {
           const result = await this.mcpService.callTool({
@@ -229,6 +256,71 @@ export class ToolExecutionService {
         success: false,
       };
     }
+  }
+
+  private shouldExecuteMCPOnDesktop(mcpParams: any): boolean {
+    if (mcpParams.type === 'stdio') return true;
+
+    return mcpParams.type === 'http' && typeof mcpParams.url === 'string'
+      ? isLocalOrPrivateHttpUrl(mcpParams.url)
+      : false;
+  }
+
+  private async executeDesktopMCPTool(
+    payload: ChatToolPayload,
+    context: ToolExecutionContext,
+    mcpParams: any,
+  ): Promise<ToolExecutionResult> {
+    const { apiName, arguments: args } = payload;
+
+    const response = await deviceProxy.executeToolCall(
+      { deviceId: context.activeDeviceId, userId: context.userId! },
+      {
+        apiName: 'callTool',
+        arguments: JSON.stringify({
+          args,
+          params: mcpParams,
+          toolName: apiName,
+        }),
+        identifier: REMOTE_MCP_IDENTIFIER,
+      },
+      120_000,
+    );
+
+    if (!response.success) {
+      return {
+        content: response.content,
+        error: {
+          code: response.error || 'MCP_DESKTOP_EXECUTION_ERROR',
+          message: response.error || 'Desktop MCP execution failed',
+        },
+        success: false,
+      };
+    }
+
+    const parsed = safeParseJSON(response.content);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const result = parsed as Record<string, any>;
+      const success =
+        typeof result.success === 'boolean' ? result.success : result.error === undefined;
+
+      return {
+        content: typeof result.content === 'string' ? result.content : response.content,
+        error: success
+          ? undefined
+          : result.error || {
+              code: 'MCP_DESKTOP_EXECUTION_ERROR',
+              message: 'Desktop MCP execution failed',
+            },
+        state:
+          result.state && typeof result.state === 'object' && !Array.isArray(result.state)
+            ? result.state
+            : undefined,
+        success,
+      };
+    }
+
+    return response;
   }
 
   private async executeCloudMCPTool(

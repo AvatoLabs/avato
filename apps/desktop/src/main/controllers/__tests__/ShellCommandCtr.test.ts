@@ -317,6 +317,33 @@ describe('ShellCommandCtr', () => {
         expect(result.shell_id).toBe('test-uuid-123');
       });
 
+      it('should reject new background commands when the process registry is full', async () => {
+        const { randomUUID } = await import('node:crypto');
+        for (let i = 0; i < 32; i += 1) {
+          vi.mocked(randomUUID).mockImplementationOnce(() => `test-uuid-${i + 1}` as any);
+        }
+        mockChildProcess.on.mockImplementation(() => mockChildProcess);
+        mockChildProcess.stdout.on.mockImplementation(() => mockChildProcess.stdout);
+        mockChildProcess.stderr.on.mockImplementation(() => mockChildProcess.stderr);
+
+        for (let i = 0; i < 32; i += 1) {
+          const result = await shellCommandCtr.handleRunCommand({
+            command: `background-${i}`,
+            run_in_background: true,
+          });
+          expect(result.success).toBe(true);
+        }
+
+        const rejected = await shellCommandCtr.handleRunCommand({
+          command: 'background-over-limit',
+          run_in_background: true,
+        });
+
+        expect(rejected.success).toBe(false);
+        expect(rejected.error).toContain('Too many background shell processes');
+        expect(mockSpawn).toHaveBeenCalledTimes(32);
+      });
+
       it('should use correct shell on Windows', async () => {
         const originalPlatform = process.platform;
         Object.defineProperty(process, 'platform', { value: 'win32' });

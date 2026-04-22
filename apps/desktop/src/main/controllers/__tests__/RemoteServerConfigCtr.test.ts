@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { App } from '@/core/App';
 
+import DeviceGatewayCtr from '../DeviceGatewayCtr';
 import RemoteServerConfigCtr from '../RemoteServerConfigCtr';
 
 const { ipcMainHandleMock } = vi.hoisted(() => ({
@@ -36,6 +37,10 @@ vi.mock('@/const/env', () => ({
   OFFICIAL_CLOUD_SERVER: 'https://cloud.lobehub.com',
 }));
 
+vi.mock('../DeviceGatewayCtr', () => ({
+  default: class DeviceGatewayCtr {},
+}));
+
 // Mock storeManager
 const mockStoreManager = {
   delete: vi.fn(),
@@ -47,8 +52,16 @@ const mockBrowserManager = {
   broadcastToAllWindows: vi.fn(),
 };
 
+const mockDeviceGatewayCtr = {
+  disconnectForRemoteServerReset: vi.fn().mockResolvedValue(undefined),
+};
+
 const mockApp = {
   browserManager: mockBrowserManager,
+  getController: vi.fn((controller) => {
+    if (controller === DeviceGatewayCtr) return mockDeviceGatewayCtr;
+    return undefined;
+  }),
   storeManager: mockStoreManager,
 } as unknown as App;
 
@@ -115,6 +128,7 @@ describe('RemoteServerConfigCtr', () => {
         storageMode: 'cloud',
       });
       expect(mockStoreManager.delete).toHaveBeenCalledWith('encryptedTokens');
+      expect(mockDeviceGatewayCtr.disconnectForRemoteServerReset).toHaveBeenCalled();
     });
   });
 
@@ -289,10 +303,13 @@ describe('RemoteServerConfigCtr', () => {
       await controller.clearTokens();
 
       expect(mockStoreManager.delete).toHaveBeenCalledWith('encryptedTokens');
+      expect(mockDeviceGatewayCtr.disconnectForRemoteServerReset).toHaveBeenCalled();
 
       // Verify tokens are cleared from memory
       const accessToken = await controller.getAccessToken();
       expect(accessToken).toBeNull();
+      expect(controller.getTokenExpiresAt()).toBeUndefined();
+      expect(controller.getLastTokenRefreshAt()).toBeUndefined();
     });
   });
 

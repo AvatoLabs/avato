@@ -101,6 +101,12 @@ class MCPService {
     }
 
     const isStdio = plugin?.customParams?.mcp?.type === 'stdio';
+    const shouldUseDesktopIPC =
+      isDesktop &&
+      (isStdio ||
+        (plugin?.customParams?.mcp?.type === 'http' &&
+          typeof plugin.customParams.mcp.url === 'string' &&
+          isLocalOrPrivateUrl(plugin.customParams.mcp.url)));
     const isCloud = plugin?.customParams?.mcp?.type === 'cloud';
     const isCustomPlugin = !!customPlugin;
 
@@ -121,7 +127,7 @@ class MCPService {
     const data = {
       // For desktop IPC, always pass a record/object for tool "arguments"
       // (IPC layer will superjson serialize the whole payload).
-      args: isDesktop && isStdio ? (safeParseJSON(args) ?? {}) : args,
+      args: shouldUseDesktopIPC ? (safeParseJSON(args) ?? {}) : args,
       env: connection?.type === 'stdio' ? params.env : (pluginSettings ?? connection?.env),
       meta,
       params,
@@ -151,8 +157,8 @@ class MCPService {
           meta,
           toolName: apiName,
         });
-      } else if (isDesktop && isStdio) {
-        // For desktop and stdio, use IPC (main process)
+      } else if (shouldUseDesktopIPC) {
+        // For desktop-local MCP endpoints, use IPC (main process)
         // Note: IPC doesn't support AbortSignal yet
         const serialized = superjson.serialize(data);
         const serializedResult = await ensureElectronIpc().mcp.callTool(serialized as any);

@@ -1,9 +1,10 @@
 import { type BuiltinServerRuntimeOutput } from '@lobechat/types';
 
-import { type DeviceAttachment } from './types';
+import { type DeviceAttachment, type DeviceSystemInfo } from './types';
 
 export interface RemoteDeviceRuntimeService {
   queryDeviceList: () => Promise<DeviceAttachment[]>;
+  queryDeviceSystemInfo?: (deviceId: string) => Promise<DeviceSystemInfo | undefined>;
 }
 
 export class RemoteDeviceExecutionRuntime {
@@ -17,13 +18,14 @@ export class RemoteDeviceExecutionRuntime {
     try {
       const devices = await this.service.queryDeviceList();
       const onlineDevices = devices.filter((d) => d.online);
+      const eligibleDevices = onlineDevices.filter((d) => d.allowRemoteTools);
 
       return {
         content:
           onlineDevices.length > 0
             ? JSON.stringify(onlineDevices)
             : 'No online devices found. Please make sure your desktop application is running and connected.',
-        state: { devices: onlineDevices },
+        state: { devices: onlineDevices, eligibleDevices },
         success: true,
       };
     } catch (error) {
@@ -47,11 +49,45 @@ export class RemoteDeviceExecutionRuntime {
         };
       }
 
+      if (!target.allowRemoteTools) {
+        return {
+          content: `Device "${target.hostname}" is online, but Remote Tool Execution is disabled in LobeHub Desktop.`,
+          success: false,
+        };
+      }
+
+      let systemInfo: DeviceSystemInfo | undefined;
+      try {
+        systemInfo = await this.service.queryDeviceSystemInfo?.(args.deviceId);
+      } catch {
+        systemInfo = undefined;
+      }
+
+      const deviceSystemInfo = systemInfo
+        ? {
+            arch: systemInfo.arch,
+            desktopPath: systemInfo.desktopPath,
+            documentsPath: systemInfo.documentsPath,
+            downloadsPath: systemInfo.downloadsPath,
+            homePath: systemInfo.homePath,
+            musicPath: systemInfo.musicPath,
+            picturesPath: systemInfo.picturesPath,
+            platform: target.platform,
+            userDataPath: systemInfo.userDataPath,
+            videosPath: systemInfo.videosPath,
+            workingDirectory: systemInfo.workingDirectory,
+          }
+        : undefined;
+
       return {
-        content: `Device "${target.hostname}" (${target.platform}) activated successfully. Local System tools are now available.`,
+        content: `Device "${target.hostname}" (${target.platform}) activated successfully. Local System, Skills, and local/private MCP tools are now available.`,
         state: {
           activatedDevice: target,
-          metadata: { activeDeviceId: args.deviceId },
+          metadata: {
+            activeDeviceId: args.deviceId,
+            devicePlatform: target.platform,
+            deviceSystemInfo,
+          },
         },
         success: true,
       };

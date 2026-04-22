@@ -84,14 +84,14 @@ describe('SkillsExecutionRuntime', () => {
 
       it('should return success: false when execScript throws', async () => {
         const service = createMockService({
-          execScript: vi.fn().mockRejectedValue(new Error('sandbox timeout')),
+          execScript: vi.fn().mockRejectedValue(new Error('execution timeout')),
         });
         const runtime = new SkillsExecutionRuntime({ service });
 
         const result = await runtime.execScript(args);
 
         expect(result.success).toBe(false);
-        expect(result.content).toBe('Failed to execute command: sandbox timeout');
+        expect(result.content).toBe('Failed to execute command: execution timeout');
       });
     });
 

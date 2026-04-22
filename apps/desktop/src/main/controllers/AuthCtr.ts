@@ -1,18 +1,20 @@
-import {
+import crypto from 'node:crypto';
+import querystring from 'node:querystring';
+import { URL } from 'node:url';
+
+import type {
   AuthorizationProgress,
   DataSyncConfig,
   MarketAuthorizationParams,
 } from '@lobechat/electron-client-ipc';
 import { BrowserWindow, shell } from 'electron';
-import crypto from 'node:crypto';
-import querystring from 'node:querystring';
-import { URL } from 'node:url';
 
 import { appendVercelCookie } from '@/utils/http-headers';
 import { createLogger } from '@/utils/logger';
 
-import RemoteServerConfigCtr from './RemoteServerConfigCtr';
+import DeviceGatewayCtr from './DeviceGatewayCtr';
 import { ControllerModule, IpcMethod } from './index';
+import RemoteServerConfigCtr from './RemoteServerConfigCtr';
 
 const logger = createLogger('controllers:AuthCtr');
 
@@ -42,14 +44,14 @@ export default class AuthCtr extends ControllerModule {
   /**
    * Polling related parameters
    */
-  // eslint-disable-next-line no-undef
+
   private pollingInterval: NodeJS.Timeout | null = null;
   private cachedRemoteUrl: string | null = null;
 
   /**
    * Auto-refresh timer
    */
-  // eslint-disable-next-line no-undef
+
   private autoRefreshTimer: NodeJS.Timeout | null = null;
 
   /**
@@ -529,6 +531,14 @@ export default class AuthCtr extends ControllerModule {
 
       // Start auto-refresh timer
       this.startAutoRefresh();
+
+      const deviceGatewayCtr = this.app.getController(DeviceGatewayCtr);
+      const deviceGatewayStatus = await deviceGatewayCtr?.getAgentStatus();
+      if (deviceGatewayStatus?.enabled) {
+        deviceGatewayCtr?.startAgent().catch((error) => {
+          logger.warn('Failed to start device gateway after authorization:', error);
+        });
+      }
 
       return { success: true };
     } catch (error) {

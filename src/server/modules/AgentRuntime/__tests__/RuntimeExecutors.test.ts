@@ -894,6 +894,63 @@ describe('RuntimeExecutors', () => {
       const payload = result.nextContext!.payload as { parentMessageId?: string };
       expect(payload.parentMessageId).toBeUndefined();
     });
+
+    it('should update active desktop device metadata from a remote-device activation result', async () => {
+      mockToolExecutionService.executeTool.mockResolvedValue({
+        content: 'Device activated',
+        error: undefined,
+        executionTime: 100,
+        state: {
+          metadata: {
+            activeDeviceId: 'device-new',
+            devicePlatform: 'darwin',
+            deviceSystemInfo: {
+              homePath: '/Users/test',
+              ignored: 123,
+              workingDirectory: '/Users/test/project',
+            },
+          },
+        },
+        success: true,
+      });
+
+      const executors = createRuntimeExecutors(ctx);
+      const state = createMockState({
+        metadata: {
+          activeDeviceId: 'device-old',
+          agentId: 'agent-123',
+          deviceSystemInfo: { homePath: '/old/home' },
+          threadId: 'thread-123',
+          topicId: 'topic-123',
+        },
+      });
+
+      const instruction = {
+        payload: {
+          parentMessageId: 'assistant-msg-123',
+          toolCalling: {
+            apiName: 'activateDevice',
+            arguments: '{"deviceId":"device-new"}',
+            id: 'tool-call-remote-device',
+            identifier: 'lobe-remote-device',
+            type: 'builtin' as const,
+          },
+        },
+        type: 'call_tool' as const,
+      };
+
+      const result = await executors.call_tool!(instruction, state);
+
+      expect(result.newState.metadata).toMatchObject({
+        activeDeviceId: 'device-new',
+        devicePlatform: 'darwin',
+        deviceSystemInfo: {
+          homePath: '/Users/test',
+          workingDirectory: '/Users/test/project',
+        },
+      });
+      expect(result.newState.metadata?.deviceSystemInfo).not.toHaveProperty('ignored');
+    });
   });
 
   describe('call_tools_batch executor', () => {
@@ -1309,6 +1366,77 @@ describe('RuntimeExecutors', () => {
           isSuccess: true,
         }),
       );
+    });
+
+    it('should update active desktop device metadata from batch tool results in tool-call order', async () => {
+      mockToolExecutionService.executeTool
+        .mockResolvedValueOnce({
+          content: 'Device one activated',
+          error: undefined,
+          executionTime: 100,
+          state: {
+            metadata: {
+              activeDeviceId: 'device-1',
+              devicePlatform: 'linux',
+              deviceSystemInfo: { homePath: '/home/one' },
+            },
+          },
+          success: true,
+        })
+        .mockResolvedValueOnce({
+          content: 'Device two activated',
+          error: undefined,
+          executionTime: 100,
+          state: {
+            metadata: {
+              activeDeviceId: 'device-2',
+              devicePlatform: 'darwin',
+            },
+          },
+          success: true,
+        });
+
+      const executors = createRuntimeExecutors(ctx);
+      const state = createMockState({
+        metadata: {
+          activeDeviceId: 'device-old',
+          agentId: 'agent-123',
+          deviceSystemInfo: { homePath: '/old/home' },
+          threadId: 'thread-123',
+          topicId: 'topic-123',
+        },
+      });
+
+      const instruction = {
+        payload: {
+          parentMessageId: 'assistant-msg-123',
+          toolsCalling: [
+            {
+              apiName: 'activateDevice',
+              arguments: '{"deviceId":"device-1"}',
+              id: 'tool-call-device-1',
+              identifier: 'lobe-remote-device',
+              type: 'builtin' as const,
+            },
+            {
+              apiName: 'activateDevice',
+              arguments: '{"deviceId":"device-2"}',
+              id: 'tool-call-device-2',
+              identifier: 'lobe-remote-device',
+              type: 'builtin' as const,
+            },
+          ],
+        },
+        type: 'call_tools_batch' as const,
+      };
+
+      const result = await executors.call_tools_batch!(instruction, state);
+
+      expect(result.newState.metadata).toMatchObject({
+        activeDeviceId: 'device-2',
+        devicePlatform: 'darwin',
+        deviceSystemInfo: undefined,
+      });
     });
 
     it('should query messages with correct metadata fields when state.metadata is defined', async () => {

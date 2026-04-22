@@ -1,11 +1,13 @@
 import type {
   DataSyncConfig,
+  DeviceGatewayConfig,
   NetworkProxySettings,
   UpdateChannel,
 } from '@lobechat/electron-client-ipc';
 
 export interface ElectronMainStore {
   dataSyncConfig: DataSyncConfig;
+  deviceGateway: DeviceGatewayConfig;
   encryptedTokens: {
     accessToken?: string;
     expiresAt?: number;

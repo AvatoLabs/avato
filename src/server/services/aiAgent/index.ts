@@ -413,7 +413,10 @@ export class AiAgentService {
         log('execAgent: failed to query device list: %O', error);
       }
     }
-    const deviceOnline = onlineDevices.length > 0;
+    const activeOnlineDevices = onlineDevices.filter(
+      (device) => device.online && device.allowRemoteTools,
+    );
+    const deviceOnline = activeOnlineDevices.length > 0;
 
     const toolsContext: ServerAgentToolsContext = {
       installedPlugins,
@@ -493,12 +496,15 @@ export class AiAgentService {
     // Derive activeDeviceId from device context:
     // 1. If agent has a bound device and it's online, use it
     // 2. In IM/Bot scenarios, auto-activate when exactly one device is online
+    const boundDeviceOnline = boundDeviceId
+      ? activeOnlineDevices.some((device) => device.deviceId === boundDeviceId)
+      : false;
     const activeDeviceId = boundDeviceId
-      ? deviceOnline
+      ? boundDeviceOnline
         ? boundDeviceId
         : undefined
-      : (discordContext || botContext) && onlineDevices.length === 1
-        ? onlineDevices[0].deviceId
+      : (discordContext || botContext) && activeOnlineDevices.length === 1
+        ? activeOnlineDevices[0].deviceId
         : undefined;
 
     // 9.4. Fetch device system info for placeholder variable replacement

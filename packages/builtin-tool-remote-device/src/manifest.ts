@@ -7,7 +7,7 @@ export const RemoteDeviceManifest: BuiltinToolManifest = {
   api: [
     {
       description:
-        'List all online desktop devices belonging to the current user. Returns device IDs, hostnames, platform, and connection status.',
+        'List all online desktop devices belonging to the current user. Returns device IDs, hostnames, platform, connection status, and whether Remote Tool Execution is enabled.',
       name: RemoteDeviceApiName.listOnlineDevices,
       parameters: {
         properties: {},
@@ -16,7 +16,7 @@ export const RemoteDeviceManifest: BuiltinToolManifest = {
     },
     {
       description:
-        'Activate a specific desktop device by its ID. Once activated, the Local System tool becomes available for file operations and shell commands on that device.',
+        'Activate a specific desktop device by its ID. The device must be online and have Remote Tool Execution enabled in LobeHub Desktop. Once activated, Local System, Skills, and local/private MCP tools can run on that device.',
       name: RemoteDeviceApiName.activateDevice,
       parameters: {
         properties: {
@@ -34,9 +34,10 @@ export const RemoteDeviceManifest: BuiltinToolManifest = {
   identifier: RemoteDeviceIdentifier,
   meta: {
     avatar: '🖥️',
-    description: 'Discover and manage remote desktop device connections',
+    description:
+      'Discover remote desktop devices and activate devices that allow remote tool execution',
     readme:
-      'Manage connections to your desktop devices. List online devices, activate a device for remote operations, and check connection status.',
+      'Manage connections to your desktop devices. List online devices, check whether Remote Tool Execution is enabled, and activate an authorized device for remote operations.',
     title: 'Remote Device',
   },
   systemRole: systemPrompt,

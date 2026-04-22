@@ -1,6 +1,7 @@
 import {
   type AgentEvent,
   type AgentInstruction,
+  type AgentState,
   type CallLLMPayload,
   type GeneralAgentCallLLMResultPayload,
   type InstructionExecutor,
@@ -38,6 +39,35 @@ const timing = debug('lobe-server:agent-runtime:timing');
 const TOOL_PRICING: Record<string, number> = {
   'lobe-web-browsing/craw': 0,
   'lobe-web-browsing/search': 0,
+};
+
+const isRecord = (value: unknown): value is Record<string, any> => {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+};
+
+const pickStringRecord = (value: unknown): Record<string, string> | undefined => {
+  if (!isRecord(value)) return undefined;
+
+  const entries = Object.entries(value).filter(
+    (entry): entry is [string, string] => typeof entry[1] === 'string',
+  );
+
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+};
+
+const applyDeviceActivationMetadata = (state: AgentState, metadata: unknown) => {
+  if (!isRecord(metadata) || typeof metadata.activeDeviceId !== 'string') return;
+
+  const activeDeviceId = metadata.activeDeviceId.trim();
+  if (!activeDeviceId) return;
+
+  state.metadata = {
+    ...state.metadata,
+    activeDeviceId,
+    devicePlatform:
+      typeof metadata.devicePlatform === 'string' ? metadata.devicePlatform : undefined,
+    deviceSystemInfo: pickStringRecord(metadata.deviceSystemInfo),
+  };
 };
 
 export interface RuntimeExecutorContext {
@@ -693,6 +723,7 @@ export const createRuntimeExecutors = (
         role: 'tool',
         tool_call_id: chatToolPayload.id,
       });
+      applyDeviceActivationMetadata(newState, executionResult.state?.metadata);
 
       events.push({ id: chatToolPayload.id, result: executionResult, type: 'tool_result' });
 
@@ -965,6 +996,10 @@ export const createRuntimeExecutors = (
         newState.usage = usage;
         if (cost) newState.cost = cost;
       }
+    }
+    for (const toolCall of toolsCalling) {
+      const result = toolResults.find((item) => item.toolCallId === toolCall.id);
+      applyDeviceActivationMetadata(newState, result?.data?.state?.metadata);
     }
 
     // Persist ToolsActivator discovery results from batch tool executions

@@ -9,6 +9,7 @@ import { OFFICIAL_CLOUD_SERVER } from '@/const/env';
 import { appendVercelCookie } from '@/utils/http-headers';
 import { createLogger } from '@/utils/logger';
 
+import DeviceGatewayCtr from './DeviceGatewayCtr';
 import { ControllerModule, IpcMethod } from './index';
 
 /**
@@ -300,9 +301,11 @@ export default class RemoteServerConfigCtr extends ControllerModule {
     this.encryptedAccessToken = undefined;
     this.encryptedRefreshToken = undefined;
     this.tokenExpiresAt = undefined;
+    this.lastRefreshAt = undefined;
     // Also clear from persistent storage
     logger.debug(`Deleting tokens from store key: ${this.encryptedTokensKey}`);
     this.app.storeManager.delete(this.encryptedTokensKey);
+    await this.app.getController(DeviceGatewayCtr)?.disconnectForRemoteServerReset();
   }
 
   /**
@@ -537,7 +540,7 @@ export default class RemoteServerConfigCtr extends ControllerModule {
   }
 
   async getRemoteServerUrl(config?: DataSyncConfig) {
-    const dataConfig = this.normalizeConfig(config ? config : await this.getRemoteServerConfig());
+    const dataConfig = this.normalizeConfig(config || (await this.getRemoteServerConfig()));
 
     return dataConfig.storageMode === 'cloud' ? OFFICIAL_CLOUD_SERVER : dataConfig.remoteServerUrl;
   }

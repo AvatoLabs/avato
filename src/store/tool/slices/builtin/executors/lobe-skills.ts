@@ -9,9 +9,109 @@ import { SkillsExecutionRuntime } from '@lobechat/builtin-tool-skills/executionR
 import { SkillsExecutor } from '@lobechat/builtin-tool-skills/executor';
 
 import { filterBuiltinSkills } from '@/helpers/skillFilters';
-import { cloudSandboxService } from '@/services/cloudSandbox';
+import { remoteDeviceService } from '@/services/remoteDevice';
 import { agentSkillService } from '@/services/skill';
-import { useChatStore } from '@/store/chat';
+
+interface RemoteCommandResult {
+  error?: string;
+  exit_code?: number;
+  exitCode?: number;
+  output?: string;
+  shell_id?: string;
+  stderr?: string;
+  stdout?: string;
+  success?: boolean;
+}
+
+const remoteCommandResultKeys = [
+  'error',
+  'exitCode',
+  'exit_code',
+  'output',
+  'shell_id',
+  'stderr',
+  'stdout',
+  'success',
+] as const;
+
+const isRemoteCommandResult = (value: unknown): value is RemoteCommandResult => {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    remoteCommandResultKeys.some((key) => key in value)
+  );
+};
+
+const stringifyRemoteOutput = (value: unknown, fallback: string) => {
+  if (typeof value === 'string') return value;
+  if (value === undefined) return fallback;
+  return JSON.stringify(value);
+};
+
+const missingDeviceResult = {
+  exitCode: 1,
+  output: '',
+  stderr:
+    'No online desktop device found with Remote Tool Execution enabled. Start LobeHub Desktop, connect it to Device Gateway, and enable Remote Tool Execution.',
+  success: false,
+};
+
+const parseRemoteCommandResult = (content?: string): RemoteCommandResult => {
+  if (!content) return { output: '', success: true };
+
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    return isRemoteCommandResult(parsed)
+      ? parsed
+      : { output: stringifyRemoteOutput(parsed, content), success: true };
+  } catch {
+    return { output: content, success: true };
+  }
+};
+
+const toCommandResult = (result: RemoteCommandResult) => {
+  const exitCode = result.exitCode ?? result.exit_code ?? (result.success === false ? 1 : 0);
+
+  return {
+    exitCode,
+    output: result.stdout || result.output || '',
+    stderr: result.stderr || result.error || '',
+    success: result.success ?? exitCode === 0,
+  };
+};
+
+const toFailedCommandResult = (
+  result: { content: string; error?: string },
+  fallbackError: string,
+) => {
+  const parsedResult = toCommandResult(parseRemoteCommandResult(result.content));
+
+  return {
+    exitCode: parsedResult.exitCode === 0 ? 1 : parsedResult.exitCode,
+    output: parsedResult.output || result.content || '',
+    stderr: parsedResult.stderr || result.error || fallbackError,
+    success: false,
+  };
+};
+
+const resolveSkillPackage = async (config?: { id?: string; name?: string }) => {
+  const skill = config?.id
+    ? await agentSkillService.getById(config.id)
+    : config?.name
+      ? await agentSkillService.getByName(config.name)
+      : undefined;
+
+  if (!skill?.zipFileHash) return {};
+
+  const zipUrl = await agentSkillService.getZipUrl(skill.id);
+  if (!zipUrl.url) return {};
+
+  return {
+    zipHash: skill.zipFileHash,
+    zipUrl: zipUrl.url,
+  };
+};
 
 // Create runtime with client-side service
 const runtime = new SkillsExecutionRuntime({
@@ -20,42 +120,31 @@ const runtime = new SkillsExecutionRuntime({
     execScript: async (command, options) => {
       const { description, config } = options;
 
-      // Cloud: execute via Cloud Sandbox with execScript tool
-      // Server will automatically resolve zipUrl based on config.name
-      const chatState = useChatStore.getState();
-      const topicId = chatState.activeTopicId || 'default';
-
       try {
-        // Call cloud sandbox execScript tool
-        const result = await cloudSandboxService.callTool(
-          'execScript',
-          {
+        const deviceId = await remoteDeviceService.getActiveDeviceId();
+        if (!deviceId) {
+          return missingDeviceResult;
+        }
+
+        const skillPackage = await resolveSkillPackage(config);
+        const result = await remoteDeviceService.executeToolCall({
+          apiName: 'execScript',
+          arguments: JSON.stringify({
             command,
             config,
             description,
-          },
-          { topicId },
-        );
+            ...skillPackage,
+          }),
+          deviceId,
+          identifier: 'lobe-skills',
+          timeout: 120_000,
+        });
 
         if (!result.success) {
-          return {
-            exitCode: 1,
-            output: '',
-            stderr: result.error?.message || 'Command execution failed',
-            success: false,
-          };
+          return toFailedCommandResult(result, 'Remote device command execution failed');
         }
 
-        const sandboxResult = result.result || {};
-
-        return {
-          exitCode: sandboxResult.exitCode ?? (result.success ? 0 : 1),
-          output: sandboxResult.stdout || sandboxResult.output || '',
-          stderr: sandboxResult.stderr || '',
-          success:
-            result.success &&
-            (sandboxResult.exitCode === 0 || sandboxResult.exitCode === undefined),
-        };
+        return toCommandResult(parseRemoteCommandResult(result.content));
       } catch (error) {
         return {
           exitCode: 1,
@@ -65,73 +154,34 @@ const runtime = new SkillsExecutionRuntime({
         };
       }
     },
-    exportFile: async (path, filename) => {
-      // Get current session context
-      const chatState = useChatStore.getState();
-      const topicId = chatState.activeTopicId || 'default';
-
-      try {
-        // Call cloud sandbox exportAndUploadFile
-        const result = await cloudSandboxService.exportAndUploadFile(path, filename, topicId);
-
-        return {
-          fileId: result.fileId,
-          filename: result.filename,
-          mimeType: result.mimeType,
-          size: result.size,
-          success: result.success,
-          url: result.url,
-        };
-      } catch {
-        return {
-          filename,
-          success: false,
-        };
-      }
-    },
     findAll: () => agentSkillService.list(),
     findById: (id) => agentSkillService.getById(id),
     findByName: (name) => agentSkillService.getByName(name),
     readResource: (id, path) => agentSkillService.readResource(id, path),
     runCommand: async ({ command, timeout }) => {
-      // Cloud: execute via Cloud Sandbox
-      // Get current session context for sandbox isolation
-      const chatState = useChatStore.getState();
-      const topicId = chatState.activeTopicId || 'default';
-
       try {
-        // Call cloud sandbox via TRPC
-        // Note: userId is automatically set by server from authenticated context
-        const result = await cloudSandboxService.callTool(
-          'runCommand',
-          {
+        const deviceId = await remoteDeviceService.getActiveDeviceId();
+        if (!deviceId) {
+          return missingDeviceResult;
+        }
+
+        const result = await remoteDeviceService.executeToolCall({
+          apiName: 'runCommand',
+          arguments: JSON.stringify({
             command,
             description: `Execute skill command: ${command.slice(0, 100)}${command.length > 100 ? '...' : ''}`,
             timeout,
-          },
-          { topicId },
-        );
+          }),
+          deviceId,
+          identifier: 'lobe-local-system',
+          timeout: timeout ?? 120_000,
+        });
 
         if (!result.success) {
-          return {
-            exitCode: 1,
-            output: '',
-            stderr: result.error?.message || 'Command execution failed',
-            success: false,
-          };
+          return toFailedCommandResult(result, 'Remote device command execution failed');
         }
 
-        // Parse cloud sandbox result
-        const sandboxResult = result.result || {};
-
-        return {
-          exitCode: sandboxResult.exitCode ?? (result.success ? 0 : 1),
-          output: sandboxResult.stdout || sandboxResult.output || '',
-          stderr: sandboxResult.stderr || '',
-          success:
-            result.success &&
-            (sandboxResult.exitCode === 0 || sandboxResult.exitCode === undefined),
-        };
+        return toCommandResult(parseRemoteCommandResult(result.content));
       } catch (error) {
         return {
           exitCode: 1,
