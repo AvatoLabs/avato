@@ -209,6 +209,35 @@ describe('remoteDeviceRouter', () => {
     expect(executeToolCallMock).not.toHaveBeenCalled();
   });
 
+  it('rejects unsupported Local System APIs before hitting deviceProxy', async () => {
+    await expect(
+      caller.executeToolCall({
+        apiName: 'deleteEverything',
+        arguments: '{}',
+        identifier: LocalSystemIdentifier,
+      }),
+    ).rejects.toThrow();
+
+    expect(executeToolCallMock).not.toHaveBeenCalled();
+  });
+
+  it('does not expose Skills exportFile as a direct browser-to-device call', async () => {
+    await expect(
+      caller.executeToolCall({
+        apiName: 'exportFile',
+        arguments: JSON.stringify({
+          filename: 'result.txt',
+          path: 'output.txt',
+          uploadUrl: 'https://storage.example.com/upload',
+        }),
+        deviceId: 'device-1',
+        identifier: SkillsIdentifier,
+      }),
+    ).rejects.toThrow();
+
+    expect(executeToolCallMock).not.toHaveBeenCalled();
+  });
+
   it('queries device list, status, and system info for the authenticated user', async () => {
     queryDeviceListMock.mockResolvedValue([{ deviceId: 'device-1', online: true }]);
     queryDeviceStatusMock.mockResolvedValue({ deviceCount: 1, online: true });

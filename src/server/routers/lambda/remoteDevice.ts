@@ -1,5 +1,9 @@
-import { LocalSystemApiName, LocalSystemIdentifier } from '@lobechat/builtin-tool-local-system';
-import { SkillsIdentifier } from '@lobechat/builtin-tool-skills';
+import {
+  LocalSystemApiName,
+  LocalSystemIdentifier,
+  LocalSystemManifest,
+} from '@lobechat/builtin-tool-local-system';
+import { SkillsApiName, SkillsIdentifier } from '@lobechat/builtin-tool-skills';
 import { safeParseJSON } from '@lobechat/utils';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
@@ -12,6 +16,8 @@ const MAX_TOOL_ARGUMENTS_LENGTH = 2_000_000;
 const REMOTE_COMMAND_DEFAULT_TIMEOUT = 120_000;
 const REMOTE_COMMAND_MIN_TIMEOUT = 1000;
 const REMOTE_COMMAND_MAX_TIMEOUT = 600_000;
+const directLocalSystemApiNames = new Set(LocalSystemManifest.api.map((api) => api.name));
+const directSkillsApiNames = new Set<string>([SkillsApiName.execScript]);
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -42,13 +48,28 @@ const resolveDeviceRpcTimeout = (input: {
     : REMOTE_COMMAND_DEFAULT_TIMEOUT;
 };
 
-const executeToolCallSchema = z.object({
-  apiName: z.string().trim().min(1).max(MAX_IDENTIFIER_FIELD_LENGTH),
-  arguments: z.string().max(MAX_TOOL_ARGUMENTS_LENGTH),
-  deviceId: z.string().trim().min(1).max(MAX_IDENTIFIER_FIELD_LENGTH).optional(),
-  identifier: z.enum([LocalSystemIdentifier, SkillsIdentifier]),
-  timeout: z.number().min(1000).max(600_000).optional(),
-});
+const executeToolCallSchema = z
+  .object({
+    apiName: z.string().trim().min(1).max(MAX_IDENTIFIER_FIELD_LENGTH),
+    arguments: z.string().max(MAX_TOOL_ARGUMENTS_LENGTH),
+    deviceId: z.string().trim().min(1).max(MAX_IDENTIFIER_FIELD_LENGTH).optional(),
+    identifier: z.enum([LocalSystemIdentifier, SkillsIdentifier]),
+    timeout: z.number().min(1000).max(600_000).optional(),
+  })
+  .superRefine((input, ctx) => {
+    const allowed =
+      input.identifier === LocalSystemIdentifier
+        ? directLocalSystemApiNames.has(input.apiName)
+        : directSkillsApiNames.has(input.apiName);
+
+    if (!allowed) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Unsupported remote device tool: ${input.identifier}/${input.apiName}`,
+        path: ['apiName'],
+      });
+    }
+  });
 
 export const remoteDeviceRouter = router({
   executeToolCall: authedProcedure.input(executeToolCallSchema).mutation(async ({ ctx, input }) => {
