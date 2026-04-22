@@ -12,15 +12,8 @@ import {
   X,
 } from 'lucide-react-native';
 import React from 'react';
-import type {
-  ScrollView,
-  StyleProp,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import type { StyleProp, TextInput, ViewStyle } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 import type { FolderCrumb } from '../../lib/api';
 import type { MobileGovernanceFilterState } from '../../lib/fileGovernance';

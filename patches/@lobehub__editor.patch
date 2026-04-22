@@ -52,7 +52,7 @@ diff --git a/es/plugins/math/react/components/MathInline.js b/es/plugins/math/re
 index fe79a40549ba245b942eed30d8c1f21ca342c9d7..f95aeb7770cc8449f6e61e6372d8cb0d55b01b93 100644
 --- a/es/plugins/math/react/components/MathInline.js
 +++ b/es/plugins/math/react/components/MathInline.js
-@@ -32,7 +32,14 @@ var MathInline = function MathInline(_ref) {
+@@ -32,10 +32,17 @@ var MathInline = function MathInline(_ref) {
    var isMathBlock = node instanceof MathBlockNode;
    useEffect(function () {
      if (ref.current && node.code) {

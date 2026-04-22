@@ -1,0 +1,220 @@
+diff --git a/es/Modal/Modal.mjs b/es/Modal/Modal.mjs
+index 81ec2ee..294ab0a 100644
+--- a/es/Modal/Modal.mjs
++++ b/es/Modal/Modal.mjs
+@@ -13 +13 @@ import { Maximize2, Minimize2, X } from "lucide-react";
+-const Modal$1 = memo(({ panelRef, allowFullscreen, children, title = " ", className, classNames, width = 700, onCancel, open, destroyOnHidden, paddings, height = "75dvh", enableResponsive = true, footer, styles: customStyles, okText, onOk, cancelText, okButtonProps, cancelButtonProps, confirmLoading, ...rest }) => {
++const Modal$1 = memo(({ panelRef, allowFullscreen, children, title = " ", className, classNames, width = 700, onCancel, open, destroyOnHidden, paddings, height = "75dvh", enableResponsive = true, footer, styles: customStyles, okText, onOk, cancelText, okButtonProps, cancelButtonProps, confirmLoading, focusable, focusTriggerAfterClose, mask, ...rest }) => {
+@@ -15,0 +16,4 @@ const Modal$1 = memo(({ panelRef, allowFullscreen, children, title = " ", classN
++	const mergedFocusable = focusTriggerAfterClose === void 0 ? focusable : {
++		...(focusable && typeof focusable === "object" ? focusable : {}),
++		focusTriggerAfterClose
++	};
+@@ -61,0 +66,2 @@ const Modal$1 = memo(({ panelRef, allowFullscreen, children, title = " ", classN
++			focusable: mergedFocusable,
++			mask: { closable: true, ...(mask && typeof mask === "object" && mask !== null ? mask : {}) },
+@@ -70 +75,0 @@ const Modal$1 = memo(({ panelRef, allowFullscreen, children, title = " ", classN
+-			maskClosable: true,
+@@ -106,0 +112,2 @@ const Modal$1 = memo(({ panelRef, allowFullscreen, children, title = " ", classN
++			focusable: mergedFocusable,
++			mask: { closable: true, ...(mask && typeof mask === "object" && mask !== null ? mask : {}) },
+@@ -117 +124 @@ export { Modal_default as default };
+-//# sourceMappingURL=Modal.mjs.map
+\ No newline at end of file
++//# sourceMappingURL=Modal.mjs.map
+diff --git a/es/Modal/ModalStackItem.mjs b/es/Modal/ModalStackItem.mjs
+index 94086f7..de88404 100644
+--- a/es/Modal/ModalStackItem.mjs
++++ b/es/Modal/ModalStackItem.mjs
+@@ -17 +17 @@ const ModalStackItem = memo(({ id, props, onClose, onUpdate, onDestroy }) => {
+-	const setCanDismissByClickOutside = useEventCallback((value) => onUpdate(id, { maskClosable: value }));
++	const setCanDismissByClickOutside = useEventCallback((value) => onUpdate(id, { mask: { closable: value } }));
+@@ -55 +55 @@ export { ModalStackItem };
+-//# sourceMappingURL=ModalStackItem.mjs.map
+\ No newline at end of file
++//# sourceMappingURL=ModalStackItem.mjs.map
+diff --git a/es/Modal/RawModalStackItem.mjs b/es/Modal/RawModalStackItem.mjs
+index 7f79ef2..8ec2557 100644
+--- a/es/Modal/RawModalStackItem.mjs
++++ b/es/Modal/RawModalStackItem.mjs
+@@ -13 +13 @@ const RawModalStackItem = memo(({ component: Component, id, onClose, onUpdate, o
+-		onUpdate(id, { maskClosable: value });
++		onUpdate(id, { mask: { closable: value } });
+@@ -34 +34 @@ export { RawModalStackItem };
+-//# sourceMappingURL=RawModalStackItem.mjs.map
+\ No newline at end of file
++//# sourceMappingURL=RawModalStackItem.mjs.map
+diff --git a/es/Modal/imperative.mjs b/es/Modal/imperative.mjs
+index 6401038..00b1d81 100644
+--- a/es/Modal/imperative.mjs
++++ b/es/Modal/imperative.mjs
+@@ -36,0 +37,16 @@ const updateModal = (id, nextProps) => {
++		const mergedProps = {
++			...item.props,
++			...nextProps
++		};
++		if (
++			nextProps.mask !== void 0 &&
++			item.props.mask !== void 0 &&
++			typeof item.props.mask === "object" &&
++			item.props.mask !== null &&
++			typeof nextProps.mask === "object" &&
++			nextProps.mask !== null &&
++			!Array.isArray(item.props.mask) &&
++			!Array.isArray(nextProps.mask)
++		) {
++			mergedProps.mask = { ...item.props.mask, ...nextProps.mask };
++		}
+@@ -39,4 +55 @@ const updateModal = (id, nextProps) => {
+-			props: {
+-				...item.props,
+-				...nextProps
+-			}
++			props: mergedProps
+@@ -52,0 +66,16 @@ const updateRawProps = (id, nextProps) => {
++		const mergedProps = {
++			...item.props,
++			...nextProps
++		};
++		if (
++			nextProps.mask !== void 0 &&
++			item.props.mask !== void 0 &&
++			typeof item.props.mask === "object" &&
++			item.props.mask !== null &&
++			typeof nextProps.mask === "object" &&
++			nextProps.mask !== null &&
++			!Array.isArray(item.props.mask) &&
++			!Array.isArray(nextProps.mask)
++		) {
++			mergedProps.mask = { ...item.props.mask, ...nextProps.mask };
++		}
+@@ -55,4 +84 @@ const updateRawProps = (id, nextProps) => {
+-			props: {
+-				...item.props,
+-				...nextProps
+-			}
++			props: mergedProps
+@@ -163 +189 @@ const createModal = (props) => {
+-		setCanDismissByClickOutside: (value) => updateModal(id, { maskClosable: value }),
++		setCanDismissByClickOutside: (value) => updateModal(id, { mask: { closable: value } }),
+@@ -181 +207 @@ function createRawModal(component, props, options) {
+-		setCanDismissByClickOutside: (value) => updateRawProps(id, { maskClosable: value }),
++		setCanDismissByClickOutside: (value) => updateRawProps(id, { mask: { closable: value } }),
+@@ -188 +214 @@ export { ModalHost, createModal, createRawModal };
+-//# sourceMappingURL=imperative.mjs.map
+\ No newline at end of file
++//# sourceMappingURL=imperative.mjs.map
+diff --git a/es/Tooltip/TooltipInGroup.mjs b/es/Tooltip/TooltipInGroup.mjs
+index ac11a7a..a231ccb 100644
+--- a/es/Tooltip/TooltipInGroup.mjs
++++ b/es/Tooltip/TooltipInGroup.mjs
+@@ -81,13 +81,14 @@ const TooltipInGroup = ({ children, ref: refProp, arrow, className, classNames,
+-		const resolvedProps = (() => {
+-			if (isNativeButtonTriggerElement) return renderProps;
+-			const { type, ref: triggerRef, ...triggerRest } = renderProps;
+-			return triggerRest;
+-		})();
+-		return cloneElement(childElement, {
+-			...mergeProps(restProps, childElement.props, resolvedProps),
+-			ref: mergeRefs([
+-				childElement.ref,
+-				renderProps.ref,
+-				refProp
+-			])
+-		});
++			const resolvedProps = (() => {
++				if (isNativeButtonTriggerElement) return renderProps;
++				const { type, ref: triggerRef, ...triggerRest } = renderProps;
++				return triggerRest;
++			})();
++			const childRef = childElement.props?.ref ?? null;
++			return cloneElement(childElement, {
++				...mergeProps(restProps, childElement.props, resolvedProps),
++				ref: mergeRefs([
++					childRef,
++					renderProps.ref,
++					refProp
++				])
++			});
+@@ -123 +124 @@ export { TooltipInGroup };
+-//# sourceMappingURL=TooltipInGroup.mjs.map
+\ No newline at end of file
++//# sourceMappingURL=TooltipInGroup.mjs.map
+diff --git a/es/Tooltip/TooltipStandalone.mjs b/es/Tooltip/TooltipStandalone.mjs
+index c31115a..d55943d 100644
+--- a/es/Tooltip/TooltipStandalone.mjs
++++ b/es/Tooltip/TooltipStandalone.mjs
+@@ -96,0 +97 @@ const TooltipStandalone = memo(({ children, title, arrow = false, className, cla
++				const childRef = children.props?.ref ?? null;
+@@ -100 +101 @@ const TooltipStandalone = memo(({ children, title, arrow = false, className, cla
+-						children.ref,
++						childRef,
+@@ -192 +193 @@ export { TooltipStandalone };
+-//# sourceMappingURL=TooltipStandalone.mjs.map
+\ No newline at end of file
++//# sourceMappingURL=TooltipStandalone.mjs.map
+diff --git a/es/base-ui/DropdownMenu/atoms.mjs b/es/base-ui/DropdownMenu/atoms.mjs
+index 6ff8513..f7e0861 100644
+--- a/es/base-ui/DropdownMenu/atoms.mjs
++++ b/es/base-ui/DropdownMenu/atoms.mjs
+@@ -40,0 +41 @@ const DropdownMenuTrigger = ({ children, className, nativeButton, ref: refProp,
++		const childRef = children.props?.ref ?? null;
+@@ -45 +46 @@ const DropdownMenuTrigger = ({ children, className, nativeButton, ref: refProp,
+-				children.ref,
++				childRef,
+@@ -215 +216 @@ export { DropdownMenuCheckboxItemIndicator, DropdownMenuCheckboxItemPrimitive, D
+-//# sourceMappingURL=atoms.mjs.map
+\ No newline at end of file
++//# sourceMappingURL=atoms.mjs.map
+diff --git a/es/base-ui/Modal/atoms.mjs b/es/base-ui/Modal/atoms.mjs
+index d825edc..b8843ea 100644
+--- a/es/base-ui/Modal/atoms.mjs
++++ b/es/base-ui/Modal/atoms.mjs
+@@ -163,0 +164 @@ const ModalTrigger = ({ children, className, nativeButton, ref: refProp, ...rest
++		const childRef = children.props?.ref ?? null;
+@@ -167 +168 @@ const ModalTrigger = ({ children, className, nativeButton, ref: refProp, ...rest
+-				children.ref,
++				childRef,
+@@ -190 +191 @@ export { ModalBackdrop, ModalClose, ModalContent, ModalDescription, ModalFooter,
+-//# sourceMappingURL=atoms.mjs.map
+\ No newline at end of file
++//# sourceMappingURL=atoms.mjs.map
+diff --git a/es/base-ui/Popover/PopoverInGroup.mjs b/es/base-ui/Popover/PopoverInGroup.mjs
+index e7754cb..e2e3ceb 100644
+--- a/es/base-ui/Popover/PopoverInGroup.mjs
++++ b/es/base-ui/Popover/PopoverInGroup.mjs
+@@ -45,0 +46 @@ const PopoverInGroup = ({ children, ref: refProp, ...props }) => {
++			const childRef = children.props?.ref ?? null;
+@@ -50 +51 @@ const PopoverInGroup = ({ children, ref: refProp, ...props }) => {
+-					children.ref,
++					childRef,
+@@ -70 +71 @@ export { PopoverInGroup };
+-//# sourceMappingURL=PopoverInGroup.mjs.map
+\ No newline at end of file
++//# sourceMappingURL=PopoverInGroup.mjs.map
+diff --git a/es/base-ui/Popover/atoms.mjs b/es/base-ui/Popover/atoms.mjs
+index 763e5f0..70c8965 100644
+--- a/es/base-ui/Popover/atoms.mjs
++++ b/es/base-ui/Popover/atoms.mjs
+@@ -35,0 +36 @@ const PopoverTriggerElement = ({ children, className, nativeButton, ref: refProp
++			const childRef = children.props?.ref ?? null;
+@@ -40 +41 @@ const PopoverTriggerElement = ({ children, className, nativeButton, ref: refProp
+-					children.ref,
++					childRef,
+@@ -111 +112 @@ export { PopoverArrow, PopoverBackdrop, PopoverPopup, PopoverPortal, PopoverPosi
+-//# sourceMappingURL=atoms.mjs.map
+\ No newline at end of file
++//# sourceMappingURL=atoms.mjs.map
+diff --git a/es/base-ui/Select/atoms.mjs b/es/base-ui/Select/atoms.mjs
+index 3ddca23..a5da452 100644
+--- a/es/base-ui/Select/atoms.mjs
++++ b/es/base-ui/Select/atoms.mjs
+@@ -44,0 +45 @@ const SelectTrigger = ({ children, className, nativeButton, shadow, size = "midd
++			const childRef = children.props?.ref ?? null;
+@@ -49 +50 @@ const SelectTrigger = ({ children, className, nativeButton, shadow, size = "midd
+-					children.ref,
++					childRef,
+@@ -171 +172 @@ export { SelectArrow, SelectBackdrop, SelectGroup, SelectGroupLabel, SelectIcon,
+-//# sourceMappingURL=atoms.mjs.map
+\ No newline at end of file
++//# sourceMappingURL=atoms.mjs.map

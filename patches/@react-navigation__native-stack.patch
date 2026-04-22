@@ -9,7 +9,7 @@ diff --git a/lib/module/views/useHeaderConfigProps.js b/lib/module/views/useHead
    const leftItems = headerLeftItems?.({
      tintColor,
      canGoBack
-@@ -333,35 +334,35 @@
+@@ -333,34 +334,34 @@
      backButtonInCustomView,
      backgroundColor: headerBackgroundColor,
      backTitle: headerBackTitle,
