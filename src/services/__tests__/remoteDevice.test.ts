@@ -28,6 +28,49 @@ describe('remoteDeviceService', () => {
     localStorage.clear();
   });
 
+  it('clamps explicit tool-call timeouts before sending them to lambda', async () => {
+    vi.mocked(lambdaClient.remoteDevice.executeToolCall.mutate).mockResolvedValue({
+      content: 'ok',
+      success: true,
+    } as any);
+
+    await remoteDeviceService.executeToolCall({
+      apiName: 'runCommand',
+      arguments: JSON.stringify({ command: 'sleep 600', timeout: 900_000 }),
+      deviceId: 'device-1',
+      identifier: 'lobe-local-system',
+      timeout: 900_000,
+    });
+
+    expect(lambdaClient.remoteDevice.executeToolCall.mutate).toHaveBeenCalledWith({
+      apiName: 'runCommand',
+      arguments: JSON.stringify({ command: 'sleep 600', timeout: 900_000 }),
+      deviceId: 'device-1',
+      identifier: 'lobe-local-system',
+      timeout: 600_000,
+    });
+  });
+
+  it('omits invalid tool-call timeouts before sending them to lambda', async () => {
+    vi.mocked(lambdaClient.remoteDevice.executeToolCall.mutate).mockResolvedValue({
+      content: 'ok',
+      success: true,
+    } as any);
+
+    await remoteDeviceService.executeToolCall({
+      apiName: 'runCommand',
+      arguments: JSON.stringify({ command: 'pwd' }),
+      identifier: 'lobe-local-system',
+      timeout: Number.POSITIVE_INFINITY,
+    });
+
+    expect(lambdaClient.remoteDevice.executeToolCall.mutate).toHaveBeenCalledWith({
+      apiName: 'runCommand',
+      arguments: JSON.stringify({ command: 'pwd' }),
+      identifier: 'lobe-local-system',
+    });
+  });
+
   it('uses the stored active device when it is still online', async () => {
     localStorage.setItem('lobehub.remoteDevice.activeDeviceId', 'device-1');
     vi.mocked(lambdaClient.remoteDevice.list.query).mockResolvedValue([

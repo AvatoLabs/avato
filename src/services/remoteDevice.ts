@@ -11,11 +11,32 @@ interface ExecuteToolCallParams {
   timeout?: number;
 }
 
+const MIN_REMOTE_DEVICE_TIMEOUT = 1000;
+const MAX_REMOTE_DEVICE_TIMEOUT = 600_000;
+
+const normalizeRemoteDeviceTimeout = (timeout?: number) => {
+  if (typeof timeout !== 'number' || !Number.isFinite(timeout)) return undefined;
+
+  return Math.min(
+    Math.max(Math.trunc(timeout), MIN_REMOTE_DEVICE_TIMEOUT),
+    MAX_REMOTE_DEVICE_TIMEOUT,
+  );
+};
+
 class RemoteDeviceService {
   private readonly activeDeviceStorageKey = 'lobehub.remoteDevice.activeDeviceId';
 
   async executeToolCall(params: ExecuteToolCallParams) {
-    return lambdaClient.remoteDevice.executeToolCall.mutate(params);
+    const timeout = normalizeRemoteDeviceTimeout(params.timeout);
+    const normalizedParams: ExecuteToolCallParams = { ...params };
+
+    if (timeout === undefined) {
+      delete normalizedParams.timeout;
+    } else {
+      normalizedParams.timeout = timeout;
+    }
+
+    return lambdaClient.remoteDevice.executeToolCall.mutate(normalizedParams);
   }
 
   async getActiveDeviceId(): Promise<string | undefined> {
