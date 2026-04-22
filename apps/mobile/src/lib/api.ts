@@ -1236,6 +1236,7 @@ export const threadApi = {
 
 // ── AI Chat API ─────────────────────────────────────────────────────
 export interface ChatRequestOptions {
+  activeDeviceId?: string;
   enabledSearch?: boolean;
   enableSearch?: boolean;
   frequency_penalty?: number;
@@ -1639,6 +1640,7 @@ export const aiChatApi = {
         if (options?.max_tokens !== undefined) payload.max_tokens = options.max_tokens;
         if (options?.enabledSearch ?? options?.enableSearch) payload.enabledSearch = true;
         if (options?.memory) payload.memory = options.memory;
+        if (options?.activeDeviceId) payload.activeDeviceId = options.activeDeviceId;
         if (options?.sessionId) payload.sessionId = options.sessionId;
         if (options?.topicId) payload.topicId = options.topicId;
         if (options?.plugins?.length) payload.plugins = options.plugins;
