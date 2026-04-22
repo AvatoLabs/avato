@@ -1,3 +1,4 @@
+import { LocalSystemManifest } from '@lobechat/builtin-tool-local-system';
 import { GatewayClient } from '@lobechat/device-gateway-client';
 import superjson from 'superjson';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -49,10 +50,22 @@ const createAccessToken = (payload: Record<string, unknown>) => {
 
 describe('DeviceGatewayCtr', () => {
   const localFileCtr = {
+    handleEditFile: vi.fn(),
+    handleGlobFiles: vi.fn(),
+    handleGrepContent: vi.fn(),
+    handleLocalFilesSearch: vi.fn(),
+    handleMoveFiles: vi.fn(),
     handlePrepareSkillDirectory: vi.fn(),
     handleReadFileAsBase64: vi.fn(),
+    handleRenameFile: vi.fn(),
+    handleWriteFile: vi.fn(),
+    listLocalFiles: vi.fn(),
+    readFile: vi.fn(),
+    readFiles: vi.fn(),
   };
   const shellCommandCtr = {
+    handleGetCommandOutput: vi.fn(),
+    handleKillCommand: vi.fn(),
     handleRunCommand: vi.fn(),
   };
   const remoteServerConfigCtr = {
@@ -508,6 +521,85 @@ describe('DeviceGatewayCtr', () => {
       stderr: 'command failed',
       success: false,
     });
+  });
+
+  it('dispatches every Local System manifest API through desktop controllers', async () => {
+    const cases = {
+      editLocalFile: {
+        args: { file_path: '/tmp/a.txt', new_string: 'b', old_string: 'a' },
+        handler: localFileCtr.handleEditFile,
+      },
+      getCommandOutput: {
+        args: { shell_id: 'shell-1' },
+        handler: shellCommandCtr.handleGetCommandOutput,
+      },
+      globLocalFiles: {
+        args: { pattern: '**/*.ts' },
+        handler: localFileCtr.handleGlobFiles,
+      },
+      grepContent: {
+        args: { pattern: 'TODO' },
+        handler: localFileCtr.handleGrepContent,
+      },
+      killCommand: {
+        args: { shell_id: 'shell-1' },
+        handler: shellCommandCtr.handleKillCommand,
+      },
+      listLocalFiles: {
+        args: { path: '/tmp' },
+        handler: localFileCtr.listLocalFiles,
+      },
+      moveLocalFiles: {
+        args: { items: [{ newPath: '/tmp/b.txt', oldPath: '/tmp/a.txt' }] },
+        handler: localFileCtr.handleMoveFiles,
+      },
+      readLocalFile: {
+        args: { path: '/tmp/a.txt' },
+        handler: localFileCtr.readFile,
+      },
+      readLocalFiles: {
+        args: { paths: ['/tmp/a.txt', '/tmp/b.txt'] },
+        handler: localFileCtr.readFiles,
+      },
+      renameLocalFile: {
+        args: { newName: 'b.txt', path: '/tmp/a.txt' },
+        handler: localFileCtr.handleRenameFile,
+      },
+      runCommand: {
+        args: { command: 'echo ok' },
+        handler: shellCommandCtr.handleRunCommand,
+      },
+      searchLocalFiles: {
+        args: { keywords: 'demo' },
+        handler: localFileCtr.handleLocalFilesSearch,
+      },
+      writeLocalFile: {
+        args: { content: 'hello', path: '/tmp/a.txt' },
+        handler: localFileCtr.handleWriteFile,
+      },
+    } satisfies Record<
+      string,
+      {
+        args: Record<string, unknown>;
+        handler: ReturnType<typeof vi.fn>;
+      }
+    >;
+
+    for (const api of LocalSystemManifest.api) {
+      const item = cases[api.name];
+      expect(item, `Missing DeviceGatewayCtr test case for ${api.name}`).toBeDefined();
+
+      item.handler.mockResolvedValueOnce({ success: true });
+
+      const result = await (controller as any).executeToolCall({
+        apiName: api.name,
+        arguments: JSON.stringify(item.args),
+        identifier: 'lobe-local-system',
+      });
+
+      expect(result.success).toBe(true);
+      expect(item.handler).toHaveBeenCalledWith(item.args);
+    }
   });
 
   it('rejects oversized gateway tool responses before sending them back to the relay', async () => {
