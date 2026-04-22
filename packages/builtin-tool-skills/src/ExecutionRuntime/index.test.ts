@@ -82,6 +82,25 @@ describe('SkillsExecutionRuntime', () => {
         expect(result.content).toBe('(no output)');
       });
 
+      it('should pass timeout to the execScript service method', async () => {
+        const execScript = vi.fn().mockResolvedValue({
+          exitCode: 0,
+          output: 'done',
+          success: true,
+        } satisfies CommandResult);
+        const service = createMockService({ execScript });
+        const runtime = new SkillsExecutionRuntime({ service });
+
+        await runtime.execScript({ ...args, timeout: 300_000 });
+
+        expect(execScript).toHaveBeenCalledWith('echo hello', {
+          config: undefined,
+          context: undefined,
+          description: 'test command',
+          timeout: 300_000,
+        });
+      });
+
       it('should return success: false when execScript throws', async () => {
         const service = createMockService({
           execScript: vi.fn().mockRejectedValue(new Error('execution timeout')),
@@ -140,6 +159,23 @@ describe('SkillsExecutionRuntime', () => {
 
         expect(result.success).toBe(false);
         expect(result.content).toBe('Failed to execute command: connection lost');
+      });
+
+      it('should pass timeout to the runCommand fallback', async () => {
+        const runCommand = vi.fn().mockResolvedValue({
+          exitCode: 0,
+          output: 'done',
+          success: true,
+        } satisfies CommandResult);
+        const service = createMockService({ runCommand });
+        const runtime = new SkillsExecutionRuntime({ service });
+
+        await runtime.execScript({ ...args, timeout: 300_000 });
+
+        expect(runCommand).toHaveBeenCalledWith({
+          command: 'echo hello',
+          timeout: 300_000,
+        });
       });
 
       it('should return success: false when neither execScript nor runCommand is available', async () => {

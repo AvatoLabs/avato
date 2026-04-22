@@ -118,7 +118,7 @@ const runtime = new SkillsExecutionRuntime({
   builtinSkills: filterBuiltinSkills(builtinSkills),
   service: {
     execScript: async (command, options) => {
-      const { description, config, context } = options;
+      const { description, config, context, timeout } = options;
 
       try {
         const deviceId = await remoteDeviceService.getActiveDeviceId();
@@ -134,11 +134,12 @@ const runtime = new SkillsExecutionRuntime({
             config,
             description,
             executionContextId: context?.operationId || context?.messageId,
+            timeout,
             ...skillPackage,
           }),
           deviceId,
           identifier: 'lobe-skills',
-          timeout: 120_000,
+          timeout: timeout ?? 120_000,
         });
 
         if (!result.success) {

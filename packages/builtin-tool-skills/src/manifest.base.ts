@@ -89,6 +89,10 @@ export const execScriptBaseParams = {
       'Clear description of what this command does (5-10 words, in active voice). Use the same language as the user input.',
     type: 'string' as const,
   },
+  timeout: {
+    description: 'Timeout in milliseconds (default: 120000ms, max: 600000ms).',
+    type: 'number' as const,
+  },
 };
 
 export const manifestMeta = {

@@ -182,6 +182,7 @@ describe('skillsRuntime', () => {
         command: 'bun run build',
         config: { name: 'demo-skill' },
         description: 'Build skill',
+        timeout: 900_000,
       },
       { operationId: 'operation-1' },
     );
@@ -196,13 +197,14 @@ describe('skillsRuntime', () => {
         apiName: 'execScript',
         identifier: SkillsIdentifier,
       }),
-      120_000,
+      600_000,
     );
     expect(JSON.parse(executeToolCallMock.mock.calls[0][1].arguments)).toEqual({
       command: 'bun run build',
       config: { name: 'demo-skill' },
       description: 'Build skill',
       executionContextId: 'operation-1',
+      timeout: 600_000,
       zipSha256: 'zip-hash-1',
       zipUrl: 'https://example.com/skills/demo.zip',
     });

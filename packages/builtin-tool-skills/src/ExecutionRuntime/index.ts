@@ -48,6 +48,7 @@ export interface SkillRuntimeService {
       config?: { description?: string; id?: string; name?: string };
       context?: SkillRuntimeContext;
       description: string;
+      timeout?: number;
     },
   ) => Promise<CommandResult>;
   exportFile?: (
@@ -80,7 +81,7 @@ export class SkillsExecutionRuntime {
     args: ExecScriptParams,
     context?: SkillRuntimeContext,
   ): Promise<BuiltinServerRuntimeOutput> {
-    const { command, description, config } = args;
+    const { command, description, config, timeout } = args;
 
     // Try the runtime-provided execScript method first.
     if (this.service.execScript) {
@@ -89,6 +90,7 @@ export class SkillsExecutionRuntime {
           config,
           context,
           description,
+          timeout,
         });
 
         const output = [result.output, result.stderr].filter(Boolean).join('\n');
@@ -119,7 +121,7 @@ export class SkillsExecutionRuntime {
     }
 
     try {
-      const result = await this.service.runCommand({ command });
+      const result = await this.service.runCommand({ command, timeout });
 
       const output = [result.output, result.stderr].filter(Boolean).join('\n');
 

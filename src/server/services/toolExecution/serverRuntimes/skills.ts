@@ -32,6 +32,7 @@ interface ExecScriptDeviceParams {
   config?: { description?: string; id?: string; name?: string };
   description: string;
   executionContextId?: string;
+  timeout?: number;
   zipSha256?: string;
   zipUrl?: string;
 }
@@ -68,12 +69,25 @@ const remoteCommandResultKeys = [
   'success',
 ] as const;
 
+const REMOTE_COMMAND_DEFAULT_TIMEOUT = 120_000;
+const REMOTE_COMMAND_MIN_TIMEOUT = 1000;
+const REMOTE_COMMAND_MAX_TIMEOUT = 600_000;
+
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 };
 
 const isRemoteCommandResult = (value: unknown): value is RemoteCommandResult => {
   return isRecord(value) && remoteCommandResultKeys.some((key) => key in value);
+};
+
+const normalizeRemoteCommandTimeout = (timeout?: number) => {
+  if (typeof timeout !== 'number' || !Number.isFinite(timeout)) return undefined;
+
+  return Math.min(
+    Math.max(Math.trunc(timeout), REMOTE_COMMAND_MIN_TIMEOUT),
+    REMOTE_COMMAND_MAX_TIMEOUT,
+  );
 };
 
 const stringifyRemoteOutput = (value: unknown, fallback: string) => {
@@ -193,6 +207,7 @@ class SkillServerRuntimeService implements SkillRuntimeService {
       context?: SkillRuntimeContext;
       description: string;
       runInClient?: boolean;
+      timeout?: number;
     },
   ): Promise<CommandResult> => {
     const { config, context, description } = options;
@@ -216,6 +231,9 @@ class SkillServerRuntimeService implements SkillRuntimeService {
       };
       const executionContextId = resolveExecutionContextId(context);
       if (executionContextId) enhancedParams.executionContextId = executionContextId;
+
+      const timeout = normalizeRemoteCommandTimeout(options.timeout);
+      if (timeout !== undefined) enhancedParams.timeout = timeout;
 
       if (config?.name) {
         const skill = await this.skillModel.findByName(config.name);
@@ -287,7 +305,7 @@ class SkillServerRuntimeService implements SkillRuntimeService {
         arguments: JSON.stringify(params),
         identifier: SkillsIdentifier,
       },
-      120_000,
+      params.timeout ?? REMOTE_COMMAND_DEFAULT_TIMEOUT,
     );
 
     if (!response.success) {

@@ -110,6 +110,7 @@ describe('lobe-skills web executor', () => {
         command: 'bun run build',
         config: { name: 'demo-skill' },
         description: 'Build skill',
+        timeout: 300_000,
       },
       ctx,
     );
@@ -125,7 +126,7 @@ describe('lobe-skills web executor', () => {
         apiName: 'execScript',
         deviceId: 'device-1',
         identifier: 'lobe-skills',
-        timeout: 120_000,
+        timeout: 300_000,
       }),
     );
 
@@ -135,6 +136,7 @@ describe('lobe-skills web executor', () => {
       config: { name: 'demo-skill' },
       description: 'Build skill',
       executionContextId: 'operation-1',
+      timeout: 300_000,
       zipSha256: 'zip-hash-1',
       zipUrl: 'https://example.com/demo-skill.zip',
     });
