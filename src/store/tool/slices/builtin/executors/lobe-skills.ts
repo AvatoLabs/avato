@@ -118,7 +118,7 @@ const runtime = new SkillsExecutionRuntime({
   builtinSkills: filterBuiltinSkills(builtinSkills),
   service: {
     execScript: async (command, options) => {
-      const { description, config } = options;
+      const { description, config, context } = options;
 
       try {
         const deviceId = await remoteDeviceService.getActiveDeviceId();
@@ -133,6 +133,7 @@ const runtime = new SkillsExecutionRuntime({
             command,
             config,
             description,
+            executionContextId: context?.operationId || context?.messageId,
             ...skillPackage,
           }),
           deviceId,

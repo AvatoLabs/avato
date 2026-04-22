@@ -41,7 +41,7 @@ export const readReferenceApi: LobeChatPluginApi = {
 
 export const exportFileApi: LobeChatPluginApi = {
   description:
-    'Export a file generated during skill execution to cloud storage. Use this to save outputs, results, or generated files for the user to download. The file will be uploaded and a permanent download URL will be returned.',
+    'Export a file generated during skill execution to workspace storage. Use this to save outputs, results, or generated files for the user to download. The file will be uploaded and a permanent download URL will be returned.',
   name: SkillsApiName.exportFile,
   parameters: {
     properties: {

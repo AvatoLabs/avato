@@ -2,17 +2,16 @@ import { builtinSkills } from '@lobechat/builtin-skills';
 import { type CommandResult, SkillsIdentifier } from '@lobechat/builtin-tool-skills';
 import {
   type ExportFileResult,
+  type SkillRuntimeContext,
   type SkillRuntimeService,
   SkillsExecutionRuntime,
 } from '@lobechat/builtin-tool-skills/executionRuntime';
 import type { LobeChatDatabase } from '@lobechat/database';
 import type { SkillItem, SkillListItem, SkillResourceContent } from '@lobechat/types';
-import type { CodeInterpreterToolName } from '@lobehub/market-sdk';
 import debug from 'debug';
 
 import { AgentSkillModel } from '@/database/models/agentSkill';
 import { FileModel } from '@/database/models/file';
-import { UserModel } from '@/database/models/user';
 import { filterBuiltinSkills } from '@/helpers/skillFilters';
 import { getBlobProvider } from '@/server/modules/BlobProvider';
 import { FileService } from '@/server/services/file';
@@ -20,7 +19,6 @@ import {
   generateSandboxExportStorageKey,
   resolveTargetSpaceIdForSandboxExport,
 } from '@/server/services/file/sandboxExport';
-import { MarketService } from '@/server/services/market';
 import { resolveAccessibleSkillZipProxyUrl } from '@/server/services/skill/resolveAccessibleSkillZipProxyUrl';
 import { SkillResourceService } from '@/server/services/skill/resource';
 import { deviceProxy } from '@/server/services/toolExecution/deviceProxy';
@@ -33,8 +31,19 @@ interface ExecScriptDeviceParams {
   command: string;
   config?: { description?: string; id?: string; name?: string };
   description: string;
+  executionContextId?: string;
   zipSha256?: string;
   zipUrl?: string;
+}
+
+interface ExportFileDeviceResult {
+  error?: string;
+  filename?: string;
+  mimeType?: string;
+  path?: string;
+  sha256?: string;
+  size?: number;
+  success?: boolean;
 }
 
 interface RemoteCommandResult {
@@ -59,13 +68,12 @@ const remoteCommandResultKeys = [
   'success',
 ] as const;
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+};
+
 const isRemoteCommandResult = (value: unknown): value is RemoteCommandResult => {
-  return (
-    !!value &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    remoteCommandResultKeys.some((key) => key in value)
-  );
+  return isRecord(value) && remoteCommandResultKeys.some((key) => key in value);
 };
 
 const stringifyRemoteOutput = (value: unknown, fallback: string) => {
@@ -112,12 +120,25 @@ const toFailedCommandResult = (
   };
 };
 
+const resolveExecutionContextId = (context?: SkillRuntimeContext) =>
+  context?.operationId || context?.messageId;
+
+const parseRemoteExportFileResult = (content?: string): ExportFileDeviceResult => {
+  if (!content) return { success: true };
+
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    return isRecord(parsed) ? (parsed as ExportFileDeviceResult) : { success: true };
+  } catch {
+    return { success: true };
+  }
+};
+
 class SkillServerRuntimeService implements SkillRuntimeService {
   private resourceService: SkillResourceService;
   private serverDB: LobeChatDatabase;
   private spaceId?: string;
   private skillModel: AgentSkillModel;
-  private marketService: MarketService;
   private fileService: FileService;
   private fileModel: FileModel;
   private topicId?: string;
@@ -128,7 +149,6 @@ class SkillServerRuntimeService implements SkillRuntimeService {
     activeDeviceId?: string;
     fileModel: FileModel;
     fileService: FileService;
-    marketService: MarketService;
     resourceService: SkillResourceService;
     serverDB: LobeChatDatabase;
     spaceId?: string;
@@ -140,7 +160,6 @@ class SkillServerRuntimeService implements SkillRuntimeService {
     this.resourceService = options.resourceService;
     this.serverDB = options.serverDB;
     this.spaceId = options.spaceId;
-    this.marketService = options.marketService;
     this.fileService = options.fileService;
     this.fileModel = options.fileModel;
     this.topicId = options.topicId;
@@ -171,11 +190,12 @@ class SkillServerRuntimeService implements SkillRuntimeService {
     command: string,
     options: {
       config?: { description?: string; id?: string; name?: string };
+      context?: SkillRuntimeContext;
       description: string;
       runInClient?: boolean;
     },
   ): Promise<CommandResult> => {
-    const { config, description } = options;
+    const { config, context, description } = options;
 
     if (!this.activeDeviceId) {
       return {
@@ -194,6 +214,8 @@ class SkillServerRuntimeService implements SkillRuntimeService {
         config,
         description,
       };
+      const executionContextId = resolveExecutionContextId(context);
+      if (executionContextId) enhancedParams.executionContextId = executionContextId;
 
       if (config?.name) {
         const skill = await this.skillModel.findByName(config.name);
@@ -275,9 +297,19 @@ class SkillServerRuntimeService implements SkillRuntimeService {
     return toCommandResult(parseRemoteCommandResult(response.content));
   };
 
-  exportFile = async (path: string, filename: string): Promise<ExportFileResult> => {
+  exportFile = async (
+    path: string,
+    filename: string,
+    context?: SkillRuntimeContext,
+  ): Promise<ExportFileResult> => {
     if (!this.topicId) {
       throw new Error('topicId is required for exportFile');
+    }
+    if (!this.activeDeviceId) {
+      return {
+        filename,
+        success: false,
+      };
     }
 
     try {
@@ -295,15 +327,23 @@ class SkillServerRuntimeService implements SkillRuntimeService {
       const uploadUrl = await blobProvider.createUploadUrl(key);
       log('Generated upload URL for key: %s', key);
 
-      // Step 2: Call sandbox's exportFile tool with the upload URL
-      const market = this.marketService.market;
-      const response = await market.plugins.runBuildInTool(
-        'exportFile' as CodeInterpreterToolName,
-        { path, uploadUrl },
-        { topicId: this.topicId, userId: this.userId },
+      // Step 2: Ask the active desktop device to upload the generated file directly to storage.
+      const response = await deviceProxy.executeToolCall(
+        { deviceId: this.activeDeviceId, userId: this.userId },
+        {
+          apiName: 'exportFile',
+          arguments: JSON.stringify({
+            executionContextId: resolveExecutionContextId(context),
+            filename,
+            path,
+            uploadUrl,
+          }),
+          identifier: SkillsIdentifier,
+        },
+        120_000,
       );
 
-      log('Sandbox exportFile response: %O', response);
+      log('Device exportFile response: %O', response);
 
       if (!response.success) {
         return {
@@ -312,7 +352,7 @@ class SkillServerRuntimeService implements SkillRuntimeService {
         };
       }
 
-      const result = response.data?.result;
+      const result = parseRemoteExportFileResult(response.content);
       const uploadSuccess = result?.success !== false;
 
       if (!uploadSuccess) {
@@ -322,7 +362,7 @@ class SkillServerRuntimeService implements SkillRuntimeService {
         };
       }
 
-      // Step 3: Resolve content type from storage metadata / sandbox response
+      // Step 3: Resolve content type from storage metadata / device response
       const metadata = await blobProvider.getObjectMetadata(key);
       const mimeType = metadata.contentType || result?.mimeType || 'application/octet-stream';
 
@@ -371,27 +411,8 @@ export const skillsRuntime: ServerRuntimeRegistration = {
       throw new Error('userId is required for Skills execution');
     }
 
-    // Fetch market access token from user settings for exportFile compatibility.
-    let marketAccessToken: string | undefined;
-    try {
-      const userModel = new UserModel(context.serverDB, context.userId);
-      const userSettings = await userModel.getUserSettings();
-      marketAccessToken = (userSettings?.market as any)?.accessToken;
-      log(
-        'Fetched market accessToken for user %s: %s',
-        context.userId,
-        marketAccessToken ? 'exists' : 'not found',
-      );
-    } catch (error) {
-      log('Failed to fetch market accessToken for user %s: %O', context.userId, error);
-    }
-
     const skillModel = new AgentSkillModel(context.serverDB, context.userId);
     const resourceService = new SkillResourceService(context.serverDB, context.userId);
-    const marketService = new MarketService({
-      accessToken: marketAccessToken,
-      userInfo: { userId: context.userId },
-    });
     const fileService = new FileService(context.serverDB, context.userId);
     const fileModel = new FileModel(context.serverDB, context.userId);
 
@@ -399,7 +420,6 @@ export const skillsRuntime: ServerRuntimeRegistration = {
       activeDeviceId: context.activeDeviceId,
       fileModel,
       fileService,
-      marketService,
       resourceService,
       serverDB: context.serverDB,
       spaceId: context.spaceId,

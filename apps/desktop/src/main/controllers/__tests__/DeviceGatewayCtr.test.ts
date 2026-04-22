@@ -50,6 +50,7 @@ const createAccessToken = (payload: Record<string, unknown>) => {
 describe('DeviceGatewayCtr', () => {
   const localFileCtr = {
     handlePrepareSkillDirectory: vi.fn(),
+    handleReadFileAsBase64: vi.fn(),
   };
   const shellCommandCtr = {
     handleRunCommand: vi.fn(),
@@ -96,6 +97,7 @@ describe('DeviceGatewayCtr', () => {
     sendToolCallResponse: ReturnType<typeof vi.fn>;
   };
   let gatewayEventHandlers: Record<string, (...args: any[]) => void>;
+  let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -116,6 +118,21 @@ describe('DeviceGatewayCtr', () => {
         success: true,
       }),
     );
+    localFileCtr.handleReadFileAsBase64.mockResolvedValue({
+      base64: Buffer.from('hello').toString('base64'),
+      filename: 'output.txt',
+      mimeType: 'text/plain',
+      path: '/tmp/skill-dir/output.txt',
+      sha256: 'sha-1',
+      size: 5,
+      success: true,
+    });
+    fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+    });
+    vi.stubGlobal('fetch', fetchMock);
 
     gatewayClient = {
       connect: vi.fn().mockResolvedValue(undefined),
@@ -529,6 +546,7 @@ describe('DeviceGatewayCtr', () => {
       arguments: JSON.stringify({
         command: 'bun run build',
         description: 'Build skill project',
+        executionContextId: 'operation-1',
         zipSha256: 'hash-1',
         zipUrl: 'https://example.com/skill.zip',
       }),
@@ -546,6 +564,81 @@ describe('DeviceGatewayCtr', () => {
       description: 'Build skill project',
       timeout: undefined,
     });
+  });
+
+  it('uploads skill export files from the remembered execution directory', async () => {
+    localFileCtr.handlePrepareSkillDirectory.mockResolvedValue({
+      extractedDir: '/tmp/skill-dir',
+      success: true,
+      zipPath: '/tmp/skill.zip',
+    });
+    shellCommandCtr.handleRunCommand.mockResolvedValue({
+      exit_code: 0,
+      stdout: 'done',
+      success: true,
+    });
+
+    await (controller as any).executeToolCall({
+      apiName: 'execScript',
+      arguments: JSON.stringify({
+        command: 'node build.js',
+        executionContextId: 'operation-1',
+        zipSha256: 'hash-1',
+        zipUrl: 'https://example.com/skill.zip',
+      }),
+      identifier: 'lobe-skills',
+    });
+
+    const result = await (controller as any).executeToolCall({
+      apiName: 'exportFile',
+      arguments: JSON.stringify({
+        executionContextId: 'operation-1',
+        filename: 'result.txt',
+        path: 'output.txt',
+        uploadUrl: 'https://storage.example.com/upload',
+      }),
+      identifier: 'lobe-skills',
+    });
+
+    expect(result.success).toBe(true);
+    expect(JSON.parse(result.content)).toMatchObject({
+      filename: 'result.txt',
+      mimeType: 'text/plain',
+      path: '/tmp/skill-dir/output.txt',
+      sha256: 'sha-1',
+      size: 5,
+      success: true,
+    });
+    expect(localFileCtr.handleReadFileAsBase64).toHaveBeenCalledWith({
+      baseDir: '/tmp/skill-dir',
+      path: 'output.txt',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://storage.example.com/upload',
+      expect.objectContaining({
+        headers: { 'content-type': 'text/plain' },
+        method: 'PUT',
+      }),
+    );
+  });
+
+  it('rejects skill export files when no execution directory is active', async () => {
+    const result = await (controller as any).executeToolCall({
+      apiName: 'exportFile',
+      arguments: JSON.stringify({
+        filename: 'result.txt',
+        path: 'output.txt',
+        uploadUrl: 'https://storage.example.com/upload',
+      }),
+      identifier: 'lobe-skills',
+    });
+
+    expect(result).toMatchObject({
+      error: 'No skill execution directory is available for export',
+      success: false,
+    });
+    expect(localFileCtr.handleReadFileAsBase64).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('executes MCP tool calls through the desktop MCP controller', async () => {

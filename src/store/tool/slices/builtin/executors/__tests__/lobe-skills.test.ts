@@ -134,6 +134,7 @@ describe('lobe-skills web executor', () => {
       command: 'bun run build',
       config: { name: 'demo-skill' },
       description: 'Build skill',
+      executionContextId: 'operation-1',
       zipSha256: 'zip-hash-1',
       zipUrl: 'https://example.com/demo-skill.zip',
     });

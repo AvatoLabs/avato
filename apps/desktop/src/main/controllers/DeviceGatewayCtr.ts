@@ -33,9 +33,11 @@ const LOCAL_SYSTEM_IDENTIFIER = 'lobe-local-system';
 const MCP_IDENTIFIER = 'lobe-mcp';
 const SKILLS_IDENTIFIER = 'lobe-skills';
 const SKILL_EXEC_SCRIPT = 'execScript';
+const SKILL_EXPORT_FILE = 'exportFile';
 const MCP_CALL_TOOL = 'callTool';
 const GATEWAY_START_AUTH_TIMEOUT = 15_000;
 const MAX_GATEWAY_TOOL_RESPONSE_CONTENT_LENGTH = 5_000_000;
+const MAX_SKILL_EXECUTION_CONTEXTS = 32;
 const REMOTE_TOOLS_DISABLED_ERROR = 'REMOTE_TOOLS_DISABLED';
 
 interface ToolCallResult {
@@ -52,9 +54,17 @@ interface ExecScriptParams {
     name?: string;
   };
   description?: string;
+  executionContextId?: string;
   timeout?: number;
   zipSha256?: string;
   zipUrl?: string;
+}
+
+interface ExportFileParams {
+  executionContextId?: string;
+  filename: string;
+  path: string;
+  uploadUrl: string;
 }
 
 interface StartAgentOptions {
@@ -144,6 +154,8 @@ export default class DeviceGatewayCtr extends ControllerModule {
   private lastError?: string;
   private authExpiredRefreshPromise?: Promise<void>;
   private authFailureRefreshAttempted = false;
+  private lastSkillExecutionDirectory?: string;
+  private skillExecutionDirectoriesByContext = new Map<string, string>();
   private userId?: string;
 
   private get localFileCtr() {
@@ -644,10 +656,18 @@ export default class DeviceGatewayCtr extends ControllerModule {
     apiName: string,
     args: Record<string, unknown>,
   ): Promise<unknown> {
-    if (apiName !== SKILL_EXEC_SCRIPT) {
-      throw new Error(`Unsupported Skills API: ${apiName}`);
+    if (apiName === SKILL_EXEC_SCRIPT) {
+      return this.executeSkillScript(args);
     }
 
+    if (apiName === SKILL_EXPORT_FILE) {
+      return this.executeSkillExportFile(args);
+    }
+
+    throw new Error(`Unsupported Skills API: ${apiName}`);
+  }
+
+  private async executeSkillScript(args: Record<string, unknown>): Promise<unknown> {
     const params = this.parseExecScriptParams(args);
 
     let cwd: string | undefined;
@@ -664,12 +684,66 @@ export default class DeviceGatewayCtr extends ControllerModule {
       cwd = prepared.extractedDir;
     }
 
+    this.rememberSkillExecutionDirectory(cwd, params.executionContextId);
+
     return this.shellCommandCtr.handleRunCommand({
       command: params.command,
       cwd,
       description: params.description || params.config?.description,
       timeout: params.timeout,
     });
+  }
+
+  private async executeSkillExportFile(args: Record<string, unknown>): Promise<unknown> {
+    const params = this.parseExportFileParams(args);
+    const baseDir = this.resolveSkillExecutionDirectory(params.executionContextId);
+
+    if (!baseDir) {
+      return {
+        error: 'No skill execution directory is available for export',
+        filename: params.filename,
+        success: false,
+      };
+    }
+
+    const localFile = await this.localFileCtr.handleReadFileAsBase64({
+      baseDir,
+      path: params.path,
+    });
+
+    if (!localFile.success || localFile.base64 === undefined) {
+      return {
+        error: localFile.error || 'Failed to read exported file',
+        filename: params.filename,
+        success: false,
+      };
+    }
+
+    const uploadUrl = this.parseUploadUrl(params.uploadUrl);
+    const mimeType = localFile.mimeType || 'application/octet-stream';
+    const buffer = Buffer.from(localFile.base64, 'base64');
+    const response = await fetch(uploadUrl, {
+      body: new Blob([buffer], { type: mimeType }),
+      headers: { 'content-type': mimeType },
+      method: 'PUT',
+    });
+
+    if (!response.ok) {
+      return {
+        error: `Failed to upload exported file: ${response.status} ${response.statusText}`,
+        filename: params.filename,
+        success: false,
+      };
+    }
+
+    return {
+      filename: params.filename,
+      mimeType,
+      path: localFile.path,
+      sha256: localFile.sha256,
+      size: localFile.size,
+      success: true,
+    };
   }
 
   private parseExecScriptParams(args: Record<string, unknown>): ExecScriptParams {
@@ -686,6 +760,9 @@ export default class DeviceGatewayCtr extends ControllerModule {
     const description = this.readOptionalString(args, 'description');
     if (description) params.description = description;
 
+    const executionContextId = this.readOptionalString(args, 'executionContextId');
+    if (executionContextId) params.executionContextId = executionContextId;
+
     const timeout =
       typeof args.timeout === 'number' && Number.isFinite(args.timeout) ? args.timeout : undefined;
     if (timeout !== undefined) params.timeout = timeout;
@@ -698,6 +775,71 @@ export default class DeviceGatewayCtr extends ControllerModule {
     if (zipUrl) params.zipUrl = zipUrl;
 
     return params;
+  }
+
+  private parseExportFileParams(args: Record<string, unknown>): ExportFileParams {
+    const filePath = this.readOptionalString(args, 'path');
+    if (!filePath) {
+      throw new Error('Missing path for skill file export');
+    }
+
+    const filename = this.readOptionalString(args, 'filename');
+    if (!filename) {
+      throw new Error('Missing filename for skill file export');
+    }
+
+    const uploadUrl = this.readOptionalString(args, 'uploadUrl');
+    if (!uploadUrl) {
+      throw new Error('Missing uploadUrl for skill file export');
+    }
+
+    return {
+      executionContextId: this.readOptionalString(args, 'executionContextId'),
+      filename,
+      path: filePath,
+      uploadUrl,
+    };
+  }
+
+  private parseUploadUrl(uploadUrl: string) {
+    let url: URL;
+    try {
+      url = new URL(uploadUrl);
+    } catch (error) {
+      throw new Error('Invalid uploadUrl for skill file export', { cause: error });
+    }
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new Error('Only HTTP(S) upload URLs are supported');
+    }
+
+    return url.toString();
+  }
+
+  private rememberSkillExecutionDirectory(directory: string | undefined, contextId?: string) {
+    this.lastSkillExecutionDirectory = directory;
+
+    if (!contextId) return;
+
+    if (!directory) {
+      this.skillExecutionDirectoriesByContext.delete(contextId);
+      return;
+    }
+
+    this.skillExecutionDirectoriesByContext.set(contextId, directory);
+    while (this.skillExecutionDirectoriesByContext.size > MAX_SKILL_EXECUTION_CONTEXTS) {
+      const oldestContextId = this.skillExecutionDirectoriesByContext.keys().next().value;
+      if (!oldestContextId) return;
+
+      this.skillExecutionDirectoriesByContext.delete(oldestContextId);
+    }
+  }
+
+  private resolveSkillExecutionDirectory(contextId?: string) {
+    return (
+      (contextId ? this.skillExecutionDirectoriesByContext.get(contextId) : undefined) ||
+      this.lastSkillExecutionDirectory
+    );
   }
 
   private parseExecScriptConfig(value: unknown): ExecScriptParams['config'] {
