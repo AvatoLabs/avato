@@ -616,6 +616,69 @@ describe('GatewayClient', () => {
 
       expect(disconnectedCb).toHaveBeenCalled();
     });
+
+    it('should ignore late close events from a stale websocket after reconnecting', async () => {
+      const reconnectClient = new GatewayClient({
+        autoReconnect: true,
+        gatewayUrl: 'https://gateway.test.com',
+        token: 'tok',
+      });
+
+      reconnectClient.connect();
+      await vi.advanceTimersByTimeAsync(1);
+      const firstWs = (reconnectClient as any).ws;
+
+      const closeHandler = (reconnectClient as any).handleClose;
+      closeHandler(firstWs, 1000, Buffer.from('network closed'));
+
+      expect(reconnectClient.connectionStatus).toBe('reconnecting');
+
+      await vi.advanceTimersByTimeAsync(1000);
+      const secondWs = (reconnectClient as any).ws;
+
+      expect(secondWs).not.toBe(firstWs);
+      expect(secondWs).toBeTruthy();
+
+      closeHandler(firstWs, 1000, Buffer.from('late stale close'));
+
+      expect((reconnectClient as any).ws).toBe(secondWs);
+
+      reconnectClient.disconnect();
+    });
+
+    it('should ignore late messages from a stale websocket after reconnecting', async () => {
+      const reconnectClient = new GatewayClient({
+        autoReconnect: true,
+        gatewayUrl: 'https://gateway.test.com',
+        token: 'tok',
+      });
+      const toolCallCb = vi.fn();
+      reconnectClient.on('tool_call_request', toolCallCb);
+
+      reconnectClient.connect();
+      await vi.advanceTimersByTimeAsync(1);
+      const firstWs = (reconnectClient as any).ws;
+
+      const closeHandler = (reconnectClient as any).handleClose;
+      closeHandler(firstWs, 1000, Buffer.from('network closed'));
+
+      await vi.advanceTimersByTimeAsync(1000);
+      const secondWs = (reconnectClient as any).ws;
+      const messageHandler = (reconnectClient as any).handleMessage;
+      const message = JSON.stringify({
+        requestId: 'req-1',
+        toolCall: { apiName: 'runCommand', arguments: '{}', identifier: 'lobe-local-system' },
+        type: 'tool_call_request',
+      });
+
+      messageHandler(firstWs, message);
+      expect(toolCallCb).not.toHaveBeenCalled();
+
+      messageHandler(secondWs, message);
+      expect(toolCallCb).toHaveBeenCalledTimes(1);
+
+      reconnectClient.disconnect();
+    });
   });
 
   describe('handleError', () => {

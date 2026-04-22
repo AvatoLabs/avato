@@ -209,12 +209,12 @@ export class GatewayClient extends EventEmitter {
 
       const ws = new WebSocket(wsUrl);
 
-      ws.on('open', this.handleOpen);
-      ws.on('message', this.handleMessage);
-      ws.on('close', this.handleClose);
-      ws.on('error', this.handleError);
-
       this.ws = ws;
+
+      ws.on('open', () => this.handleOpen(ws));
+      ws.on('message', (data) => this.handleMessage(ws, data));
+      ws.on('close', (code, reason) => this.handleClose(ws, code, reason));
+      ws.on('error', (error) => this.handleError(ws, error));
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       const normalizedError = error instanceof Error ? error : new Error(msg);
@@ -253,7 +253,9 @@ export class GatewayClient extends EventEmitter {
 
   // ─── WebSocket Event Handlers ───
 
-  private handleOpen = () => {
+  private handleOpen = (sourceWs?: WebSocket) => {
+    if (sourceWs && sourceWs !== this.ws) return;
+
     this.logger.info('WebSocket connected, sending auth...');
     this.reconnectDelay = INITIAL_RECONNECT_DELAY;
     this.setStatus('authenticating');
@@ -262,7 +264,13 @@ export class GatewayClient extends EventEmitter {
     this.sendMessage({ type: 'auth', token: this.token });
   };
 
-  private handleMessage = (data: WebSocket.Data) => {
+  private handleMessage = (
+    sourceWsOrData: WebSocket | WebSocket.Data,
+    maybeData?: WebSocket.Data,
+  ) => {
+    if (maybeData !== undefined && sourceWsOrData !== this.ws) return;
+
+    const data = maybeData ?? (sourceWsOrData as WebSocket.Data);
     try {
       const message = JSON.parse(String(data)) as unknown;
       if (!isRecord(message) || typeof message.type !== 'string') {
@@ -329,7 +337,15 @@ export class GatewayClient extends EventEmitter {
     }
   };
 
-  private handleClose = (code: number, reason: Buffer) => {
+  private handleClose = (
+    sourceWsOrCode: WebSocket | number,
+    codeOrReason: Buffer | number,
+    maybeReason?: Buffer,
+  ) => {
+    if (typeof sourceWsOrCode !== 'number' && sourceWsOrCode !== this.ws) return;
+
+    const code = typeof sourceWsOrCode === 'number' ? sourceWsOrCode : (codeOrReason as number);
+    const reason = typeof sourceWsOrCode === 'number' ? (codeOrReason as Buffer) : maybeReason!;
     this.logger.info(`WebSocket closed: code=${code} reason=${reason.toString()}`);
     this.stopHeartbeat();
     this.ws = null;
@@ -343,7 +359,10 @@ export class GatewayClient extends EventEmitter {
     }
   };
 
-  private handleError = (error: Error) => {
+  private handleError = (sourceWsOrError: WebSocket | Error, maybeError?: Error) => {
+    if (maybeError && sourceWsOrError !== this.ws) return;
+
+    const error = maybeError ?? (sourceWsOrError as Error);
     this.logger.error('WebSocket error:', error.message);
     this.emitError(error);
   };
