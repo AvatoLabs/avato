@@ -61,7 +61,36 @@ interface StartAgentOptions {
   suppressMissingRemoteConfigError?: boolean;
 }
 
-const normalizeGatewayUrl = (url?: string) => (url ? url.replace(/\/+$/, '') : undefined);
+const normalizeGatewayUrl = (url?: string) => {
+  const value = url?.trim();
+  return value ? value.replace(/\/+$/, '') : undefined;
+};
+
+const hasConfigField = (
+  config: DeviceGatewayConfig | undefined,
+  field: keyof DeviceGatewayConfig,
+) => !!config && Object.prototype.hasOwnProperty.call(config, field);
+
+const mergeDeviceGatewayConfig = (
+  current: DeviceGatewayConfig,
+  patch: DeviceGatewayConfig,
+): DeviceGatewayConfig => {
+  const next: DeviceGatewayConfig = {
+    ...current,
+    ...patch,
+  };
+
+  if (hasConfigField(patch, 'gatewayUrl')) {
+    const gatewayUrl = normalizeGatewayUrl(patch.gatewayUrl);
+    if (gatewayUrl) {
+      next.gatewayUrl = gatewayUrl;
+    } else {
+      delete next.gatewayUrl;
+    }
+  }
+
+  return next;
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -154,11 +183,7 @@ export default class DeviceGatewayCtr extends ControllerModule {
   @IpcMethod()
   async setAgentConfig(config: DeviceGatewayConfig): Promise<DeviceGatewayResult> {
     const current = this.getConfig();
-    const next: DeviceGatewayConfig = {
-      ...current,
-      ...config,
-      gatewayUrl: normalizeGatewayUrl(config.gatewayUrl) ?? current.gatewayUrl,
-    };
+    const next = mergeDeviceGatewayConfig(current, config);
 
     this.app.storeManager.set('deviceGateway', next);
 
@@ -166,7 +191,7 @@ export default class DeviceGatewayCtr extends ControllerModule {
       await this.stopAgent();
     } else if (
       config.enabled !== undefined ||
-      config.gatewayUrl !== undefined ||
+      hasConfigField(config, 'gatewayUrl') ||
       config.deviceId !== undefined
     ) {
       await this.startAgent();
@@ -188,12 +213,13 @@ export default class DeviceGatewayCtr extends ControllerModule {
     options: StartAgentOptions = {},
   ): Promise<DeviceGatewayResult> {
     if (config) {
-      this.app.storeManager.set('deviceGateway', {
-        ...this.getConfig(),
-        ...config,
-        enabled: true,
-        gatewayUrl: normalizeGatewayUrl(config.gatewayUrl) ?? this.getConfig().gatewayUrl,
-      });
+      this.app.storeManager.set(
+        'deviceGateway',
+        mergeDeviceGatewayConfig(this.getConfig(), {
+          ...config,
+          enabled: true,
+        }),
+      );
     }
 
     const storedConfig = this.getConfig();
@@ -251,12 +277,15 @@ export default class DeviceGatewayCtr extends ControllerModule {
     this.client = client;
 
     if (!deviceId) {
-      this.app.storeManager.set('deviceGateway', {
+      const nextConfig: DeviceGatewayConfig = {
         ...storedConfig,
         deviceId: client.currentDeviceId,
         enabled: true,
-        gatewayUrl,
-      });
+      };
+
+      if (storedConfig.gatewayUrl) nextConfig.gatewayUrl = gatewayUrl;
+
+      this.app.storeManager.set('deviceGateway', nextConfig);
     }
 
     try {

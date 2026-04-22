@@ -6,9 +6,28 @@ import {
   useWatchBroadcast,
 } from '@lobechat/electron-client-ipc';
 import { type FormGroupItemType, type FormItemProps } from '@lobehub/ui';
-import { Button, CopyButton, Flexbox, Form, Icon, Skeleton, Tag, Text, Tooltip } from '@lobehub/ui';
+import {
+  Button,
+  CopyButton,
+  Flexbox,
+  Form,
+  Icon,
+  Input,
+  Skeleton,
+  Tag,
+  Text,
+  Tooltip,
+} from '@lobehub/ui';
 import { Switch } from 'antd';
-import { CheckCircle2, Loader2Icon, RefreshCw, Unplug, XCircle } from 'lucide-react';
+import {
+  CheckCircle2,
+  Loader2Icon,
+  RefreshCw,
+  RotateCcw,
+  Save,
+  Unplug,
+  XCircle,
+} from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -20,6 +39,8 @@ const runningStatuses = new Set<DeviceGatewayConnectionStatus>([
   'connecting',
   'reconnecting',
 ]);
+
+const normalizeGatewayUrlInput = (value?: string) => value?.trim().replace(/\/+$/, '') || '';
 
 interface StatusDisplayProps {
   status?: DeviceGatewayStatus;
@@ -92,6 +113,7 @@ const DeviceGatewaySection = memo(() => {
   const [status, setStatus] = useState<DeviceGatewayStatus>();
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [gatewayUrlInput, setGatewayUrlInput] = useState('');
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -112,6 +134,10 @@ const DeviceGatewaySection = memo(() => {
   useEffect(() => {
     void refreshStatus();
   }, [refreshStatus]);
+
+  useEffect(() => {
+    setGatewayUrlInput(status?.gatewayUrl ?? '');
+  }, [status?.gatewayUrl]);
 
   useWatchBroadcast('deviceGatewayStatusChanged', (next) => {
     setStatus(next);
@@ -164,6 +190,45 @@ const DeviceGatewaySection = memo(() => {
     }
   }, []);
 
+  const gatewayUrlDirty = useMemo(
+    () =>
+      normalizeGatewayUrlInput(gatewayUrlInput) !== normalizeGatewayUrlInput(status?.gatewayUrl),
+    [gatewayUrlInput, status?.gatewayUrl],
+  );
+
+  const applyGatewayUrlConfig = useCallback(async (gatewayUrl: string) => {
+    setUpdating(true);
+    try {
+      const result = await desktopDeviceGatewayService.setAgentConfig({
+        gatewayUrl: normalizeGatewayUrlInput(gatewayUrl),
+      });
+      setStatus(result.status);
+      setGatewayUrlInput(result.status.gatewayUrl ?? '');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus((current) => ({
+        allowRemoteTools: current?.allowRemoteTools ?? false,
+        connectionStatus: current?.connectionStatus ?? 'disconnected',
+        deviceId: current?.deviceId,
+        enabled: current?.enabled ?? false,
+        gatewayUrl: current?.gatewayUrl,
+        lastConnectedAt: current?.lastConnectedAt,
+        lastError: message,
+        userId: current?.userId,
+      }));
+    } finally {
+      setUpdating(false);
+    }
+  }, []);
+
+  const handleGatewayUrlSave = useCallback(async () => {
+    await applyGatewayUrlConfig(gatewayUrlInput);
+  }, [applyGatewayUrlConfig, gatewayUrlInput]);
+
+  const handleGatewayUrlReset = useCallback(async () => {
+    await applyGatewayUrlConfig('');
+  }, [applyGatewayUrlConfig]);
+
   const formItems = useMemo<FormGroupItemType[]>(() => {
     const children: FormItemProps[] = [
       {
@@ -200,7 +265,42 @@ const DeviceGatewaySection = memo(() => {
         minWidth: undefined,
       },
       {
-        children: <InlineValue value={status?.gatewayUrl} />,
+        children: (
+          <Flexbox gap={8} style={{ maxWidth: 520, width: '100%' }}>
+            <Flexbox horizontal align="center" gap={6}>
+              <Input
+                aria-label={t('deviceGateway.gatewayUrl.title')}
+                disabled={updating}
+                placeholder={t('deviceGateway.gatewayUrl.placeholder')}
+                style={{ flex: 1, minWidth: 0 }}
+                value={gatewayUrlInput}
+                variant={'filled'}
+                onChange={(event) => setGatewayUrlInput(event.target.value)}
+                onPressEnter={() => void handleGatewayUrlSave()}
+              />
+              {status?.gatewayUrl && <CopyButton content={status.gatewayUrl} size="small" />}
+            </Flexbox>
+            <Flexbox horizontal align="center" gap={8} justify="flex-end">
+              <Button
+                disabled={!gatewayUrlDirty || updating}
+                icon={<Icon icon={Save} />}
+                loading={updating && gatewayUrlDirty}
+                size="small"
+                onClick={() => void handleGatewayUrlSave()}
+              >
+                {t('deviceGateway.gatewayUrl.save')}
+              </Button>
+              <Button
+                disabled={updating || !status?.gatewayUrl}
+                icon={<Icon icon={RotateCcw} />}
+                size="small"
+                onClick={() => void handleGatewayUrlReset()}
+              >
+                {t('deviceGateway.gatewayUrl.reset')}
+              </Button>
+            </Flexbox>
+          </Flexbox>
+        ),
         desc: t('deviceGateway.gatewayUrl.desc'),
         label: t('deviceGateway.gatewayUrl.title'),
         minWidth: undefined,
@@ -229,7 +329,17 @@ const DeviceGatewaySection = memo(() => {
         title: t('deviceGateway.title'),
       },
     ];
-  }, [handleRemoteToolsToggle, handleToggle, status, t, updating]);
+  }, [
+    gatewayUrlDirty,
+    gatewayUrlInput,
+    handleGatewayUrlReset,
+    handleGatewayUrlSave,
+    handleRemoteToolsToggle,
+    handleToggle,
+    status,
+    t,
+    updating,
+  ]);
 
   if (loading) {
     return <Skeleton active paragraph={{ rows: 5 }} title={false} />;

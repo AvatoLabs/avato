@@ -21,7 +21,20 @@ const HEARTBEAT_INTERVAL = 30_000; // 30s
 const INITIAL_RECONNECT_DELAY = 1000; // 1s
 const MAX_RECONNECT_DELAY = 30_000; // 30s
 const DEFAULT_AUTH_TIMEOUT = 15_000; // 15s
-const normalizeGatewayUrl = (url: string) => url.replace(/\/+$/, '');
+const normalizeGatewayUrl = (url: string) => url.trim().replace(/\/+$/, '');
+const toWebSocketGatewayUrl = (gatewayUrl: string) => {
+  const url = new URL(gatewayUrl);
+
+  if (url.protocol === 'https:') {
+    url.protocol = 'wss:';
+  } else if (url.protocol === 'http:') {
+    url.protocol = 'ws:';
+  } else if (url.protocol !== 'ws:' && url.protocol !== 'wss:') {
+    throw new Error(`Unsupported gateway protocol: ${url.protocol}`);
+  }
+
+  return url;
+};
 const redactWsUrl = (url: string) => {
   try {
     const parsed = new URL(url);
@@ -230,8 +243,7 @@ export class GatewayClient extends EventEmitter {
   }
 
   private buildWsUrl(): string {
-    const url = new URL(this.gatewayUrl);
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = toWebSocketGatewayUrl(this.gatewayUrl);
     url.pathname = `${url.pathname.replace(/\/+$/, '')}/ws`;
     url.search = '';
 

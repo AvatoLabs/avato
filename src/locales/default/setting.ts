@@ -253,7 +253,11 @@ export default {
   'deviceGateway.deviceId.title': 'Device ID',
   'deviceGateway.enabled.desc': 'Connect automatically after desktop sign-in',
   'deviceGateway.enabled.title': 'Remote Device Agent',
-  'deviceGateway.gatewayUrl.desc': 'Device gateway endpoint used by this desktop app',
+  'deviceGateway.gatewayUrl.desc':
+    'Override only for self-hosted or staging gateways. Saving reconnects the desktop agent.',
+  'deviceGateway.gatewayUrl.placeholder': 'Use the default gateway',
+  'deviceGateway.gatewayUrl.reset': 'Reset',
+  'deviceGateway.gatewayUrl.save': 'Save',
   'deviceGateway.gatewayUrl.title': 'Gateway',
   'deviceGateway.lastError.desc': 'Latest connection or authorization error',
   'deviceGateway.lastError.title': 'Last Error',

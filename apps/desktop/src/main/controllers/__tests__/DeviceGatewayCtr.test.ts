@@ -143,7 +143,7 @@ describe('DeviceGatewayCtr', () => {
       allowRemoteTools: true,
       deviceId: 'stored-device-id',
       enabled: true,
-      gatewayUrl: 'https://gateway.example.com///',
+      gatewayUrl: '  https://gateway.example.com///  ',
     });
     const token = createAccessToken({ sub: 'user-1' });
     remoteServerConfigCtr.getAccessToken.mockResolvedValue(token);
@@ -204,8 +204,35 @@ describe('DeviceGatewayCtr', () => {
       allowRemoteTools: true,
       deviceId: 'generated-device-id',
       enabled: true,
-      gatewayUrl: 'https://gateway.test',
     });
+  });
+
+  it('clears a custom gateway URL and reconnects to the default gateway', async () => {
+    let storedConfig = {
+      allowRemoteTools: true,
+      deviceId: 'stored-device-id',
+      enabled: true,
+      gatewayUrl: 'https://custom-gateway.example.com',
+    };
+    storeManager.get.mockImplementation(() => storedConfig);
+    storeManager.set.mockImplementation((_key, nextConfig) => {
+      storedConfig = nextConfig;
+    });
+
+    const result = await controller.setAgentConfig({ gatewayUrl: '' });
+
+    expect(result.success).toBe(true);
+    expect(storedConfig).toEqual({
+      allowRemoteTools: true,
+      deviceId: 'stored-device-id',
+      enabled: true,
+    });
+    expect(GatewayClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deviceId: 'stored-device-id',
+        gatewayUrl: 'https://gateway.test',
+      }),
+    );
   });
 
   it('updates remote tool permission without reconnecting the gateway client', async () => {

@@ -181,6 +181,26 @@ describe('GatewayClient', () => {
       c.disconnect();
     });
 
+    it('should preserve explicit websocket gateway protocols', () => {
+      const secureClient = new GatewayClient({
+        autoReconnect: false,
+        gatewayUrl: 'wss://gateway.test.com',
+        token: 'tok',
+      });
+      secureClient.connect();
+      expect((secureClient as any).ws.url).toContain('wss://gateway.test.com/ws');
+      secureClient.disconnect();
+
+      const localClient = new GatewayClient({
+        autoReconnect: false,
+        gatewayUrl: 'ws://localhost:3000',
+        token: 'tok',
+      });
+      localClient.connect();
+      expect((localClient as any).ws.url).toContain('ws://localhost:3000/ws');
+      localClient.disconnect();
+    });
+
     it('should preserve gateway URL path prefixes', () => {
       const c = new GatewayClient({
         autoReconnect: false,
