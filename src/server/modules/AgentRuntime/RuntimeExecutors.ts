@@ -8,6 +8,7 @@ import {
   UsageCounter,
 } from '@lobechat/agent-runtime';
 import { LocalSystemManifest } from '@lobechat/builtin-tool-local-system';
+import { RemoteDeviceIdentifier } from '@lobechat/builtin-tool-remote-device';
 import {
   buildStepToolDelta,
   type LobeToolManifest,
@@ -55,7 +56,12 @@ const pickStringRecord = (value: unknown): Record<string, string> | undefined =>
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 };
 
-const applyDeviceActivationMetadata = (state: AgentState, metadata: unknown) => {
+const applyDeviceActivationMetadata = (
+  state: AgentState,
+  toolIdentifier: string | undefined,
+  metadata: unknown,
+) => {
+  if (toolIdentifier !== RemoteDeviceIdentifier) return;
   if (!isRecord(metadata) || typeof metadata.activeDeviceId !== 'string') return;
 
   const activeDeviceId = metadata.activeDeviceId.trim();
@@ -723,7 +729,11 @@ export const createRuntimeExecutors = (
         role: 'tool',
         tool_call_id: chatToolPayload.id,
       });
-      applyDeviceActivationMetadata(newState, executionResult.state?.metadata);
+      applyDeviceActivationMetadata(
+        newState,
+        chatToolPayload.identifier,
+        executionResult.state?.metadata,
+      );
 
       events.push({ id: chatToolPayload.id, result: executionResult, type: 'tool_result' });
 
@@ -999,7 +1009,7 @@ export const createRuntimeExecutors = (
     }
     for (const toolCall of toolsCalling) {
       const result = toolResults.find((item) => item.toolCallId === toolCall.id);
-      applyDeviceActivationMetadata(newState, result?.data?.state?.metadata);
+      applyDeviceActivationMetadata(newState, toolCall.identifier, result?.data?.state?.metadata);
     }
 
     // Persist ToolsActivator discovery results from batch tool executions

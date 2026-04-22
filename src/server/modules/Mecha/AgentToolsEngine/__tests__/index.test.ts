@@ -375,11 +375,11 @@ describe('createServerAgentToolsEngine', () => {
       expect(result.enabledToolIds).not.toContain(LocalSystemManifest.identifier);
     });
 
-    it('should enable LocalSystem tool when gateway configured AND device online', () => {
+    it('should enable LocalSystem tool when gateway configured AND an active device is ready', () => {
       const context = createMockContext();
       const engine = createServerAgentToolsEngine(context, {
         agentConfig: { plugins: [LocalSystemManifest.identifier] },
-        deviceContext: { gatewayConfigured: true, deviceOnline: true },
+        deviceContext: { activeDeviceReady: true, gatewayConfigured: true },
         model: 'gpt-4',
         provider: 'openai',
       });
@@ -391,6 +391,24 @@ describe('createServerAgentToolsEngine', () => {
       });
 
       expect(result.enabledToolIds).toContain(LocalSystemManifest.identifier);
+    });
+
+    it('should disable LocalSystem tool when a device is online but not yet active', () => {
+      const context = createMockContext();
+      const engine = createServerAgentToolsEngine(context, {
+        agentConfig: { plugins: [LocalSystemManifest.identifier] },
+        deviceContext: { deviceOnline: true, gatewayConfigured: true },
+        model: 'gpt-4',
+        provider: 'openai',
+      });
+
+      const result = engine.generateToolsDetailed({
+        toolIds: [LocalSystemManifest.identifier],
+        model: 'gpt-4',
+        provider: 'openai',
+      });
+
+      expect(result.enabledToolIds).not.toContain(LocalSystemManifest.identifier);
     });
 
     it('should disable LocalSystem tool when gateway configured but device offline', () => {

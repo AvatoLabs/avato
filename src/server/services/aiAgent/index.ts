@@ -418,6 +418,20 @@ export class AiAgentService {
     );
     const deviceOnline = activeOnlineDevices.length > 0;
 
+    // Derive activeDeviceId before tool generation:
+    // 1. If agent has a bound device and it's online, use it
+    // 2. In IM/Bot scenarios, auto-activate when exactly one device is online
+    const boundDeviceOnline = boundDeviceId
+      ? activeOnlineDevices.some((device) => device.deviceId === boundDeviceId)
+      : false;
+    const activeDeviceId = boundDeviceId
+      ? boundDeviceOnline
+        ? boundDeviceId
+        : undefined
+      : (discordContext || botContext) && activeOnlineDevices.length === 1
+        ? activeOnlineDevices[0].deviceId
+        : undefined;
+
     const toolsContext: ServerAgentToolsContext = {
       installedPlugins,
       isModelSupportToolUse,
@@ -430,7 +444,12 @@ export class AiAgentService {
         plugins: agentConfig?.plugins ?? undefined,
       },
       deviceContext: gatewayConfigured
-        ? { boundDeviceId, deviceOnline, gatewayConfigured: true }
+        ? {
+            activeDeviceReady: !!activeDeviceId,
+            boundDeviceId,
+            deviceOnline,
+            gatewayConfigured: true,
+          }
         : undefined,
       globalMemoryEnabled,
       hasEnabledSourceSets,
@@ -492,20 +511,6 @@ export class AiAgentService {
         systemRole: generateSystemPrompt(onlineDevices),
       };
     }
-
-    // Derive activeDeviceId from device context:
-    // 1. If agent has a bound device and it's online, use it
-    // 2. In IM/Bot scenarios, auto-activate when exactly one device is online
-    const boundDeviceOnline = boundDeviceId
-      ? activeOnlineDevices.some((device) => device.deviceId === boundDeviceId)
-      : false;
-    const activeDeviceId = boundDeviceId
-      ? boundDeviceOnline
-        ? boundDeviceId
-        : undefined
-      : (discordContext || botContext) && activeOnlineDevices.length === 1
-        ? activeOnlineDevices[0].deviceId
-        : undefined;
 
     // 9.4. Fetch device system info for placeholder variable replacement
     let deviceSystemInfo: Record<string, string> = {};
