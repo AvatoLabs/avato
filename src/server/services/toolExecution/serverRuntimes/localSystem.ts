@@ -26,6 +26,10 @@ interface DeviceToolCallResult {
   success: boolean;
 }
 
+const REMOTE_COMMAND_DEFAULT_TIMEOUT = 120_000;
+const REMOTE_COMMAND_MIN_TIMEOUT = 1000;
+const REMOTE_COMMAND_MAX_TIMEOUT = 600_000;
+
 const pluginError = (message?: string) => ({
   message: message || 'Remote desktop execution failed',
   type: 'PluginServerError',
@@ -38,6 +42,17 @@ const isRecord = (value: unknown): value is Record<string, any> => {
 const readDevicePayload = (response: DeviceToolCallResult): unknown => {
   const parsed = safeParseJSON(response.content);
   return parsed ?? response.content;
+};
+
+const clampRemoteTimeout = (timeout: number) =>
+  Math.min(Math.max(Math.trunc(timeout), REMOTE_COMMAND_MIN_TIMEOUT), REMOTE_COMMAND_MAX_TIMEOUT);
+
+const resolveDeviceRpcTimeout = (apiName: string, args: Record<string, any>) => {
+  if (apiName !== 'runCommand') return undefined;
+
+  return typeof args.timeout === 'number' && Number.isFinite(args.timeout)
+    ? clampRemoteTimeout(args.timeout)
+    : REMOTE_COMMAND_DEFAULT_TIMEOUT;
 };
 
 const toDate = (value: unknown): Date | undefined => {
@@ -372,16 +387,20 @@ export const localSystemRuntime: ServerRuntimeRegistration = {
 
     for (const api of LocalSystemManifest.api) {
       proxy[api.name] = async (args: any) => {
-        const response = await deviceProxy.executeToolCall(
-          { deviceId: context.activeDeviceId!, userId: context.userId! },
-          {
-            apiName: api.name,
-            arguments: JSON.stringify(args),
-            identifier: LocalSystemIdentifier,
-          },
-        );
+        const toolArgs = isRecord(args) ? args : {};
+        const target = { deviceId: context.activeDeviceId!, userId: context.userId! };
+        const toolCall = {
+          apiName: api.name,
+          arguments: JSON.stringify(toolArgs),
+          identifier: LocalSystemIdentifier,
+        };
+        const timeout = resolveDeviceRpcTimeout(api.name, toolArgs);
+        const response =
+          timeout === undefined
+            ? await deviceProxy.executeToolCall(target, toolCall)
+            : await deviceProxy.executeToolCall(target, toolCall, timeout);
 
-        return formatLocalSystemDeviceResult(api.name, args, response);
+        return formatLocalSystemDeviceResult(api.name, toolArgs, response);
       };
     }
 

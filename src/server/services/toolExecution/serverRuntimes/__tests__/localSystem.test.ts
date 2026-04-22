@@ -140,6 +140,58 @@ describe('localSystemRuntime', () => {
       });
     });
 
+    it('uses the Local System command timeout default for remote runCommand calls', async () => {
+      const context: ToolExecutionContext = {
+        activeDeviceId: 'device-1',
+        toolManifestMap: {},
+        userId: 'user-1',
+      };
+
+      mockExecuteToolCall.mockResolvedValue({
+        content: JSON.stringify({ exit_code: 0, stdout: 'ok', success: true }),
+        success: true,
+      });
+
+      const proxy = localSystemRuntime.factory(context);
+      await proxy.runCommand({ command: 'sleep 60' });
+
+      expect(mockExecuteToolCall).toHaveBeenCalledWith(
+        { deviceId: 'device-1', userId: 'user-1' },
+        {
+          apiName: 'runCommand',
+          arguments: JSON.stringify({ command: 'sleep 60' }),
+          identifier: LocalSystemIdentifier,
+        },
+        120_000,
+      );
+    });
+
+    it('passes a clamped custom command timeout to the device gateway', async () => {
+      const context: ToolExecutionContext = {
+        activeDeviceId: 'device-1',
+        toolManifestMap: {},
+        userId: 'user-1',
+      };
+
+      mockExecuteToolCall.mockResolvedValue({
+        content: JSON.stringify({ exit_code: 0, stdout: 'ok', success: true }),
+        success: true,
+      });
+
+      const proxy = localSystemRuntime.factory(context);
+      await proxy.runCommand({ command: 'sleep 600', timeout: 900_000 });
+
+      expect(mockExecuteToolCall).toHaveBeenCalledWith(
+        { deviceId: 'device-1', userId: 'user-1' },
+        {
+          apiName: 'runCommand',
+          arguments: JSON.stringify({ command: 'sleep 600', timeout: 900_000 }),
+          identifier: LocalSystemIdentifier,
+        },
+        600_000,
+      );
+    });
+
     it('formats failed write results with a plugin error', async () => {
       const context: ToolExecutionContext = {
         activeDeviceId: 'device-1',
