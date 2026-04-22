@@ -102,13 +102,13 @@ const resolveSkillPackage = async (config?: { id?: string; name?: string }) => {
       ? await agentSkillService.getByName(config.name)
       : undefined;
 
-  if (!skill?.zipFileHash) return {};
+  if (!skill?.zipSha256) return {};
 
   const zipUrl = await agentSkillService.getZipUrl(skill.id);
   if (!zipUrl.url) return {};
 
   return {
-    zipHash: skill.zipFileHash,
+    zipSha256: skill.zipSha256,
     zipUrl: zipUrl.url,
   };
 };

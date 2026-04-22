@@ -502,7 +502,7 @@ describe('DeviceGatewayCtr', () => {
       arguments: JSON.stringify({
         command: 'bun run build',
         description: 'Build skill project',
-        zipHash: 'hash-1',
+        zipSha256: 'hash-1',
         zipUrl: 'https://example.com/skill.zip',
       }),
       identifier: 'lobe-skills',
@@ -511,7 +511,7 @@ describe('DeviceGatewayCtr', () => {
     expect(result.success).toBe(true);
     expect(localFileCtr.handlePrepareSkillDirectory).toHaveBeenCalledWith({
       url: 'https://example.com/skill.zip',
-      zipHash: 'hash-1',
+      zipSha256: 'hash-1',
     });
     expect(shellCommandCtr.handleRunCommand).toHaveBeenCalledWith({
       command: 'bun run build',

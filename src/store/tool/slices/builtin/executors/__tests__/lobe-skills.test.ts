@@ -94,7 +94,7 @@ describe('lobe-skills web executor', () => {
     getByNameMock.mockResolvedValue({
       id: 'skill-1',
       name: 'demo-skill',
-      zipFileHash: 'zip-hash-1',
+      zipSha256: 'zip-hash-1',
     });
     getZipUrlMock.mockResolvedValue({
       url: 'https://example.com/demo-skill.zip',
@@ -134,7 +134,7 @@ describe('lobe-skills web executor', () => {
       command: 'bun run build',
       config: { name: 'demo-skill' },
       description: 'Build skill',
-      zipHash: 'zip-hash-1',
+      zipSha256: 'zip-hash-1',
       zipUrl: 'https://example.com/demo-skill.zip',
     });
   });

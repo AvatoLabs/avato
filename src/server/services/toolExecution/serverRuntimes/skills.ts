@@ -33,7 +33,7 @@ interface ExecScriptDeviceParams {
   command: string;
   config?: { description?: string; id?: string; name?: string };
   description: string;
-  zipHash?: string;
+  zipSha256?: string;
   zipUrl?: string;
 }
 
@@ -226,7 +226,7 @@ class SkillServerRuntimeService implements SkillRuntimeService {
           });
           if (zipUrl) {
             enhancedParams.zipUrl = zipUrl;
-            enhancedParams.zipHash = skill.zipSha256;
+            enhancedParams.zipSha256 = skill.zipSha256;
             log(
               'Added stable zipUrl to execScript params for skill %s: %s',
               skill.name,
@@ -327,13 +327,16 @@ class SkillServerRuntimeService implements SkillRuntimeService {
       const mimeType = metadata.contentType || result?.mimeType || 'application/octet-stream';
 
       // Step 4: Create a persistent file record using the real stored-object sha256
-      const { fileId, size: fileSize, url } =
-        await this.fileService.createFileRecordFromStorageObject({
-          fileType: mimeType,
-          name: filename,
-          spaceId: exportSpaceId,
-          storageKey: key, // Store S3 key
-        });
+      const {
+        fileId,
+        size: fileSize,
+        url,
+      } = await this.fileService.createFileRecordFromStorageObject({
+        fileType: mimeType,
+        name: filename,
+        spaceId: exportSpaceId,
+        storageKey: key, // Store S3 key
+      });
 
       log('Created file record: fileId=%s, url=%s', fileId, url);
 

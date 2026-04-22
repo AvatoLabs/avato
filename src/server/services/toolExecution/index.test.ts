@@ -1,10 +1,16 @@
-import { SourceSetApiName, SourceSetIdentifier } from '@lobechat/builtin-tool-source-set';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ToolExecutionService } from './index';
-
-const { executeToolCallMock } = vi.hoisted(() => ({
+const { executeToolCallMock, SourceSetApiName, SourceSetIdentifier } = vi.hoisted(() => ({
   executeToolCallMock: vi.fn(),
+  SourceSetApiName: {
+    readSourceFiles: 'readSourceFiles',
+  } as const,
+  SourceSetIdentifier: 'lobe-source-set',
+}));
+
+vi.mock('@lobechat/builtin-tool-source-set', () => ({
+  SourceSetApiName,
+  SourceSetIdentifier,
 }));
 
 vi.mock('./deviceProxy', () => ({
@@ -12,6 +18,8 @@ vi.mock('./deviceProxy', () => ({
     executeToolCall: executeToolCallMock,
   },
 }));
+
+const { ToolExecutionService } = await import('./index');
 
 describe('ToolExecutionService', () => {
   beforeEach(() => {

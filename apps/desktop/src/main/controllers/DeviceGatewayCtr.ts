@@ -53,7 +53,7 @@ interface ExecScriptParams {
   };
   description?: string;
   timeout?: number;
-  zipHash?: string;
+  zipSha256?: string;
   zipUrl?: string;
 }
 
@@ -622,10 +622,10 @@ export default class DeviceGatewayCtr extends ControllerModule {
     const params = this.parseExecScriptParams(args);
 
     let cwd: string | undefined;
-    if (params.zipUrl && params.zipHash) {
+    if (params.zipUrl && params.zipSha256) {
       const prepared = await this.localFileCtr.handlePrepareSkillDirectory({
         url: params.zipUrl,
-        zipHash: params.zipHash,
+        zipSha256: params.zipSha256,
       });
 
       if (!prepared.success) {
@@ -661,8 +661,9 @@ export default class DeviceGatewayCtr extends ControllerModule {
       typeof args.timeout === 'number' && Number.isFinite(args.timeout) ? args.timeout : undefined;
     if (timeout !== undefined) params.timeout = timeout;
 
-    const zipHash = this.readOptionalString(args, 'zipHash');
-    if (zipHash) params.zipHash = zipHash;
+    const zipSha256 =
+      this.readOptionalString(args, 'zipSha256') ?? this.readOptionalString(args, 'zipHash');
+    if (zipSha256) params.zipSha256 = zipSha256;
 
     const zipUrl = this.readOptionalString(args, 'zipUrl');
     if (zipUrl) params.zipUrl = zipUrl;

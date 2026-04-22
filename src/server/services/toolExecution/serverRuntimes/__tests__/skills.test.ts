@@ -167,7 +167,7 @@ describe('skillsRuntime', () => {
       command: 'bun run build',
       config: { name: 'demo-skill' },
       description: 'Build skill',
-      zipHash: 'zip-hash-1',
+      zipSha256: 'zip-hash-1',
       zipUrl: 'https://example.com/skills/demo.zip',
     });
     expect(runBuildInToolMock).not.toHaveBeenCalled();
