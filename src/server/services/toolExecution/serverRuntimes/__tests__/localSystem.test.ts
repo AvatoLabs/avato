@@ -140,6 +140,37 @@ describe('localSystemRuntime', () => {
       });
     });
 
+    it('formats remote batch file reads like the local executor', async () => {
+      const context: ToolExecutionContext = {
+        activeDeviceId: 'device-1',
+        toolManifestMap: {},
+        userId: 'user-1',
+      };
+
+      const filesContent = [{ content: 'const value = 1;', filename: 'a.ts' }];
+      mockExecuteToolCall.mockResolvedValue({
+        content: JSON.stringify(filesContent),
+        success: true,
+      });
+
+      const proxy = localSystemRuntime.factory(context);
+      const result = await proxy.readLocalFiles({ paths: ['/tmp/a.ts'] });
+
+      expect(mockExecuteToolCall).toHaveBeenCalledWith(
+        { deviceId: 'device-1', userId: 'user-1' },
+        {
+          apiName: 'readLocalFiles',
+          arguments: JSON.stringify({ paths: ['/tmp/a.ts'] }),
+          identifier: LocalSystemIdentifier,
+        },
+      );
+      expect(result).toEqual({
+        content: 'Read 1 file(s):\n\n=== a.ts ===\nconst value = 1;',
+        state: { filesContent },
+        success: true,
+      });
+    });
+
     it('uses the Local System command timeout default for remote runCommand calls', async () => {
       const context: ToolExecutionContext = {
         activeDeviceId: 'device-1',

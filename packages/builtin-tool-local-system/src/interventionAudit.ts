@@ -35,6 +35,12 @@ const extractPaths = (toolArgs: Record<string, any>): string[] => {
     }
   }
 
+  if (Array.isArray(toolArgs.paths)) {
+    for (const pathValue of toolArgs.paths) {
+      if (typeof pathValue === 'string') paths.push(pathValue);
+    }
+  }
+
   // Only check 'pattern' when it's an absolute path (e.g. glob like /Users/me/**/*.ts).
   // Relative globs (e.g. **/*.ts) and regex patterns (e.g. TODO|FIXME) are not paths.
   if (typeof toolArgs.pattern === 'string' && toolArgs.pattern.startsWith('/')) {

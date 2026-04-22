@@ -4,6 +4,7 @@ import { GlobLocalFilesInspector } from './GlobLocalFiles';
 import { GrepContentInspector } from './GrepContent';
 import { ListLocalFilesInspector } from './ListLocalFiles';
 import { ReadLocalFileInspector } from './ReadLocalFile';
+import { ReadLocalFilesInspector } from './ReadLocalFiles';
 import { RenameLocalFileInspector } from './RenameLocalFile';
 import { RunCommandInspector } from './RunCommand';
 import { SearchLocalFilesInspector } from './SearchLocalFiles';
@@ -18,6 +19,7 @@ export const LocalSystemInspectors = {
   [LocalSystemApiName.grepContent]: GrepContentInspector,
   [LocalSystemApiName.listLocalFiles]: ListLocalFilesInspector,
   [LocalSystemApiName.readLocalFile]: ReadLocalFileInspector,
+  [LocalSystemApiName.readLocalFiles]: ReadLocalFilesInspector,
   [LocalSystemApiName.renameLocalFile]: RenameLocalFileInspector,
   [LocalSystemApiName.runCommand]: RunCommandInspector,
   [LocalSystemApiName.searchLocalFiles]: SearchLocalFilesInspector,

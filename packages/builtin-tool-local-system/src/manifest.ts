@@ -76,6 +76,31 @@ export const LocalSystemManifest: BuiltinToolManifest = {
     },
     {
       description:
+        'Read the contents of multiple files in one request. Input should be an array of file paths. Output is an array of file content results.',
+      humanIntervention: {
+        dynamic: {
+          default: 'never',
+          policy: 'required',
+          type: 'pathScopeAudit',
+        },
+      },
+      name: LocalSystemApiName.readLocalFiles,
+      parameters: {
+        properties: {
+          paths: {
+            description: 'The file paths to read',
+            items: {
+              type: 'string',
+            },
+            type: 'array',
+          },
+        },
+        required: ['paths'],
+        type: 'object',
+      },
+    },
+    {
+      description:
         'Search for files within the workspace based on a query string and optional filter options. Input should include the search query and any filter options. Output is a JSON array of matching file paths.',
       humanIntervention: {
         dynamic: {

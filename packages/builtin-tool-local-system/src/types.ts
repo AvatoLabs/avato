@@ -1,4 +1,4 @@
-import  {
+import {
   type GetCommandOutputResult,
   type GlobFilesResult,
   type GrepContentResult,
@@ -20,6 +20,7 @@ export const LocalSystemApiName = {
   listLocalFiles: 'listLocalFiles',
   moveLocalFiles: 'moveLocalFiles',
   readLocalFile: 'readLocalFile',
+  readLocalFiles: 'readLocalFiles',
   renameLocalFile: 'renameLocalFile',
   runCommand: 'runCommand',
   searchLocalFiles: 'searchLocalFiles',

@@ -155,6 +155,30 @@ describe('remoteDeviceRouter', () => {
     );
   });
 
+  it('allows batch Local System file reads as direct device calls', async () => {
+    executeToolCallMock.mockResolvedValue({
+      content: JSON.stringify([{ content: 'a', filename: 'a.ts' }]),
+      success: true,
+    });
+
+    await caller.executeToolCall({
+      apiName: 'readLocalFiles',
+      arguments: JSON.stringify({ paths: ['/tmp/a.ts'] }),
+      deviceId: 'device-1',
+      identifier: LocalSystemIdentifier,
+    });
+
+    expect(executeToolCallMock).toHaveBeenCalledWith(
+      { deviceId: 'device-1', userId: 'user-1' },
+      {
+        apiName: 'readLocalFiles',
+        arguments: JSON.stringify({ paths: ['/tmp/a.ts'] }),
+        identifier: LocalSystemIdentifier,
+      },
+      undefined,
+    );
+  });
+
   it('rejects blank deviceId for tool calls instead of treating it as an implicit target', async () => {
     await expect(
       caller.executeToolCall({
