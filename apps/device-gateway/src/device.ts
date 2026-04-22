@@ -103,6 +103,16 @@ export const shouldReplaceAuthenticatedDeviceSocket = (
   return attachment.authenticated && attachment.deviceId === deviceId;
 };
 
+export const isActiveAuthenticatedDeviceAttachment = (
+  attachment: DeviceAttachment,
+  now: number,
+): boolean => {
+  if (!attachment.authenticated) return false;
+  if (attachment.authExpiresAt === undefined) return true;
+
+  return Number.isFinite(attachment.authExpiresAt) && now < attachment.authExpiresAt;
+};
+
 export const decodeWebSocketMessage = (message: string | ArrayBuffer): string | undefined => {
   const byteLength =
     typeof message === 'string' ? new TextEncoder().encode(message).byteLength : message.byteLength;

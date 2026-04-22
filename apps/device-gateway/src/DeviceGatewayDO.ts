@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { verifyDesktopToken } from './auth';
 import {
   decodeWebSocketMessage,
+  isActiveAuthenticatedDeviceAttachment,
   isServiceTokenDeviceAuthEnabled,
   normalizeDeviceRpcResult,
   resolveNextDeviceAlarm,
@@ -294,9 +295,11 @@ export class DeviceGatewayDO extends DurableObject<Env> {
   // ─── Helpers ───
 
   private getAuthenticatedSockets(): WebSocket[] {
+    const now = Date.now();
+
     return this.ctx.getWebSockets().filter((ws) => {
       const att = ws.deserializeAttachment() as DeviceAttachment;
-      return att.authenticated;
+      return isActiveAuthenticatedDeviceAttachment(att, now);
     });
   }
 

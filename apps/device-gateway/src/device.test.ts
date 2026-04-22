@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   decodeWebSocketMessage,
+  isActiveAuthenticatedDeviceAttachment,
   isServiceTokenDeviceAuthEnabled,
   MAX_DEVICE_RESULT_CONTENT_LENGTH,
   MAX_WS_MESSAGE_BYTES,
@@ -233,6 +234,44 @@ describe('shouldReplaceAuthenticatedDeviceSocket', () => {
       shouldReplaceAuthenticatedDeviceSocket(
         { ...baseAttachment, authenticated: true, deviceId: 'device-2' },
         'device-1',
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('isActiveAuthenticatedDeviceAttachment', () => {
+  const baseAttachment = {
+    allowRemoteTools: true,
+    connectedAt: 1000,
+    deviceId: 'device-1',
+    hostname: 'desktop',
+    lastHeartbeat: 1000,
+    platform: 'darwin',
+  } satisfies Omit<DeviceAttachment, 'authenticated'>;
+
+  it('accepts authenticated service-token sockets without an expiry', () => {
+    expect(
+      isActiveAuthenticatedDeviceAttachment({ ...baseAttachment, authenticated: true }, 5000),
+    ).toBe(true);
+  });
+
+  it('accepts authenticated sockets before token expiry', () => {
+    expect(
+      isActiveAuthenticatedDeviceAttachment(
+        { ...baseAttachment, authExpiresAt: 10_000, authenticated: true },
+        9999,
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects unauthenticated and expired sockets', () => {
+    expect(
+      isActiveAuthenticatedDeviceAttachment({ ...baseAttachment, authenticated: false }, 5000),
+    ).toBe(false);
+    expect(
+      isActiveAuthenticatedDeviceAttachment(
+        { ...baseAttachment, authExpiresAt: 10_000, authenticated: true },
+        10_000,
       ),
     ).toBe(false);
   });
