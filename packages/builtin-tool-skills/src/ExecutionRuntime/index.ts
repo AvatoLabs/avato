@@ -35,15 +35,26 @@ export interface ExportFileResult {
   url?: string;
 }
 
+export interface SkillRuntimeContext {
+  messageId?: string;
+  operationId?: string;
+  registerAfterCompletion?: (callback: () => Promise<void> | void) => void;
+}
+
 export interface SkillRuntimeService {
   execScript?: (
     command: string,
     options: {
       config?: { description?: string; id?: string; name?: string };
+      context?: SkillRuntimeContext;
       description: string;
     },
   ) => Promise<CommandResult>;
-  exportFile?: (path: string, filename: string) => Promise<ExportFileResult>;
+  exportFile?: (
+    path: string,
+    filename: string,
+    context?: SkillRuntimeContext,
+  ) => Promise<ExportFileResult>;
   findAll: () => Promise<{ data: SkillListItem[]; total: number }>;
   findById: (id: string) => Promise<SkillItem | undefined>;
   findByName: (name: string) => Promise<SkillItem | undefined>;
@@ -65,7 +76,10 @@ export class SkillsExecutionRuntime {
     this.builtinSkills = options.builtinSkills || [];
   }
 
-  async execScript(args: ExecScriptParams): Promise<BuiltinServerRuntimeOutput> {
+  async execScript(
+    args: ExecScriptParams,
+    context?: SkillRuntimeContext,
+  ): Promise<BuiltinServerRuntimeOutput> {
     const { command, description, config } = args;
 
     // Try the runtime-provided execScript method first.
@@ -73,6 +87,7 @@ export class SkillsExecutionRuntime {
       try {
         const result = await this.service.execScript(command, {
           config,
+          context,
           description,
         });
 
@@ -125,7 +140,10 @@ export class SkillsExecutionRuntime {
     }
   }
 
-  async exportFile(args: ExportFileParams): Promise<BuiltinServerRuntimeOutput> {
+  async exportFile(
+    args: ExportFileParams,
+    context?: SkillRuntimeContext,
+  ): Promise<BuiltinServerRuntimeOutput> {
     const { path, filename } = args;
 
     if (!this.service.exportFile) {
@@ -136,7 +154,7 @@ export class SkillsExecutionRuntime {
     }
 
     try {
-      const result = await this.service.exportFile(path, filename);
+      const result = await this.service.exportFile(path, filename, context);
 
       if (!result.success) {
         return {

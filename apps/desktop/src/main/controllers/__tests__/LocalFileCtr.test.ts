@@ -836,6 +836,65 @@ describe('LocalFileCtr', () => {
     });
   });
 
+  describe('handleReadFileAsBase64', () => {
+    it('should read a file as base64 with metadata', async () => {
+      const buffer = Buffer.from('hello');
+      vi.mocked(mockFsPromises.stat).mockResolvedValue({
+        isDirectory: () => false,
+        size: buffer.length,
+      } as any);
+      vi.mocked(mockFsPromises.readFile).mockResolvedValue(buffer);
+
+      const result = await localFileCtr.handleReadFileAsBase64({
+        baseDir: '/tmp/skill',
+        path: 'output/result.txt',
+      });
+
+      expect(result).toMatchObject({
+        base64: buffer.toString('base64'),
+        filename: 'result.txt',
+        mimeType: 'text/plain',
+        path: '/tmp/skill/output/result.txt',
+        size: buffer.length,
+        success: true,
+      });
+      expect(result.sha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(mockFsPromises.readFile).toHaveBeenCalledWith('/tmp/skill/output/result.txt');
+    });
+
+    it('should reject file paths that escape the provided base directory', async () => {
+      const result = await localFileCtr.handleReadFileAsBase64({
+        baseDir: '/tmp/skill',
+        path: '../secret.txt',
+      });
+
+      expect(result).toEqual({
+        error: 'File path escapes the skill execution directory: ../secret.txt',
+        success: false,
+      });
+      expect(mockFsPromises.stat).not.toHaveBeenCalled();
+      expect(mockFsPromises.readFile).not.toHaveBeenCalled();
+    });
+
+    it('should reject directories', async () => {
+      vi.mocked(mockFsPromises.stat).mockResolvedValue({
+        isDirectory: () => true,
+        size: 0,
+      } as any);
+
+      const result = await localFileCtr.handleReadFileAsBase64({
+        path: '/tmp/output',
+      });
+
+      expect(result).toEqual({
+        error: 'Cannot export a directory',
+        path: '/tmp/output',
+        success: false,
+      });
+      expect(mockFsPromises.readFile).not.toHaveBeenCalled();
+    });
+  });
+
   describe('listLocalFiles', () => {
     it('should list directory contents successfully', async () => {
       vi.mocked(mockFsPromises.readdir).mockResolvedValue(['file1.txt', 'file2.txt', 'folder1']);

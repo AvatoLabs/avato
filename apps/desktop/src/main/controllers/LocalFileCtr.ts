@@ -23,6 +23,8 @@ import {
   type PickFileResult,
   type PrepareSkillDirectoryParams,
   type PrepareSkillDirectoryResult,
+  type ReadLocalFileAsBase64Params,
+  type ReadLocalFileAsBase64Result,
   type RenameLocalFileResult,
   type ResolveSkillResourcePathParams,
   type ResolveSkillResourcePathResult,
@@ -50,6 +52,25 @@ const logger = createLogger('controllers:LocalFileCtr');
 
 const SKILL_ARCHIVE_HASH_PATTERN = /^[\w-]{1,128}$/;
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
+const MAX_EXPORT_FILE_BYTES = 100 * 1024 * 1024;
+const MIME_TYPE_BY_EXTENSION: Record<string, string> = {
+  csv: 'text/csv',
+  gif: 'image/gif',
+  html: 'text/html',
+  jpeg: 'image/jpeg',
+  jpg: 'image/jpeg',
+  json: 'application/json',
+  md: 'text/markdown',
+  mp3: 'audio/mpeg',
+  mp4: 'video/mp4',
+  pdf: 'application/pdf',
+  png: 'image/png',
+  svg: 'image/svg+xml',
+  txt: 'text/plain',
+  webp: 'image/webp',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  zip: 'application/zip',
+};
 
 const assertSafeSkillArchiveHash = (zipSha256: string) => {
   if (!SKILL_ARCHIVE_HASH_PATTERN.test(zipSha256)) {
@@ -64,6 +85,23 @@ const verifySkillArchiveHash = (buffer: Buffer, zipSha256: string) => {
   if (actualHash !== zipSha256.toLowerCase()) {
     throw new Error('Downloaded skill archive hash mismatch');
   }
+};
+
+const getMimeType = (filePath: string) => {
+  const extension = path.extname(filePath).toLowerCase().slice(1);
+  return MIME_TYPE_BY_EXTENSION[extension] || 'application/octet-stream';
+};
+
+const resolveFilePathWithinBaseDir = (filePath: string, baseDir?: string) => {
+  if (!baseDir) return path.resolve(filePath);
+
+  const root = path.resolve(baseDir);
+  const target = path.isAbsolute(filePath) ? path.resolve(filePath) : path.resolve(root, filePath);
+  if (target !== root && !target.startsWith(`${root}${path.sep}`)) {
+    throw new Error(`File path escapes the skill execution directory: ${filePath}`);
+  }
+
+  return target;
 };
 
 export default class LocalFileCtr extends ControllerModule {
@@ -211,6 +249,48 @@ export default class LocalFileCtr extends ControllerModule {
 
     logger.debug('Batch file reading completed', { count: results.length });
     return results;
+  }
+
+  @IpcMethod()
+  async handleReadFileAsBase64({
+    baseDir,
+    path: filePath,
+  }: ReadLocalFileAsBase64Params): Promise<ReadLocalFileAsBase64Result> {
+    try {
+      const resolvedPath = resolveFilePathWithinBaseDir(filePath, baseDir);
+      const stats = await stat(resolvedPath);
+      if (stats.isDirectory()) {
+        return {
+          error: 'Cannot export a directory',
+          path: resolvedPath,
+          success: false,
+        };
+      }
+      if (stats.size > MAX_EXPORT_FILE_BYTES) {
+        return {
+          error: `File is too large to export (${stats.size} bytes)`,
+          path: resolvedPath,
+          success: false,
+        };
+      }
+
+      const buffer = await readFile(resolvedPath);
+
+      return {
+        base64: buffer.toString('base64'),
+        filename: path.basename(resolvedPath),
+        mimeType: getMimeType(resolvedPath),
+        path: resolvedPath,
+        sha256: createHash('sha256').update(buffer).digest('hex'),
+        size: buffer.length,
+        success: true,
+      };
+    } catch (error) {
+      return {
+        error: (error as Error).message,
+        success: false,
+      };
+    }
   }
 
   @IpcMethod()
