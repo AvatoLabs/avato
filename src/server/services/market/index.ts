@@ -533,7 +533,7 @@ export class MarketService {
             identifier: providerId,
             meta: {
               avatar: icon || '🔗',
-              description: `LobeHub Skill: ${providerName}`,
+              description: `Avato Skill: ${providerName}`,
               tags: ['lobehub-skill', providerId],
               title: providerName,
             },

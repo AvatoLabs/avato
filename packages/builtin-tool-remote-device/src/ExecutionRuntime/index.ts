@@ -51,7 +51,7 @@ export class RemoteDeviceExecutionRuntime {
 
       if (!target.allowRemoteTools) {
         return {
-          content: `Device "${target.hostname}" is online, but Remote Tool Execution is disabled in LobeHub Desktop.`,
+          content: `Device "${target.hostname}" is online, but Remote Tool Execution is disabled in Avato Desktop.`,
           success: false,
         };
       }

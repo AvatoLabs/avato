@@ -217,7 +217,7 @@ class SkillServerRuntimeService implements SkillRuntimeService {
         exitCode: 1,
         output: '',
         stderr:
-          'No active desktop device selected. Start LobeHub Desktop, connect it to Device Gateway, enable Remote Tool Execution, and activate the device before running Skills.',
+          'No active desktop device selected. Start Avato Desktop, connect it to Device Gateway, enable Remote Tool Execution, and activate the device before running Skills.',
         success: false,
       };
     }

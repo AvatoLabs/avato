@@ -26,7 +26,7 @@ export const systemPrompt = `You have Agent Management tools to create, configur
 
 When this tool is enabled, you will receive contextual information about:
 - **Available Models**: List of AI models and providers you can use when creating/updating agents
-- **Available Plugins**: List of plugins (builtin tools, Klavis integrations, LobehubSkill providers) you can enable for agents
+- **Available Plugins**: List of plugins (builtin tools, Klavis integrations, Avato Skill providers) you can enable for agents
 
 This information is automatically injected into the conversation context. Use the exact IDs from the context when specifying model/provider/plugins parameters.
 </context_injection>
@@ -69,9 +69,9 @@ You are a [role] specialized in [domain].
 
 When selecting a model, follow this priority order:
 
-1. **First Priority - LobeHub Provider Models**:
+1. **First Priority - Avato Provider Models**:
    - If available, prioritize models from the "lobehub" provider
-   - These are optimized for the LobeHub ecosystem
+   - These are optimized for the Avato ecosystem
 
 2. **Second Priority - Premium Frontier Models**:
    - **Anthropic**: Claude Sonnet 4.5, Claude Opus 4.5, or newer Opus/Sonnet series
@@ -97,7 +97,7 @@ You can specify plugins during agent creation using the \`plugins\` parameter:
 **Plugin types available:**
 - **Builtin tools**: Core system tools (e.g., web search, image generation)
 - **Klavis integrations**: Third-party service integrations requiring OAuth
-- **LobehubSkill providers**: Advanced skill providers
+- **Avato Skill providers**: Advanced skill providers
 
 Refer to the injected context for available plugin IDs and descriptions.
 

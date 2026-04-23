@@ -1,12 +1,12 @@
 import { type StorageMode } from '@lobechat/electron-client-ipc';
 import { StorageModeEnum } from '@lobechat/electron-client-ipc';
 import { Button, Center, Flexbox, Input, stopPropagation } from '@lobehub/ui';
-import { LobeHub } from '@lobehub/ui/brand';
 import { createStaticStyles } from 'antd-style';
 import { Server } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ProductLogo } from '@/components/Branding';
 import { useElectronStore } from '@/store/electron';
 import { electronSyncSelectors } from '@/store/electron/selectors';
 
@@ -76,6 +76,10 @@ type RemoteStorageMode = Extract<StorageMode, 'cloud' | 'selfHost'>;
 interface ConnectionModeProps {
   setWaiting: (waiting: boolean) => void;
 }
+
+const AvatoCloudIcon = memo(() => <ProductLogo size={24} />);
+
+AvatoCloudIcon.displayName = 'AvatoCloudIcon';
 
 const ConnectionMode = memo<ConnectionModeProps>(({ setWaiting }) => {
   const { t } = useTranslation(['electron', 'common']);
@@ -147,7 +151,7 @@ const ConnectionMode = memo<ConnectionModeProps>(({ setWaiting }) => {
           </Flexbox>
           <Option
             description={t('sync.avatohubCloud.description')}
-            icon={LobeHub}
+            icon={AvatoCloudIcon}
             isSelected={selectedOption === StorageModeEnum.Cloud}
             label={t('sync.avatohubCloud.title')}
             value={StorageModeEnum.Cloud}
@@ -167,7 +171,7 @@ const ConnectionMode = memo<ConnectionModeProps>(({ setWaiting }) => {
                   <Input
                     autoFocus
                     className={styles.selfHostedInput}
-                    placeholder="https://your-lobechat.com"
+                    placeholder="https://your-avato.com"
                     status={urlError ? 'error' : undefined}
                     value={selfHostedUrl}
                     onClick={stopPropagation}

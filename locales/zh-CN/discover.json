@@ -37,7 +37,7 @@
   "aggregator.skills.installability.verified": "已验证",
   "aggregator.skills.installabilityReason.downloadUnavailable": "这个条目已被索引，但当前没有可下载的技能包。",
   "aggregator.skills.installabilityReason.fetchFailed": "服务端验证时无法拉取这个技能包，所以暂不开放一键导入。",
-  "aggregator.skills.installabilityReason.invalidPackage": "下载下来的技能包没有通过 LobeHub 的技能解析校验，所以暂不开放一键导入。",
+  "aggregator.skills.installabilityReason.invalidPackage": "下载下来的技能包没有通过 Avato 的技能解析校验，所以暂不开放一键导入。",
   "aggregator.skills.installabilityReason.packageTooLarge": "这个技能包超过当前的验证体积限制，所以暂不开放一键导入。",
   "aggregator.skills.meta.version": "v{{version}}",
   "aggregator.skills.metrics.downloads": "{{count}} 下载",

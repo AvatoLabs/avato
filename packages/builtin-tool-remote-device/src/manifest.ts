@@ -16,7 +16,7 @@ export const RemoteDeviceManifest: BuiltinToolManifest = {
     },
     {
       description:
-        'Activate a specific desktop device by its ID. The device must be online and have Remote Tool Execution enabled in LobeHub Desktop. Once activated, Local System, Skills, and local/private MCP tools can run on that device.',
+        'Activate a specific desktop device by its ID. The device must be online and have Remote Tool Execution enabled in Avato Desktop. Once activated, Local System, Skills, and local/private MCP tools can run on that device.',
       name: RemoteDeviceApiName.activateDevice,
       parameters: {
         properties: {

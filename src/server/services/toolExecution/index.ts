@@ -195,7 +195,7 @@ export class ToolExecutionService {
         if (!context.activeDeviceId || !context.userId) {
           return {
             content:
-              'No active desktop device selected. Connect LobeHub Desktop, enable Remote Tool Execution, and select an online device before running this MCP tool.',
+              'No active desktop device selected. Connect Avato Desktop, enable Remote Tool Execution, and select an online device before running this MCP tool.',
             error: {
               code: 'MCP_DESKTOP_DEVICE_REQUIRED',
               message: 'Active desktop device is required for this MCP tool',

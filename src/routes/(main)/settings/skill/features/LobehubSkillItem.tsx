@@ -244,7 +244,7 @@ const LobehubSkillItem = memo<LobehubSkillItemProps>(({ provider, server }) => {
           {
             icon: <Icon icon={Unplug} />,
             key: 'disconnect',
-            label: t('tools.lobehubSkill.disconnect', { defaultValue: 'Disconnect' }),
+            label: t('tools.avatohubSkill.disconnect', { defaultValue: 'Disconnect' }),
             onClick: handleDisconnect,
           },
         ]}

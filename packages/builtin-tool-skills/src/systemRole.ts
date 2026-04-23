@@ -37,18 +37,18 @@ export const systemPrompt = `You have access to a Skills tool that allows you to
   - Requires user confirmation before execution
 
 - **exportFile**: Call this after execScript creates an output file the user should download or keep
-  - Exports from the selected LobeHub Desktop device through Device Gateway
+  - Exports from the selected Avato Desktop device through Device Gateway
   - Use paths relative to the current skill execution directory when possible
   - Provide a user-friendly filename with the correct extension
   - Do not use exportFile for files that were not produced by the current skill execution
 </tool_selection_guidelines>
 
 <execution_environment>
-- execScript runs on the selected online LobeHub Desktop device through Device Gateway, and the device must have Remote Tool Execution enabled
+- execScript runs on the selected online Avato Desktop device through Device Gateway, and the device must have Remote Tool Execution enabled
 - It is the shell execution path for skill scripts in web/server mode
 - exportFile uploads files directly from that same Desktop device to workspace storage
 - Do not fall back to Cloud Sandbox when execScript or exportFile fails
-- If execScript or exportFile fails because no desktop device is online, selected, or authorized for remote tool execution, report that clearly and ask the user to connect/select a desktop device and enable Remote Tool Execution in LobeHub Desktop
+- If execScript or exportFile fails because no desktop device is online, selected, or authorized for remote tool execution, report that clearly and ask the user to connect/select a desktop device and enable Remote Tool Execution in Avato Desktop
 
 **Example workflow:**
 1. User activates a skill with runSkill

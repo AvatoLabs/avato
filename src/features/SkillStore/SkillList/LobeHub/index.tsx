@@ -48,7 +48,7 @@ export const LobeHubList = memo<LobeHubListProps>(({ keywords }) => {
   const isLobehubSkillEnabled = useServerConfigStore(serverConfigSelectors.enableLobehubSkill);
   const isKlavisEnabled = useServerConfigStore(serverConfigSelectors.enableKlavis);
 
-  // Fetch LobeHub skill providers from market dynamically
+  // Fetch Avato skill providers from market dynamically
   const { providers: lobehubProviders, loading: loadingMarket } = useMarketLobehubSkills({
     enabled: isLobehubSkillEnabled,
   });
@@ -99,7 +99,7 @@ export const LobeHubList = memo<LobeHubListProps>(({ keywords }) => {
       items.push({ tool, type: 'builtin' });
     }
 
-    // Add LobeHub skills from market (dynamic)
+    // Add Avato skills from market (dynamic)
     if (isLobehubSkillEnabled && !loadingMarket) {
       for (const provider of lobehubProviders) {
         items.push({ provider, type: 'lobehub' });
@@ -147,7 +147,7 @@ export const LobeHubList = memo<LobeHubListProps>(({ keywords }) => {
   if (loadingMarket && isLobehubSkillEnabled) {
     return (
       <div className={gridStyles.grid}>
-        {/* Show skeleton or placeholder for LobeHub skills */}
+        {/* Show skeleton or placeholder for Avato skills */}
         {Array.from({ length: 6 }).map((_, i) => (
           <div className={itemStyles.container} key={i} style={{ opacity: 0.5 }}>
             Loading...

@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { type LobeChatDatabase } from '@lobechat/database';
 import {
   type SkillResourceContent,
@@ -7,7 +9,6 @@ import {
 import { getMimeType } from '@lobechat/utils';
 import debug from 'debug';
 import { sha256 } from 'js-sha256';
-import path from 'node:path';
 
 import { FileService } from '@/server/services/file';
 
@@ -204,7 +205,7 @@ export class SkillResourceService {
 
     await this.fileService.createGlobalFile({
       fileType,
-      metadata: { dirname, filename, path: key },
+      metadata: { dirname, filename, originalPath: virtualPath, path: key },
       sha256: resourceSha256,
       size: buffer.length,
       storageKey: key,

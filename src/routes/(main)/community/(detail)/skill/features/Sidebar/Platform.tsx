@@ -79,7 +79,7 @@ const genInstallCommand = (identifier?: string, platform?: PlatformType) => {
       return `npx -y @lobehub/market-cli skills install ${id} --agent ${agentMap[platform]}`;
     }
     default: {
-      return `# Recommended for LobeHub users:
+      return `# Recommended for Avato users:
 # Open the marketplace page and install with one click:
 # https://lobechat.com/community/skills/${id}`;
     }
@@ -99,7 +99,7 @@ const genLayout = (
     [PlatformType.Claude]: `~/.claude/skills/${id}`,
     [PlatformType.Cline]: `~/.cline/skills/${id}`,
     [PlatformType.Cursor]: `~/.cursor/skills/${id}`,
-    [PlatformType.LobeHub]: `<managed-by-lobehub>`,
+    [PlatformType.LobeHub]: `<managed-by-avato>`,
     [PlatformType.Codex]: `~/.agents/skills/${id}`,
     [PlatformType.VsCode]: `./.vscode/skills/${id}`,
   };
@@ -155,7 +155,7 @@ const Platform = memo<PlatformProps>(
       switch (active) {
         case PlatformType.LobeHub: {
           return {
-            platform: 'LobeHub',
+            platform: 'Avato',
             steps: t('skills.details.sidebar.platform.steps.avatohub'),
           };
         }

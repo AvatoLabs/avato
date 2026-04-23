@@ -100,7 +100,7 @@ describe('remoteDeviceRuntime', () => {
 
       expect(result).toMatchObject({
         content:
-          'Device "host1" is online, but Remote Tool Execution is disabled in LobeHub Desktop.',
+          'Device "host1" is online, but Remote Tool Execution is disabled in Avato Desktop.',
         success: false,
       });
     });

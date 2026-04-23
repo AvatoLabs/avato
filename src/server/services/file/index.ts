@@ -366,7 +366,7 @@ export class FileService {
    */
   public async createGlobalFile(params: {
     fileType: string;
-    metadata?: { dirname: string; filename: string; path: string };
+    metadata?: { dirname: string; filename: string; originalPath?: string; path: string };
     sha256: string;
     size: number;
     storageKey: string;

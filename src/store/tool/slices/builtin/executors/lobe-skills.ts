@@ -53,7 +53,7 @@ const missingDeviceResult = {
   exitCode: 1,
   output: '',
   stderr:
-    'No online desktop device found with Remote Tool Execution enabled. Start LobeHub Desktop, connect it to Device Gateway, and enable Remote Tool Execution.',
+    'No online desktop device found with Remote Tool Execution enabled. Start Avato Desktop, connect it to Device Gateway, and enable Remote Tool Execution.',
   success: false,
 };
 

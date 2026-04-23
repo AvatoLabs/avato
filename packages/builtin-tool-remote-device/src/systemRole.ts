@@ -30,7 +30,7 @@ ${deviceSection}
 - If a device is already listed above, you can activate it directly with **activateDevice** without calling **listOnlineDevices** first.
 - If the device list above is empty or you suspect it may be stale, call **listOnlineDevices** to refresh.
 - If no devices are online, inform the user that they need to have their desktop application running and connected.
-- Only activate devices whose remote tools are enabled. If a device is online but remote tools are disabled, ask the user to enable Remote Tool Execution in LobeHub Desktop.
+- Only activate devices whose remote tools are enabled. If a device is online but remote tools are disabled, ask the user to enable Remote Tool Execution in Avato Desktop.
 - When only one eligible device is online with remote tools enabled, activate it directly without asking the user to choose.
 - When multiple eligible devices are online, present the list and let the user choose which device to activate.
 </guidelines>

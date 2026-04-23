@@ -59,7 +59,7 @@ export default {
   'aggregator.skills.installabilityReason.fetchFailed':
     'The source package could not be fetched during verification, so one-click import is disabled.',
   'aggregator.skills.installabilityReason.invalidPackage':
-    'The downloaded package did not pass LobeHub skill parsing, so one-click import is disabled.',
+    'The downloaded package did not pass Avato skill parsing, so one-click import is disabled.',
   'aggregator.skills.installabilityReason.packageTooLarge':
     'The source package is larger than the current verification limit, so one-click import is disabled.',
   'aggregator.skills.meta.version': 'v{{version}}',
