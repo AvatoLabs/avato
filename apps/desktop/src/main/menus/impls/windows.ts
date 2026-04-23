@@ -1,10 +1,12 @@
 import type { MenuItemConstructorOptions } from 'electron';
 import { app, clipboard, Menu, shell } from 'electron';
 
-import { isDev } from '@/const/env';
+import { isDev, OFFICIAL_CLOUD_SERVER } from '@/const/env';
 
 import type { ContextMenuData, IMenuPlatform, MenuOptions } from '../types';
 import { BaseMenuPlatform } from './BaseMenuPlatform';
+
+const GITHUB_REPO_URL = 'https://github.com/AvatoLabs/avatohub';
 
 export class WindowsMenu extends BaseMenuPlatform implements IMenuPlatform {
   private appMenu: Menu | null = null;
@@ -175,13 +177,13 @@ export class WindowsMenu extends BaseMenuPlatform implements IMenuPlatform {
         submenu: [
           {
             click: async () => {
-              await shell.openExternal('https://lobehub.com');
+              await shell.openExternal(OFFICIAL_CLOUD_SERVER);
             },
             label: t('help.visitWebsite'),
           },
           {
             click: async () => {
-              await shell.openExternal('https://github.com/lobehub/lobe-chat');
+              await shell.openExternal(GITHUB_REPO_URL);
             },
             label: t('help.githubRepo'),
           },

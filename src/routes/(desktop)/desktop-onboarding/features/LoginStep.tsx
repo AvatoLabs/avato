@@ -10,6 +10,7 @@ import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import urlJoin from 'url-join';
 
+import AuthIcons from '@/components/AuthIcons';
 import { OFFICIAL_SITE } from '@/const/url';
 import { isDesktop } from '@/const/version';
 import UserInfo from '@/features/User/UserInfo';
@@ -24,6 +25,7 @@ const LEGACY_LOCAL_DB_MIGRATION_GUIDE_URL = urlJoin(
   OFFICIAL_SITE,
   '/docs/usage/migrate-from-local-database',
 );
+const CLOUD_SSO_PROVIDER = 'feishu';
 
 // 登录方式类型
 type LoginMethod = 'cloud' | 'selfhost';
@@ -320,7 +322,14 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
 
       return (
         <Flexbox gap={8} style={{ width: '100%' }}>
-          <Button block disabled={true} icon={Cloud} loading={true} size={'large'} type={'primary'}>
+          <Button
+            block
+            disabled={true}
+            icon={<Icon icon={AuthIcons(CLOUD_SSO_PROVIDER, 18)} />}
+            loading={true}
+            size={'large'}
+            type={'primary'}
+          >
             {t('screen5.actions.signingIn')}
           </Button>
           <Text style={{ color: cssVar.colorTextDescription }} type={'secondary'}>
@@ -348,7 +357,7 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
       <Button
         block
         disabled={isConnectingServer}
-        icon={Cloud}
+        icon={<Icon icon={AuthIcons(CLOUD_SSO_PROVIDER, 18)} />}
         loading={false}
         size={'large'}
         type={'primary'}

@@ -51,8 +51,8 @@ async function parseJsonResponse<T>(res: Response, endpoint: string): Promise<T>
 export function registerLoginCommand(program: Command) {
   program
     .command('login')
-    .description('Log in to LobeHub via browser (Device Code Flow)')
-    .option('--server <url>', 'LobeHub server URL', OFFICIAL_SERVER_URL)
+    .description('Log in to Avato via browser (Device Code Flow)')
+    .option('--server <url>', 'Avato server URL', OFFICIAL_SERVER_URL)
     .action(async (options: LoginOptions) => {
       const serverUrl = options.server.replace(/\/$/, '');
 

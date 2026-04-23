@@ -16,7 +16,8 @@ import type {
 
 // ─── Constants ───
 
-const DEFAULT_GATEWAY_URL = 'https://device-gateway.lobehub.com';
+const DEFAULT_GATEWAY_URL =
+  process.env.DEVICE_GATEWAY_URL || 'https://device-gateway.turingmesh.com';
 const HEARTBEAT_INTERVAL = 30_000; // 30s
 const INITIAL_RECONNECT_DELAY = 1000; // 1s
 const MAX_RECONNECT_DELAY = 30_000; // 30s

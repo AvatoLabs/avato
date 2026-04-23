@@ -1,3 +1,5 @@
+import { OFFICIAL_URL } from '@lobechat/const';
+
 import { type ToolStoreState } from '../../initialState';
 import { type LobehubSkillServer } from './types';
 import { LobehubSkillStatus } from './types';
@@ -96,11 +98,11 @@ export const lobehubSkillStoreSelectors = {
           manifest: {
             api: apis,
             author: 'LobeHub Market',
-            homepage: 'https://lobehub.com/market',
+            homepage: `${OFFICIAL_URL}/market`,
             identifier: server.identifier,
             meta: {
               avatar: server.icon || '🔗',
-              description: `LobeHub Skill: ${server.name}`,
+              description: `Avato Skill: ${server.name}`,
               tags: ['lobehub-skill', server.identifier],
               title: server.name,
             },

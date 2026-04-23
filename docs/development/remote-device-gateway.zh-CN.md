@@ -112,7 +112,7 @@ DEVICE_GATEWAY_SERVICE_TOKEN=dev-service-token
 
 ### Avato Desktop
 
-Desktop 默认连接 `https://device-gateway.lobehub.com`。自建或本地联调时，在 Desktop 启动环境中覆盖：
+Desktop 默认连接 `https://device-gateway.turingmesh.com`。自建或本地联调时，在 Desktop 启动环境中覆盖：
 
 ```dotenv
 DEVICE_GATEWAY_URL=https://device-gateway.example.com

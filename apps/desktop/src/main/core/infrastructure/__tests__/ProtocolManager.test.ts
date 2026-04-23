@@ -12,11 +12,11 @@ const { mockApp, mockGetProtocolScheme, mockParseProtocolUrl } = vi.hoisted(() =
     getPath: vi.fn().mockReturnValue('/mock/exe/path'),
     isDefaultProtocolClient: vi.fn().mockReturnValue(true),
     isReady: vi.fn().mockReturnValue(true),
-    name: 'LobeHub',
+    name: 'Avato',
     on: vi.fn(),
     setAsDefaultProtocolClient: vi.fn().mockReturnValue(true),
   },
-  mockGetProtocolScheme: vi.fn().mockReturnValue('lobehub'),
+  mockGetProtocolScheme: vi.fn().mockReturnValue('avato'),
   mockParseProtocolUrl: vi.fn(),
 }));
 
@@ -77,7 +77,7 @@ describe('ProtocolManager', () => {
     });
 
     // Reset protocol utils mock
-    mockGetProtocolScheme.mockReturnValue('lobehub');
+    mockGetProtocolScheme.mockReturnValue('avato');
     mockParseProtocolUrl.mockReturnValue({
       action: 'install',
       params: { url: 'https://example.com' },
@@ -101,7 +101,7 @@ describe('ProtocolManager', () => {
   describe('constructor', () => {
     it('should initialize with protocol scheme from getProtocolScheme', () => {
       expect(getProtocolScheme).toHaveBeenCalled();
-      expect(manager.getScheme()).toBe('lobehub');
+      expect(manager.getScheme()).toBe('avato');
     });
   });
 
@@ -109,7 +109,7 @@ describe('ProtocolManager', () => {
     it('should register protocol handlers', () => {
       manager.initialize();
 
-      expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith('lobehub');
+      expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith('avato');
     });
 
     it('should set up event listeners', () => {
@@ -124,7 +124,7 @@ describe('ProtocolManager', () => {
     it('should use simple registration in production mode', () => {
       manager.initialize();
 
-      expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith('lobehub');
+      expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith('avato');
     });
 
     it('should use explicit parameters in development mode', async () => {
@@ -137,7 +137,7 @@ describe('ProtocolManager', () => {
 
       // In dev mode, should be called with additional arguments
       expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith(
-        'lobehub',
+        'avato',
         expect.any(String),
         expect.any(Array),
       );
@@ -146,7 +146,7 @@ describe('ProtocolManager', () => {
     it('should verify registration status after registering', () => {
       manager.initialize();
 
-      expect(app.isDefaultProtocolClient).toHaveBeenCalledWith('lobehub');
+      expect(app.isDefaultProtocolClient).toHaveBeenCalledWith('avato');
     });
   });
 
@@ -159,10 +159,10 @@ describe('ProtocolManager', () => {
       // Access private method through prototype
       const result = manager['getProtocolUrlFromArgs']([
         '/path/to/app',
-        'lobehub://plugin/install?url=https://example.com',
+        'avato://plugin/install?url=https://example.com',
       ]);
 
-      expect(result).toBe('lobehub://plugin/install?url=https://example.com');
+      expect(result).toBe('avato://plugin/install?url=https://example.com');
     });
 
     it('should return null when no matching URL found', () => {
@@ -173,11 +173,11 @@ describe('ProtocolManager', () => {
 
     it('should return first matching URL when multiple exist', () => {
       const result = manager['getProtocolUrlFromArgs']([
-        'lobehub://first/action',
-        'lobehub://second/action',
+        'avato://first/action',
+        'avato://second/action',
       ]);
 
-      expect(result).toBe('lobehub://first/action');
+      expect(result).toBe('avato://first/action');
     });
   });
 
@@ -189,16 +189,16 @@ describe('ProtocolManager', () => {
     it('should store URL when app is not ready', () => {
       mockApp.isReady.mockReturnValue(false);
 
-      manager['handleProtocolUrl']('lobehub://plugin/install');
+      manager['handleProtocolUrl']('avato://plugin/install');
 
-      expect(manager['pendingUrls']).toContain('lobehub://plugin/install');
+      expect(manager['pendingUrls']).toContain('avato://plugin/install');
       expect(mockShowMainWindow).not.toHaveBeenCalled();
     });
 
     it('should process URL immediately when app is ready', async () => {
       mockApp.isReady.mockReturnValue(true);
 
-      manager['handleProtocolUrl']('lobehub://plugin/install');
+      manager['handleProtocolUrl']('avato://plugin/install');
 
       // Allow async processing
       await vi.waitFor(() => {
@@ -226,7 +226,7 @@ describe('ProtocolManager', () => {
       expect(openUrlHandler).toBeDefined();
 
       const mockEvent = { preventDefault: vi.fn() };
-      openUrlHandler!(mockEvent, 'lobehub://plugin/install');
+      openUrlHandler!(mockEvent, 'avato://plugin/install');
 
       expect(mockEvent.preventDefault).toHaveBeenCalled();
       await vi.waitFor(() => {
@@ -238,7 +238,7 @@ describe('ProtocolManager', () => {
       expect(secondInstanceHandler).toBeDefined();
 
       const mockEvent = {};
-      secondInstanceHandler!(mockEvent, ['/path/to/app', 'lobehub://plugin/install']);
+      secondInstanceHandler!(mockEvent, ['/path/to/app', 'avato://plugin/install']);
 
       await vi.waitFor(() => {
         expect(mockShowMainWindow).toHaveBeenCalled();
@@ -262,7 +262,7 @@ describe('ProtocolManager', () => {
 
     it('should process all pending URLs', async () => {
       // Add pending URLs
-      manager['pendingUrls'] = ['lobehub://action1', 'lobehub://action2'];
+      manager['pendingUrls'] = ['avato://action1', 'avato://action2'];
 
       await manager.processPendingUrls();
 
@@ -271,7 +271,7 @@ describe('ProtocolManager', () => {
     });
 
     it('should clear pending URLs after processing', async () => {
-      manager['pendingUrls'] = ['lobehub://action1'];
+      manager['pendingUrls'] = ['avato://action1'];
 
       await manager.processPendingUrls();
 
@@ -289,7 +289,7 @@ describe('ProtocolManager', () => {
 
   describe('getScheme', () => {
     it('should return the protocol scheme', () => {
-      expect(manager.getScheme()).toBe('lobehub');
+      expect(manager.getScheme()).toBe('avato');
     });
   });
 
@@ -315,12 +315,12 @@ describe('ProtocolManager', () => {
     it('should show main window and dispatch to handler', async () => {
       vi.mocked(parseProtocolUrl).mockReturnValue({
         action: 'install',
-        originalUrl: 'lobehub://plugin/install?url=https://example.com',
+        originalUrl: 'avato://plugin/install?url=https://example.com',
         params: { url: 'https://example.com' },
         urlType: 'plugin',
       });
 
-      await manager['processProtocolUrl']('lobehub://plugin/install');
+      await manager['processProtocolUrl']('avato://plugin/install');
 
       expect(mockShowMainWindow).toHaveBeenCalled();
       expect(mockHandleProtocolRequest).toHaveBeenCalledWith('plugin', 'install', {
@@ -331,7 +331,7 @@ describe('ProtocolManager', () => {
     it('should warn and return when parseProtocolUrl returns null', async () => {
       vi.mocked(parseProtocolUrl).mockReturnValue(null);
 
-      await manager['processProtocolUrl']('lobehub://invalid');
+      await manager['processProtocolUrl']('avato://invalid');
 
       expect(mockShowMainWindow).toHaveBeenCalled();
       expect(mockHandleProtocolRequest).not.toHaveBeenCalled();
@@ -341,9 +341,7 @@ describe('ProtocolManager', () => {
       mockHandleProtocolRequest.mockRejectedValue(new Error('Handler error'));
 
       // Should not throw
-      await expect(
-        manager['processProtocolUrl']('lobehub://plugin/install'),
-      ).resolves.not.toThrow();
+      await expect(manager['processProtocolUrl']('avato://plugin/install')).resolves.not.toThrow();
     });
   });
 });

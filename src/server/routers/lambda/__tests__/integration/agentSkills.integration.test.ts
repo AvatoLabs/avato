@@ -658,9 +658,11 @@ description: A skill from URL
 
     it('should keep the market identifier stable when re-importing from market', async () => {
       mockMarketServiceInstance.getSkillDownloadUrl
-        .mockReturnValueOnce('https://market.lobehub.com/api/v1/skills/github.owner.repo/download')
         .mockReturnValueOnce(
-          'https://market.lobehub.com/api/v1/skills/github.owner.repo/download?version=1.0.0',
+          'https://avato.turingmesh.com/api/v1/skills/github.owner.repo/download',
+        )
+        .mockReturnValueOnce(
+          'https://avato.turingmesh.com/api/v1/skills/github.owner.repo/download?version=1.0.0',
         );
 
       mockFetch.mockResolvedValue({

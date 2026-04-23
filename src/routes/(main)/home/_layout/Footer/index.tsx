@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import ChangelogModal from '@/components/ChangelogModal';
 import HighlightNotification from '@/components/HighlightNotification';
 import LabsModal from '@/components/LabsModal';
+import { OFFICIAL_SITE } from '@/const/url';
 import { useFeedbackModal } from '@/hooks/useFeedbackModal';
 import User from '@/routes/(main)/home/_layout/Header/components/User';
 import { useGlobalStore } from '@/store/global';
@@ -16,7 +17,7 @@ import { systemStatusSelectors } from '@/store/global/selectors/systemStatus';
 const PRODUCT_HUNT_NOTIFICATION = {
   actionHref: 'https://www.producthunt.com/products/lobehub?launch=lobehub',
   endTime: new Date('2026-02-01T00:00:00Z'),
-  image: 'https://hub-apac-1.lobeobjects.space/og/lobehub-ph.png',
+  image: `${OFFICIAL_SITE}/og/product-hunt.png`,
   slug: 'product-hunt-2026',
   startTime: new Date('2026-01-27T08:00:00Z'),
 };

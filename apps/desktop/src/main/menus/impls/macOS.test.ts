@@ -30,6 +30,7 @@ vi.mock('electron', () => ({
 
 // Mock isDev
 vi.mock('@/const/env', () => ({
+  OFFICIAL_CLOUD_SERVER: 'https://avato.turingmesh.com',
   isDev: false,
 }));
 
@@ -225,7 +226,7 @@ describe('MacOSMenu', () => {
 
       expect(visitWebsiteItem).toBeDefined();
       await visitWebsiteItem.click();
-      expect(shell.openExternal).toHaveBeenCalledWith('https://lobehub.com');
+      expect(shell.openExternal).toHaveBeenCalledWith('https://avato.turingmesh.com');
     });
 
     it('should handle github repo click', async () => {
@@ -237,7 +238,7 @@ describe('MacOSMenu', () => {
 
       expect(githubItem).toBeDefined();
       await githubItem.click();
-      expect(shell.openExternal).toHaveBeenCalledWith('https://github.com/lobehub/lobe-chat');
+      expect(shell.openExternal).toHaveBeenCalledWith('https://github.com/AvatoLabs/avatohub');
     });
 
     it('should handle open logs directory click', () => {

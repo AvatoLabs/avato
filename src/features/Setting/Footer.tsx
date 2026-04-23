@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 import GuideModal from '@/components/GuideModal';
 import GuideVideo from '@/components/GuideVideo';
-import { GITHUB, GITHUB_ISSUES } from '@/const/url';
+import { GITHUB, GITHUB_ISSUES, OFFICIAL_SITE } from '@/const/url';
 import { featureFlagsSelectors, useServerConfigStore } from '@/store/serverConfig';
 import { isOnServerSide } from '@/utils/env';
 
@@ -100,13 +100,7 @@ const Footer = memo<PropsWithChildren>(() => {
         okText={t('footer.star.action')}
         open={openStar}
         title={t('footer.star.title')}
-        cover={
-          <GuideVideo
-            height={269}
-            src={`https://hub-apac-1.lobeobjects.space/assets/star.mp4`}
-            width={358}
-          />
-        }
+        cover={<GuideVideo height={269} src={`${OFFICIAL_SITE}/assets/star.mp4`} width={358} />}
         onCancel={() => setOpenStar(false)}
         onOk={() => {
           if (isOnServerSide) return;
@@ -119,13 +113,7 @@ const Footer = memo<PropsWithChildren>(() => {
         okText={t('footer.feedback.action')}
         open={openFeedback}
         title={t('footer.feedback.title')}
-        cover={
-          <GuideVideo
-            height={269}
-            src={'https://hub-apac-1.lobeobjects.space/assets/feedback.mp4'}
-            width={358}
-          />
-        }
+        cover={<GuideVideo height={269} src={`${OFFICIAL_SITE}/assets/feedback.mp4`} width={358} />}
         onCancel={() => setOpenFeedback(false)}
         onOk={() => {
           if (isOnServerSide) return;

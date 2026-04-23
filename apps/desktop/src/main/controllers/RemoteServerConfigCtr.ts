@@ -37,6 +37,18 @@ const DETERMINISTIC_FAILURES = [
 // Create logger
 const logger = createLogger('controllers:RemoteServerConfigCtr');
 
+const getOfficialCloudRequestPatterns = () => {
+  try {
+    const url = new URL(OFFICIAL_CLOUD_SERVER);
+
+    return [`${url.origin}/*`];
+  } catch (error) {
+    logger.warn('Invalid OFFICIAL_CLOUD_SERVER for webRequest filter:', error);
+
+    return [];
+  }
+};
+
 /**
  * Remote Server Configuration Controller
  * Used to manage custom remote LobeChat server configuration
@@ -569,22 +581,20 @@ export default class RemoteServerConfigCtr extends ControllerModule {
     logger.info(`Setting up subscription webview session for partition: ${partition}`);
 
     const session = electronSession.fromPartition(partition);
+    const urls = getOfficialCloudRequestPatterns();
 
-    session.webRequest.onBeforeSendHeaders(
-      { urls: [`https://*.lobehub.com/*`] },
-      async (details, callback) => {
-        const requestHeaders = { ...details.requestHeaders };
+    session.webRequest.onBeforeSendHeaders({ urls }, async (details, callback) => {
+      const requestHeaders = { ...details.requestHeaders };
 
-        const token = await this.getAccessToken();
+      const token = await this.getAccessToken();
 
-        if (token) {
-          requestHeaders['Oidc-Auth'] = token;
-          logger.debug(`Injected Oidc-Auth token for: ${details.url}`);
-        }
+      if (token) {
+        requestHeaders['Oidc-Auth'] = token;
+        logger.debug(`Injected Oidc-Auth token for: ${details.url}`);
+      }
 
-        callback({ requestHeaders });
-      },
-    );
+      callback({ requestHeaders });
+    });
 
     logger.debug(`Subscription webview session setup completed for partition: ${partition}`);
 

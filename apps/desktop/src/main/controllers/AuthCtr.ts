@@ -9,6 +9,7 @@ import type {
 } from '@lobechat/electron-client-ipc';
 import { BrowserWindow, shell } from 'electron';
 
+import { DESKTOP_CLOUD_SSO_PROVIDER } from '@/const/env';
 import { appendVercelCookie } from '@/utils/http-headers';
 import { createLogger } from '@/utils/logger';
 
@@ -64,6 +65,19 @@ export default class AuthCtr extends ControllerModule {
     return callbackUrl.toString();
   }
 
+  private getAuthorizationLaunchUrl(authUrl: URL, config: DataSyncConfig, remoteUrl: string) {
+    if (config.storageMode !== 'cloud') return authUrl.toString();
+
+    const provider = DESKTOP_CLOUD_SSO_PROVIDER?.trim();
+    if (!provider) return authUrl.toString();
+
+    const signInUrl = new URL('/signin', remoteUrl);
+    signInUrl.searchParams.set('sso', provider);
+    signInUrl.searchParams.set('callbackUrl', authUrl.toString());
+
+    return signInUrl.toString();
+  }
+
   /**
    * Request OAuth authorization
    */
@@ -113,8 +127,10 @@ export default class AuthCtr extends ControllerModule {
 
       logger.info(`Constructed authorization URL: ${authUrl.toString()}`);
 
-      // Open authorization URL in the default browser
-      await shell.openExternal(authUrl.toString());
+      const launchUrl = this.getAuthorizationLaunchUrl(authUrl, config, remoteUrl);
+
+      // Open sign-in/authorization URL in the default browser.
+      await shell.openExternal(launchUrl);
       logger.debug('Opening authorization URL in default browser');
 
       this.broadcastAuthorizationProgress({

@@ -34,7 +34,7 @@ vi.mock('electron', () => ({
 
 // Mock @/const/env
 vi.mock('@/const/env', () => ({
-  OFFICIAL_CLOUD_SERVER: 'https://cloud.lobehub.com',
+  OFFICIAL_CLOUD_SERVER: 'https://avato.turingmesh.com',
 }));
 
 vi.mock('../DeviceGatewayCtr', () => ({
@@ -103,7 +103,7 @@ describe('RemoteServerConfigCtr', () => {
 
       expect(result).toEqual({
         active: false,
-        remoteServerUrl: 'https://cloud.lobehub.com',
+        remoteServerUrl: 'https://avato.turingmesh.com',
         storageMode: 'cloud',
       });
     });
@@ -750,7 +750,7 @@ describe('RemoteServerConfigCtr', () => {
 
       const result = await controller.getRemoteServerUrl();
 
-      expect(result).toBe('https://cloud.lobehub.com');
+      expect(result).toBe('https://avato.turingmesh.com');
     });
 
     it('should return custom URL for selfHost mode', async () => {

@@ -8,7 +8,9 @@ import { marketSDK, marketUserInfo, serverDatabase } from '@/libs/trpc/lambda/mi
 import { type TrustedClientUserInfo } from '@/libs/trusted-client';
 import { generateTrustedClientToken } from '@/libs/trusted-client';
 
-const MARKET_BASE_URL = process.env.MARKET_BASE_URL || 'https://market.lobehub.com';
+const MARKET_BASE_URL =
+  process.env.MARKET_BASE_URL || process.env.APP_URL || 'https://avato.turingmesh.com';
+const MARKET_BASE_ORIGIN = MARKET_BASE_URL.replace(/\/$/, '');
 
 interface MarketUserInfo {
   accountId: number;
@@ -555,7 +557,7 @@ export const agentGroupRouter = router({
           category: group.category,
           createdAt: group.createdAt,
           description: group.description || '',
-          homepage: `https://lobehub.com/discover/group_agent/${group.identifier}`,
+          homepage: `${MARKET_BASE_ORIGIN}/discover/group_agent/${group.identifier}`,
           identifier: group.identifier,
           installCount: group.installCount || 0,
           isFeatured: group.isFeatured || false,
