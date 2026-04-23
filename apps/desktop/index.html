@@ -16,7 +16,6 @@
       --loading-logo-bg: rgba(255, 255, 252, 0.88);
       --loading-logo-border: rgba(17, 23, 22, 0.08);
       --loading-logo-shadow: rgba(17, 23, 22, 0.08);
-      --loading-logo-filter: none;
       --loading-track: rgba(17, 23, 22, 0.12);
       --loading-accent: #5fb193;
       --loading-accent-soft: rgba(95, 177, 147, 0.18);
@@ -33,7 +32,6 @@
       --loading-logo-bg: #000;
       --loading-logo-border: rgba(243, 247, 245, 0.08);
       --loading-logo-shadow: rgba(0, 0, 0, 0.36);
-      --loading-logo-filter: brightness(0) invert(1);
       --loading-track: rgba(243, 247, 245, 0.12);
       --loading-accent: #76c4a5;
       --loading-accent-soft: rgba(118, 196, 165, 0.2);
@@ -113,7 +111,6 @@
       image-rendering: -webkit-optimize-contrast;
       image-rendering: crisp-edges;
       backface-visibility: hidden;
-      filter: var(--loading-logo-filter);
       transform: translateZ(0);
     }
 
@@ -313,8 +310,9 @@
     <div id="loading-brand" aria-label="Loading" aria-live="polite" role="status">
       <div class="loading-logo-wrap">
         <div class="loading-logo-core">
-          <img alt="Avato" decoding="async" draggable="false" fetchpriority="high" height="56"
-            src="/icons/icon-512x512.png" width="56" />
+          <img id="loading-logo-img" alt="Avato" decoding="async" draggable="false"
+            fetchpriority="high" height="56" src="/icons/icon-512x512-transparent.png"
+            width="56" />
         </div>
       </div>
       <div class="loading-headline">Avato</div>
@@ -328,6 +326,7 @@
       var loadingLabel = window.__LOADING_LABEL__ || 'Loading';
       var loadingBrand = document.getElementById('loading-brand');
       var loadingLabelNode = document.getElementById('loading-label');
+      var logoImg = document.getElementById('loading-logo-img');
 
       if (loadingBrand) {
         loadingBrand.setAttribute('aria-label', loadingLabel);
@@ -335,6 +334,13 @@
 
       if (loadingLabelNode) {
         loadingLabelNode.textContent = loadingLabel;
+      }
+
+      if (logoImg) {
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        logoImg.src = isDark
+          ? '/icons/icon-512x512-transparent-dark.png'
+          : '/icons/icon-512x512-transparent.png';
       }
     })();
   </script>

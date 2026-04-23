@@ -67,6 +67,17 @@ export default class RemoteServerConfigCtr extends ControllerModule {
     return nextConfig;
   };
 
+  private withEffectiveRemoteServerUrl = (config: DataSyncConfig): DataSyncConfig => {
+    const normalized = this.normalizeConfig(config);
+
+    if (normalized.storageMode !== 'cloud') return normalized;
+
+    return {
+      ...normalized,
+      remoteServerUrl: normalized.remoteServerUrl || OFFICIAL_CLOUD_SERVER,
+    };
+  };
+
   /**
    * Get remote server configuration
    */
@@ -76,7 +87,7 @@ export default class RemoteServerConfigCtr extends ControllerModule {
     const { storeManager } = this.app;
 
     const config: DataSyncConfig = storeManager.get('dataSyncConfig');
-    const normalized = this.normalizeConfig(config);
+    const normalized = this.withEffectiveRemoteServerUrl(config);
 
     logger.debug(
       `Remote server config: active=${normalized.active}, storageMode=${normalized.storageMode}, url=${normalized.remoteServerUrl}`,

@@ -92,6 +92,21 @@ describe('RemoteServerConfigCtr', () => {
       expect(result).toEqual(config);
       expect(mockStoreManager.get).toHaveBeenCalledWith('dataSyncConfig');
     });
+
+    it('should include the effective cloud URL for cloud mode', async () => {
+      mockStoreManager.get.mockReturnValue({
+        active: false,
+        storageMode: 'cloud',
+      });
+
+      const result = await controller.getRemoteServerConfig();
+
+      expect(result).toEqual({
+        active: false,
+        remoteServerUrl: 'https://cloud.lobehub.com',
+        storageMode: 'cloud',
+      });
+    });
   });
 
   describe('setRemoteServerConfig', () => {

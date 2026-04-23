@@ -93,7 +93,7 @@ const BrandTextLoading = ({
               src={
                 isDark
                   ? '/icons/icon-192x192-transparent-dark.png'
-                  : '/icons/icon-192x192.png'
+                  : '/icons/icon-192x192-transparent.png'
               }
             />
           </div>
@@ -121,7 +121,7 @@ const BrandTextLoading = ({
             src={
               isDark
                 ? '/icons/icon-192x192-transparent-dark.png'
-                : '/icons/icon-192x192.png'
+                : '/icons/icon-192x192-transparent.png'
             }
           />
         </motion.div>

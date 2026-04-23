@@ -1028,10 +1028,10 @@ const getNodeSizeSeed = (node: StudioCanvasNode) => {
 };
 
 export const estimateNodeSize = (node: StudioCanvasNode) => {
-  const seed = getNodeSizeSeed(node);
-  const lines = Math.max(1, Math.ceil(seed.trim().length / 26));
+  const seed = String(getNodeSizeSeed(node) || '').trim();
+  const lines = Math.max(1, Math.ceil(seed.length / 26));
   const height = Math.min(132 + lines * 20, 280);
-  const width = Math.min(Math.max(260, 260 + Math.min(seed.trim().length, 80) * 1.05), 400);
+  const width = Math.min(Math.max(260, 260 + Math.min(seed.length, 80) * 1.05), 400);
 
   return { height, width };
 };

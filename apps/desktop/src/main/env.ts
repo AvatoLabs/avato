@@ -81,10 +81,17 @@ export const getDesktopEnv = memoize(() =>
       NODE_ENV: z.enum(['development', 'production', 'test']).optional(),
 
       // cloud server url (can be overridden for selfhost/dev)
-      OFFICIAL_CLOUD_SERVER: z.string().optional().default('https://app.lobehub.com'),
+      OFFICIAL_CLOUD_SERVER: z
+        .string()
+        .optional()
+        .default(process.env.OFFICIAL_CLOUD_SERVER || 'https://app.lobehub.com'),
 
       // remote device gateway url (can be overridden for selfhost/dev)
-      DEVICE_GATEWAY_URL: z.string().url().optional().default('https://device-gateway.lobehub.com'),
+      DEVICE_GATEWAY_URL: z
+        .string()
+        .url()
+        .optional()
+        .default(process.env.DEVICE_GATEWAY_URL || 'https://device-gateway.lobehub.com'),
 
       // updater
       // process.env.xxx will replace in build stage
