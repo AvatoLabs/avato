@@ -53,6 +53,10 @@ Host avato-prod
   UserKnownHostsFile /dev/null
 EOF
 
+if [ -n "${SSH_PROXY_COMMAND}" ]; then
+  printf '  ProxyCommand %s\n' "${SSH_PROXY_COMMAND}" >> "${SSH_CONFIG_FILE}"
+fi
+
 SSH_COMMON_ARGS=(
   -F "${SSH_CONFIG_FILE}"
   -o PreferredAuthentications=password
@@ -63,10 +67,6 @@ SSH_COMMON_ARGS=(
   -o ServerAliveInterval=15
   -o ServerAliveCountMax=3
 )
-
-if [ -n "${SSH_PROXY_COMMAND}" ]; then
-  SSH_COMMON_ARGS+=(-o "ProxyCommand=${SSH_PROXY_COMMAND}")
-fi
 
 run_with_expect() {
   EXPECT_PASSWORD="${DEPLOY_PASSWORD}" expect -f - "$@" <<'EOF'

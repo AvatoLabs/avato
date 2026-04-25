@@ -23,7 +23,22 @@ const vercelConfig = {
   outputFileTracingExcludes,
 };
 
+const immutableSpaAssetHeaders = [
+  {
+    key: 'Cache-Control',
+    value: 'public, max-age=31536000, immutable',
+  },
+  {
+    key: 'CDN-Cache-Control',
+    value: 'public, max-age=31536000, immutable',
+  },
+];
+
 const nextConfig = defineConfig({
+  headers: ['assets', 'vendor', 'i18n', 'provider'].map((directory) => ({
+    headers: immutableSpaAssetHeaders,
+    source: `/spa/${directory}/:path*`,
+  })),
   // Always apply exclusions for Docker builds too
   outputFileTracingExcludes,
   ...(isVercel ? vercelConfig : {}),
