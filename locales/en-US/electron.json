@@ -80,6 +80,7 @@
   "remoteServer.statusDisconnected": "Not connected",
   "remoteServer.urlRequired": "Please enter the server address",
   "sync.avatohubCloud.description": "Officially provided cloud version",
+  "sync.avatohubCloud.serverUrl.placeholder": "Optional server address, default Avato Cloud",
   "sync.avatohubCloud.title": "Avato Cloud",
   "sync.continue": "Continue",
   "sync.inCloud": "Currently using cloud sync",

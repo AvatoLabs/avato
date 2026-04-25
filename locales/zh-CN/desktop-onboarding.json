@@ -71,6 +71,8 @@
   "screen5.auth.phase.waitingForAuth": "等待授权...",
   "screen5.auth.remaining": "剩余时间：{{time}}秒",
   "screen5.badge": "登录",
+  "screen5.cloud.endpointInvalid": "请输入有效的 http(s) 服务器地址",
+  "screen5.cloud.endpointPlaceholder": "服务器地址（可选，默认 Avato Cloud）",
   "screen5.description": "登录以在所有设备间同步代理、群组、设置和上下文。",
   "screen5.errors.desktopOnlyOidc": "OIDC 授权仅在桌面端运行时可用。",
   "screen5.errors.timedOut": "授权超时，请重试",

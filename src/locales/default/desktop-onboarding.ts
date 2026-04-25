@@ -85,6 +85,8 @@ export default {
   'screen5.auth.phase.waitingForAuth': 'Waiting for authorization...',
   'screen5.auth.remaining': 'Remaining: {{time}}s',
   'screen5.badge': 'Sign in',
+  'screen5.cloud.endpointInvalid': 'Please enter a valid http(s) server address',
+  'screen5.cloud.endpointPlaceholder': 'Server address (optional, default Avato Cloud)',
   'screen5.description':
     'Sign in to sync Agents, Groups, settings, and Context across all devices.',
   'screen5.errors.desktopOnlyOidc':

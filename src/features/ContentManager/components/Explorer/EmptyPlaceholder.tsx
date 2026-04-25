@@ -35,7 +35,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     gap: 12px;
     width: 100%;
 
-    @media (max-width: 768px) {
+    @media (width <= 768px) {
       grid-template-columns: 1fr;
     }
   `,
@@ -91,6 +91,15 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 
     border: 0;
   `,
+  cardUpload: css`
+    display: block;
+    width: 100%;
+
+    .ant-upload {
+      display: block;
+      width: 100%;
+    }
+  `,
   cardContent: css`
     cursor: pointer;
 
@@ -110,9 +119,9 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   introEyebrow: css`
     font-size: 11px;
     font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
     color: ${cssVar.colorTextSecondary};
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
   `,
   glow: css`
     position: absolute;
@@ -141,10 +150,13 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   governanceFiltersSummary: css`
     gap: 10px;
     align-items: center;
+
     width: min(560px, 100%);
-    padding: 14px 16px;
+    padding-block: 14px;
+    padding-inline: 16px;
     border: 1px solid ${cssVar.colorBorderSecondary};
     border-radius: calc(${cssVar.borderRadiusLG} + 4px);
+
     text-align: center;
 
     background: color-mix(in srgb, ${cssVar.colorFillSecondary} 76%, ${cssVar.colorBgContainer});
@@ -220,9 +232,9 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     }
 
     &:focus-visible {
+      border-radius: 999px;
       outline: 2px solid ${cssVar.colorPrimary};
       outline-offset: 2px;
-      border-radius: 999px;
     }
   `,
   governanceFilterMeta: css`
@@ -256,15 +268,14 @@ const EmptyPlaceholder = memo(() => {
     assetUsagePolicy,
     sourceSetId,
     spaceId,
-  ] =
-    useContentManagerStore((s) => [
-      s.assetClassification,
-      s.assetRightsOwner,
-      s.assetReviewStatus,
-      s.assetUsagePolicy,
-      s.sourceSetId,
-      s.spaceId,
-    ]);
+  ] = useContentManagerStore((s) => [
+    s.assetClassification,
+    s.assetRightsOwner,
+    s.assetReviewStatus,
+    s.assetUsagePolicy,
+    s.sourceSetId,
+    s.spaceId,
+  ]);
   const { data: spaces } = useSWR(
     spaceId ? SPACE_LIST_KEY : null,
     () => lambdaClient.space.listSpaces.query(),
@@ -322,13 +333,7 @@ const EmptyPlaceholder = memo(() => {
     }
 
     return items;
-  }, [
-    assetClassification,
-    assetRightsOwner,
-    assetReviewStatus,
-    assetUsagePolicy,
-    translateText,
-  ]);
+  }, [assetClassification, assetRightsOwner, assetReviewStatus, assetUsagePolicy, translateText]);
 
   const { open } = useCreateSourceSetModal();
 
@@ -398,7 +403,7 @@ const EmptyPlaceholder = memo(() => {
                 <div className={styles.governanceFilterChip} key={item.queryKey}>
                   <span>{item.label}:</span>
                   <span className={styles.governanceFilterValue}>{item.value}</span>
-                  <Flexbox className={styles.governanceFilterActions} horizontal>
+                  <Flexbox horizontal className={styles.governanceFilterActions}>
                     <button
                       className={styles.governanceFilterActionButton}
                       type="button"
@@ -427,177 +432,185 @@ const EmptyPlaceholder = memo(() => {
           </Flexbox>
         )}
         <div className={styles.actionGrid}>
-        {hasGovernanceFilters ? (
-          <>
-            <button
-              className={cx(styles.card, styles.cardButton)}
-              type="button"
-              onClick={() => openGovernanceFilters()}
-            >
-              <Flexbox className={styles.cardContent}>
-                <span className={styles.actionTitle}>
-                  {translateText('filters.adjustGovernance')}
-                </span>
-                <div className={styles.glow} style={{ background: accentColors[0] }} />
-                <FileTypeIcon
-                  aria-hidden
-                  className={styles.icon}
-                  color={accentColors[0]}
-                  icon={<Icon color={cssVar.colorTextLightSolid} icon={SlidersHorizontal} />}
-                  size={ICON_SIZE}
-                />
-              </Flexbox>
-            </button>
-            <button
-              className={cx(styles.card, styles.cardButton)}
-              type="button"
-              onClick={clearGovernanceFilters}
-            >
-              <Flexbox className={styles.cardContent}>
-                <span className={styles.actionTitle}>{translateText('filters.clearGovernance')}</span>
-                <div className={styles.glow} style={{ background: accentColors[1] }} />
-                <FileTypeIcon
-                  aria-hidden
-                  className={styles.icon}
-                  color={accentColors[1]}
-                  icon={<Icon color={cssVar.colorTextLightSolid} icon={FilterXIcon} />}
-                  size={ICON_SIZE}
-                />
-              </Flexbox>
-            </button>
-          </>
-        ) : (
-          <>
-            {currentSpace?.kind === 'team' && pendingCount > 0 && pendingTarget && (
+          {hasGovernanceFilters ? (
+            <>
               <button
                 className={cx(styles.card, styles.cardButton)}
                 type="button"
-                onClick={() => navigate(buildPendingGovernancePath(currentSpace.id, pendingTarget))}
+                onClick={() => openGovernanceFilters()}
               >
                 <Flexbox className={styles.cardContent}>
                   <span className={styles.actionTitle}>
-                    {t('space.home.recall.actions.review', { count: pendingCount, ns: 'file' })}
+                    {translateText('filters.adjustGovernance')}
                   </span>
                   <div className={styles.glow} style={{ background: accentColors[0] }} />
                   <FileTypeIcon
                     aria-hidden
                     className={styles.icon}
                     color={accentColors[0]}
-                    icon={<Icon color={cssVar.colorTextLightSolid} icon={BrainCircuitIcon} />}
+                    icon={<Icon color={cssVar.colorTextLightSolid} icon={SlidersHorizontal} />}
                     size={ICON_SIZE}
                   />
                 </Flexbox>
               </button>
-            )}
-            {showOpenSpaceMemoryAction && (
               <button
                 className={cx(styles.card, styles.cardButton)}
                 type="button"
-                onClick={() => navigate(buildSpaceMemoryPath(currentSpace.id))}
+                onClick={clearGovernanceFilters}
               >
                 <Flexbox className={styles.cardContent}>
                   <span className={styles.actionTitle}>
-                    {t('space.home.recall.actions.open', { ns: 'file' })}
-                  </span>
-                  <div className={styles.glow} style={{ background: accentColors[0] }} />
-                  <FileTypeIcon
-                    aria-hidden
-                    className={styles.icon}
-                    color={accentColors[0]}
-                    icon={<Icon color={cssVar.colorTextLightSolid} icon={BrainCircuitIcon} />}
-                    size={ICON_SIZE}
-                  />
-                </Flexbox>
-              </button>
-            )}
-            {!sourceSetId && (
-              <button
-                className={cx(styles.card, styles.cardButton)}
-                type="button"
-                onClick={() => {
-                  open({ spaceId });
-                }}
-              >
-                <Flexbox className={styles.cardContent}>
-                  <span className={styles.actionTitle}>
-                    {t('FileManager.emptyStatus.actions.sourceSet')}
-                  </span>
-                  <div className={styles.glow} style={{ background: accentColors[0] }} />
-                  <FileTypeIcon
-                    aria-hidden
-                    className={styles.icon}
-                    color={accentColors[0]}
-                    icon={<Icon color={cssVar.colorTextLightSolid} icon={RESOURCE_ENTRY_ICONS.plus} />}
-                    size={ICON_SIZE}
-                    type={'folder'}
-                  />
-                </Flexbox>
-              </button>
-            )}
-            <Upload
-              multiple={true}
-              showUploadList={false}
-              beforeUpload={async (file) => {
-                await pushDockFileList([file], sourceSetId, undefined, spaceId);
-
-                return false;
-              }}
-            >
-              <button className={cx(styles.card, styles.cardButton)} type="button">
-                <Flexbox className={styles.cardContent}>
-                  <span className={styles.actionTitle}>
-                    {t('FileManager.emptyStatus.actions.file')}
+                    {translateText('filters.clearGovernance')}
                   </span>
                   <div className={styles.glow} style={{ background: accentColors[1] }} />
                   <FileTypeIcon
                     aria-hidden
                     className={styles.icon}
                     color={accentColors[1]}
+                    icon={<Icon color={cssVar.colorTextLightSolid} icon={FilterXIcon} />}
                     size={ICON_SIZE}
-                    icon={
-                      <Icon
-                        color={cssVar.colorTextLightSolid}
-                        icon={RESOURCE_ENTRY_ICONS.uploadArrow}
-                      />
-                    }
                   />
                 </Flexbox>
               </button>
-            </Upload>
-            <Upload
-              directory
-              multiple={true}
-              showUploadList={false}
-              beforeUpload={async (file) => {
-                await pushDockFileList([file], sourceSetId, undefined, spaceId);
+            </>
+          ) : (
+            <>
+              {currentSpace?.kind === 'team' && pendingCount > 0 && pendingTarget && (
+                <button
+                  className={cx(styles.card, styles.cardButton)}
+                  type="button"
+                  onClick={() =>
+                    navigate(buildPendingGovernancePath(currentSpace.id, pendingTarget))
+                  }
+                >
+                  <Flexbox className={styles.cardContent}>
+                    <span className={styles.actionTitle}>
+                      {t('space.home.recall.actions.review', { count: pendingCount, ns: 'file' })}
+                    </span>
+                    <div className={styles.glow} style={{ background: accentColors[0] }} />
+                    <FileTypeIcon
+                      aria-hidden
+                      className={styles.icon}
+                      color={accentColors[0]}
+                      icon={<Icon color={cssVar.colorTextLightSolid} icon={BrainCircuitIcon} />}
+                      size={ICON_SIZE}
+                    />
+                  </Flexbox>
+                </button>
+              )}
+              {showOpenSpaceMemoryAction && (
+                <button
+                  className={cx(styles.card, styles.cardButton)}
+                  type="button"
+                  onClick={() => navigate(buildSpaceMemoryPath(currentSpace.id))}
+                >
+                  <Flexbox className={styles.cardContent}>
+                    <span className={styles.actionTitle}>
+                      {t('space.home.recall.actions.open', { ns: 'file' })}
+                    </span>
+                    <div className={styles.glow} style={{ background: accentColors[0] }} />
+                    <FileTypeIcon
+                      aria-hidden
+                      className={styles.icon}
+                      color={accentColors[0]}
+                      icon={<Icon color={cssVar.colorTextLightSolid} icon={BrainCircuitIcon} />}
+                      size={ICON_SIZE}
+                    />
+                  </Flexbox>
+                </button>
+              )}
+              {!sourceSetId && (
+                <button
+                  className={cx(styles.card, styles.cardButton)}
+                  type="button"
+                  onClick={() => {
+                    open({ spaceId });
+                  }}
+                >
+                  <Flexbox className={styles.cardContent}>
+                    <span className={styles.actionTitle}>
+                      {t('FileManager.emptyStatus.actions.sourceSet')}
+                    </span>
+                    <div className={styles.glow} style={{ background: accentColors[0] }} />
+                    <FileTypeIcon
+                      aria-hidden
+                      className={styles.icon}
+                      color={accentColors[0]}
+                      icon={
+                        <Icon color={cssVar.colorTextLightSolid} icon={RESOURCE_ENTRY_ICONS.plus} />
+                      }
+                      size={ICON_SIZE}
+                      type={'folder'}
+                    />
+                  </Flexbox>
+                </button>
+              )}
+              <Upload
+                className={styles.cardUpload}
+                multiple={true}
+                showUploadList={false}
+                beforeUpload={async (file) => {
+                  await pushDockFileList([file], sourceSetId, undefined, spaceId);
 
-                return false;
-              }}
-            >
-              <button className={cx(styles.card, styles.cardButton)} type="button">
-                <Flexbox className={styles.cardContent}>
-                  <span className={styles.actionTitle}>
-                    {t('FileManager.emptyStatus.actions.folder')}
-                  </span>
-                  <div className={styles.glow} style={{ background: accentColors[2] }} />
-                  <FileTypeIcon
-                    aria-hidden
-                    className={styles.icon}
-                    color={accentColors[2]}
-                    size={ICON_SIZE}
-                    type={'folder'}
-                    icon={
-                      <Icon
-                        color={cssVar.colorTextLightSolid}
-                        icon={RESOURCE_ENTRY_ICONS.uploadArrow}
-                      />
-                    }
-                  />
-                </Flexbox>
-              </button>
-            </Upload>
-          </>
-        )}
+                  return false;
+                }}
+              >
+                <button className={cx(styles.card, styles.cardButton)} type="button">
+                  <Flexbox className={styles.cardContent}>
+                    <span className={styles.actionTitle}>
+                      {t('FileManager.emptyStatus.actions.file')}
+                    </span>
+                    <div className={styles.glow} style={{ background: accentColors[1] }} />
+                    <FileTypeIcon
+                      aria-hidden
+                      className={styles.icon}
+                      color={accentColors[1]}
+                      size={ICON_SIZE}
+                      icon={
+                        <Icon
+                          color={cssVar.colorTextLightSolid}
+                          icon={RESOURCE_ENTRY_ICONS.uploadArrow}
+                        />
+                      }
+                    />
+                  </Flexbox>
+                </button>
+              </Upload>
+              <Upload
+                directory
+                className={styles.cardUpload}
+                multiple={true}
+                showUploadList={false}
+                beforeUpload={async (file) => {
+                  await pushDockFileList([file], sourceSetId, undefined, spaceId);
+
+                  return false;
+                }}
+              >
+                <button className={cx(styles.card, styles.cardButton)} type="button">
+                  <Flexbox className={styles.cardContent}>
+                    <span className={styles.actionTitle}>
+                      {t('FileManager.emptyStatus.actions.folder')}
+                    </span>
+                    <div className={styles.glow} style={{ background: accentColors[2] }} />
+                    <FileTypeIcon
+                      aria-hidden
+                      className={styles.icon}
+                      color={accentColors[2]}
+                      size={ICON_SIZE}
+                      type={'folder'}
+                      icon={
+                        <Icon
+                          color={cssVar.colorTextLightSolid}
+                          icon={RESOURCE_ENTRY_ICONS.uploadArrow}
+                        />
+                      }
+                    />
+                  </Flexbox>
+                </button>
+              </Upload>
+            </>
+          )}
         </div>
       </div>
     </Center>

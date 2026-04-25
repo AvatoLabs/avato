@@ -107,6 +107,22 @@ describe('RemoteServerConfigCtr', () => {
         storageMode: 'cloud',
       });
     });
+
+    it('should keep a configured cloud URL override', async () => {
+      mockStoreManager.get.mockReturnValue({
+        active: false,
+        remoteServerUrl: 'https://canary.turingmesh.com',
+        storageMode: 'cloud',
+      });
+
+      const result = await controller.getRemoteServerConfig();
+
+      expect(result).toEqual({
+        active: false,
+        remoteServerUrl: 'https://canary.turingmesh.com',
+        storageMode: 'cloud',
+      });
+    });
   });
 
   describe('setRemoteServerConfig', () => {
@@ -751,6 +767,18 @@ describe('RemoteServerConfigCtr', () => {
       const result = await controller.getRemoteServerUrl();
 
       expect(result).toBe('https://avato.turingmesh.com');
+    });
+
+    it('should return configured cloud server override for cloud mode', async () => {
+      mockStoreManager.get.mockReturnValue({
+        active: true,
+        remoteServerUrl: 'https://canary.turingmesh.com',
+        storageMode: 'cloud',
+      });
+
+      const result = await controller.getRemoteServerUrl();
+
+      expect(result).toBe('https://canary.turingmesh.com');
     });
 
     it('should return custom URL for selfHost mode', async () => {

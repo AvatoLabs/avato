@@ -8,8 +8,7 @@ import { generateTrustedClientToken, getTrustedClientTokenForSession } from '@/l
 
 const log = debug('lobe-server:market-service');
 
-const MARKET_BASE_URL =
-  process.env.MARKET_BASE_URL || process.env.APP_URL || 'https://avato.turingmesh.com';
+const MARKET_BASE_URL = process.env.MARKET_BASE_URL || 'https://market.lobehub.com';
 
 // ============================== Helper Functions ==============================
 
@@ -533,7 +532,7 @@ export class MarketService {
             identifier: providerId,
             meta: {
               avatar: icon || '🔗',
-              description: `Avato Skill: ${providerName}`,
+              description: `LobeHub Skill: ${providerName}`,
               tags: ['lobehub-skill', providerId],
               title: providerName,
             },

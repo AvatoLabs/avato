@@ -6,7 +6,6 @@ import { createContext, use, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { mutate as globalMutate } from 'swr';
 
-import { OFFICIAL_URL } from '@/const/url';
 import { lambdaClient } from '@/libs/trpc/client';
 import { MARKET_OIDC_ENDPOINTS } from '@/services/_url';
 import { useServerConfigStore } from '@/store/serverConfig';
@@ -167,7 +166,7 @@ export const MarketAuthProvider = ({ children, isDesktop }: MarketAuthProviderPr
   // Initialize OIDC client (client-side only)
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const baseUrl = process.env.NEXT_PUBLIC_MARKET_BASE_URL || OFFICIAL_URL;
+      const baseUrl = process.env.NEXT_PUBLIC_MARKET_BASE_URL || 'https://market.lobehub.com';
       const desktopRedirectUri = new URL(MARKET_OIDC_ENDPOINTS.desktopCallback, baseUrl).toString();
 
       // Desktop uses Market's manually maintained Web callback; Web uses the current domain

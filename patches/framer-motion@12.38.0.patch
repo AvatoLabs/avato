@@ -1,24 +1,42 @@
 diff --git a/dist/cjs/index.js b/dist/cjs/index.js
-index 660b9cdc..17b13aa1 100644
+index 660b9cd..17b13aa 100644
 --- a/dist/cjs/index.js
 +++ b/dist/cjs/index.js
 @@ -134,8 +134,7 @@ function PopChild({ children, isPresent, anchorX, anchorY, root, pop }) {
+      * In React 19, refs are passed via props.ref instead of element.ref.
+      * We check props.ref first (React 19) and fall back to element.ref (React 18).
+      */
 -    const childRef = children.props?.ref ??
 -        children?.ref;
 +    const childRef = children.props?.ref;
-     const ref = React.useMemo(() => motion.utils.combineRefs(pop.setChild, childRef), [childRef]);
-     const props = {
-         ref,
+     const composedRef = useComposedRefs(ref, childRef);
+     /**
+      * We create and inject a style block so we can apply this explicit
+diff --git a/dist/es/components/AnimatePresence/PopChild.mjs b/dist/es/components/AnimatePresence/PopChild.mjs
+index 3f49ba7..5c16afa 100644
+--- a/dist/es/components/AnimatePresence/PopChild.mjs
++++ b/dist/es/components/AnimatePresence/PopChild.mjs
+@@ -56,8 +56,7 @@ function PopChild({ children, isPresent, anchorX, anchorY, root, pop }) {
+      * In React 19, refs are passed via props.ref instead of element.ref.
+      * We check props.ref first (React 19) and fall back to element.ref (React 18).
+      */
+-    const childRef = children.props?.ref ??
+-        children?.ref;
++    const childRef = children.props?.ref;
+     const composedRef = useComposedRefs(ref, childRef);
+     /**
+      * We create and inject a style block so we can apply this explicit
 diff --git a/dist/framer-motion.dev.js b/dist/framer-motion.dev.js
-index 3c30ec50..a9c8cd12 100644
+index 3c30ec5..a9c8cd1 100644
 --- a/dist/framer-motion.dev.js
 +++ b/dist/framer-motion.dev.js
 @@ -10248,8 +10248,7 @@
-         function PopChild({ children, isPresent, anchorX, anchorY, root, pop }) {
-             const id = react.useId();
--            const childRef = children.props?.ref ??
--                children?.ref;
-+            const childRef = children.props?.ref;
-             const ref = react.useMemo(() => utils.combineRefs(pop.setChild, childRef), [childRef]);
-             const props = {
-                 ref,
+          * In React 19, refs are passed via props.ref instead of element.ref.
+          * We check props.ref first (React 19) and fall back to element.ref (React 18).
+          */
+-        const childRef = children.props?.ref ??
+-            children?.ref;
++        const childRef = children.props?.ref;
+         const composedRef = useComposedRefs(ref, childRef);
+         /**
+          * We create and inject a style block so we can apply this explicit

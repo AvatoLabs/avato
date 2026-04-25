@@ -109,9 +109,9 @@ export default class RemoteServerConfigCtr extends ControllerModule {
   }
 
   /**
-   * Check if remote server is properly configured and ready for use
-   * For 'cloud' mode, only checks if active (remoteServerUrl is undefined, uses OFFICIAL_CLOUD_SERVER)
-   * For 'selfHost' mode, checks if active AND remoteServerUrl is configured
+   * Check if remote server is properly configured and ready for use.
+   * Cloud mode can use either the built-in official server or an optional server URL override.
+   * Self-host mode requires an explicit remoteServerUrl.
    * @param config Optional config object, if not provided will fetch current config
    * @returns true if remote server is properly configured
    */
@@ -565,7 +565,9 @@ export default class RemoteServerConfigCtr extends ControllerModule {
   async getRemoteServerUrl(config?: DataSyncConfig) {
     const dataConfig = this.normalizeConfig(config || (await this.getRemoteServerConfig()));
 
-    return dataConfig.storageMode === 'cloud' ? OFFICIAL_CLOUD_SERVER : dataConfig.remoteServerUrl;
+    return dataConfig.storageMode === 'cloud'
+      ? dataConfig.remoteServerUrl || OFFICIAL_CLOUD_SERVER
+      : dataConfig.remoteServerUrl;
   }
 
   /**

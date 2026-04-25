@@ -4,8 +4,7 @@ import { NextResponse } from 'next/server';
 import { getTrustedClientTokenForSession } from '@/libs/trusted-client';
 import { MarketService } from '@/server/services/market';
 
-const MARKET_BASE_URL =
-  process.env.MARKET_BASE_URL || process.env.APP_URL || 'https://avato.turingmesh.com';
+const MARKET_BASE_URL = process.env.MARKET_BASE_URL || 'https://market.lobehub.com';
 
 type RouteContext = {
   params: Promise<{
