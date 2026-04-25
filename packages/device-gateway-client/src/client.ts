@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import os from 'node:os';
 
+import type { ClientOptions } from 'ws';
 import WebSocket from 'ws';
 
 import type {
@@ -103,6 +104,7 @@ export interface GatewayClientOptions {
   logger?: GatewayClientLogger;
   token: string;
   userId?: string;
+  webSocketAgent?: ClientOptions['agent'];
 }
 
 export interface GatewayClientConnectOptions {
@@ -119,6 +121,7 @@ export class GatewayClient extends EventEmitter {
   private intentionalDisconnect = false;
   private deviceId: string;
   private gatewayUrl: string;
+  private webSocketAgent?: ClientOptions['agent'];
   private token: string;
   private userId?: string;
   private logger: GatewayClientLogger;
@@ -129,6 +132,7 @@ export class GatewayClient extends EventEmitter {
     super();
     this.token = options.token;
     this.gatewayUrl = normalizeGatewayUrl(options.gatewayUrl || DEFAULT_GATEWAY_URL);
+    this.webSocketAgent = options.webSocketAgent;
     this.deviceId = options.deviceId || randomUUID();
     this.userId = options.userId;
     this.logger = options.logger || noopLogger;
@@ -221,7 +225,9 @@ export class GatewayClient extends EventEmitter {
       const wsUrl = this.buildWsUrl();
       this.logger.debug(`Connecting to: ${redactWsUrl(wsUrl)}`);
 
-      const ws = new WebSocket(wsUrl);
+      const ws = this.webSocketAgent
+        ? new WebSocket(wsUrl, { agent: this.webSocketAgent })
+        : new WebSocket(wsUrl);
 
       this.ws = ws;
 

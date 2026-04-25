@@ -13,11 +13,16 @@ import type {
   DeviceGatewayConfig,
   DeviceGatewayResult,
   DeviceGatewayStatus,
+  NetworkProxySettings,
 } from '@lobechat/electron-client-ipc';
 import { app as electronApp } from 'electron';
+import { HttpProxyAgent } from 'http-proxy-agent';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import superjson from 'superjson';
 
 import { DEVICE_GATEWAY_URL } from '@/const/env';
+import { defaultProxySettings } from '@/const/store';
+import { ProxyUrlBuilder } from '@/modules/networkProxy';
 import { createLogger } from '@/utils/logger';
 
 import type { MCPClientParams } from '../libs/mcp/types';
@@ -283,6 +288,7 @@ export default class DeviceGatewayCtr extends ControllerModule {
       logger: this.createGatewayLogger(),
       token,
       userId: tokenUserId,
+      webSocketAgent: this.createGatewayWebSocketAgent(gatewayUrl),
     });
 
     this.bindClientEvents(client);
@@ -340,6 +346,10 @@ export default class DeviceGatewayCtr extends ControllerModule {
       allowRemoteTools: false,
       enabled: true,
     });
+  }
+
+  private getNetworkProxyConfig(): NetworkProxySettings {
+    return this.app.storeManager.get('networkProxy', defaultProxySettings) as NetworkProxySettings;
   }
 
   private getStatus(): DeviceGatewayStatus {
@@ -907,5 +917,24 @@ export default class DeviceGatewayCtr extends ControllerModule {
       info: (msg, ...args) => logger.info(msg, ...args),
       warn: (msg, ...args) => logger.warn(msg, ...args),
     };
+  }
+
+  private createGatewayWebSocketAgent(gatewayUrl: string) {
+    const proxyConfig = this.getNetworkProxyConfig();
+    if (!proxyConfig.enableProxy || !proxyConfig.proxyServer) return undefined;
+
+    if (proxyConfig.proxyType === 'socks5') {
+      logger.warn(
+        'Device Gateway WebSocket proxy does not support socks5 yet; falling back direct',
+      );
+      return undefined;
+    }
+
+    const proxyUrl = ProxyUrlBuilder.build(proxyConfig);
+    const gatewayProtocol = new URL(gatewayUrl).protocol;
+
+    return gatewayProtocol === 'https:' || gatewayProtocol === 'wss:'
+      ? new HttpsProxyAgent(proxyUrl)
+      : new HttpProxyAgent(proxyUrl);
   }
 }

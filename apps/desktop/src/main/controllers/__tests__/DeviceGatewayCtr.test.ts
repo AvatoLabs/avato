@@ -32,6 +32,7 @@ vi.mock('@lobechat/device-gateway-client', () => ({
 
 vi.mock('@/const/env', () => ({
   DEVICE_GATEWAY_URL: 'https://gateway.test',
+  isDev: false,
 }));
 
 vi.mock('@/utils/logger', () => ({
@@ -224,6 +225,46 @@ describe('DeviceGatewayCtr', () => {
       allowRemoteTools: false,
       deviceId: 'stored-device-id',
     });
+  });
+
+  it('passes the desktop HTTP proxy to the gateway websocket client when enabled', async () => {
+    let deviceGatewayConfig = {
+      allowRemoteTools: true,
+      deviceId: 'stored-device-id',
+      enabled: true,
+      gatewayUrl: 'https://gateway.example.com',
+    };
+    storeManager.get.mockImplementation((key: string, fallback?: unknown) => {
+      if (key === 'networkProxy') {
+        return {
+          enableProxy: true,
+          proxyBypass: 'localhost, 127.0.0.1, ::1',
+          proxyPort: '49790',
+          proxyRequireAuth: false,
+          proxyServer: '127.0.0.1',
+          proxyType: 'http',
+        };
+      }
+
+      if (key === 'deviceGateway') return deviceGatewayConfig;
+
+      return fallback;
+    });
+    storeManager.set.mockImplementation((key, nextConfig) => {
+      if (key === 'deviceGateway') {
+        deviceGatewayConfig = nextConfig;
+      }
+    });
+
+    const result = await controller.startAgent();
+
+    expect(result.success).toBe(true);
+    expect(GatewayClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gatewayUrl: 'https://gateway.example.com',
+        webSocketAgent: expect.anything(),
+      }),
+    );
   });
 
   it('persists generated device id on first start', async () => {
