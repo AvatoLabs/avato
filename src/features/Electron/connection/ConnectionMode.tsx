@@ -9,6 +9,11 @@ import { useTranslation } from 'react-i18next';
 import { ProductLogo } from '@/components/Branding';
 import { useElectronStore } from '@/store/electron';
 import { electronSyncSelectors } from '@/store/electron/selectors';
+import {
+  formatRemoteServerUrlForInput,
+  normalizeRemoteServerUrl,
+  validateRemoteServerUrl,
+} from '@/utils/electron/remoteServerUrl';
 
 import { Option } from './Option';
 
@@ -95,24 +100,20 @@ const ConnectionMode = memo<ConnectionModeProps>(({ setWaiting }) => {
   const [selectedOption, setSelectedOption] = useState<RemoteStorageMode>(
     storageMode === StorageModeEnum.SelfHost ? StorageModeEnum.SelfHost : StorageModeEnum.Cloud,
   );
-  const [serverUrl, setServerUrl] = useState(rawRemoteServerUrl);
+  const [serverUrl, setServerUrl] = useState(() =>
+    formatRemoteServerUrlForInput(rawRemoteServerUrl),
+  );
 
-  const validateUrl = useCallback((url: string, required = true) => {
-    const value = url.trim();
-    if (!value) {
-      if (!required) return undefined;
-      return t('remoteServer.urlRequired');
-    }
-    try {
-      const parsedUrl = new URL(value);
-      if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-        throw new Error('Invalid protocol');
-      }
-      return undefined;
-    } catch {
-      return t('remoteServer.invalidUrl');
-    }
-  }, []);
+  const validateUrl = useCallback(
+    (url: string, required = true) => {
+      return validateRemoteServerUrl(url, {
+        invalidMessage: t('remoteServer.invalidUrl'),
+        required,
+        requiredMessage: t('remoteServer.urlRequired'),
+      });
+    },
+    [t],
+  );
 
   const handleSelectOption = (option: RemoteStorageMode) => {
     setSelectedOption(option);
@@ -120,7 +121,7 @@ const ConnectionMode = memo<ConnectionModeProps>(({ setWaiting }) => {
   };
 
   const handleContinue = async () => {
-    const normalizedServerUrl = serverUrl.trim();
+    const normalizedServerUrl = normalizeRemoteServerUrl(serverUrl);
     const error = validateUrl(normalizedServerUrl, selectedOption === StorageModeEnum.SelfHost);
     setUrlError(error);
 
@@ -130,6 +131,7 @@ const ConnectionMode = memo<ConnectionModeProps>(({ setWaiting }) => {
 
     // try to connect
     setWaiting(true);
+    setServerUrl(formatRemoteServerUrlForInput(normalizedServerUrl));
     await connect({
       remoteServerUrl: normalizedServerUrl || undefined,
       storageMode: selectedOption,

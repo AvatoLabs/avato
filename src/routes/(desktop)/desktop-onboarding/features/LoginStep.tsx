@@ -18,6 +18,11 @@ import { remoteServerService } from '@/services/electron/remoteServer';
 import { electronSystemService } from '@/services/electron/system';
 import { useElectronStore } from '@/store/electron';
 import { setDesktopAutoOidcFirstOpenHandled } from '@/utils/electron/autoOidc';
+import {
+  formatRemoteServerUrlForInput,
+  normalizeRemoteServerUrl,
+  validateRemoteServerUrl,
+} from '@/utils/electron/remoteServerUrl';
 
 import LobeMessage from '../components/LobeMessage';
 
@@ -67,6 +72,7 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
   const [hasEditedCloudEndpoint, setHasEditedCloudEndpoint] = useState(false);
   const [cloudEndpointError, setCloudEndpointError] = useState<string | null>(null);
   const [cloudLoginStatus, setCloudLoginStatus] = useState<LoginStatus>('idle');
+  const [selfhostEndpointError, setSelfhostEndpointError] = useState<string | null>(null);
   const [authProgress, setAuthProgress] = useState<AuthorizationProgress | null>(null);
   const [selfhostLoginStatus, setSelfhostLoginStatus] = useState<LoginStatus>('idle');
   const [remoteError, setRemoteError] = useState<string | null>(null);
@@ -102,7 +108,7 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
     if (cloudEndpoint) return;
     if (dataSyncConfig?.storageMode !== 'cloud') return;
     if (!dataSyncConfig.remoteServerUrl) return;
-    setCloudEndpoint(dataSyncConfig.remoteServerUrl);
+    setCloudEndpoint(formatRemoteServerUrlForInput(dataSyncConfig.remoteServerUrl));
   }, [
     cloudEndpoint,
     dataSyncConfig?.remoteServerUrl,
@@ -110,19 +116,15 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
     hasEditedCloudEndpoint,
   ]);
 
-  const validateOptionalServerUrl = (url: string) => {
-    const value = url.trim();
-    if (!value) return null;
+  const validateOptionalServerUrl = (url: string) =>
+    validateRemoteServerUrl(url, { invalidMessage: t('screen5.cloud.endpointInvalid') }) || null;
 
-    try {
-      const parsedUrl = new URL(value);
-      return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:'
-        ? null
-        : t('screen5.cloud.endpointInvalid');
-    } catch {
-      return t('screen5.cloud.endpointInvalid');
-    }
-  };
+  const validateRequiredServerUrl = (url: string) =>
+    validateRemoteServerUrl(url, {
+      invalidMessage: t('screen5.cloud.endpointInvalid'),
+      required: true,
+      requiredMessage: t('screen5.cloud.endpointInvalid'),
+    }) || null;
 
   useEffect(() => {
     if (!isDesktop) return;
@@ -160,10 +162,12 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
       return;
     }
 
-    const normalizedEndpoint = cloudEndpoint.trim();
-    const endpointError = validateOptionalServerUrl(normalizedEndpoint);
+    const endpointError = validateOptionalServerUrl(cloudEndpoint);
     setCloudEndpointError(endpointError);
     if (endpointError) return;
+
+    const normalizedEndpoint = normalizeRemoteServerUrl(cloudEndpoint);
+    if (normalizedEndpoint) setCloudEndpoint(formatRemoteServerUrlForInput(normalizedEndpoint));
 
     setRemoteError(null);
     clearRemoteServerSyncError();
@@ -183,8 +187,13 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
       return;
     }
 
-    const url = endpoint.trim();
+    const endpointError = validateRequiredServerUrl(endpoint);
+    setSelfhostEndpointError(endpointError);
+    if (endpointError) return;
+
+    const url = normalizeRemoteServerUrl(endpoint);
     if (!url) return;
+    setEndpoint(formatRemoteServerUrlForInput(url));
 
     setRemoteError(null);
     clearRemoteServerSyncError();
@@ -210,6 +219,7 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
       setCloudEndpointError(null);
       setHasEditedCloudEndpoint(false);
       setEndpoint('');
+      setSelfhostEndpointError(null);
       setIsSigningOut(false);
     }
   };
@@ -535,9 +545,14 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
           placeholder={t('screen5.selfhost.endpointPlaceholder')}
           prefix={<Icon icon={Server} style={{ marginRight: 4 }} />}
           size={'large'}
+          status={selfhostEndpointError ? 'error' : undefined}
           style={{ width: '100%' }}
           value={endpoint}
-          onChange={(e) => setEndpoint(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value;
+            setEndpoint(value);
+            setSelfhostEndpointError(value.trim() ? validateRequiredServerUrl(value) : null);
+          }}
           onContextMenu={async (e) => {
             if (!isDesktop) return;
             e.preventDefault();
@@ -556,8 +571,9 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
             }
           }}
         />
+        {selfhostEndpointError && <Text type={'danger'}>{selfhostEndpointError}</Text>}
         <Button
-          disabled={!endpoint.trim() || isConnectingServer}
+          disabled={!endpoint.trim() || isConnectingServer || !!selfhostEndpointError}
           loading={false}
           size={'large'}
           style={{ width: '100%' }}
