@@ -27,6 +27,7 @@ vi.mock('ws', async () => {
 
     send = vi.fn();
     close = vi.fn();
+    terminate = vi.fn();
     override removeAllListeners = vi.fn(() => {
       return this;
     });
@@ -804,9 +805,29 @@ describe('GatewayClient', () => {
       const ws = (client as any).ws;
       ws.readyState = 0; // CONNECTING
       ws.close = vi.fn();
+      ws.terminate = vi.fn(function (this: any) {
+        this.emit('error', new Error('WebSocket was closed before the connection was established'));
+      });
       ws.removeAllListeners = vi.fn();
 
-      (client as any).closeWebSocket();
+      expect(() => (client as any).closeWebSocket()).not.toThrow();
+      expect(ws.close).not.toHaveBeenCalled();
+      expect(ws.terminate).toHaveBeenCalled();
+      expect(ws.removeAllListeners).not.toHaveBeenCalled();
+    });
+
+    it('should not throw if closing ws fails', async () => {
+      client.connect();
+      await vi.advanceTimersByTimeAsync(1);
+
+      const ws = (client as any).ws;
+      ws.readyState = 1; // OPEN
+      ws.close = vi.fn(() => {
+        throw new Error('close failed');
+      });
+      ws.removeAllListeners = vi.fn();
+
+      expect(() => (client as any).closeWebSocket()).not.toThrow();
       expect(ws.close).toHaveBeenCalled();
     });
 

@@ -507,12 +507,23 @@ export class GatewayClient extends EventEmitter {
 
   private closeWebSocket() {
     if (this.ws) {
-      this.ws.removeAllListeners();
-
-      if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
-        this.ws.close(1000, 'Client disconnect');
-      }
+      const ws = this.ws;
       this.ws = null;
+
+      try {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.removeAllListeners();
+          ws.close(1000, 'Client disconnect');
+        } else if (ws.readyState === WebSocket.CONNECTING) {
+          ws.on('error', () => {});
+          ws.terminate();
+        } else {
+          ws.removeAllListeners();
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn('Failed to close WebSocket:', message);
+      }
     }
   }
 

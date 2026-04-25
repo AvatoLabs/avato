@@ -81,6 +81,10 @@ export default defineConfig({
       'process.env.OFFICIAL_CLOUD_SERVER': JSON.stringify(process.env.OFFICIAL_CLOUD_SERVER),
       'process.env.UPDATE_CHANNEL': JSON.stringify(process.env.UPDATE_CHANNEL),
       'process.env.UPDATE_SERVER_URL': JSON.stringify(process.env.UPDATE_SERVER_URL),
+      // Avoid bundling ws optional native accelerators into Electron main.
+      // Missing optional requires can otherwise become empty modules in Rollup.
+      'process.env.WS_NO_BUFFER_UTIL': JSON.stringify('true'),
+      'process.env.WS_NO_UTF_8_VALIDATE': JSON.stringify('true'),
     },
     resolve: {
       alias: {
