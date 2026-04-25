@@ -259,6 +259,12 @@ export default {
   'deviceGateway.gatewayUrl.reset': 'Reset',
   'deviceGateway.gatewayUrl.save': 'Save',
   'deviceGateway.gatewayUrl.title': 'Gateway',
+  'deviceGateway.gatewayProxyUrl.desc':
+    'Optional proxy used only by the device gateway WebSocket. Leave global Network Proxy off if it breaks the main Avato server.',
+  'deviceGateway.gatewayProxyUrl.placeholder': 'Optional, for example http://127.0.0.1:49790',
+  'deviceGateway.gatewayProxyUrl.reset': 'Clear',
+  'deviceGateway.gatewayProxyUrl.save': 'Save',
+  'deviceGateway.gatewayProxyUrl.title': 'Gateway Proxy',
   'deviceGateway.lastError.desc': 'Latest connection or authorization error',
   'deviceGateway.lastError.title': 'Last Error',
   'deviceGateway.refresh': 'Refresh',
@@ -1473,8 +1479,7 @@ When I am ___, I need ___
   'tools.avatohubSkill.disconnected': 'Disconnected',
 
   'tools.avatohubSkill.error': 'Error',
-  'tools.avatohubSkill.togglePluginFailed':
-    'Failed to update the skill state. Please try again.',
+  'tools.avatohubSkill.togglePluginFailed': 'Failed to update the skill state. Please try again.',
   // Avato Skill Providers i18n
   'tools.avatohubSkill.providers.linear.description':
     'Linear is a modern issue tracking and project management tool designed for high-performance teams to build better software faster',

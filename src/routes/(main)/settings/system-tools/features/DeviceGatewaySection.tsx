@@ -41,6 +41,13 @@ const runningStatuses = new Set<DeviceGatewayConnectionStatus>([
 ]);
 
 const normalizeGatewayUrlInput = (value?: string) => value?.trim().replace(/\/+$/, '') || '';
+const normalizeGatewayProxyUrlInput = (value?: string) => {
+  const trimmed = value?.trim() || '';
+  if (!trimmed) return '';
+
+  const normalized = trimmed.includes('://') ? trimmed : `http://${trimmed}`;
+  return normalized.replace(/\/+$/, '');
+};
 
 interface StatusDisplayProps {
   status?: DeviceGatewayStatus;
@@ -113,6 +120,7 @@ const DeviceGatewaySection = memo(() => {
   const [status, setStatus] = useState<DeviceGatewayStatus>();
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [gatewayProxyUrlInput, setGatewayProxyUrlInput] = useState('');
   const [gatewayUrlInput, setGatewayUrlInput] = useState('');
 
   const refreshStatus = useCallback(async () => {
@@ -139,6 +147,10 @@ const DeviceGatewaySection = memo(() => {
     setGatewayUrlInput(status?.gatewayUrl ?? '');
   }, [status?.gatewayUrl]);
 
+  useEffect(() => {
+    setGatewayProxyUrlInput(status?.gatewayProxyUrl ?? '');
+  }, [status?.gatewayProxyUrl]);
+
   useWatchBroadcast('deviceGatewayStatusChanged', (next) => {
     setStatus(next);
     setLoading(false);
@@ -158,6 +170,7 @@ const DeviceGatewaySection = memo(() => {
         connectionStatus: 'disconnected',
         deviceId: current?.deviceId,
         enabled: current?.enabled ?? false,
+        gatewayProxyUrl: current?.gatewayProxyUrl,
         gatewayUrl: current?.gatewayUrl,
         lastConnectedAt: current?.lastConnectedAt,
         lastError: message,
@@ -180,6 +193,7 @@ const DeviceGatewaySection = memo(() => {
         connectionStatus: current?.connectionStatus ?? 'disconnected',
         deviceId: current?.deviceId,
         enabled: current?.enabled ?? false,
+        gatewayProxyUrl: current?.gatewayProxyUrl,
         gatewayUrl: current?.gatewayUrl,
         lastConnectedAt: current?.lastConnectedAt,
         lastError: message,
@@ -194,6 +208,13 @@ const DeviceGatewaySection = memo(() => {
     () =>
       normalizeGatewayUrlInput(gatewayUrlInput) !== normalizeGatewayUrlInput(status?.gatewayUrl),
     [gatewayUrlInput, status?.gatewayUrl],
+  );
+
+  const gatewayProxyUrlDirty = useMemo(
+    () =>
+      normalizeGatewayProxyUrlInput(gatewayProxyUrlInput) !==
+      normalizeGatewayProxyUrlInput(status?.gatewayProxyUrl),
+    [gatewayProxyUrlInput, status?.gatewayProxyUrl],
   );
 
   const applyGatewayUrlConfig = useCallback(async (gatewayUrl: string) => {
@@ -211,6 +232,7 @@ const DeviceGatewaySection = memo(() => {
         connectionStatus: current?.connectionStatus ?? 'disconnected',
         deviceId: current?.deviceId,
         enabled: current?.enabled ?? false,
+        gatewayProxyUrl: current?.gatewayProxyUrl,
         gatewayUrl: current?.gatewayUrl,
         lastConnectedAt: current?.lastConnectedAt,
         lastError: message,
@@ -228,6 +250,40 @@ const DeviceGatewaySection = memo(() => {
   const handleGatewayUrlReset = useCallback(async () => {
     await applyGatewayUrlConfig('');
   }, [applyGatewayUrlConfig]);
+
+  const applyGatewayProxyUrlConfig = useCallback(async (gatewayProxyUrl: string) => {
+    setUpdating(true);
+    try {
+      const result = await desktopDeviceGatewayService.setAgentConfig({
+        gatewayProxyUrl: normalizeGatewayProxyUrlInput(gatewayProxyUrl),
+      });
+      setStatus(result.status);
+      setGatewayProxyUrlInput(result.status.gatewayProxyUrl ?? '');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus((current) => ({
+        allowRemoteTools: current?.allowRemoteTools ?? false,
+        connectionStatus: current?.connectionStatus ?? 'disconnected',
+        deviceId: current?.deviceId,
+        enabled: current?.enabled ?? false,
+        gatewayProxyUrl: current?.gatewayProxyUrl,
+        gatewayUrl: current?.gatewayUrl,
+        lastConnectedAt: current?.lastConnectedAt,
+        lastError: message,
+        userId: current?.userId,
+      }));
+    } finally {
+      setUpdating(false);
+    }
+  }, []);
+
+  const handleGatewayProxyUrlSave = useCallback(async () => {
+    await applyGatewayProxyUrlConfig(gatewayProxyUrlInput);
+  }, [applyGatewayProxyUrlConfig, gatewayProxyUrlInput]);
+
+  const handleGatewayProxyUrlReset = useCallback(async () => {
+    await applyGatewayProxyUrlConfig('');
+  }, [applyGatewayProxyUrlConfig]);
 
   const formItems = useMemo<FormGroupItemType[]>(() => {
     const children: FormItemProps[] = [
@@ -305,6 +361,49 @@ const DeviceGatewaySection = memo(() => {
         label: t('deviceGateway.gatewayUrl.title'),
         minWidth: undefined,
       },
+      {
+        children: (
+          <Flexbox gap={8} style={{ maxWidth: 520, width: '100%' }}>
+            <Flexbox horizontal align="center" gap={6}>
+              <Input
+                aria-label={t('deviceGateway.gatewayProxyUrl.title')}
+                disabled={updating}
+                placeholder={t('deviceGateway.gatewayProxyUrl.placeholder')}
+                style={{ flex: 1, minWidth: 0 }}
+                value={gatewayProxyUrlInput}
+                variant={'filled'}
+                onChange={(event) => setGatewayProxyUrlInput(event.target.value)}
+                onPressEnter={() => void handleGatewayProxyUrlSave()}
+              />
+              {status?.gatewayProxyUrl && (
+                <CopyButton content={status.gatewayProxyUrl} size="small" />
+              )}
+            </Flexbox>
+            <Flexbox horizontal align="center" gap={8} justify="flex-end">
+              <Button
+                disabled={!gatewayProxyUrlDirty || updating}
+                icon={<Icon icon={Save} />}
+                loading={updating && gatewayProxyUrlDirty}
+                size="small"
+                onClick={() => void handleGatewayProxyUrlSave()}
+              >
+                {t('deviceGateway.gatewayProxyUrl.save')}
+              </Button>
+              <Button
+                disabled={updating || !status?.gatewayProxyUrl}
+                icon={<Icon icon={RotateCcw} />}
+                size="small"
+                onClick={() => void handleGatewayProxyUrlReset()}
+              >
+                {t('deviceGateway.gatewayProxyUrl.reset')}
+              </Button>
+            </Flexbox>
+          </Flexbox>
+        ),
+        desc: t('deviceGateway.gatewayProxyUrl.desc'),
+        label: t('deviceGateway.gatewayProxyUrl.title'),
+        minWidth: undefined,
+      },
     ];
 
     if (status?.lastError) {
@@ -330,8 +429,12 @@ const DeviceGatewaySection = memo(() => {
       },
     ];
   }, [
+    gatewayProxyUrlDirty,
+    gatewayProxyUrlInput,
     gatewayUrlDirty,
     gatewayUrlInput,
+    handleGatewayProxyUrlReset,
+    handleGatewayProxyUrlSave,
     handleGatewayUrlReset,
     handleGatewayUrlSave,
     handleRemoteToolsToggle,

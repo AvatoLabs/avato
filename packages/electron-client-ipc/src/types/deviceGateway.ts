@@ -9,6 +9,7 @@ export interface DeviceGatewayConfig {
   allowRemoteTools?: boolean;
   deviceId?: string;
   enabled?: boolean;
+  gatewayProxyUrl?: string;
   gatewayUrl?: string;
 }
 
@@ -17,6 +18,7 @@ export interface DeviceGatewayStatus {
   connectionStatus: DeviceGatewayConnectionStatus;
   deviceId?: string;
   enabled: boolean;
+  gatewayProxyUrl?: string;
   gatewayUrl?: string;
   lastConnectedAt?: string;
   lastError?: string;

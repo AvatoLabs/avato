@@ -81,6 +81,14 @@ const normalizeGatewayUrl = (url?: string) => {
   return value ? value.replace(/\/+$/, '') : undefined;
 };
 
+const normalizeGatewayProxyUrl = (url?: string) => {
+  const value = url?.trim();
+  if (!value) return undefined;
+
+  const normalized = value.includes('://') ? value : `http://${value}`;
+  return normalized.replace(/\/+$/, '');
+};
+
 const hasConfigField = (
   config: DeviceGatewayConfig | undefined,
   field: keyof DeviceGatewayConfig,
@@ -101,6 +109,15 @@ const mergeDeviceGatewayConfig = (
       next.gatewayUrl = gatewayUrl;
     } else {
       delete next.gatewayUrl;
+    }
+  }
+
+  if (hasConfigField(patch, 'gatewayProxyUrl')) {
+    const gatewayProxyUrl = normalizeGatewayProxyUrl(patch.gatewayProxyUrl);
+    if (gatewayProxyUrl) {
+      next.gatewayProxyUrl = gatewayProxyUrl;
+    } else {
+      delete next.gatewayProxyUrl;
     }
   }
 
@@ -209,6 +226,7 @@ export default class DeviceGatewayCtr extends ControllerModule {
     } else if (
       config.enabled !== undefined ||
       hasConfigField(config, 'gatewayUrl') ||
+      hasConfigField(config, 'gatewayProxyUrl') ||
       config.deviceId !== undefined
     ) {
       await this.startAgent();
@@ -288,7 +306,7 @@ export default class DeviceGatewayCtr extends ControllerModule {
       logger: this.createGatewayLogger(),
       token,
       userId: tokenUserId,
-      webSocketAgent: this.createGatewayWebSocketAgent(gatewayUrl),
+      webSocketAgent: this.createGatewayWebSocketAgent(gatewayUrl, storedConfig.gatewayProxyUrl),
     });
 
     this.bindClientEvents(client);
@@ -360,6 +378,7 @@ export default class DeviceGatewayCtr extends ControllerModule {
       connectionStatus: this.client?.connectionStatus ?? this.connectionStatus,
       deviceId: this.client?.currentDeviceId ?? config.deviceId,
       enabled: config.enabled !== false,
+      gatewayProxyUrl: normalizeGatewayProxyUrl(config.gatewayProxyUrl),
       gatewayUrl: normalizeGatewayUrl(config.gatewayUrl) || DEVICE_GATEWAY_URL,
       lastConnectedAt: this.lastConnectedAt,
       lastError: this.lastError,
@@ -919,7 +938,10 @@ export default class DeviceGatewayCtr extends ControllerModule {
     };
   }
 
-  private createGatewayWebSocketAgent(gatewayUrl: string) {
+  private resolveGatewayWebSocketProxyUrl(gatewayProxyUrl?: string) {
+    const normalizedGatewayProxyUrl = normalizeGatewayProxyUrl(gatewayProxyUrl);
+    if (normalizedGatewayProxyUrl) return normalizedGatewayProxyUrl;
+
     const proxyConfig = this.getNetworkProxyConfig();
     if (!proxyConfig.enableProxy || !proxyConfig.proxyServer) return undefined;
 
@@ -930,7 +952,20 @@ export default class DeviceGatewayCtr extends ControllerModule {
       return undefined;
     }
 
-    const proxyUrl = ProxyUrlBuilder.build(proxyConfig);
+    return ProxyUrlBuilder.build(proxyConfig);
+  }
+
+  private createGatewayWebSocketAgent(gatewayUrl: string, gatewayProxyUrl?: string) {
+    const proxyUrl = this.resolveGatewayWebSocketProxyUrl(gatewayProxyUrl);
+    if (!proxyUrl) return undefined;
+
+    if (proxyUrl.startsWith('socks:') || proxyUrl.startsWith('socks5:')) {
+      logger.warn(
+        'Device Gateway WebSocket proxy does not support socks5 yet; falling back direct',
+      );
+      return undefined;
+    }
+
     const gatewayProtocol = new URL(gatewayUrl).protocol;
 
     return gatewayProtocol === 'https:' || gatewayProtocol === 'wss:'

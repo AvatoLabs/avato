@@ -267,6 +267,44 @@ describe('DeviceGatewayCtr', () => {
     );
   });
 
+  it('passes the gateway-only proxy to the gateway websocket client without enabling global proxy', async () => {
+    storeManager.get.mockImplementation((key: string, fallback?: unknown) => {
+      if (key === 'networkProxy') {
+        return {
+          enableProxy: false,
+          proxyBypass: 'localhost, 127.0.0.1, ::1',
+          proxyPort: '',
+          proxyRequireAuth: false,
+          proxyServer: '',
+          proxyType: 'http',
+        };
+      }
+
+      if (key === 'deviceGateway') {
+        return {
+          allowRemoteTools: true,
+          deviceId: 'stored-device-id',
+          enabled: true,
+          gatewayProxyUrl: '127.0.0.1:49790',
+          gatewayUrl: 'https://gateway.example.com',
+        };
+      }
+
+      return fallback;
+    });
+
+    const result = await controller.startAgent();
+
+    expect(result.success).toBe(true);
+    expect(result.status.gatewayProxyUrl).toBe('http://127.0.0.1:49790');
+    expect(GatewayClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gatewayUrl: 'https://gateway.example.com',
+        webSocketAgent: expect.anything(),
+      }),
+    );
+  });
+
   it('persists generated device id on first start', async () => {
     const result = await controller.startAgent();
 
