@@ -9,6 +9,7 @@
  * - Gets model capabilities from provided function
  * - No dependency on frontend stores (useToolStore, useAgentStore, etc.)
  */
+import { ComputerUseManifest } from '@lobechat/builtin-tool-computer-use';
 import { LocalSystemManifest } from '@lobechat/builtin-tool-local-system';
 import { MemoryManifest } from '@lobechat/builtin-tool-memory';
 import { RemoteDeviceManifest } from '@lobechat/builtin-tool-remote-device';
@@ -134,6 +135,8 @@ export const createServerAgentToolsEngine = (
       rules: {
         [SourceSetManifest.identifier]: hasEnabledSourceSets,
         [LocalSystemManifest.identifier]:
+          !!deviceContext?.gatewayConfigured && !!deviceContext?.activeDeviceReady,
+        [ComputerUseManifest.identifier]:
           !!deviceContext?.gatewayConfigured && !!deviceContext?.activeDeviceReady,
         [MemoryManifest.identifier]: globalMemoryEnabled,
         [RemoteDeviceManifest.identifier]: !!deviceContext?.gatewayConfigured,

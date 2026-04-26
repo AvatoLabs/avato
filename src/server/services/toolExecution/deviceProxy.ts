@@ -60,6 +60,7 @@ export class DeviceProxy {
       // Transform gateway format to runtime-expected format
       // All devices from gateway have active WebSocket connections, so they're online
       return devices.map((d) => ({
+        ...(d.allowRemoteComputerUse === true ? { allowRemoteComputerUse: true } : {}),
         allowRemoteTools: d.allowRemoteTools === true,
         deviceId: d.deviceId,
         hostname: d.hostname,

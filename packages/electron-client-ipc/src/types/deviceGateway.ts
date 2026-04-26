@@ -6,6 +6,7 @@ export type DeviceGatewayConnectionStatus =
   | 'reconnecting';
 
 export interface DeviceGatewayConfig {
+  allowRemoteComputerUse?: boolean;
   allowRemoteTools?: boolean;
   deviceId?: string;
   enabled?: boolean;
@@ -14,6 +15,7 @@ export interface DeviceGatewayConfig {
 }
 
 export interface DeviceGatewayStatus {
+  allowRemoteComputerUse: boolean;
   allowRemoteTools: boolean;
   connectionStatus: DeviceGatewayConnectionStatus;
   deviceId?: string;

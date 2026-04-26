@@ -32,6 +32,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 };
 
 export const toPublicDeviceAttachment = (attachment: DeviceAttachment): PublicDeviceAttachment => ({
+  ...(attachment.allowRemoteComputerUse === true ? { allowRemoteComputerUse: true } : {}),
   allowRemoteTools: attachment.allowRemoteTools,
   connectedAt: attachment.connectedAt,
   deviceId: attachment.deviceId,

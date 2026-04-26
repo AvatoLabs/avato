@@ -169,6 +169,9 @@ export class DeviceGatewayDO extends DurableObject<Env> {
     }
 
     if (data.type === 'heartbeat') {
+      if (typeof data.allowRemoteComputerUse === 'boolean') {
+        att.allowRemoteComputerUse = data.allowRemoteComputerUse;
+      }
       if (typeof data.allowRemoteTools === 'boolean') {
         att.allowRemoteTools = data.allowRemoteTools;
       }
@@ -243,6 +246,7 @@ export class DeviceGatewayDO extends DurableObject<Env> {
 
     const hostname = url.searchParams.get('hostname')?.trim() || '';
     const platform = url.searchParams.get('platform')?.trim() || '';
+    const allowRemoteComputerUse = url.searchParams.get('allowRemoteComputerUse') === 'true';
     const allowRemoteTools = url.searchParams.get('allowRemoteTools') === 'true';
     if (hostname.length > MAX_DEVICE_METADATA_FIELD_LENGTH) {
       return new Response('Invalid hostname', { status: 400 });
@@ -263,6 +267,7 @@ export class DeviceGatewayDO extends DurableObject<Env> {
 
     const now = Date.now();
     server.serializeAttachment({
+      allowRemoteComputerUse,
       allowRemoteTools,
       authDeadline: now + AUTH_TIMEOUT,
       authenticated: false,

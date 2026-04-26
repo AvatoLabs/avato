@@ -7,6 +7,7 @@ import {
   type InstructionExecutor,
   UsageCounter,
 } from '@lobechat/agent-runtime';
+import { ComputerUseApiName, ComputerUseIdentifier } from '@lobechat/builtin-tool-computer-use';
 import { LocalSystemManifest } from '@lobechat/builtin-tool-local-system';
 import { RemoteDeviceIdentifier } from '@lobechat/builtin-tool-remote-device';
 import {
@@ -74,6 +75,55 @@ const applyDeviceActivationMetadata = (
       typeof metadata.devicePlatform === 'string' ? metadata.devicePlatform : undefined,
     deviceSystemInfo: pickStringRecord(metadata.deviceSystemInfo),
   };
+};
+
+const buildComputerUseScreenshotObservation = (
+  toolCall: ChatToolPayload,
+  executionResult: { state?: unknown; success?: boolean },
+) => {
+  if (
+    toolCall.identifier !== ComputerUseIdentifier ||
+    toolCall.apiName !== ComputerUseApiName.screenshot ||
+    executionResult.success === false ||
+    !isRecord(executionResult.state)
+  ) {
+    return undefined;
+  }
+
+  const imageUrl = executionResult.state.imageUrl;
+  if (typeof imageUrl !== 'string' || !imageUrl) return undefined;
+
+  const width = executionResult.state.width;
+  const height = executionResult.state.height;
+  const source =
+    typeof executionResult.state.source === 'string'
+      ? executionResult.state.source
+      : 'remote desktop';
+  const size =
+    typeof width === 'number' && typeof height === 'number' ? ` (${width}x${height})` : '';
+
+  return {
+    content: [
+      {
+        text: `Remote Computer Use observation: screenshot from ${source}${size}.`,
+        type: 'text',
+      },
+      {
+        image_url: { detail: 'auto', url: imageUrl },
+        type: 'image_url',
+      },
+    ],
+    role: 'user',
+  };
+};
+
+const appendComputerUseScreenshotObservation = (
+  messages: any[],
+  toolCall: ChatToolPayload,
+  executionResult: { state?: unknown; success?: boolean },
+) => {
+  const observation = buildComputerUseScreenshotObservation(toolCall, executionResult);
+  if (observation) messages.push(observation);
 };
 
 export interface RuntimeExecutorContext {
@@ -731,6 +781,7 @@ export const createRuntimeExecutors = (
         role: 'tool',
         tool_call_id: chatToolPayload.id,
       });
+      appendComputerUseScreenshotObservation(newState.messages, chatToolPayload, executionResult);
       applyDeviceActivationMetadata(
         newState,
         chatToolPayload.identifier,
@@ -1065,6 +1116,9 @@ export const createRuntimeExecutors = (
     // parse() handles assistantGroup, compare, supervisor, etc. virtual message types
     const { flatList } = parse(latestMessages);
     newState.messages = flatList;
+    for (const result of toolResults) {
+      appendComputerUseScreenshotObservation(newState.messages, result.toolCall, result.data);
+    }
 
     log(
       `[${operationLogId}][call_tools_batch] Refreshed ${newState.messages.length} messages from database`,

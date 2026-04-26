@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { App } from '@/core/App';
 
+import ComputerUseCtr from '../ComputerUseCtr';
 import DeviceGatewayCtr from '../DeviceGatewayCtr';
 import LocalFileCtr from '../LocalFileCtr';
 import McpCtr from '../McpCtr';
@@ -79,6 +80,9 @@ describe('DeviceGatewayCtr', () => {
   const mcpCtr = {
     callTool: vi.fn(),
   };
+  const computerUseCtr = {
+    execute: vi.fn(),
+  };
   const storeManager = {
     get: vi.fn(),
     set: vi.fn(),
@@ -90,6 +94,7 @@ describe('DeviceGatewayCtr', () => {
   const app = {
     browserManager,
     getController: vi.fn((controller) => {
+      if (controller === ComputerUseCtr) return computerUseCtr;
       if (controller === LocalFileCtr) return localFileCtr;
       if (controller === McpCtr) return mcpCtr;
       if (controller === ShellCommandCtr) return shellCommandCtr;
@@ -106,6 +111,7 @@ describe('DeviceGatewayCtr', () => {
     currentDeviceId: string;
     disconnect: ReturnType<typeof vi.fn>;
     on: ReturnType<typeof vi.fn>;
+    setAllowRemoteComputerUse: ReturnType<typeof vi.fn>;
     setAllowRemoteTools: ReturnType<typeof vi.fn>;
     sendSystemInfoResponse: ReturnType<typeof vi.fn>;
     sendToolCallResponse: ReturnType<typeof vi.fn>;
@@ -132,6 +138,7 @@ describe('DeviceGatewayCtr', () => {
         success: true,
       }),
     );
+    computerUseCtr.execute.mockResolvedValue({ success: true });
     localFileCtr.handleReadFileAsBase64.mockResolvedValue({
       base64: Buffer.from('hello').toString('base64'),
       filename: 'output.txt',
@@ -157,6 +164,7 @@ describe('DeviceGatewayCtr', () => {
         gatewayEventHandlers[event] = handler;
         return gatewayClient;
       }),
+      setAllowRemoteComputerUse: vi.fn(),
       setAllowRemoteTools: vi.fn(),
       sendSystemInfoResponse: vi.fn(),
       sendToolCallResponse: vi.fn(),
@@ -357,6 +365,25 @@ describe('DeviceGatewayCtr', () => {
     expect(browserManager.broadcastToAllWindows).toHaveBeenCalledWith(
       'deviceGatewayStatusChanged',
       expect.objectContaining({ allowRemoteTools: false }),
+    );
+  });
+
+  it('updates remote computer use permission without reconnecting the gateway client', async () => {
+    await controller.startAgent();
+    vi.clearAllMocks();
+    storeManager.get.mockReturnValue({
+      allowRemoteComputerUse: true,
+      allowRemoteTools: true,
+      enabled: true,
+    });
+
+    const result = await controller.setAgentConfig({ allowRemoteComputerUse: true });
+
+    expect(result.success).toBe(true);
+    expect(gatewayClient.connect).not.toHaveBeenCalled();
+    expect(browserManager.broadcastToAllWindows).toHaveBeenCalledWith(
+      'deviceGatewayStatusChanged',
+      expect.objectContaining({ allowRemoteComputerUse: true }),
     );
   });
 
@@ -599,6 +626,53 @@ describe('DeviceGatewayCtr', () => {
       exit_code: 1,
       stderr: 'command failed',
       success: false,
+    });
+  });
+
+  it('rejects computer use tool calls when the separate computer use permission is disabled', async () => {
+    storeManager.get.mockReturnValue({
+      allowRemoteComputerUse: false,
+      allowRemoteTools: true,
+      enabled: true,
+    });
+
+    const result = await (controller as any).executeToolCall({
+      apiName: 'screenshot',
+      arguments: JSON.stringify({ source: 'main-window' }),
+      identifier: 'avato-computer-use',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('REMOTE_COMPUTER_USE_DISABLED');
+    expect(computerUseCtr.execute).not.toHaveBeenCalled();
+  });
+
+  it('executes computer use tool calls through the desktop computer use controller', async () => {
+    storeManager.get.mockReturnValue({
+      allowRemoteComputerUse: true,
+      allowRemoteTools: true,
+      enabled: true,
+    });
+    computerUseCtr.execute.mockResolvedValue({
+      mediaType: 'image/jpeg',
+      source: 'main-window',
+      success: true,
+    });
+
+    const result = await (controller as any).executeToolCall({
+      apiName: 'screenshot',
+      arguments: JSON.stringify({ source: 'main-window' }),
+      identifier: 'avato-computer-use',
+    });
+
+    expect(result.success).toBe(true);
+    expect(JSON.parse(result.content)).toMatchObject({
+      mediaType: 'image/jpeg',
+      source: 'main-window',
+      success: true,
+    });
+    expect(computerUseCtr.execute).toHaveBeenCalledWith('screenshot', {
+      source: 'main-window',
     });
   });
 

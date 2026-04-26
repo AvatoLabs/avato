@@ -1,3 +1,4 @@
+import { ComputerUseApiName, ComputerUseIdentifier } from '@lobechat/builtin-tool-computer-use';
 import { SourceSetApiName, SourceSetIdentifier } from '@lobechat/builtin-tool-source-set';
 import { type ChatToolPayload } from '@lobechat/types';
 import { isLocalOrPrivateUrl, safeParseJSON } from '@lobechat/utils';
@@ -25,6 +26,7 @@ const log = debug('lobe-server:tool-execution-service');
 const MAX_MCP_RETRIES = 3;
 const REMOTE_MCP_IDENTIFIER = 'lobe-mcp';
 const SOURCE_SET_READ_TOOL_RESULT_MAX_LENGTH = 100_000;
+const COMPUTER_USE_SCREENSHOT_RESULT_MAX_LENGTH = 2_500_000;
 
 const isLocalOrPrivateHttpUrl = (value: string) => {
   try {
@@ -137,6 +139,13 @@ export class ToolExecutionService {
       payload.apiName === SourceSetApiName.readSourceFiles
     ) {
       return SOURCE_SET_READ_TOOL_RESULT_MAX_LENGTH;
+    }
+
+    if (
+      payload.identifier === ComputerUseIdentifier &&
+      payload.apiName === ComputerUseApiName.screenshot
+    ) {
+      return COMPUTER_USE_SCREENSHOT_RESULT_MAX_LENGTH;
     }
 
     return undefined;

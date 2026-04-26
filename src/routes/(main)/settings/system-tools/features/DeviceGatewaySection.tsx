@@ -129,6 +129,7 @@ const DeviceGatewaySection = memo(() => {
       setStatus(next);
     } catch (error) {
       setStatus({
+        allowRemoteComputerUse: false,
         allowRemoteTools: false,
         connectionStatus: 'disconnected',
         enabled: false,
@@ -166,6 +167,7 @@ const DeviceGatewaySection = memo(() => {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setStatus((current) => ({
+        allowRemoteComputerUse: current?.allowRemoteComputerUse ?? false,
         allowRemoteTools: current?.allowRemoteTools ?? false,
         connectionStatus: 'disconnected',
         deviceId: current?.deviceId,
@@ -184,11 +186,39 @@ const DeviceGatewaySection = memo(() => {
   const handleRemoteToolsToggle = useCallback(async (allowRemoteTools: boolean) => {
     setUpdating(true);
     try {
-      const result = await desktopDeviceGatewayService.setAgentConfig({ allowRemoteTools });
+      const result = await desktopDeviceGatewayService.setAgentConfig({
+        ...(allowRemoteTools ? {} : { allowRemoteComputerUse: false }),
+        allowRemoteTools,
+      });
       setStatus(result.status);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setStatus((current) => ({
+        allowRemoteComputerUse: current?.allowRemoteComputerUse ?? false,
+        allowRemoteTools: current?.allowRemoteTools ?? false,
+        connectionStatus: current?.connectionStatus ?? 'disconnected',
+        deviceId: current?.deviceId,
+        enabled: current?.enabled ?? false,
+        gatewayProxyUrl: current?.gatewayProxyUrl,
+        gatewayUrl: current?.gatewayUrl,
+        lastConnectedAt: current?.lastConnectedAt,
+        lastError: message,
+        userId: current?.userId,
+      }));
+    } finally {
+      setUpdating(false);
+    }
+  }, []);
+
+  const handleRemoteComputerUseToggle = useCallback(async (allowRemoteComputerUse: boolean) => {
+    setUpdating(true);
+    try {
+      const result = await desktopDeviceGatewayService.setAgentConfig({ allowRemoteComputerUse });
+      setStatus(result.status);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus((current) => ({
+        allowRemoteComputerUse: current?.allowRemoteComputerUse ?? false,
         allowRemoteTools: current?.allowRemoteTools ?? false,
         connectionStatus: current?.connectionStatus ?? 'disconnected',
         deviceId: current?.deviceId,
@@ -228,6 +258,7 @@ const DeviceGatewaySection = memo(() => {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setStatus((current) => ({
+        allowRemoteComputerUse: current?.allowRemoteComputerUse ?? false,
         allowRemoteTools: current?.allowRemoteTools ?? false,
         connectionStatus: current?.connectionStatus ?? 'disconnected',
         deviceId: current?.deviceId,
@@ -262,6 +293,7 @@ const DeviceGatewaySection = memo(() => {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setStatus((current) => ({
+        allowRemoteComputerUse: current?.allowRemoteComputerUse ?? false,
         allowRemoteTools: current?.allowRemoteTools ?? false,
         connectionStatus: current?.connectionStatus ?? 'disconnected',
         deviceId: current?.deviceId,
@@ -312,6 +344,19 @@ const DeviceGatewaySection = memo(() => {
         ),
         desc: t('deviceGateway.allowRemoteTools.desc'),
         label: t('deviceGateway.allowRemoteTools.title'),
+        minWidth: undefined,
+      },
+      {
+        children: (
+          <Switch
+            checked={status?.allowRemoteComputerUse ?? false}
+            disabled={!status?.enabled || !status?.allowRemoteTools}
+            loading={updating}
+            onChange={handleRemoteComputerUseToggle}
+          />
+        ),
+        desc: t('deviceGateway.allowRemoteComputerUse.desc'),
+        label: t('deviceGateway.allowRemoteComputerUse.title'),
         minWidth: undefined,
       },
       {
@@ -437,6 +482,7 @@ const DeviceGatewaySection = memo(() => {
     handleGatewayProxyUrlSave,
     handleGatewayUrlReset,
     handleGatewayUrlSave,
+    handleRemoteComputerUseToggle,
     handleRemoteToolsToggle,
     handleToggle,
     status,

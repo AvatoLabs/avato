@@ -199,6 +199,8 @@
   "defaultAgent.model.desc": "创建新智能体时使用的默认模型",
   "defaultAgent.model.title": "模型",
   "defaultAgent.title": "默认智能体设置",
+  "deviceGateway.allowRemoteComputerUse.desc": "允许登录同一账号的 Web 和移动端通过截图、点击、输入、滚动和按键控制 Avato 桌面端窗口。除非信任当前会话，否则保持关闭。",
+  "deviceGateway.allowRemoteComputerUse.title": "远程电脑控制",
   "deviceGateway.allowRemoteTools.desc": "允许登录同一账号的 Web 和移动端在此桌面端运行本地系统工具、Skills 和本机 MCP",
   "deviceGateway.allowRemoteTools.title": "远程工具执行",
   "deviceGateway.connection.desc": "通过网关反向控制设备的连接状态",

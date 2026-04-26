@@ -9,6 +9,7 @@
 import { type ToolExecutionContext } from '../types';
 import { calculatorRuntime } from './calculator';
 import { cloudSandboxRuntime } from './cloudSandbox';
+import { computerUseRuntime } from './computerUse';
 import { localSystemRuntime } from './localSystem';
 import { memoryRuntime } from './memory';
 import { notebookRuntime } from './notebook';
@@ -46,6 +47,7 @@ registerRuntimes([
   memoryRuntime,
   toolsActivatorRuntime,
   localSystemRuntime,
+  computerUseRuntime,
   remoteDeviceRuntime,
 ]);
 

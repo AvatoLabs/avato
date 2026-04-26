@@ -1,5 +1,6 @@
 import type { AgentRuntimeContext, AgentState } from '@lobechat/agent-runtime';
 import { BUILTIN_AGENT_SLUGS, getAgentRuntimeConfig } from '@lobechat/builtin-agents';
+import { ComputerUseManifest } from '@lobechat/builtin-tool-computer-use';
 import { LocalSystemManifest } from '@lobechat/builtin-tool-local-system';
 import {
   type DeviceAttachment,
@@ -461,6 +462,7 @@ export class AiAgentService {
     // Include device tool IDs so ToolsEngine can process them via enableChecker
     const pluginIds = [
       ...(agentConfig.plugins || []),
+      ComputerUseManifest.identifier,
       LocalSystemManifest.identifier,
       RemoteDeviceManifest.identifier,
     ];
