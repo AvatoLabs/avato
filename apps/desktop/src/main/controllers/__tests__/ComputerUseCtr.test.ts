@@ -50,6 +50,7 @@ describe('ComputerUseCtr', () => {
   const browserWindow = {
     capturePage: vi.fn(),
     focus: vi.fn(),
+    getContentBounds: vi.fn(() => ({ height: 600, width: 800, x: 0, y: 0 })),
     isDestroyed: vi.fn(() => false),
     isMinimized: vi.fn(() => false),
     restore: vi.fn(),
@@ -135,7 +136,7 @@ describe('ComputerUseCtr', () => {
   });
 
   it('sends click events into the focused main window', async () => {
-    await controller.click({ x: 42, y: 24 });
+    await controller.click({ x: 42.4, y: 24.4 });
 
     expect(browserWindow.focus).toHaveBeenCalled();
     expect(webContents.focus).toHaveBeenCalled();
@@ -153,10 +154,34 @@ describe('ComputerUseCtr', () => {
     );
   });
 
+  it('rejects mouse input outside the main window bounds', async () => {
+    await expect(controller.click({ x: 801, y: 24 })).rejects.toThrow(
+      'Point is outside the main window bounds',
+    );
+
+    expect(webContents.sendInputEvent).not.toHaveBeenCalled();
+  });
+
+  it('clamps scroll deltas before sending input events', async () => {
+    await controller.scroll({ deltaX: -5000, deltaY: 5000, x: 42, y: 24 });
+
+    expect(webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ deltaX: -2000, deltaY: 2000, type: 'mouseWheel', x: 42, y: 24 }),
+    );
+  });
+
   it('types text through the focused webContents', async () => {
     await controller.typeText({ text: 'hello' });
 
     expect(webContents.insertText).toHaveBeenCalledWith('hello');
+  });
+
+  it('rejects oversized text input', async () => {
+    await expect(controller.typeText({ text: 'x'.repeat(4001) })).rejects.toThrow(
+      'typeText input exceeds 4000 characters',
+    );
+
+    expect(webContents.insertText).not.toHaveBeenCalled();
   });
 
   it('presses keys with normalized modifiers', async () => {
@@ -169,6 +194,15 @@ describe('ComputerUseCtr', () => {
     expect(webContents.sendInputEvent).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ keyCode: 'A', modifiers: ['meta', 'shift'], type: 'keyUp' }),
+    );
+  });
+
+  it('rejects invalid key input', async () => {
+    await expect(controller.pressKey({ key: 'x'.repeat(65) })).rejects.toThrow(
+      'pressKey key exceeds 64 characters',
+    );
+    await expect(controller.pressKey({ key: 'A', modifiers: 'cmd' as any })).rejects.toThrow(
+      'pressKey modifiers must be an array',
     );
   });
 });

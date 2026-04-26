@@ -24,6 +24,9 @@ const DEFAULT_MAX_WIDTH = 1280;
 const DEFAULT_MAX_HEIGHT = 900;
 const DEFAULT_JPEG_QUALITY = 70;
 const MAX_DRAG_STEPS = 60;
+const MAX_KEY_CODE_LENGTH = 64;
+const MAX_SCROLL_DELTA = 2000;
+const MAX_TYPE_TEXT_LENGTH = 4000;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -59,6 +62,21 @@ const readPoint = (data: Record<string, unknown>): { x: number; y: number } => {
     x: readFiniteNumber(data, 'x'),
     y: readFiniteNumber(data, 'y'),
   };
+};
+
+const readBoundedPoint = (
+  data: Record<string, unknown>,
+  bounds: Pick<Electron.Rectangle, 'height' | 'width'>,
+): { x: number; y: number } => {
+  const point = readPoint(data);
+  const x = Math.round(point.x);
+  const y = Math.round(point.y);
+
+  if (x < 0 || y < 0 || x >= bounds.width || y >= bounds.height) {
+    throw new Error(`Point is outside the main window bounds: ${x}, ${y}`);
+  }
+
+  return { x, y };
 };
 
 const serializeBounds = (bounds: Electron.Rectangle) => ({
@@ -145,15 +163,13 @@ export default class ComputerUseCtr extends ControllerModule {
 
   @IpcMethod()
   async click(input: ComputerUseMouseInput): Promise<ComputerUseActionResult> {
-    const point = this.parseMouseInput(input);
-    await this.sendMouseClick(point, 1);
+    await this.sendMouseClick(input, 1);
     return { success: true };
   }
 
   @IpcMethod()
   async doubleClick(input: ComputerUseMouseInput): Promise<ComputerUseActionResult> {
-    const point = this.parseMouseInput(input);
-    await this.sendMouseClick(point, 2);
+    await this.sendMouseClick(input, 2);
     return { success: true };
   }
 
@@ -163,10 +179,11 @@ export default class ComputerUseCtr extends ControllerModule {
       throw new Error('Drag input must include from and to points');
     }
 
-    const from = this.parseMouseInput(input.from, input.button);
-    const to = this.parseMouseInput(input.to, input.button);
     const steps = clamp(Math.round(input.steps ?? 16), 1, MAX_DRAG_STEPS);
     const window = this.getFocusedMainWindow();
+    const bounds = this.getInputBounds(window);
+    const from = this.parseMouseInput(input.from, bounds, input.button);
+    const to = this.parseMouseInput(input.to, bounds, input.button);
 
     window.webContents.sendInputEvent({
       button: from.button,
@@ -199,12 +216,12 @@ export default class ComputerUseCtr extends ControllerModule {
 
   @IpcMethod()
   async scroll(input: ComputerUseScrollInput): Promise<ComputerUseActionResult> {
-    const point = this.parseMouseInput(input);
     const window = this.getFocusedMainWindow();
+    const point = this.parseMouseInput(input, this.getInputBounds(window));
     const data = input as unknown as Record<string, unknown>;
     window.webContents.sendInputEvent({
-      deltaX: readFiniteNumber(data, 'deltaX', 0),
-      deltaY: readFiniteNumber(data, 'deltaY', 0),
+      deltaX: clamp(readFiniteNumber(data, 'deltaX', 0), -MAX_SCROLL_DELTA, MAX_SCROLL_DELTA),
+      deltaY: clamp(readFiniteNumber(data, 'deltaY', 0), -MAX_SCROLL_DELTA, MAX_SCROLL_DELTA),
       type: 'mouseWheel',
       x: point.x,
       y: point.y,
@@ -218,6 +235,9 @@ export default class ComputerUseCtr extends ControllerModule {
     if (typeof input?.text !== 'string') {
       throw new Error('typeText input must include text');
     }
+    if (input.text.length > MAX_TYPE_TEXT_LENGTH) {
+      throw new Error(`typeText input exceeds ${MAX_TYPE_TEXT_LENGTH} characters`);
+    }
 
     const window = this.getFocusedMainWindow();
     await window.webContents.insertText(input.text);
@@ -229,6 +249,9 @@ export default class ComputerUseCtr extends ControllerModule {
   async pressKey(input: ComputerUseKeyInput): Promise<ComputerUseActionResult> {
     if (typeof input?.key !== 'string' || input.key.length === 0) {
       throw new Error('pressKey input must include key');
+    }
+    if (input.key.length > MAX_KEY_CODE_LENGTH) {
+      throw new Error(`pressKey key exceeds ${MAX_KEY_CODE_LENGTH} characters`);
     }
 
     const modifiers = this.normalizeModifiers(input.modifiers);
@@ -338,6 +361,7 @@ export default class ComputerUseCtr extends ControllerModule {
 
   private parseMouseInput(
     input: unknown,
+    bounds: Pick<Electron.Rectangle, 'height' | 'width'>,
     fallbackButton?: ComputerUseButton,
   ): ComputerUseMouseInput {
     if (!isRecord(input)) {
@@ -345,42 +369,47 @@ export default class ComputerUseCtr extends ControllerModule {
     }
 
     return {
-      ...readPoint(input),
+      ...readBoundedPoint(input, bounds),
       button: normalizeButton(input.button ?? fallbackButton),
     };
   }
 
-  private async sendMouseClick(input: ComputerUseMouseInput, clickCount: 1 | 2) {
+  private async sendMouseClick(input: unknown, clickCount: 1 | 2) {
     const window = this.getFocusedMainWindow();
-    const button = normalizeButton(input.button);
+    const parsedInput = this.parseMouseInput(input, this.getInputBounds(window));
+    const button = normalizeButton(parsedInput.button);
 
     window.webContents.sendInputEvent({
       button,
       clickCount,
       type: 'mouseMove',
-      x: input.x,
-      y: input.y,
+      x: parsedInput.x,
+      y: parsedInput.y,
     });
     window.webContents.sendInputEvent({
       button,
       clickCount,
       type: 'mouseDown',
-      x: input.x,
-      y: input.y,
+      x: parsedInput.x,
+      y: parsedInput.y,
     });
     window.webContents.sendInputEvent({
       button,
       clickCount,
       type: 'mouseUp',
-      x: input.x,
-      y: input.y,
+      x: parsedInput.x,
+      y: parsedInput.y,
     });
   }
 
   private normalizeModifiers(modifiers: ComputerUseKeyModifier[] | undefined) {
+    if (modifiers !== undefined && !Array.isArray(modifiers)) {
+      throw new Error('pressKey modifiers must be an array');
+    }
+
     const normalized = new Set<'alt' | 'control' | 'meta' | 'shift'>();
 
-    for (const modifier of modifiers || []) {
+    for (const modifier of (modifiers || []).slice(0, 8)) {
       if (modifier === 'ctrl') {
         normalized.add('control');
       } else if (modifier === 'cmd' || modifier === 'command') {
@@ -396,5 +425,15 @@ export default class ComputerUseCtr extends ControllerModule {
     }
 
     return [...normalized];
+  }
+
+  private getInputBounds(window: BrowserWindow): Pick<Electron.Rectangle, 'height' | 'width'> {
+    const bounds = window.getContentBounds();
+
+    if (bounds.width <= 0 || bounds.height <= 0) {
+      throw new Error('MAIN_WINDOW_BOUNDS_UNAVAILABLE');
+    }
+
+    return bounds;
   }
 }
