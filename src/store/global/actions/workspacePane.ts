@@ -74,9 +74,39 @@ export class GlobalWorkspacePaneActionImpl {
   };
 
   toggleLeftPanel = (newValue?: boolean): void => {
-    const showLeftPanel =
-      typeof newValue === 'boolean' ? newValue : !this.#get().status.showLeftPanel;
-    this.#get().updateSystemStatus({ showLeftPanel }, n('toggleLeftPanel', newValue));
+    if (typeof newValue === 'boolean') {
+      this.#get().updateSystemStatus(
+        {
+          leftPanelCollapsed: false,
+          showLeftPanel: newValue,
+        },
+        n('toggleLeftPanel', newValue),
+      );
+      return;
+    }
+
+    const { leftPanelCollapsed, showLeftPanel: rawShow } = this.#get().status;
+
+    if (!rawShow) {
+      this.#get().updateSystemStatus(
+        { leftPanelCollapsed: false, showLeftPanel: true },
+        n('toggleLeftPanel', 'showFromHidden'),
+      );
+      return;
+    }
+
+    if (leftPanelCollapsed) {
+      this.#get().updateSystemStatus(
+        { leftPanelCollapsed: false },
+        n('toggleLeftPanel', 'expandToFull'),
+      );
+      return;
+    }
+
+    this.#get().updateSystemStatus(
+      { leftPanelCollapsed: true },
+      n('toggleLeftPanel', 'collapseToMini'),
+    );
   };
 
   toggleMobilePortal = (newValue?: boolean): void => {

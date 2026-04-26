@@ -1,6 +1,7 @@
 'use client';
 
 import { ORG_NAME, UTM_SOURCE } from '@lobechat/business-const';
+import { OFFICIAL_URL } from '@lobechat/const';
 import { type FlexboxProps } from '@lobehub/ui';
 import { Flexbox } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
@@ -87,7 +88,7 @@ const BrandWatermark = memo<Omit<FlexboxProps, 'children'>>(({ style, ...rest })
       ) : (
         <a
           className={styles.logoLink}
-          href={`https://lobehub.com?utm_source=${UTM_SOURCE}&utm_content=brand_watermark`}
+          href={`${OFFICIAL_URL}?utm_source=${UTM_SOURCE}&utm_content=brand_watermark`}
           rel="noreferrer"
           target="_blank"
         >

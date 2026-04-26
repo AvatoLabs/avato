@@ -29,6 +29,8 @@ export type TranslationKeys = {
   tabMe: string;
   /** Create tab — header action to open artwork/video options */
   createOpenOptionsA11y: string;
+  createCurrentSetup: string;
+  createHistory: string;
 
   // Chat List
   chatListTitle: string;
@@ -125,7 +127,7 @@ export type TranslationKeys = {
   chatToolStreamingAddExperience: string;
   chatToolStreamingAddPreference: string;
   chatToolStreamingWebSearch: string;
-  chatToolStreamingKnowledgeBase: string;
+  chatToolStreamingSourceSet: string;
   chatToolStreamingSearchSkill: string;
   chatToolStreamingRunning: string;
   chatToolTapToExpand: string;
@@ -263,6 +265,9 @@ export type TranslationKeys = {
   notebookDiscard: string;
   notebookPreview: string;
   notebookEdit: string;
+  notebookTableAddColumn: string;
+  notebookTableAddRow: string;
+  notebookTableLabel: string;
 
   // Settings
   settingsTitle: string;
@@ -398,6 +403,8 @@ export type TranslationKeys = {
   homeQuickCreate: string;
   homeAgentAll: string;
   homeRecents: string;
+  homeRecentDocs: string;
+  homeRecentFiles: string;
   homeSeeAll: string;
   homeAssistants: string;
   homeStartChat: string;
@@ -429,6 +436,21 @@ export type TranslationKeys = {
   workspaceNotConnected: string;
   workspaceProviders: string;
   workspaceUserId: string;
+  workspaceCreateTitle: string;
+  workspaceCreateNamePlaceholder: string;
+  workspaceCreateDescriptionPlaceholder: string;
+  workspaceCreateConfirm: string;
+  workspaceCreateCreating: string;
+  workspaceCreateCreated: string;
+  workspaceCreateFailed: string;
+  workspaceLoadFailed: string;
+  workspaceQuickAccessTitle: string;
+  workspaceCurrentContext: string;
+  workspaceSpaceLabel: string;
+  workspaceScopeLabel: string;
+  workspaceManageSourceSet: string;
+  workspaceSwitchSpaces: string;
+  workspaceSwitchSourceSets: string;
 
   // Message Actions
   msgActionCopy: string;
@@ -439,6 +461,44 @@ export type TranslationKeys = {
   msgActionDeleteConfirm: string;
   msgActionCopied: string;
   msgActionSaveToTopic: string;
+  chatOpenConversation: string;
+  messageDetailTitle: string;
+  messageDetailOpen: string;
+  messageDetailLoadFailed: string;
+  messageDetailEmpty: string;
+  messageDetailEmptyDesc: string;
+  toolDetailTitle: string;
+  toolDetailOpen: string;
+  toolDetailEmpty: string;
+  toolDetailEmptyDesc: string;
+  threadListTitle: string;
+  threadDetailTitle: string;
+  threadEmpty: string;
+  threadEmptyDesc: string;
+  threadUntitled: string;
+  threadLoadFailed: string;
+  threadDeleteConfirm: string;
+  threadDeleted: string;
+  threadDeleteFailed: string;
+  threadStatusProcessing: string;
+  threadStatusCompleted: string;
+  threadStatusFailed: string;
+  threadStatusInterrupted: string;
+  threadStatusInReview: string;
+  threadOpen: string;
+  threadStart: string;
+  threadStartModePrompt: string;
+  threadCreateFailed: string;
+  threadInputPlaceholder: string;
+  threadSendFailed: string;
+  threadTypeContinuation: string;
+  threadTypeStandalone: string;
+  threadTypeIsolation: string;
+  threadContextLabel: string;
+  threadStartDivider: string;
+  threadMessageNoContent: string;
+  threadMessageTools: string;
+  threadMessageTasks: string;
   msgStatTokens: string;
   msgStatUncachedInput: string;
   msgStatCachedInput: string;
@@ -488,10 +548,20 @@ export type TranslationKeys = {
   // File / Attachment
   fileAttach: string;
   fileAttachDesc: string;
+  fileAddToChatContext: string;
+  fileAddToChatContextDesc: string;
+  fileAddToChatContextSuccess: string;
+  fileAddToConversationSuccess: string;
   fileCamera: string;
   fileCameraDesc: string;
+  fileConversationFile: string;
+  fileChatContext: string;
+  fileOpen: string;
   fileDocument: string;
   fileDocumentDesc: string;
+  fileEditAsDocument: string;
+  fileEditAsDocumentDesc: string;
+  fileEditAsDocumentSuccess: string;
   fileFromWorkspace: string;
   fileFromWorkspaceDesc: string;
   fileGallery: string;
@@ -763,7 +833,7 @@ export type TranslationKeys = {
   providerDetailPlaceholderRegion: string;
   providerDetailPlaceholderApiVersion: string;
 
-  // Resources / Files
+  // Content / Files
   resourceTitle: string;
   resourceTabAll: string;
   resourceTabImages: string;
@@ -790,6 +860,9 @@ export type TranslationKeys = {
   resourceExplorer: string;
   resourceOpenExternal: string;
   resourcePreviewUnavailable: string;
+  resourceTablePreviewReadOnly: string;
+  resourceTablePreviewUnavailable: string;
+  resourceTablePreviewSummary: string;
   resourceDeleteFailed: string;
   resourceRenameFailed: string;
   resourceRenamePlaceholder: string;
@@ -798,8 +871,8 @@ export type TranslationKeys = {
   resourceShareLinkTitle: string;
   resourceShareLinkSheetSubtitle: string;
   resourceShareCreateLinkAction: string;
-  resourceShareLibraryMenuTitle: string;
-  resourceFolderOpenNeedsLibrary: string;
+  resourceShareSourceSetMenuTitle: string;
+  resourceFolderOpenNeedsSourceSet: string;
   resourceBatchShareLink: string;
   resourceShareExpiresLabel: string;
   resourceShareExpires1d: string;
@@ -808,7 +881,7 @@ export type TranslationKeys = {
   resourceSharePasswordOptional: string;
   resourceSharePasswordPlaceholder: string;
   resourceShareConfirm: string;
-  resourceShareLibrary: string;
+  resourceShareSourceSet: string;
   resourcePickerPickLocation: string;
   resourceShareManage: string;
   resourceShareManageLinks: string;
@@ -835,7 +908,7 @@ export type TranslationKeys = {
   resourceSharedWithMeLoadFailed: string;
   resourceSharedKindFile: string;
   resourceSharedKindDocument: string;
-  resourceSharedKindLibrary: string;
+  resourceSharedKindSourceSet: string;
   resourceSharedFolderHint: string;
   resourceShareGrantInheritChildren: string;
   resourceShareGrantCanReshare: string;
@@ -877,14 +950,71 @@ export type TranslationKeys = {
   resourcePublicShareDocEmpty: string;
   resourcePublicShareNotFoundHint: string;
   resourcePublicShareDownloadFailed: string;
-  resourcePublicShareKbHint: string;
+  resourcePublicShareSourceSetHint: string;
+  resourceGovernanceUsageInternal: string;
+  resourceGovernanceUsagePublic: string;
+  resourceGovernanceUsageRestricted: string;
+  resourceGovernanceReviewDraft: string;
+  resourceGovernanceReviewApproved: string;
+  resourceGovernanceReviewArchived: string;
+  resourceGovernanceClassificationGeneral: string;
+  resourceGovernanceClassificationBrand: string;
+  resourceGovernanceClassificationFinance: string;
+  resourceGovernanceClassificationHr: string;
+  resourceGovernanceClassificationLegal: string;
+  resourceGovernanceClassificationProduct: string;
+  resourceGovernanceRenditionCaption: string;
+  resourceGovernanceRenditionEmbedding: string;
+  resourceGovernanceRenditionPreview: string;
+  resourceGovernanceRenditionPrint: string;
+  resourceGovernanceRenditionThumbnail: string;
+  resourceGovernanceRenditionTranscript: string;
+  resourceGovernanceRenditionWeb: string;
+  resourceGovernanceFilters: string;
+  resourceGovernanceFiltersSubtitle: string;
+  resourceGovernanceSectionReview: string;
+  resourceGovernanceSectionUsage: string;
+  resourceGovernanceSectionClassification: string;
+  resourceGovernanceSectionRightsOwner: string;
+  resourceGovernanceRightsOwnerPlaceholder: string;
+  resourceGovernanceRightsOwnerSummary: string;
+  resourceGovernanceQuickHint: string;
+  resourceGovernanceSelectedFilters: string;
+  resourceGovernanceNoFilters: string;
+  resourceGovernanceAdvanced: string;
+  resourceGovernanceCapabilitiesViewerHint: string;
+  resourceGovernanceCapabilitiesEditorHint: string;
+  resourceGovernanceCapabilitiesManagerHint: string;
+  resourceGovernanceClear: string;
+  resourceGovernanceApply: string;
+  resourceGovernanceAny: string;
   resourceBytes: string;
   resourceKB: string;
   resourceMB: string;
   resourceGB: string;
-  resourceLibraryAll: string;
-  resourceLibraryInbox: string;
-  resourceLibrarySelect: string;
+  resourceAllFiles: string;
+  resourceSourceSetUnassigned: string;
+  resourceSourceSetSelect: string;
+  resourceCreateSourceSet: string;
+  resourceCreateSourceSetPlaceholder: string;
+  resourceSourceSetCreated: string;
+  resourceSourceSetLoadFailed: string;
+  resourceDeleteSourceSetConfirm: string;
+  resourceDeleteSourceSetDesc: string;
+  resourceSourceSetDeleted: string;
+  resourceAddToSourceSet: string;
+  resourceAddToSourceSetSuccess: string;
+  resourceAddToSourceSetFailed: string;
+  resourceAddToSourceSetExists: string;
+  resourceMoveToSourceSet: string;
+  resourceMoveToSourceSetSuccess: string;
+  resourceMoveToSourceSetFailed: string;
+  resourceRemoveFromSourceSet: string;
+  resourceRemoveFromSourceSetConfirm: string;
+  resourceRemoveFromSourceSetDesc: string;
+  resourceRemoveFromSourceSetSuccess: string;
+  resourceRemoveFromSourceSetFailed: string;
+  resourceSelectSourceSetTarget: string;
   resourceFolderRoot: string;
   resourceNewFolder: string;
   resourceMoveToFolder: string;
@@ -903,6 +1033,9 @@ export type TranslationKeys = {
   resourceViewList: string;
   resourceViewGrid: string;
   resourceViewModeToggle: string;
+  resourceScopeTree: string;
+  resourceScopeFiles: string;
+  resourceMoreActions: string;
   resourceSelect: string;
   resourceSelectCount: string;
   resourceBatchDelete: string;
@@ -1109,6 +1242,103 @@ export type TranslationKeys = {
   memoryEmptyDesc: string;
   memoryPersona: string;
   memoryPersonaEmpty: string;
+  memoryHomePersonal: string;
+  memoryHomeSpaces: string;
+  memoryHomePersonalEmpty: string;
+  memoryHomePersonalEmptyDesc: string;
+  memorySpacesTitle: string;
+  memorySpacesDesc: string;
+  memorySpacesEmpty: string;
+  memorySpaceKindTeam: string;
+  memorySpaceRoleOwner: string;
+  memorySpaceRoleAdmin: string;
+  memorySpaceRoleEditor: string;
+  memorySpaceRoleViewer: string;
+  memorySpaceCanCreate: string;
+  memorySpaceCreateAction: string;
+  memorySpaceCreateFailed: string;
+  memorySpaceCreateSuccess: string;
+  memorySpaceCanReview: string;
+  memorySpaceCategoryGeneral: string;
+  memorySpaceCategoryPlaybook: string;
+  memorySpaceCategoryPolicy: string;
+  memorySpaceInboxCount: string;
+  memorySpacePublishedCount: string;
+  memorySpacePlaybooksCount: string;
+  memorySpacePoliciesCount: string;
+  memorySpaceRecallActive: string;
+  memorySpaceRecallDisabled: string;
+  memorySpaceRecallExpired: string;
+  memorySpaceRecallStale: string;
+  memorySpacePendingAction: string;
+  memorySpaceBrowse: string;
+  memorySpaceEntriesEmpty: string;
+  memorySpaceEntriesEmptyDesc: string;
+  memorySpaceBackToList: string;
+  memorySpaceDetailOverview: string;
+  memorySpaceDetailAudit: string;
+  memorySpaceEntryCandidate: string;
+  memorySpaceEntryMemory: string;
+  memorySpaceSummaryUnavailable: string;
+  memorySpaceSummaryRetry: string;
+  memorySpaceAuditTitle: string;
+  memorySpaceAuditEmpty: string;
+  memorySpaceAuditShareAction: string;
+  memorySpaceAuditShareSectionAction: string;
+  memorySpaceAuditShareFailed: string;
+  memorySpaceAuditActionMerged: string;
+  memorySpaceAuditActionPolicyUpdated: string;
+  memorySpaceAuditActionPublished: string;
+  memorySpaceAuditByline: string;
+  memorySpaceAuditChangeFromTo: string;
+  memorySpaceAuditChangeSet: string;
+  memorySpaceAuditChangeUnset: string;
+  memorySpaceAuditResolutionMerged: string;
+  memorySpaceFieldTitle: string;
+  memorySpaceFieldRecall: string;
+  memorySpaceFieldExpiresAt: string;
+  memorySpaceFieldLastVerifiedAt: string;
+  memorySpaceFieldStaleAt: string;
+  memorySpaceReviewHintTitle: string;
+  memorySpaceReviewHintDesc: string;
+  memorySpaceReviewHintMatchTitle: string;
+  memorySpaceReviewHintPublishedAt: string;
+  memorySpaceReviewHintImpactTitle: string;
+  memorySpaceReviewHintUpdatesTitle: string;
+  memorySpaceReviewHintUpdatesSummary: string;
+  memorySpaceReviewHintUpdatesContent: string;
+  memorySpaceReviewHintAddsSources: string;
+  memorySpaceReviewActionsTitle: string;
+  memorySpaceMergeAction: string;
+  memorySpacePublishAction: string;
+  memorySpaceRejectAction: string;
+  memorySpaceMarkNeedsReviewAction: string;
+  memorySpaceRevalidateAction: string;
+  memorySpaceMergeSuccess: string;
+  memorySpacePublishSuccess: string;
+  memorySpaceRejectSuccess: string;
+  memorySpaceMarkNeedsReviewSuccess: string;
+  memorySpaceRevalidateSuccess: string;
+  memorySpaceReviewActionFailed: string;
+  memorySpaceLoadFailed: string;
+  memorySpaceSectionInbox: string;
+  memorySpaceSectionPlaybooks: string;
+  memorySpaceSectionPolicies: string;
+  memorySpaceSectionPublished: string;
+  memorySpaceIntakeAutomation: string;
+  memorySpaceIntakeHarness: string;
+  memorySpaceIntakeManual: string;
+  memorySpaceRecallLabel: string;
+  memorySpaceRecallStateActive: string;
+  memorySpaceRecallStateAll: string;
+  memorySpaceRecallStateDisabled: string;
+  memorySpaceRecallStateExpired: string;
+  memorySpaceRecallStateStale: string;
+  memorySpaceSources: string;
+  memorySpaceSourceCount: string;
+  memorySpaceUpdatedAt: string;
+  memorySpacePublishedAt: string;
+  memorySpaceActor: string;
   memorySearch: string;
   memoryDeleteConfirm: string;
   memoryDeleteDesc: string;
@@ -1144,8 +1374,12 @@ export type TranslationKeys = {
   memoryAssociatedLocations: string;
   memoryTotalCount: string;
   memoryEdit: string;
+  memoryReset: string;
   memorySave: string;
+  memorySavingChanges: string;
+  memoryAllChangesSaved: string;
   memorySaved: string;
+  memoryUnsavedChanges: string;
   memoryCreateIdentity: string;
   memoryCreateTitle: string;
   memoryCreateTitlePlaceholder: string;
@@ -1242,7 +1476,7 @@ export type TranslationKeys = {
   videoStatusError: string;
 };
 
-const en: TranslationKeys = {
+export const enUS: TranslationKeys = {
   cancel: 'Cancel',
   confirm: 'Confirm',
   delete: 'Delete',
@@ -1256,6 +1490,8 @@ const en: TranslationKeys = {
   tabDiscover: 'Discover',
   tabMe: 'Me',
   createOpenOptionsA11y: 'Open image and video creation settings',
+  createCurrentSetup: 'Current setup',
+  createHistory: 'History',
 
   chatListTitle: 'Avato',
   chatListSearch: 'Search sessions and messages',
@@ -1350,7 +1586,7 @@ const en: TranslationKeys = {
   chatToolStreamingAddExperience: 'Adding experience…',
   chatToolStreamingAddPreference: 'Adding preference…',
   chatToolStreamingWebSearch: 'Searching…',
-  chatToolStreamingKnowledgeBase: 'Searching knowledge base…',
+  chatToolStreamingSourceSet: 'Searching source sets…',
   chatToolStreamingSearchSkill: 'Searching skills…',
   chatToolStreamingRunning: 'Running…',
   chatToolTapToExpand: 'Tap to expand',
@@ -1478,8 +1714,8 @@ const en: TranslationKeys = {
   notebookDocContentPlaceholder: 'Start writing in Markdown...',
   notebookDeleteConfirm: 'Delete Document',
   notebookDeleteDesc:
-    'This document will be moved to the recycle bin. You can restore it from the Resources screen.',
-  notebookDeletedToTrash: 'Moved to recycle bin. Restore from Resources if needed.',
+    'This document will be moved to the recycle bin. You can restore it from the Content screen.',
+  notebookDeletedToTrash: 'Moved to recycle bin. Restore from Content if needed.',
   notebookDeleteFailed: 'Could not delete document',
   notebookEditorMore: 'More options',
   notebookListOpenDoc: 'Open',
@@ -1489,6 +1725,9 @@ const en: TranslationKeys = {
   notebookDiscard: 'Discard',
   notebookPreview: 'Preview',
   notebookEdit: 'Edit',
+  notebookTableAddColumn: 'Add Column',
+  notebookTableAddRow: 'Add Row',
+  notebookTableLabel: 'Table',
 
   settingsTitle: 'Settings',
   settingsServer: 'Server',
@@ -1616,6 +1855,8 @@ const en: TranslationKeys = {
   homeQuickCreate: 'Art',
   homeAgentAll: 'All',
   homeRecents: 'Assistants',
+  homeRecentDocs: 'Recent docs',
+  homeRecentFiles: 'Recent files',
   homeSeeAll: 'See all',
   homeAssistants: 'Assistants',
   homeStartChat: 'Start Chat',
@@ -1646,6 +1887,21 @@ const en: TranslationKeys = {
   workspaceNotConnected: 'Not connected',
   workspaceProviders: 'Providers',
   workspaceUserId: 'User ID',
+  workspaceCreateTitle: 'New Team Space',
+  workspaceCreateNamePlaceholder: 'Team Space name',
+  workspaceCreateDescriptionPlaceholder: 'What is this space for?',
+  workspaceCreateConfirm: 'Create Team Space',
+  workspaceCreateCreating: 'Creating...',
+  workspaceCreateCreated: 'Team Space created',
+  workspaceCreateFailed: 'Unable to create team space',
+  workspaceLoadFailed: 'Could not load spaces',
+  workspaceQuickAccessTitle: 'Quick Access',
+  workspaceCurrentContext: 'Current context',
+  workspaceSpaceLabel: 'Space',
+  workspaceScopeLabel: 'Scope',
+  workspaceManageSourceSet: 'Manage source set',
+  workspaceSwitchSpaces: 'Spaces',
+  workspaceSwitchSourceSets: 'Source Sets',
 
   msgActionCopy: 'Copy',
   msgActionEdit: 'Edit',
@@ -1655,6 +1911,44 @@ const en: TranslationKeys = {
   msgActionDeleteConfirm: 'Delete this message?',
   msgActionCopied: 'Copied',
   msgActionSaveToTopic: 'Save to Topic',
+  chatOpenConversation: 'Open conversation',
+  messageDetailTitle: 'Message details',
+  messageDetailOpen: 'View details',
+  messageDetailLoadFailed: 'Unable to load message details',
+  messageDetailEmpty: 'Message unavailable',
+  messageDetailEmptyDesc: 'This message could not be found or is no longer available.',
+  toolDetailTitle: 'Tool details',
+  toolDetailOpen: 'Open tool view',
+  toolDetailEmpty: 'Tool details unavailable',
+  toolDetailEmptyDesc: 'This tool result has no additional details to display.',
+  threadListTitle: 'Threads',
+  threadDetailTitle: 'Thread',
+  threadEmpty: 'No threads yet',
+  threadEmptyDesc: 'This topic does not have any threads to inspect yet.',
+  threadUntitled: 'Untitled thread',
+  threadLoadFailed: 'Could not load threads',
+  threadDeleteConfirm: 'Delete thread',
+  threadDeleted: 'Thread deleted',
+  threadDeleteFailed: 'Could not delete thread',
+  threadStatusProcessing: 'Processing',
+  threadStatusCompleted: 'Completed',
+  threadStatusFailed: 'Failed',
+  threadStatusInterrupted: 'Interrupted',
+  threadStatusInReview: 'In review',
+  threadOpen: 'Open thread',
+  threadStart: 'Start thread',
+  threadStartModePrompt: 'Include the earlier conversation, or branch from this message only?',
+  threadCreateFailed: 'Could not create thread',
+  threadInputPlaceholder: 'Continue this thread...',
+  threadSendFailed: 'Could not send thread message',
+  threadTypeContinuation: 'Continuation',
+  threadTypeStandalone: 'Standalone',
+  threadTypeIsolation: 'Isolation',
+  threadContextLabel: 'Source context',
+  threadStartDivider: 'Thread starts here',
+  threadMessageNoContent: 'No text content',
+  threadMessageTools: 'Tool activity · {count}',
+  threadMessageTasks: 'Task activity · {count}',
   msgStatTokens: 'tokens',
   msgStatUncachedInput: 'Uncached Input',
   msgStatCachedInput: 'Cached Input',
@@ -1700,12 +1994,22 @@ const en: TranslationKeys = {
 
   fileAttach: 'Attach',
   fileAttachDesc: 'Choose a source. Everything goes into this composer.',
+  fileAddToChatContext: 'Add to Chat Context',
+  fileAddToChatContextDesc: 'Attach this document as context instead of a binary file.',
+  fileAddToChatContextSuccess: 'Added to chat context',
+  fileAddToConversationSuccess: 'Added to conversation files',
   fileCamera: 'Camera',
   fileCameraDesc: 'Take a photo and attach it right away.',
+  fileConversationFile: 'Conversation file',
+  fileChatContext: 'Document context',
+  fileOpen: 'Open',
   fileDocument: 'Document',
   fileDocumentDesc: 'Attach files, notes, PDFs, or other supporting material.',
+  fileEditAsDocument: 'Edit as document',
+  fileEditAsDocumentDesc: 'Convert this file into a document you can edit in place.',
+  fileEditAsDocumentSuccess: 'Opened as document',
   fileFromWorkspace: 'From Workspace',
-  fileFromWorkspaceDesc: 'Import files from your resource workspace.',
+  fileFromWorkspaceDesc: 'Import files from Content.',
   fileGallery: 'Photo Library',
   fileGalleryDesc: 'Pick one or more images from your library.',
   fileNewFolderDesc: 'Create a folder in the current location.',
@@ -1968,8 +2272,8 @@ const en: TranslationKeys = {
   providerDetailPlaceholderRegion: 'us-east-1',
   providerDetailPlaceholderApiVersion: '2024-02-01',
 
-  // Resources / Files
-  resourceTitle: 'Resources',
+  // Content / Files
+  resourceTitle: 'Content',
   resourceTabAll: 'All',
   resourceTabImages: 'Images',
   resourceTabDocuments: 'Documents',
@@ -1981,7 +2285,7 @@ const en: TranslationKeys = {
   resourceUploadFile: 'Choose File',
   resourceDeleting: 'Deleting…',
   resourceDeleteConfirm: 'Delete File',
-  resourceDeleteDesc: 'The file will be moved to the recycle bin. You can restore it from Resources.',
+  resourceDeleteDesc: 'The file will be moved to the recycle bin. You can restore it from Content.',
   resourceUploadFailed: 'Upload failed',
   resourceUploaded: 'Uploaded successfully',
   resourceDownload: 'Download',
@@ -1992,9 +2296,12 @@ const en: TranslationKeys = {
   resourceCollapseAll: 'Collapse all',
   resourceCurrentFolder: 'Current folder',
   resourceExpandAll: 'Expand all',
-  resourceExplorer: 'Explorer',
+  resourceExplorer: 'Content Explorer',
   resourceOpenExternal: 'Open in Browser',
   resourcePreviewUnavailable: 'Unable to load preview',
+  resourceTablePreviewReadOnly: 'Read-only table preview',
+  resourceTablePreviewUnavailable: 'This table can only be previewed on mobile right now',
+  resourceTablePreviewSummary: '{rows} rows · {columns} columns',
   resourceDeleteFailed: 'Delete failed',
   resourceRenameFailed: 'Rename failed',
   resourceRenamePlaceholder: 'Enter new name',
@@ -2004,8 +2311,8 @@ const en: TranslationKeys = {
   resourceShareLinkSheetSubtitle:
     'Creates a time-limited link others can open. This is not the same as sending the raw file.',
   resourceShareCreateLinkAction: 'Create share link',
-  resourceShareLibraryMenuTitle: 'Library sharing',
-  resourceFolderOpenNeedsLibrary: 'Pick a library above to open folders.',
+  resourceShareSourceSetMenuTitle: 'Source set sharing',
+  resourceFolderOpenNeedsSourceSet: 'Pick a source set above to browse folders.',
   resourceBatchShareLink: 'Share link',
   resourceShareExpiresLabel: 'Link expires after',
   resourceShareExpires1d: '1 day',
@@ -2014,7 +2321,7 @@ const en: TranslationKeys = {
   resourceSharePasswordOptional: 'Password (optional)',
   resourceSharePasswordPlaceholder: 'Leave empty for no password',
   resourceShareConfirm: 'Create & share',
-  resourceShareLibrary: 'Share library',
+  resourceShareSourceSet: 'Share source set',
   resourcePickerPickLocation: 'Location',
   resourceShareManage: 'Manage sharing',
   resourceShareManageLinks: 'Share links',
@@ -2037,12 +2344,12 @@ const en: TranslationKeys = {
   resourceShareCopyAccess: 'Copy',
   resourceAccessCopied: 'Copied',
   resourceSharedWithMe: 'Shared with me',
-  resourceSharedWithMeEmpty: 'Nothing has been shared with you yet',
+  resourceSharedWithMeEmpty: 'No one has shared content with you yet',
   resourceSharedWithMeLoadFailed: 'Could not load shared items',
   resourceSharedKindFile: 'File',
   resourceSharedKindDocument: 'Document',
-  resourceSharedKindLibrary: 'Library',
-  resourceSharedFolderHint: 'Open folders from a library in Resources.',
+  resourceSharedKindSourceSet: 'Source Set',
+  resourceSharedFolderHint: 'Open this folder from its source set on the Content page.',
   resourceShareGrantInheritChildren: 'Apply to items inside (inherit)',
   resourceShareGrantCanReshare: 'Allow this editor to manage sharing',
   resourceShareGrantExpiresPlaceholder: 'Access expiry (optional, YYYY-MM-DD)',
@@ -2056,9 +2363,9 @@ const en: TranslationKeys = {
   resourceShareGrantExpirySelected: 'Ends:',
   resourceShareMemberCanReshare: 'Can manage sharing',
   resourceShareMemberInheritOff: 'Not inherited to sub-items',
-  resourcePublicShareTitle: 'Shared resource',
+  resourcePublicShareTitle: 'Shared content',
   resourcePublicSharePasswordTitle: 'Password protected',
-  resourcePublicSharePasswordSubtitle: 'Enter the password to view this resource.',
+  resourcePublicSharePasswordSubtitle: 'Enter the password to view this content.',
   resourcePublicSharePasswordPlaceholder: 'Password',
   resourcePublicShareUnlock: 'Unlock',
   resourcePublicShareNotFound: 'This share link is invalid or has expired.',
@@ -2066,8 +2373,8 @@ const en: TranslationKeys = {
   resourcePublicShareDownload: 'Download file',
   resourceSharedAccessNoExpiry: 'No expiry',
   resourceSharedPermissionValidUntil: 'Access valid until',
-  resourceShareAccessOk: 'You can access this resource',
-  resourceShareAccessDenied: "You don't have access to this resource",
+  resourceShareAccessOk: 'You can access this content',
+  resourceShareAccessDenied: "You don't have access to this content",
   resourceShareAccessUnknown: 'Could not load access details',
   resourceShareAccessViaSpace: 'Through your space membership',
   resourceShareAccessViaDirect: 'Shared with you directly',
@@ -2077,7 +2384,7 @@ const en: TranslationKeys = {
   resourceShareConfirmDisableLinkMessage:
     'Anyone with the link will lose access. You can create a new link later, but old links will stay broken.',
   resourceShareConfirmRevokeTitle: 'Remove this person?',
-  resourceShareConfirmRevokeMessage: 'They will lose access to this resource.',
+  resourceShareConfirmRevokeMessage: 'They will lose access to this content.',
   resourceShareRetry: 'Retry',
   resourceShareGrantUsernamePlaceholder: 'Username',
   resourceUntitled: 'Untitled',
@@ -2085,19 +2392,76 @@ const en: TranslationKeys = {
   resourcePublicShareNotFoundHint:
     'Check the link and password. A wrong password looks the same as an expired or invalid link.',
   resourcePublicShareDownloadFailed: 'Could not open the download link.',
-  resourcePublicShareKbHint: 'For the full library and file list, use LobeHub in a browser.',
+  resourcePublicShareSourceSetHint: 'For the full source set and file list, use LobeHub in a browser.',
+  resourceGovernanceUsageInternal: 'Internal',
+  resourceGovernanceUsagePublic: 'Public',
+  resourceGovernanceUsageRestricted: 'Restricted',
+  resourceGovernanceReviewDraft: 'Draft',
+  resourceGovernanceReviewApproved: 'Approved',
+  resourceGovernanceReviewArchived: 'Archived',
+  resourceGovernanceClassificationGeneral: 'General',
+  resourceGovernanceClassificationBrand: 'Brand',
+  resourceGovernanceClassificationFinance: 'Finance',
+  resourceGovernanceClassificationHr: 'HR',
+  resourceGovernanceClassificationLegal: 'Legal',
+  resourceGovernanceClassificationProduct: 'Product',
+  resourceGovernanceRenditionCaption: 'Caption',
+  resourceGovernanceRenditionEmbedding: 'Embedding',
+  resourceGovernanceRenditionPreview: 'Preview',
+  resourceGovernanceRenditionPrint: 'Print',
+  resourceGovernanceRenditionThumbnail: 'Thumbnail',
+  resourceGovernanceRenditionTranscript: 'Transcript',
+  resourceGovernanceRenditionWeb: 'Web',
+  resourceGovernanceFilters: 'Governance',
+  resourceGovernanceFiltersSubtitle: 'Filter files by review status, usage policy, classification, or rights owner.',
+  resourceGovernanceSectionReview: 'Review status',
+  resourceGovernanceSectionUsage: 'Usage policy',
+  resourceGovernanceSectionClassification: 'Classification',
+  resourceGovernanceSectionRightsOwner: 'Rights owner',
+  resourceGovernanceRightsOwnerPlaceholder: 'Enter rights owner',
+  resourceGovernanceRightsOwnerSummary: 'Rights owner: {rightsOwner}',
+  resourceGovernanceQuickHint: 'Use common filters here. Open Advanced for classification or rights owner.',
+  resourceGovernanceSelectedFilters: 'Selected filters',
+  resourceGovernanceNoFilters: 'No filters selected',
+  resourceGovernanceAdvanced: 'Advanced',
+  resourceGovernanceCapabilitiesViewerHint: 'You can review governance metadata in this scope.',
+  resourceGovernanceCapabilitiesEditorHint: 'This scope allows governance editing on supported surfaces.',
+  resourceGovernanceCapabilitiesManagerHint: 'This scope allows governance approval and archiving on supported surfaces.',
+  resourceGovernanceClear: 'Clear',
+  resourceGovernanceApply: 'Apply',
+  resourceGovernanceAny: 'Any',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
   resourceGB: 'GB',
-  resourceLibraryAll: 'All Files',
-  resourceLibraryInbox: 'Uncategorized',
+  resourceAllFiles: 'All Files',
+  resourceSourceSetUnassigned: 'Uncategorized',
   resourceFolderRoot: 'Root',
-  resourceLibrarySelect: 'Select Library',
+  resourceSourceSetSelect: 'Select Source Set',
+  resourceCreateSourceSet: 'Create source set',
+  resourceCreateSourceSetPlaceholder: 'Source set name',
+  resourceSourceSetCreated: 'Source set created',
+  resourceSourceSetLoadFailed: 'Could not load source sets',
+  resourceDeleteSourceSetConfirm: 'Delete source set',
+  resourceDeleteSourceSetDesc: 'The source set will be deleted. Files can remain if you choose to keep them.',
+  resourceSourceSetDeleted: 'Source set deleted',
+  resourceAddToSourceSet: 'Add to source set',
+  resourceAddToSourceSetSuccess: 'Added to source set',
+  resourceAddToSourceSetFailed: 'Could not add these items to the source set',
+  resourceAddToSourceSetExists: 'Some items are already in that source set',
+  resourceMoveToSourceSet: 'Move to source set',
+  resourceMoveToSourceSetSuccess: 'Moved to source set',
+  resourceMoveToSourceSetFailed: 'Could not move these items to the source set',
+  resourceRemoveFromSourceSet: 'Remove from source set',
+  resourceRemoveFromSourceSetConfirm: 'Remove from source set',
+  resourceRemoveFromSourceSetDesc: 'Remove {count} item(s) from the current source set?',
+  resourceRemoveFromSourceSetSuccess: 'Removed from source set',
+  resourceRemoveFromSourceSetFailed: 'Could not remove these items from the source set',
+  resourceSelectSourceSetTarget: 'Choose where these items should go.',
   resourceNewFolder: 'New Folder',
   resourceMoveToFolder: 'Move to Folder',
   resourceFolderDeleteConfirm: 'Delete Folder',
-  resourceFolderDeleteDesc: 'The folder will be moved to the recycle bin. You can restore it from Resources.',
+  resourceFolderDeleteDesc: 'The folder will be moved to the recycle bin. You can restore it from Content.',
   resourceCreateFolder: 'Create Folder',
   resourceCreateFolderPlaceholder: 'Folder name',
   resourceSortBy: 'Sort by',
@@ -2111,6 +2475,9 @@ const en: TranslationKeys = {
   resourceViewList: 'List',
   resourceViewGrid: 'Grid',
   resourceViewModeToggle: 'Toggle list or grid view',
+  resourceScopeTree: 'Tree',
+  resourceScopeFiles: 'Files',
+  resourceMoreActions: 'More actions',
   resourceSelect: 'Select',
   resourceSelectCount: '{count} selected',
   resourceBatchDelete: 'Delete',
@@ -2315,6 +2682,104 @@ const en: TranslationKeys = {
   memoryEmptyDesc: 'AI will automatically extract memories from your conversations.',
   memoryPersona: 'Persona',
   memoryPersonaEmpty: 'No persona generated yet. Chat more to build your profile.',
+  memoryHomePersonal: 'Personal',
+  memoryHomeSpaces: 'Spaces',
+  memoryHomePersonalEmpty: 'No personal memory profile yet',
+  memoryHomePersonalEmptyDesc: 'Chat more and run extraction to build your personal memory.',
+  memorySpacesTitle: 'Team memory spaces',
+  memorySpacesDesc: 'Space-first memory governance and recall status across your team spaces.',
+  memorySpacesEmpty: 'You are not in any team spaces with memory summaries yet.',
+  memorySpaceKindTeam: 'Team space',
+  memorySpaceRoleOwner: 'Owner',
+  memorySpaceRoleAdmin: 'Admin',
+  memorySpaceRoleEditor: 'Editor',
+  memorySpaceRoleViewer: 'Viewer',
+  memorySpaceCanCreate: 'Can create',
+  memorySpaceCreateAction: 'New draft',
+  memorySpaceCreateFailed: 'Could not add the draft right now.',
+  memorySpaceCreateSuccess: 'Draft added to inbox.',
+  memorySpaceCanReview: 'Can review',
+  memorySpaceCategoryGeneral: 'General',
+  memorySpaceCategoryPlaybook: 'Playbook',
+  memorySpaceCategoryPolicy: 'Policy',
+  memorySpaceInboxCount: '{count} inbox',
+  memorySpacePublishedCount: '{count} published',
+  memorySpacePlaybooksCount: '{count} playbooks',
+  memorySpacePoliciesCount: '{count} policies',
+  memorySpaceRecallActive: '{count} active',
+  memorySpaceRecallDisabled: '{count} paused',
+  memorySpaceRecallExpired: '{count} expired',
+  memorySpaceRecallStale: '{count} stale',
+  memorySpacePendingAction: '{count} pending',
+  memorySpaceBrowse: 'Browse memory',
+  memorySpaceEntriesEmpty: 'No memory entries in this section yet',
+  memorySpaceEntriesEmptyDesc:
+    'Try another section or come back after your team publishes more memory.',
+  memorySpaceBackToList: 'Back to list',
+  memorySpaceDetailOverview: 'Entry overview',
+  memorySpaceDetailAudit: 'Activity',
+  memorySpaceEntryCandidate: 'Candidate',
+  memorySpaceEntryMemory: 'Published',
+  memorySpaceSummaryUnavailable: 'This team space is temporarily unavailable',
+  memorySpaceSummaryRetry: 'Retry space',
+  memorySpaceAuditTitle: 'Recent activity',
+  memorySpaceAuditEmpty: 'No audit activity yet',
+  memorySpaceAuditShareAction: 'Share audit',
+  memorySpaceAuditShareSectionAction: 'Share section audit',
+  memorySpaceAuditShareFailed: 'Could not share the audit link right now.',
+  memorySpaceAuditActionMerged: 'Merged into published memory',
+  memorySpaceAuditActionPolicyUpdated: 'Policy updated',
+  memorySpaceAuditActionPublished: 'Published',
+  memorySpaceAuditByline: 'By {name} · {date}',
+  memorySpaceAuditChangeFromTo: '{field}: {before} -> {after}',
+  memorySpaceAuditChangeSet: '{field}: {value}',
+  memorySpaceAuditChangeUnset: '{field}: cleared',
+  memorySpaceAuditResolutionMerged: 'Merged changes into {title}',
+  memorySpaceFieldTitle: 'Title',
+  memorySpaceFieldRecall: 'Recall',
+  memorySpaceFieldExpiresAt: 'Expires',
+  memorySpaceFieldLastVerifiedAt: 'Verified',
+  memorySpaceFieldStaleAt: 'Stale',
+  memorySpaceReviewHintTitle: 'Possible duplicate',
+  memorySpaceReviewHintDesc: 'Review merge impact before publishing this candidate.',
+  memorySpaceReviewHintMatchTitle: 'Matches {name}',
+  memorySpaceReviewHintPublishedAt: 'Published {date}',
+  memorySpaceReviewHintImpactTitle: 'Merge impact',
+  memorySpaceReviewHintUpdatesTitle: 'Updates title',
+  memorySpaceReviewHintUpdatesSummary: 'Updates summary',
+  memorySpaceReviewHintUpdatesContent: 'Updates content',
+  memorySpaceReviewHintAddsSources: 'Adds {count} sources',
+  memorySpaceReviewActionsTitle: 'Review actions',
+  memorySpaceMergeAction: 'Merge',
+  memorySpacePublishAction: 'Publish',
+  memorySpaceRejectAction: 'Reject',
+  memorySpaceMarkNeedsReviewAction: 'Mark Needs Review',
+  memorySpaceRevalidateAction: 'Revalidate',
+  memorySpaceMergeSuccess: 'Candidate merged',
+  memorySpacePublishSuccess: 'Candidate published',
+  memorySpaceRejectSuccess: 'Candidate rejected',
+  memorySpaceMarkNeedsReviewSuccess: 'Memory marked as needing review',
+  memorySpaceRevalidateSuccess: 'Memory revalidated',
+  memorySpaceReviewActionFailed: 'Failed to update candidate',
+  memorySpaceLoadFailed: 'Failed to load team memory',
+  memorySpaceSectionInbox: 'Inbox',
+  memorySpaceSectionPlaybooks: 'Playbooks',
+  memorySpaceSectionPolicies: 'Policies',
+  memorySpaceSectionPublished: 'Published',
+  memorySpaceIntakeAutomation: 'Automation',
+  memorySpaceIntakeHarness: 'Harness',
+  memorySpaceIntakeManual: 'Manual',
+  memorySpaceRecallLabel: 'Recall',
+  memorySpaceRecallStateActive: 'Active',
+  memorySpaceRecallStateAll: 'All',
+  memorySpaceRecallStateDisabled: 'Paused',
+  memorySpaceRecallStateExpired: 'Expired',
+  memorySpaceRecallStateStale: 'Needs review',
+  memorySpaceSources: 'Sources',
+  memorySpaceSourceCount: '{count} sources',
+  memorySpaceUpdatedAt: 'Updated {date}',
+  memorySpacePublishedAt: 'Published {date}',
+  memorySpaceActor: 'By {name}',
   memorySearch: 'Search memories...',
   memoryDeleteConfirm: 'Delete Memory',
   memoryDeleteDesc: 'Are you sure you want to delete this memory? This action cannot be undone.',
@@ -2350,8 +2815,12 @@ const en: TranslationKeys = {
   memoryAssociatedLocations: 'Locations',
   memoryTotalCount: '{count} memories',
   memoryEdit: 'Edit',
+  memoryReset: 'Reset',
   memorySave: 'Save',
+  memorySavingChanges: 'Saving changes',
+  memoryAllChangesSaved: 'All changes saved',
   memorySaved: 'Memory saved',
+  memoryUnsavedChanges: 'Unsaved changes',
   memoryCreateIdentity: 'Create Identity',
   memoryCreateTitle: 'Title',
   memoryCreateTitlePlaceholder: 'Enter identity title...',
@@ -2460,6 +2929,8 @@ const zh_tw: TranslationKeys = {
   tabDiscover: '發現',
   tabMe: '我的',
   createOpenOptionsA11y: '開啟圖片與影片創作設定',
+  createCurrentSetup: '當前配置',
+  createHistory: '歷史紀錄',
 
   chatListTitle: 'Avato',
   chatListSearch: '搜尋會話與訊息',
@@ -2467,11 +2938,11 @@ const zh_tw: TranslationKeys = {
   chatListAgents: '助手',
   chatListCollapseAssistant: '收起',
   chatListExpandAssistant: '展開',
-  chatListViewAssistant: '助理',
+  chatListViewAssistant: '智能体',
   chatListViewGroup: '群聊',
   chatListViewSession: '會話',
   chatListViewTopic: '話題',
-  chatListAssistants: '助理',
+  chatListAssistants: '智能体',
   chatListTopicRecent: '最近',
   chatListTopics: '話題',
   chatListTopicEmpty: '暫無話題',
@@ -2484,7 +2955,7 @@ const zh_tw: TranslationKeys = {
   chatListCreateGroup: '新建群組會話',
   chatListCreateTag: '新建標籤',
   chatListGroupTag: '群聊',
-  chatListNewAssistant: '新助理',
+  chatListNewAssistant: '新智能体',
   chatListNewConversation: '新會話',
   deleteTopicConfirm: '刪除此話題？',
   deleteTopicDesc: '此對話將被永久刪除。',
@@ -2554,7 +3025,7 @@ const zh_tw: TranslationKeys = {
   chatToolStreamingAddExperience: '正在添加經驗記憶…',
   chatToolStreamingAddPreference: '正在添加偏好記憶…',
   chatToolStreamingWebSearch: '正在搜索…',
-  chatToolStreamingKnowledgeBase: '正在檢索知識庫…',
+  chatToolStreamingSourceSet: '正在檢索來源集…',
   chatToolStreamingSearchSkill: '正在搜索技能…',
   chatToolStreamingRunning: '執行中…',
   chatToolTapToExpand: '點擊展開',
@@ -2675,8 +3146,8 @@ const zh_tw: TranslationKeys = {
   notebookDocTitlePlaceholder: '文檔標題...',
   notebookDocContentPlaceholder: '開始用 Markdown 撰寫...',
   notebookDeleteConfirm: '刪除文檔',
-  notebookDeleteDesc: '此文檔將移至資源回收筒，可於「資源」頁的回收筒還原。',
-  notebookDeletedToTrash: '已移至資源回收筒。如需還原請至「資源」頁。',
+  notebookDeleteDesc: '此文檔將移至回收筒，可於「內容」頁的回收筒還原。',
+  notebookDeletedToTrash: '已移至回收筒。如需還原請至「內容」頁。',
   notebookDeleteFailed: '無法刪除文檔',
   notebookEditorMore: '更多選項',
   notebookListOpenDoc: '開啟',
@@ -2686,6 +3157,9 @@ const zh_tw: TranslationKeys = {
   notebookDiscard: '捨棄',
   notebookPreview: '預覽',
   notebookEdit: '編輯',
+  notebookTableAddColumn: '新增欄位',
+  notebookTableAddRow: '新增列',
+  notebookTableLabel: '表格',
   chatSettingsClearDesc: '這將清空此會話中的所有訊息。',
 
   settingsTitle: '設定',
@@ -2813,7 +3287,9 @@ const zh_tw: TranslationKeys = {
   homeQuickAnalyze: '群組',
   homeQuickCreate: '作圖',
   homeAgentAll: '全部',
-  homeRecents: '助理',
+  homeRecents: '智能体',
+  homeRecentDocs: '最近文檔',
+  homeRecentFiles: '最近檔案',
   homeSeeAll: '檢視全部',
   homeAssistants: '助手',
   homeStartChat: '開始聊天',
@@ -2843,6 +3319,21 @@ const zh_tw: TranslationKeys = {
   workspaceNotConnected: '未連線',
   workspaceProviders: '服務商',
   workspaceUserId: '使用者 ID',
+  workspaceCreateTitle: '新增團隊空間',
+  workspaceCreateNamePlaceholder: '團隊空間名稱',
+  workspaceCreateDescriptionPlaceholder: '這個空間是做什麼用的？',
+  workspaceCreateConfirm: '建立團隊空間',
+  workspaceCreateCreating: '建立中...',
+  workspaceCreateCreated: '團隊空間已建立',
+  workspaceCreateFailed: '無法建立團隊空間',
+  workspaceLoadFailed: '無法載入空間列表',
+  workspaceQuickAccessTitle: '快速入口',
+  workspaceCurrentContext: '當前內容範圍',
+  workspaceSpaceLabel: '空間',
+  workspaceScopeLabel: '範圍',
+  workspaceManageSourceSet: '管理來源集',
+  workspaceSwitchSpaces: '空間',
+  workspaceSwitchSourceSets: '來源集',
 
   msgActionCopy: '複製',
   msgActionEdit: '編輯',
@@ -2852,6 +3343,44 @@ const zh_tw: TranslationKeys = {
   msgActionDeleteConfirm: '確定刪除這則訊息嗎？',
   msgActionCopied: '已複製',
   msgActionSaveToTopic: '儲存為話題',
+  chatOpenConversation: '打開對話',
+  messageDetailTitle: '訊息詳情',
+  messageDetailOpen: '查看詳情',
+  messageDetailLoadFailed: '無法載入訊息詳情',
+  messageDetailEmpty: '訊息不可用',
+  messageDetailEmptyDesc: '找不到這則訊息，或它已不可用。',
+  toolDetailTitle: '工具詳情',
+  toolDetailOpen: '打開工具視圖',
+  toolDetailEmpty: '工具詳情不可用',
+  toolDetailEmptyDesc: '這個工具結果沒有更多可顯示的內容。',
+  threadListTitle: '執行緒',
+  threadDetailTitle: '執行緒詳情',
+  threadEmpty: '目前沒有執行緒',
+  threadEmptyDesc: '這個話題目前還沒有可檢視的執行緒。',
+  threadUntitled: '未命名執行緒',
+  threadLoadFailed: '無法載入執行緒',
+  threadDeleteConfirm: '刪除執行緒',
+  threadDeleted: '執行緒已刪除',
+  threadDeleteFailed: '無法刪除執行緒',
+  threadStatusProcessing: '處理中',
+  threadStatusCompleted: '已完成',
+  threadStatusFailed: '失敗',
+  threadStatusInterrupted: '已中斷',
+  threadStatusInReview: '待人工審核',
+  threadOpen: '打開執行緒',
+  threadStart: '建立執行緒',
+  threadStartModePrompt: '要包含先前對話上下文，還是只從這則訊息分叉？',
+  threadCreateFailed: '無法建立執行緒',
+  threadInputPlaceholder: '繼續這個執行緒…',
+  threadSendFailed: '無法傳送執行緒訊息',
+  threadTypeContinuation: '延續',
+  threadTypeStandalone: '獨立',
+  threadTypeIsolation: '隔離',
+  threadContextLabel: '來源上下文',
+  threadStartDivider: '執行緒從這裡開始',
+  threadMessageNoContent: '沒有文字內容',
+  threadMessageTools: '工具活動 · {count}',
+  threadMessageTasks: '任務活動 · {count}',
   msgStatTokens: 'tokens',
   msgStatUncachedInput: '未快取輸入',
   msgStatCachedInput: '快取輸入',
@@ -2897,12 +3426,22 @@ const zh_tw: TranslationKeys = {
 
   fileAttach: '附件',
   fileAttachDesc: '選擇來源，內容會直接加入目前的輸入框。',
+  fileAddToChatContext: '加入聊天上下文',
+  fileAddToChatContextDesc: '把這份文檔作為上下文加入，而不是作為二進位附件。',
+  fileAddToChatContextSuccess: '已加入聊天上下文',
+  fileAddToConversationSuccess: '已加入對話文件',
   fileCamera: '拍照',
   fileCameraDesc: '拍一張照片並立即附加。',
+  fileConversationFile: '對話文件',
+  fileChatContext: '文檔上下文',
+  fileOpen: '打開',
   fileDocument: '文件',
   fileDocumentDesc: '附加文件、筆記、PDF 或其他補充資料。',
+  fileEditAsDocument: '作為文檔編輯',
+  fileEditAsDocumentDesc: '先轉成文檔，再直接在這裡編輯內容。',
+  fileEditAsDocumentSuccess: '已作為文檔開啟',
   fileFromWorkspace: '從工作區',
-  fileFromWorkspaceDesc: '從資源工作區導入文件。',
+  fileFromWorkspaceDesc: '從內容頁導入文件。',
   fileGallery: '相簿',
   fileGalleryDesc: '從相簿選取一張或多張圖片。',
   fileNewFolderDesc: '在目前位置建立資料夾。',
@@ -3103,7 +3642,7 @@ const zh_tw: TranslationKeys = {
   chatHint3: '試試：除錯這個錯誤...',
   chatHint4: '試試：規劃我的一週...',
   streakCelebrate: '\u{1F525} 連續 {count} 天！',
-  activeAssistants: '{count} 個助理',
+  activeAssistants: '{count} 個智能体',
   activeGroups: '{count} 個群聊',
   activeTopics: '{count} 個話題',
   activeChats: '{count} 個會話',
@@ -3164,7 +3703,7 @@ const zh_tw: TranslationKeys = {
   providerDetailPlaceholderRegion: 'us-east-1',
   providerDetailPlaceholderApiVersion: '2024-02-01',
 
-  resourceTitle: '資源',
+  resourceTitle: '內容',
   resourceTabAll: '全部',
   resourceTabImages: '圖片',
   resourceTabDocuments: '文件',
@@ -3176,7 +3715,7 @@ const zh_tw: TranslationKeys = {
   resourceUploadFile: '選擇檔案',
   resourceDeleting: '刪除中…',
   resourceDeleteConfirm: '刪除檔案',
-  resourceDeleteDesc: '檔案將移至資源回收筒，可於資源頁的回收筒還原。',
+  resourceDeleteDesc: '檔案將移至回收筒，可在內容頁的回收筒還原。',
   resourceUploadFailed: '上傳失敗',
   resourceUploaded: '上傳成功',
   resourceDownload: '下載',
@@ -3187,9 +3726,12 @@ const zh_tw: TranslationKeys = {
   resourceCollapseAll: '全部收合',
   resourceCurrentFolder: '目前資料夾',
   resourceExpandAll: '全部展開',
-  resourceExplorer: '資料總管',
+  resourceExplorer: '內容目錄',
   resourceOpenExternal: '在瀏覽器中打開',
   resourcePreviewUnavailable: '無法載入預覽',
+  resourceTablePreviewReadOnly: '唯讀表格預覽',
+  resourceTablePreviewUnavailable: '此表格目前僅支援在行動端預覽',
+  resourceTablePreviewSummary: '{rows} 列 · {columns} 欄',
   resourceDeleteFailed: '刪除失敗',
   resourceRenameFailed: '重新命名失敗',
   resourceRenamePlaceholder: '輸入新名稱',
@@ -3198,8 +3740,8 @@ const zh_tw: TranslationKeys = {
   resourceShareLinkTitle: '分享連結',
   resourceShareLinkSheetSubtitle: '會建立有期限的連結供他人開啟，與直接傳送原始檔案不同。',
   resourceShareCreateLinkAction: '建立分享連結',
-  resourceShareLibraryMenuTitle: '資源庫分享',
-  resourceFolderOpenNeedsLibrary: '請先在上方選擇資源庫，才能瀏覽資料夾。',
+  resourceShareSourceSetMenuTitle: '來源集分享',
+  resourceFolderOpenNeedsSourceSet: '請先在上方選擇來源集，才能瀏覽資料夾。',
   resourceBatchShareLink: '分享連結',
   resourceShareExpiresLabel: '連結有效期限',
   resourceShareExpires1d: '1 天',
@@ -3208,7 +3750,7 @@ const zh_tw: TranslationKeys = {
   resourceSharePasswordOptional: '密碼（選填）',
   resourceSharePasswordPlaceholder: '留空則不需密碼',
   resourceShareConfirm: '建立並分享',
-  resourceShareLibrary: '分享資源庫',
+  resourceShareSourceSet: '分享來源集',
   resourcePickerPickLocation: '位置',
   resourceShareManage: '管理分享',
   resourceShareManageLinks: '分享連結',
@@ -3231,12 +3773,12 @@ const zh_tw: TranslationKeys = {
   resourceShareCopyAccess: '複製',
   resourceAccessCopied: '已複製',
   resourceSharedWithMe: '與我分享',
-  resourceSharedWithMeEmpty: '目前沒有人與你分享資源',
+  resourceSharedWithMeEmpty: '暫時沒有人與你分享內容',
   resourceSharedWithMeLoadFailed: '無法載入分享列表',
   resourceSharedKindFile: '檔案',
   resourceSharedKindDocument: '文件',
-  resourceSharedKindLibrary: '資源庫',
-  resourceSharedFolderHint: '請在資源頁的資源庫中開啟此資料夾。',
+  resourceSharedKindSourceSet: '來源集',
+  resourceSharedFolderHint: '請在內容頁的來源集中開啟此資料夾。',
   resourceShareGrantInheritChildren: '對內部項目生效（繼承）',
   resourceShareGrantCanReshare: '允許此編輯者管理分享',
   resourceShareGrantExpiresPlaceholder: '存取過期（選填，YYYY-MM-DD）',
@@ -3250,9 +3792,9 @@ const zh_tw: TranslationKeys = {
   resourceShareGrantExpirySelected: '到期：',
   resourceShareMemberCanReshare: '可管理分享',
   resourceShareMemberInheritOff: '不繼承至子項目',
-  resourcePublicShareTitle: '分享的資源',
+  resourcePublicShareTitle: '分享的內容',
   resourcePublicSharePasswordTitle: '受密碼保護',
-  resourcePublicSharePasswordSubtitle: '輸入密碼以檢視此資源。',
+  resourcePublicSharePasswordSubtitle: '輸入密碼以檢視此內容。',
   resourcePublicSharePasswordPlaceholder: '密碼',
   resourcePublicShareUnlock: '解鎖',
   resourcePublicShareNotFound: '分享連結無效或已過期。',
@@ -3260,8 +3802,8 @@ const zh_tw: TranslationKeys = {
   resourcePublicShareDownload: '下載檔案',
   resourceSharedAccessNoExpiry: '無過期',
   resourceSharedPermissionValidUntil: '存取有效至',
-  resourceShareAccessOk: '你可以存取此資源',
-  resourceShareAccessDenied: '你無法存取此資源',
+  resourceShareAccessOk: '你可以存取此內容',
+  resourceShareAccessDenied: '你無法存取此內容',
   resourceShareAccessUnknown: '無法載入存取詳情',
   resourceShareAccessViaSpace: '透過空間成員身分',
   resourceShareAccessViaDirect: '有人直接與你分享',
@@ -3271,7 +3813,7 @@ const zh_tw: TranslationKeys = {
   resourceShareConfirmDisableLinkMessage:
     '擁有連結的人將無法再開啟。之後可以建立新連結，但舊連結會永久失效。',
   resourceShareConfirmRevokeTitle: '要移除此人嗎？',
-  resourceShareConfirmRevokeMessage: '對方將失去此資源的存取權。',
+  resourceShareConfirmRevokeMessage: '對方將失去對此內容的存取權。',
   resourceShareRetry: '重試',
   resourceShareGrantUsernamePlaceholder: '使用者名稱',
   resourceUntitled: '未命名',
@@ -3279,19 +3821,76 @@ const zh_tw: TranslationKeys = {
   resourcePublicShareNotFoundHint:
     '請確認連結與密碼是否正確；密碼錯誤時顯示可能與連結過期相同。',
   resourcePublicShareDownloadFailed: '無法開啟下載連結。',
-  resourcePublicShareKbHint: '若要瀏覽完整資源庫與檔案列表，請在瀏覽器使用 LobeHub。',
+  resourcePublicShareSourceSetHint: '若要瀏覽完整來源集與檔案列表，請在瀏覽器使用 LobeHub。',
+  resourceGovernanceUsageInternal: '內部',
+  resourceGovernanceUsagePublic: '公開',
+  resourceGovernanceUsageRestricted: '受限',
+  resourceGovernanceReviewDraft: '草稿',
+  resourceGovernanceReviewApproved: '已核准',
+  resourceGovernanceReviewArchived: '已封存',
+  resourceGovernanceClassificationGeneral: '一般',
+  resourceGovernanceClassificationBrand: '品牌',
+  resourceGovernanceClassificationFinance: '財務',
+  resourceGovernanceClassificationHr: '人資',
+  resourceGovernanceClassificationLegal: '法務',
+  resourceGovernanceClassificationProduct: '產品',
+  resourceGovernanceRenditionCaption: '說明',
+  resourceGovernanceRenditionEmbedding: '向量',
+  resourceGovernanceRenditionPreview: '預覽',
+  resourceGovernanceRenditionPrint: '列印',
+  resourceGovernanceRenditionThumbnail: '縮圖',
+  resourceGovernanceRenditionTranscript: '逐字稿',
+  resourceGovernanceRenditionWeb: '網頁',
+  resourceGovernanceFilters: '治理篩選',
+  resourceGovernanceFiltersSubtitle: '依審核狀態、使用政策、分類或權利歸屬方篩選檔案。',
+  resourceGovernanceSectionReview: '審核狀態',
+  resourceGovernanceSectionUsage: '使用政策',
+  resourceGovernanceSectionClassification: '分類',
+  resourceGovernanceSectionRightsOwner: '權利歸屬方',
+  resourceGovernanceRightsOwnerPlaceholder: '輸入權利歸屬方',
+  resourceGovernanceRightsOwnerSummary: '權利歸屬方：{rightsOwner}',
+  resourceGovernanceQuickHint: '常用條件可直接點選，分類與權利歸屬方請到進階篩選調整。',
+  resourceGovernanceSelectedFilters: '已選條件',
+  resourceGovernanceNoFilters: '尚未選擇篩選條件',
+  resourceGovernanceAdvanced: '進階',
+  resourceGovernanceCapabilitiesViewerHint: '你可以在此範圍檢視治理中繼資料。',
+  resourceGovernanceCapabilitiesEditorHint: '此範圍允許在支援的介面上編輯治理資料。',
+  resourceGovernanceCapabilitiesManagerHint: '此範圍允許在支援的介面上審核與封存治理資料。',
+  resourceGovernanceClear: '清除',
+  resourceGovernanceApply: '套用',
+  resourceGovernanceAny: '全部',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
   resourceGB: 'GB',
-  resourceLibraryAll: '全部檔案',
-  resourceLibraryInbox: '未归类',
+  resourceAllFiles: '全部檔案',
+  resourceSourceSetUnassigned: '未分類',
   resourceFolderRoot: '根目錄',
-  resourceLibrarySelect: '選擇資源庫',
+  resourceSourceSetSelect: '選擇來源集',
+  resourceCreateSourceSet: '建立來源集',
+  resourceCreateSourceSetPlaceholder: '來源集名稱',
+  resourceSourceSetCreated: '來源集已建立',
+  resourceSourceSetLoadFailed: '無法載入來源集列表',
+  resourceDeleteSourceSetConfirm: '刪除來源集',
+  resourceDeleteSourceSetDesc: '來源集將被刪除；若保留檔案，可稍後重新整理。',
+  resourceSourceSetDeleted: '來源集已刪除',
+  resourceAddToSourceSet: '加入來源集',
+  resourceAddToSourceSetSuccess: '已加入來源集',
+  resourceAddToSourceSetFailed: '無法將這些項目加入來源集',
+  resourceAddToSourceSetExists: '部分項目已存在於該來源集中',
+  resourceMoveToSourceSet: '移動到來源集',
+  resourceMoveToSourceSetSuccess: '已移動到來源集',
+  resourceMoveToSourceSetFailed: '無法將這些項目移動到來源集',
+  resourceRemoveFromSourceSet: '從來源集移除',
+  resourceRemoveFromSourceSetConfirm: '從來源集移除',
+  resourceRemoveFromSourceSetDesc: '要從目前來源集中移除 {count} 個項目嗎？',
+  resourceRemoveFromSourceSetSuccess: '已從來源集移除',
+  resourceRemoveFromSourceSetFailed: '無法從來源集移除這些項目',
+  resourceSelectSourceSetTarget: '選擇這些項目的目標來源集。',
   resourceNewFolder: '新建資料夾',
   resourceMoveToFolder: '移至資料夾',
   resourceFolderDeleteConfirm: '刪除資料夾',
-  resourceFolderDeleteDesc: '資料夾將移至資源回收筒，可於資源頁的回收筒還原。',
+  resourceFolderDeleteDesc: '資料夾將移至回收筒，可在內容頁的回收筒還原。',
   resourceCreateFolder: '建立資料夾',
   resourceCreateFolderPlaceholder: '資料夾名稱',
   resourceSortBy: '排序',
@@ -3305,6 +3904,9 @@ const zh_tw: TranslationKeys = {
   resourceViewList: '列表',
   resourceViewGrid: '網格',
   resourceViewModeToggle: '切換列表或網格檢視',
+  resourceScopeTree: '樹狀',
+  resourceScopeFiles: '檔案',
+  resourceMoreActions: '更多操作',
   resourceSelect: '選擇',
   resourceSelectCount: '已選 {count} 項',
   resourceBatchDelete: '刪除',
@@ -3507,6 +4109,103 @@ const zh_tw: TranslationKeys = {
   memoryEmptyDesc: 'AI 會自動從你的對話中擷取記憶。',
   memoryPersona: '人格畫像',
   memoryPersonaEmpty: '尚未產生人格畫像。多聊聊天來建構你的畫像。',
+  memoryHomePersonal: '個人',
+  memoryHomeSpaces: '空間',
+  memoryHomePersonalEmpty: '尚未建立個人記憶檔案',
+  memoryHomePersonalEmptyDesc: '多聊聊天並執行擷取，即可建立你的個人記憶。',
+  memorySpacesTitle: '團隊記憶空間',
+  memorySpacesDesc: '查看你所屬團隊空間中的記憶治理與 recall 狀態。',
+  memorySpacesEmpty: '你目前還沒有可用的團隊記憶空間摘要。',
+  memorySpaceKindTeam: '團隊空間',
+  memorySpaceRoleOwner: '擁有者',
+  memorySpaceRoleAdmin: '管理員',
+  memorySpaceRoleEditor: '編輯者',
+  memorySpaceRoleViewer: '檢視者',
+  memorySpaceCanCreate: '可建立',
+  memorySpaceCreateAction: '新增草稿',
+  memorySpaceCreateFailed: '目前無法新增草稿。',
+  memorySpaceCreateSuccess: '草稿已加入待處理。',
+  memorySpaceCanReview: '可治理',
+  memorySpaceCategoryGeneral: '一般',
+  memorySpaceCategoryPlaybook: '手冊',
+  memorySpaceCategoryPolicy: '政策',
+  memorySpaceInboxCount: '{count} 個待處理',
+  memorySpacePublishedCount: '{count} 個已發布',
+  memorySpacePlaybooksCount: '{count} 個手冊',
+  memorySpacePoliciesCount: '{count} 個政策',
+  memorySpaceRecallActive: '{count} 個啟用',
+  memorySpaceRecallDisabled: '{count} 個暫停',
+  memorySpaceRecallExpired: '{count} 個已過期',
+  memorySpaceRecallStale: '{count} 個待驗證',
+  memorySpacePendingAction: '{count} 個待處理',
+  memorySpaceBrowse: '瀏覽記憶',
+  memorySpaceEntriesEmpty: '此區段目前還沒有記憶條目',
+  memorySpaceEntriesEmptyDesc: '可切換其他區段，或等團隊發布更多記憶後再查看。',
+  memorySpaceBackToList: '返回列表',
+  memorySpaceDetailOverview: '條目概覽',
+  memorySpaceDetailAudit: '活動',
+  memorySpaceEntryCandidate: '候選項',
+  memorySpaceEntryMemory: '已發布',
+  memorySpaceSummaryUnavailable: '這個團隊空間暫時無法載入',
+  memorySpaceSummaryRetry: '重試空間',
+  memorySpaceAuditTitle: '最近活動',
+  memorySpaceAuditEmpty: '目前還沒有審計活動',
+  memorySpaceAuditShareAction: '分享審計',
+  memorySpaceAuditShareSectionAction: '分享區段審計',
+  memorySpaceAuditShareFailed: '目前無法分享審計連結。',
+  memorySpaceAuditActionMerged: '已合併到正式記憶',
+  memorySpaceAuditActionPolicyUpdated: '已更新政策',
+  memorySpaceAuditActionPublished: '已發布',
+  memorySpaceAuditByline: '由 {name} 於 {date}',
+  memorySpaceAuditChangeFromTo: '{field}：{before} -> {after}',
+  memorySpaceAuditChangeSet: '{field}：{value}',
+  memorySpaceAuditChangeUnset: '{field}：已清除',
+  memorySpaceAuditResolutionMerged: '已合併變更到 {title}',
+  memorySpaceFieldTitle: '標題',
+  memorySpaceFieldRecall: 'Recall',
+  memorySpaceFieldExpiresAt: '到期',
+  memorySpaceFieldLastVerifiedAt: '驗證',
+  memorySpaceFieldStaleAt: '過期待驗證',
+  memorySpaceReviewHintTitle: '可能重複',
+  memorySpaceReviewHintDesc: '發布候選前，先檢查合併影響。',
+  memorySpaceReviewHintMatchTitle: '匹配 {name}',
+  memorySpaceReviewHintPublishedAt: '發布於 {date}',
+  memorySpaceReviewHintImpactTitle: '合併影響',
+  memorySpaceReviewHintUpdatesTitle: '更新標題',
+  memorySpaceReviewHintUpdatesSummary: '更新摘要',
+  memorySpaceReviewHintUpdatesContent: '更新內容',
+  memorySpaceReviewHintAddsSources: '新增 {count} 個來源',
+  memorySpaceReviewActionsTitle: '審核動作',
+  memorySpaceMergeAction: '合併',
+  memorySpacePublishAction: '發布',
+  memorySpaceRejectAction: '拒絕',
+  memorySpaceMarkNeedsReviewAction: '標記為待審核',
+  memorySpaceRevalidateAction: '重新驗證',
+  memorySpaceMergeSuccess: '候選項已合併',
+  memorySpacePublishSuccess: '候選項已發布',
+  memorySpaceRejectSuccess: '候選項已拒絕',
+  memorySpaceMarkNeedsReviewSuccess: '記憶已標記為待審核',
+  memorySpaceRevalidateSuccess: '記憶已重新驗證',
+  memorySpaceReviewActionFailed: '更新候選項失敗',
+  memorySpaceLoadFailed: '載入團隊記憶失敗',
+  memorySpaceSectionInbox: '待處理',
+  memorySpaceSectionPlaybooks: '手冊',
+  memorySpaceSectionPolicies: '政策',
+  memorySpaceSectionPublished: '已發布',
+  memorySpaceIntakeAutomation: '自動化',
+  memorySpaceIntakeHarness: 'Harness',
+  memorySpaceIntakeManual: '手動',
+  memorySpaceRecallLabel: 'Recall',
+  memorySpaceRecallStateActive: '啟用中',
+  memorySpaceRecallStateAll: '全部',
+  memorySpaceRecallStateDisabled: '已暫停',
+  memorySpaceRecallStateExpired: '已過期',
+  memorySpaceRecallStateStale: '待驗證',
+  memorySpaceSources: '來源',
+  memorySpaceSourceCount: '{count} 個來源',
+  memorySpaceUpdatedAt: '更新於 {date}',
+  memorySpacePublishedAt: '發布於 {date}',
+  memorySpaceActor: '由 {name}',
   memorySearch: '搜尋記憶...',
   memoryDeleteConfirm: '刪除記憶',
   memoryDeleteDesc: '確定要刪除這則記憶嗎？此操作無法復原。',
@@ -3542,8 +4241,12 @@ const zh_tw: TranslationKeys = {
   memoryAssociatedLocations: '關聯地點',
   memoryTotalCount: '{count} 則記憶',
   memoryEdit: '編輯',
+  memoryReset: '重設',
   memorySave: '儲存',
+  memorySavingChanges: '正在儲存變更',
+  memoryAllChangesSaved: '所有變更已儲存',
   memorySaved: '記憶已儲存',
+  memoryUnsavedChanges: '尚有未儲存的變更',
   memoryCreateIdentity: '建立身分',
   memoryCreateTitle: '標題',
   memoryCreateTitlePlaceholder: '輸入身分標題...',
@@ -3652,6 +4355,8 @@ const zh: TranslationKeys = {
   tabDiscover: '发现',
   tabMe: '我的',
   createOpenOptionsA11y: '打开图片与视频创作设置',
+  createCurrentSetup: '当前配置',
+  createHistory: '历史记录',
 
   chatListTitle: 'Avato',
   chatListSearch: '搜索会话与消息',
@@ -3659,11 +4364,11 @@ const zh: TranslationKeys = {
   chatListAgents: '助手',
   chatListCollapseAssistant: '收起',
   chatListExpandAssistant: '展开',
-  chatListViewAssistant: '助理',
+  chatListViewAssistant: '智能体',
   chatListViewGroup: '群聊',
   chatListViewSession: '会话',
   chatListViewTopic: '话题',
-  chatListAssistants: '助理',
+  chatListAssistants: '智能体',
   chatListTopicRecent: '最近',
   chatListTopics: '话题',
   chatListTopicEmpty: '暂无话题',
@@ -3676,7 +4381,7 @@ const zh: TranslationKeys = {
   chatListCreateGroup: '新建群组会话',
   chatListCreateTag: '新建标签',
   chatListGroupTag: '群聊',
-  chatListNewAssistant: '新助理',
+  chatListNewAssistant: '新智能体',
   chatListNewConversation: '新会话',
   deleteTopicConfirm: '删除此话题？',
   deleteTopicDesc: '此对话将被永久删除。',
@@ -3746,7 +4451,7 @@ const zh: TranslationKeys = {
   chatToolStreamingAddExperience: '正在添加经验记忆…',
   chatToolStreamingAddPreference: '正在添加偏好记忆…',
   chatToolStreamingWebSearch: '正在搜索…',
-  chatToolStreamingKnowledgeBase: '正在检索知识库…',
+  chatToolStreamingSourceSet: '正在检索来源集…',
   chatToolStreamingSearchSkill: '正在搜索技能…',
   chatToolStreamingRunning: '执行中…',
   chatToolTapToExpand: '点击展开',
@@ -3868,8 +4573,8 @@ const zh: TranslationKeys = {
   notebookDocTitlePlaceholder: '文档标题...',
   notebookDocContentPlaceholder: '开始用 Markdown 撰写...',
   notebookDeleteConfirm: '删除文档',
-  notebookDeleteDesc: '该文档将移至回收站，可在「资源」页的回收站中恢复。',
-  notebookDeletedToTrash: '已移至回收站。如需恢复请打开「资源」页。',
+  notebookDeleteDesc: '该文档将移至回收站，可在「内容」页的回收站中恢复。',
+  notebookDeletedToTrash: '已移至回收站。如需恢复请打开「内容」页。',
   notebookDeleteFailed: '无法删除文档',
   notebookEditorMore: '更多选项',
   notebookListOpenDoc: '打开',
@@ -3879,6 +4584,9 @@ const zh: TranslationKeys = {
   notebookDiscard: '丢弃',
   notebookPreview: '预览',
   notebookEdit: '编辑',
+  notebookTableAddColumn: '新增列',
+  notebookTableAddRow: '新增行',
+  notebookTableLabel: '表格',
 
   settingsTitle: '设置',
   settingsServer: '服务器',
@@ -4005,7 +4713,9 @@ const zh: TranslationKeys = {
   homeQuickAnalyze: '群组',
   homeQuickCreate: '作图',
   homeAgentAll: '全部',
-  homeRecents: '助理',
+  homeRecents: '智能体',
+  homeRecentDocs: '最近文档',
+  homeRecentFiles: '最近文件',
   homeSeeAll: '查看全部',
   homeAssistants: '助手',
   homeStartChat: '开始聊天',
@@ -4035,6 +4745,21 @@ const zh: TranslationKeys = {
   workspaceNotConnected: '未连接',
   workspaceProviders: '服务商',
   workspaceUserId: '用户 ID',
+  workspaceCreateTitle: '新建团队空间',
+  workspaceCreateNamePlaceholder: '团队空间名称',
+  workspaceCreateDescriptionPlaceholder: '这个空间是做什么用的？',
+  workspaceCreateConfirm: '创建团队空间',
+  workspaceCreateCreating: '创建中...',
+  workspaceCreateCreated: '团队空间已创建',
+  workspaceCreateFailed: '无法创建团队空间',
+  workspaceLoadFailed: '无法加载空间列表',
+  workspaceQuickAccessTitle: '快捷入口',
+  workspaceCurrentContext: '当前内容范围',
+  workspaceSpaceLabel: '空间',
+  workspaceScopeLabel: '范围',
+  workspaceManageSourceSet: '管理来源集',
+  workspaceSwitchSpaces: '空间',
+  workspaceSwitchSourceSets: '来源集',
 
   msgActionCopy: '复制',
   msgActionEdit: '编辑',
@@ -4044,6 +4769,44 @@ const zh: TranslationKeys = {
   msgActionDeleteConfirm: '确定删除这条消息吗？',
   msgActionCopied: '已复制',
   msgActionSaveToTopic: '存为话题',
+  chatOpenConversation: '打开对话',
+  messageDetailTitle: '消息详情',
+  messageDetailOpen: '查看详情',
+  messageDetailLoadFailed: '无法加载消息详情',
+  messageDetailEmpty: '消息不可用',
+  messageDetailEmptyDesc: '找不到这条消息，或它已不可用。',
+  toolDetailTitle: '工具详情',
+  toolDetailOpen: '打开工具视图',
+  toolDetailEmpty: '工具详情不可用',
+  toolDetailEmptyDesc: '这个工具结果没有更多可显示的内容。',
+  threadListTitle: '线程',
+  threadDetailTitle: '线程详情',
+  threadEmpty: '当前没有线程',
+  threadEmptyDesc: '这个话题里还没有可查看的线程。',
+  threadUntitled: '未命名线程',
+  threadLoadFailed: '无法加载线程',
+  threadDeleteConfirm: '删除线程',
+  threadDeleted: '线程已删除',
+  threadDeleteFailed: '无法删除线程',
+  threadStatusProcessing: '处理中',
+  threadStatusCompleted: '已完成',
+  threadStatusFailed: '失败',
+  threadStatusInterrupted: '已中断',
+  threadStatusInReview: '待人工审核',
+  threadOpen: '打开线程',
+  threadStart: '新建线程',
+  threadStartModePrompt: '要包含之前的对话上下文，还是只从这条消息分叉？',
+  threadCreateFailed: '无法创建线程',
+  threadInputPlaceholder: '继续这个线程…',
+  threadSendFailed: '无法发送线程消息',
+  threadTypeContinuation: '延续',
+  threadTypeStandalone: '独立',
+  threadTypeIsolation: '隔离',
+  threadContextLabel: '来源上下文',
+  threadStartDivider: '线程从这里开始',
+  threadMessageNoContent: '没有文本内容',
+  threadMessageTools: '工具活动 · {count}',
+  threadMessageTasks: '任务活动 · {count}',
   msgStatTokens: 'tokens',
   msgStatUncachedInput: '未缓存输入',
   msgStatCachedInput: '缓存输入',
@@ -4089,12 +4852,22 @@ const zh: TranslationKeys = {
 
   fileAttach: '附件',
   fileAttachDesc: '选择来源，内容会直接加入当前输入框。',
+  fileAddToChatContext: '添加到聊天上下文',
+  fileAddToChatContextDesc: '把这份文档作为上下文添加，而不是作为二进制附件。',
+  fileAddToChatContextSuccess: '已添加到聊天上下文',
+  fileAddToConversationSuccess: '已加入对话文件',
   fileCamera: '拍照',
   fileCameraDesc: '拍一张照片并立即附加。',
+  fileConversationFile: '对话文件',
+  fileChatContext: '文档上下文',
+  fileOpen: '打开',
   fileDocument: '文档',
   fileDocumentDesc: '附加文件、笔记、PDF 或其他补充材料。',
+  fileEditAsDocument: '作为文档编辑',
+  fileEditAsDocumentDesc: '先转换成文档，再直接在这里编辑内容。',
+  fileEditAsDocumentSuccess: '已作为文档打开',
   fileFromWorkspace: '从工作区',
-  fileFromWorkspaceDesc: '从资源工作区导入文件。',
+  fileFromWorkspaceDesc: '从内容页导入文件。',
   fileGallery: '相册',
   fileGalleryDesc: '从相册选择一张或多张图片。',
   fileNewFolderDesc: '在当前位置创建文件夹。',
@@ -4295,7 +5068,7 @@ const zh: TranslationKeys = {
   chatHint3: '试试：调试这个错误...',
   chatHint4: '试试：规划我的一周...',
   streakCelebrate: '\u{1F525} 连续 {count} 天！',
-  activeAssistants: '{count} 个助理',
+  activeAssistants: '{count} 个智能体',
   activeGroups: '{count} 个群聊',
   activeTopics: '{count} 个话题',
   activeChats: '{count} 个会话',
@@ -4356,8 +5129,8 @@ const zh: TranslationKeys = {
   providerDetailPlaceholderRegion: 'us-east-1',
   providerDetailPlaceholderApiVersion: '2024-02-01',
 
-  // Resources / Files
-  resourceTitle: '资源',
+  // Content / Files
+  resourceTitle: '内容',
   resourceTabAll: '全部',
   resourceTabImages: '图片',
   resourceTabDocuments: '文档',
@@ -4369,7 +5142,7 @@ const zh: TranslationKeys = {
   resourceUploadFile: '选择文件',
   resourceDeleting: '删除中…',
   resourceDeleteConfirm: '删除文件',
-  resourceDeleteDesc: '文件将移至回收站，可在资源页的回收站中恢复。',
+  resourceDeleteDesc: '文件将移至回收站，可在内容页的回收站中恢复。',
   resourceUploadFailed: '上传失败',
   resourceUploaded: '上传成功',
   resourceDownload: '下载',
@@ -4380,9 +5153,12 @@ const zh: TranslationKeys = {
   resourceCollapseAll: '全部收拢',
   resourceCurrentFolder: '当前文件夹',
   resourceExpandAll: '全部展开',
-  resourceExplorer: '资源目录',
+  resourceExplorer: '内容目录',
   resourceOpenExternal: '在浏览器中打开',
   resourcePreviewUnavailable: '无法加载预览',
+  resourceTablePreviewReadOnly: '只读表格预览',
+  resourceTablePreviewUnavailable: '该表格目前仅支持在移动端预览',
+  resourceTablePreviewSummary: '{rows} 行 · {columns} 列',
   resourceDeleteFailed: '删除失败',
   resourceRenameFailed: '重命名失败',
   resourceRenamePlaceholder: '输入新名称',
@@ -4391,8 +5167,8 @@ const zh: TranslationKeys = {
   resourceShareLinkTitle: '分享链接',
   resourceShareLinkSheetSubtitle: '将生成限时链接供他人打开，与直接发送原始文件不同。',
   resourceShareCreateLinkAction: '创建分享链接',
-  resourceShareLibraryMenuTitle: '资源库分享',
-  resourceFolderOpenNeedsLibrary: '请先在上方选择资源库，才能浏览文件夹。',
+  resourceShareSourceSetMenuTitle: '来源集分享',
+  resourceFolderOpenNeedsSourceSet: '请先在上方选择来源集，才能浏览文件夹。',
   resourceBatchShareLink: '分享链接',
   resourceShareExpiresLabel: '链接有效期',
   resourceShareExpires1d: '1 天',
@@ -4401,7 +5177,7 @@ const zh: TranslationKeys = {
   resourceSharePasswordOptional: '密码（可选）',
   resourceSharePasswordPlaceholder: '留空则无需密码',
   resourceShareConfirm: '创建并分享',
-  resourceShareLibrary: '分享资源库',
+  resourceShareSourceSet: '分享来源集',
   resourcePickerPickLocation: '位置',
   resourceShareManage: '管理分享',
   resourceShareManageLinks: '分享链接',
@@ -4424,12 +5200,12 @@ const zh: TranslationKeys = {
   resourceShareCopyAccess: '复制',
   resourceAccessCopied: '已复制',
   resourceSharedWithMe: '与我分享',
-  resourceSharedWithMeEmpty: '暂时没有人与你分享资源',
+  resourceSharedWithMeEmpty: '暂时没有人与你分享内容',
   resourceSharedWithMeLoadFailed: '无法加载分享列表',
   resourceSharedKindFile: '文件',
   resourceSharedKindDocument: '文档',
-  resourceSharedKindLibrary: '资源库',
-  resourceSharedFolderHint: '请在资源页的资源库中打开此文件夹。',
+  resourceSharedKindSourceSet: '来源集',
+  resourceSharedFolderHint: '请在内容页的来源集中打开此文件夹。',
   resourceShareGrantInheritChildren: '对内部项目生效（继承）',
   resourceShareGrantCanReshare: '允许该编辑者管理分享',
   resourceShareGrantExpiresPlaceholder: '访问过期（选填，YYYY-MM-DD）',
@@ -4443,9 +5219,9 @@ const zh: TranslationKeys = {
   resourceShareGrantExpirySelected: '到期：',
   resourceShareMemberCanReshare: '可管理分享',
   resourceShareMemberInheritOff: '不继承到子项',
-  resourcePublicShareTitle: '分享的资源',
+  resourcePublicShareTitle: '分享的内容',
   resourcePublicSharePasswordTitle: '受密码保护',
-  resourcePublicSharePasswordSubtitle: '输入密码以查看此资源。',
+  resourcePublicSharePasswordSubtitle: '输入密码以查看此内容。',
   resourcePublicSharePasswordPlaceholder: '密码',
   resourcePublicShareUnlock: '解锁',
   resourcePublicShareNotFound: '分享链接无效或已过期。',
@@ -4453,8 +5229,8 @@ const zh: TranslationKeys = {
   resourcePublicShareDownload: '下载文件',
   resourceSharedAccessNoExpiry: '无过期',
   resourceSharedPermissionValidUntil: '访问有效期至',
-  resourceShareAccessOk: '你可以访问此资源',
-  resourceShareAccessDenied: '你无法访问此资源',
+  resourceShareAccessOk: '你可以访问此内容',
+  resourceShareAccessDenied: '你无法访问此内容',
   resourceShareAccessUnknown: '无法加载访问详情',
   resourceShareAccessViaSpace: '通过空间成员身份',
   resourceShareAccessViaDirect: '有人直接与你分享',
@@ -4464,26 +5240,83 @@ const zh: TranslationKeys = {
   resourceShareConfirmDisableLinkMessage:
     '拥有链接的人将无法再打开。之后可以新建链接，但旧链接将永久失效。',
   resourceShareConfirmRevokeTitle: '要移除此人吗？',
-  resourceShareConfirmRevokeMessage: '对方将失去对此资源的访问权限。',
+  resourceShareConfirmRevokeMessage: '对方将失去对此内容的访问权限。',
   resourceShareRetry: '重试',
   resourceShareGrantUsernamePlaceholder: '用户名',
   resourceUntitled: '未命名',
   resourcePublicShareDocEmpty: '此文档没有可预览的内容。',
   resourcePublicShareNotFoundHint: '请核对链接与密码；密码错误时提示可能与链接过期相同。',
   resourcePublicShareDownloadFailed: '无法打开下载链接。',
-  resourcePublicShareKbHint: '若要查看完整资源库与文件列表，请在浏览器中使用 LobeHub。',
+  resourcePublicShareSourceSetHint: '若要查看完整来源集与文件列表，请在浏览器中使用 LobeHub。',
+  resourceGovernanceUsageInternal: '内部',
+  resourceGovernanceUsagePublic: '公开',
+  resourceGovernanceUsageRestricted: '受限',
+  resourceGovernanceReviewDraft: '草稿',
+  resourceGovernanceReviewApproved: '已批准',
+  resourceGovernanceReviewArchived: '已归档',
+  resourceGovernanceClassificationGeneral: '通用',
+  resourceGovernanceClassificationBrand: '品牌',
+  resourceGovernanceClassificationFinance: '财务',
+  resourceGovernanceClassificationHr: '人事',
+  resourceGovernanceClassificationLegal: '法务',
+  resourceGovernanceClassificationProduct: '产品',
+  resourceGovernanceRenditionCaption: '说明',
+  resourceGovernanceRenditionEmbedding: '向量',
+  resourceGovernanceRenditionPreview: '预览',
+  resourceGovernanceRenditionPrint: '打印',
+  resourceGovernanceRenditionThumbnail: '缩略图',
+  resourceGovernanceRenditionTranscript: '转录',
+  resourceGovernanceRenditionWeb: '网页',
+  resourceGovernanceFilters: '治理筛选',
+  resourceGovernanceFiltersSubtitle: '按审核状态、使用策略、分类或权利归属方筛选文件。',
+  resourceGovernanceSectionReview: '审核状态',
+  resourceGovernanceSectionUsage: '使用策略',
+  resourceGovernanceSectionClassification: '分类',
+  resourceGovernanceSectionRightsOwner: '权利归属方',
+  resourceGovernanceRightsOwnerPlaceholder: '输入权利归属方',
+  resourceGovernanceRightsOwnerSummary: '权利归属方：{rightsOwner}',
+  resourceGovernanceQuickHint: '常用条件可直接点选，分类和权利归属方可在高级筛选中调整。',
+  resourceGovernanceSelectedFilters: '已选条件',
+  resourceGovernanceNoFilters: '还没有筛选条件',
+  resourceGovernanceAdvanced: '高级',
+  resourceGovernanceCapabilitiesViewerHint: '你可以在当前范围查看治理元数据。',
+  resourceGovernanceCapabilitiesEditorHint: '当前范围允许在受支持的界面上编辑治理数据。',
+  resourceGovernanceCapabilitiesManagerHint: '当前范围允许在受支持的界面上审批和归档治理数据。',
+  resourceGovernanceClear: '清除',
+  resourceGovernanceApply: '应用',
+  resourceGovernanceAny: '全部',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
   resourceGB: 'GB',
-  resourceLibraryAll: '全部文件',
-  resourceLibraryInbox: '未归类',
+  resourceAllFiles: '全部文件',
+  resourceSourceSetUnassigned: '未归类',
   resourceFolderRoot: '根目录',
-  resourceLibrarySelect: '选择资源库',
+  resourceSourceSetSelect: '选择来源集',
+  resourceCreateSourceSet: '创建来源集',
+  resourceCreateSourceSetPlaceholder: '来源集名称',
+  resourceSourceSetCreated: '来源集已创建',
+  resourceSourceSetLoadFailed: '无法加载来源集列表',
+  resourceDeleteSourceSetConfirm: '删除来源集',
+  resourceDeleteSourceSetDesc: '来源集将被删除；如果保留文件，之后仍可重新整理。',
+  resourceSourceSetDeleted: '来源集已删除',
+  resourceAddToSourceSet: '加入来源集',
+  resourceAddToSourceSetSuccess: '已加入来源集',
+  resourceAddToSourceSetFailed: '无法将这些项目加入来源集',
+  resourceAddToSourceSetExists: '部分项目已存在于该来源集中',
+  resourceMoveToSourceSet: '移动到来源集',
+  resourceMoveToSourceSetSuccess: '已移动到来源集',
+  resourceMoveToSourceSetFailed: '无法将这些项目移动到来源集',
+  resourceRemoveFromSourceSet: '从来源集移除',
+  resourceRemoveFromSourceSetConfirm: '从来源集移除',
+  resourceRemoveFromSourceSetDesc: '要从当前来源集中移除 {count} 个项目吗？',
+  resourceRemoveFromSourceSetSuccess: '已从来源集移除',
+  resourceRemoveFromSourceSetFailed: '无法从来源集中移除这些项目',
+  resourceSelectSourceSetTarget: '选择这些项目的目标来源集。',
   resourceNewFolder: '新建文件夹',
   resourceMoveToFolder: '移动到文件夹',
   resourceFolderDeleteConfirm: '删除文件夹',
-  resourceFolderDeleteDesc: '文件夹将移至回收站，可在资源页的回收站中恢复。',
+  resourceFolderDeleteDesc: '文件夹将移至回收站，可在内容页的回收站中恢复。',
   resourceCreateFolder: '创建文件夹',
   resourceCreateFolderPlaceholder: '文件夹名称',
   resourceSortBy: '排序',
@@ -4497,6 +5330,9 @@ const zh: TranslationKeys = {
   resourceViewList: '列表',
   resourceViewGrid: '网格',
   resourceViewModeToggle: '切换列表或网格视图',
+  resourceScopeTree: '树状',
+  resourceScopeFiles: '文件',
+  resourceMoreActions: '更多操作',
   resourceSelect: '选择',
   resourceSelectCount: '已选 {count} 项',
   resourceBatchDelete: '删除',
@@ -4699,6 +5535,103 @@ const zh: TranslationKeys = {
   memoryEmptyDesc: 'AI 会自动从你的对话中提取记忆。',
   memoryPersona: '人格画像',
   memoryPersonaEmpty: '还没有生成人格画像。多聊聊天来构建你的画像。',
+  memoryHomePersonal: '个人',
+  memoryHomeSpaces: '空间',
+  memoryHomePersonalEmpty: '还没有个人记忆档案',
+  memoryHomePersonalEmptyDesc: '多聊聊天并执行提取，就能建立你的个人记忆。',
+  memorySpacesTitle: '团队记忆空间',
+  memorySpacesDesc: '查看你所在团队空间中的记忆治理与 recall 状态。',
+  memorySpacesEmpty: '你当前还没有可用的团队记忆空间摘要。',
+  memorySpaceKindTeam: '团队空间',
+  memorySpaceRoleOwner: '所有者',
+  memorySpaceRoleAdmin: '管理员',
+  memorySpaceRoleEditor: '编辑者',
+  memorySpaceRoleViewer: '查看者',
+  memorySpaceCanCreate: '可创建',
+  memorySpaceCreateAction: '新增草稿',
+  memorySpaceCreateFailed: '暂时无法新增草稿。',
+  memorySpaceCreateSuccess: '草稿已加入待处理。',
+  memorySpaceCanReview: '可治理',
+  memorySpaceCategoryGeneral: '通用',
+  memorySpaceCategoryPlaybook: '手册',
+  memorySpaceCategoryPolicy: '策略',
+  memorySpaceInboxCount: '{count} 个待处理',
+  memorySpacePublishedCount: '{count} 个已发布',
+  memorySpacePlaybooksCount: '{count} 个手册',
+  memorySpacePoliciesCount: '{count} 个策略',
+  memorySpaceRecallActive: '{count} 个启用',
+  memorySpaceRecallDisabled: '{count} 个暂停',
+  memorySpaceRecallExpired: '{count} 个已过期',
+  memorySpaceRecallStale: '{count} 个待验证',
+  memorySpacePendingAction: '{count} 个待处理',
+  memorySpaceBrowse: '浏览记忆',
+  memorySpaceEntriesEmpty: '这个分区目前还没有记忆条目',
+  memorySpaceEntriesEmptyDesc: '可以切换其他分区，或等团队发布更多记忆后再回来查看。',
+  memorySpaceBackToList: '返回列表',
+  memorySpaceDetailOverview: '条目概览',
+  memorySpaceDetailAudit: '活动',
+  memorySpaceEntryCandidate: '候选项',
+  memorySpaceEntryMemory: '已发布',
+  memorySpaceSummaryUnavailable: '这个团队空间暂时无法加载',
+  memorySpaceSummaryRetry: '重试空间',
+  memorySpaceAuditTitle: '最近活动',
+  memorySpaceAuditEmpty: '目前还没有审计活动',
+  memorySpaceAuditShareAction: '分享审计',
+  memorySpaceAuditShareSectionAction: '分享分区审计',
+  memorySpaceAuditShareFailed: '暂时无法分享审计链接。',
+  memorySpaceAuditActionMerged: '已合并到正式记忆',
+  memorySpaceAuditActionPolicyUpdated: '已更新策略',
+  memorySpaceAuditActionPublished: '已发布',
+  memorySpaceAuditByline: '由 {name} 于 {date}',
+  memorySpaceAuditChangeFromTo: '{field}：{before} -> {after}',
+  memorySpaceAuditChangeSet: '{field}：{value}',
+  memorySpaceAuditChangeUnset: '{field}：已清除',
+  memorySpaceAuditResolutionMerged: '已合并变更到 {title}',
+  memorySpaceFieldTitle: '标题',
+  memorySpaceFieldRecall: 'Recall',
+  memorySpaceFieldExpiresAt: '到期',
+  memorySpaceFieldLastVerifiedAt: '验证',
+  memorySpaceFieldStaleAt: '过期待验证',
+  memorySpaceReviewHintTitle: '可能重复',
+  memorySpaceReviewHintDesc: '发布候选前，先检查合并影响。',
+  memorySpaceReviewHintMatchTitle: '匹配 {name}',
+  memorySpaceReviewHintPublishedAt: '发布于 {date}',
+  memorySpaceReviewHintImpactTitle: '合并影响',
+  memorySpaceReviewHintUpdatesTitle: '更新标题',
+  memorySpaceReviewHintUpdatesSummary: '更新摘要',
+  memorySpaceReviewHintUpdatesContent: '更新内容',
+  memorySpaceReviewHintAddsSources: '新增 {count} 个来源',
+  memorySpaceReviewActionsTitle: '审核动作',
+  memorySpaceMergeAction: '合并',
+  memorySpacePublishAction: '发布',
+  memorySpaceRejectAction: '拒绝',
+  memorySpaceMarkNeedsReviewAction: '标记为待审核',
+  memorySpaceRevalidateAction: '重新验证',
+  memorySpaceMergeSuccess: '候选项已合并',
+  memorySpacePublishSuccess: '候选项已发布',
+  memorySpaceRejectSuccess: '候选项已拒绝',
+  memorySpaceMarkNeedsReviewSuccess: '记忆已标记为待审核',
+  memorySpaceRevalidateSuccess: '记忆已重新验证',
+  memorySpaceReviewActionFailed: '更新候选项失败',
+  memorySpaceLoadFailed: '加载团队记忆失败',
+  memorySpaceSectionInbox: '待处理',
+  memorySpaceSectionPlaybooks: '手册',
+  memorySpaceSectionPolicies: '策略',
+  memorySpaceSectionPublished: '已发布',
+  memorySpaceIntakeAutomation: '自动化',
+  memorySpaceIntakeHarness: 'Harness',
+  memorySpaceIntakeManual: '手动',
+  memorySpaceRecallLabel: 'Recall',
+  memorySpaceRecallStateActive: '启用中',
+  memorySpaceRecallStateAll: '全部',
+  memorySpaceRecallStateDisabled: '已暂停',
+  memorySpaceRecallStateExpired: '已过期',
+  memorySpaceRecallStateStale: '待验证',
+  memorySpaceSources: '来源',
+  memorySpaceSourceCount: '{count} 个来源',
+  memorySpaceUpdatedAt: '更新于 {date}',
+  memorySpacePublishedAt: '发布于 {date}',
+  memorySpaceActor: '由 {name}',
   memorySearch: '搜索记忆...',
   memoryDeleteConfirm: '删除记忆',
   memoryDeleteDesc: '确定要删除这条记忆吗？此操作无法撤销。',
@@ -4734,8 +5667,12 @@ const zh: TranslationKeys = {
   memoryAssociatedLocations: '关联地点',
   memoryTotalCount: '{count} 条记忆',
   memoryEdit: '编辑',
+  memoryReset: '重置',
   memorySave: '保存',
+  memorySavingChanges: '正在保存更改',
+  memoryAllChangesSaved: '所有更改已保存',
   memorySaved: '记忆已保存',
+  memoryUnsavedChanges: '有未保存的更改',
   memoryCreateIdentity: '创建身份',
   memoryCreateTitle: '标题',
   memoryCreateTitlePlaceholder: '输入身份标题...',
@@ -4831,7 +5768,7 @@ const zh: TranslationKeys = {
 };
 
 const translations: Record<Locale, TranslationKeys> = {
-  'en-US': en,
+  'en-US': enUS,
   'zh-CN': zh,
   'zh-TW': zh_tw,
 
@@ -4853,10 +5790,10 @@ export const LOCALE_DISPLAY_NAMES: Record<Locale, string> = {
 };
 
 export const useI18n = create<I18nStore>((set) => ({
-  locale: 'en-US',
-  t: en,
+  locale: 'zh-CN',
+  t: zh,
   setLocale: async (locale: Locale) => {
-    set({ locale, t: translations[locale] || en });
+    set({ locale, t: translations[locale] || enUS });
 
     try {
       await AsyncStorage.setItem(STORAGE_KEY, locale);

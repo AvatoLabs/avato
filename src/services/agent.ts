@@ -1,6 +1,7 @@
 import { type AgentItem, type LobeAgentConfig, type MetaData } from '@lobechat/types';
 import { type PartialDeep } from 'type-fest';
 
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { lambdaClient } from '@/libs/trpc/client';
 
 /**
@@ -9,10 +10,10 @@ import { lambdaClient } from '@/libs/trpc/client';
 type MarketAgentModel =
   | LobeAgentConfig['model']
   | {
-    model: LobeAgentConfig['model'];
-    parameters?: Partial<LobeAgentConfig['params']>;
-    provider?: LobeAgentConfig['provider'];
-  };
+      model: LobeAgentConfig['model'];
+      parameters?: Partial<LobeAgentConfig['params']>;
+      provider?: LobeAgentConfig['provider'];
+    };
 
 /**
  * Normalize market agent config to standard agent config.
@@ -110,27 +111,23 @@ class AgentService {
     });
   };
 
-  createAgentKnowledgeBase = async (
-    agentId: string,
-    knowledgeBaseId: string,
-    enabled?: boolean,
-  ) => {
-    return lambdaClient.agent.createAgentKnowledgeBase.mutate({
+  attachSourceSetToAgent = async (agentId: string, sourceSetId: string, enabled?: boolean) => {
+    return lambdaClient.agent.attachSourceSetToAgent.mutate({
       agentId,
       enabled,
-      knowledgeBaseId,
+      sourceSetId,
     });
   };
 
-  deleteAgentKnowledgeBase = async (agentId: string, knowledgeBaseId: string) => {
-    return lambdaClient.agent.deleteAgentKnowledgeBase.mutate({ agentId, knowledgeBaseId });
+  detachSourceSetFromAgent = async (agentId: string, sourceSetId: string) => {
+    return lambdaClient.agent.detachSourceSetFromAgent.mutate({ agentId, sourceSetId });
   };
 
-  toggleKnowledgeBase = async (agentId: string, knowledgeBaseId: string, enabled?: boolean) => {
-    return lambdaClient.agent.toggleKnowledgeBase.mutate({
+  setSourceSetEnabled = async (agentId: string, sourceSetId: string, enabled?: boolean) => {
+    return lambdaClient.agent.setSourceSetEnabled.mutate({
       agentId,
       enabled,
-      knowledgeBaseId,
+      sourceSetId,
     });
   };
 
@@ -150,8 +147,11 @@ class AgentService {
     });
   };
 
-  getFilesAndKnowledgeBases = async (agentId: string) => {
-    return lambdaClient.agent.getKnowledgeBasesAndFiles.query({ agentId });
+  listAvailableSources = async (agentId: string, spaceId?: string | null) => {
+    return lambdaClient.agent.listAvailableSources.query({
+      agentId,
+      spaceId: resolveWorkspaceSpaceId({ spaceId }),
+    });
   };
 
   getAgentConfigById = async (agentId: string) => {

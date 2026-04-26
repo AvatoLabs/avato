@@ -1,8 +1,8 @@
 import isEqual from 'fast-deep-equal';
 import { memo, useCallback, useState } from 'react';
 
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 import PublishButton from './PublishButton';
 import PublishResultModal from './PublishResultModal';

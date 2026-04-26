@@ -18,7 +18,8 @@ services:
     image: pgvector/pgvector:pg17
     container_name: lobe-postgres
     ports:
-      - '5432:5432'
+      # If 5432 is already in use on the host, set POSTGRES_HOST_PORT=5433 in docker-compose/dev/.env
+      - '${POSTGRES_HOST_PORT:-5432}:5432'
     volumes:
       - './data:/var/lib/postgresql/data'
     environment:
@@ -39,7 +40,8 @@ services:
     image: redis:7-alpine
     container_name: lobe-redis
     ports:
-      - '6379:6379'
+      # If 6379 is already in use on the host, set REDIS_HOST_PORT=6380 in docker-compose/dev/.env
+      - '${REDIS_HOST_PORT:-6379}:6379'
     command: redis-server --save 60 1000 --appendonly yes
     volumes:
       - 'redis_data:/data'
@@ -56,6 +58,7 @@ services:
     image: rustfs/rustfs:latest
     container_name: lobe-rustfs
     network_mode: 'service:network-service'
+    restart: always
     environment:
       - RUSTFS_CONSOLE_ENABLE=true
       - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY}
@@ -63,11 +66,11 @@ services:
     volumes:
       - rustfs-data:/data
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/health >/dev/null 2>&1 || exit 1"]
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:9000/health >/dev/null 2>&1 || exit 1']
       interval: 5s
       timeout: 3s
       retries: 30
-    command: ["--access-key","${RUSTFS_ACCESS_KEY}","--secret-key","${RUSTFS_SECRET_KEY}","/data"]
+    command: ['--access-key','${RUSTFS_ACCESS_KEY}','--secret-key','${RUSTFS_SECRET_KEY}','/data']
     env_file:
       - .env
 
@@ -90,7 +93,7 @@ services:
         mc admin info rustfs || true;
         mc anonymous set-json "/bucket.config.json" "rustfs/lobe";
       '
-    restart: "no"
+    restart: 'no'
     networks:
       - lobe-network
     env_file:

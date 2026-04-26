@@ -1,7 +1,7 @@
 export interface UploadFileParams {
   content: ArrayBuffer;
   filename: string;
-  hash: string;
+  sha256: string;
   path: string;
   type: string;
 }

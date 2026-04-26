@@ -26,11 +26,19 @@ beforeEach(() => {
   vi.resetAllMocks();
 });
 
+const emptyPluginListResponse = {
+  currentPage: 1,
+  items: [],
+  pageSize: 20,
+  totalCount: 0,
+  totalPages: 0,
+};
+
 describe('ToolService', () => {
   describe('getDiscoverPluginList', () => {
     it('should query market getPluginList with locale and numeric pagination', async () => {
       vi.mocked(globalHelpers.getCurrentLanguage).mockReturnValue('en-US');
-      vi.mocked(lambdaClient.market.getPluginList.query).mockResolvedValue({ items: [] });
+      vi.mocked(lambdaClient.market.getPluginList.query).mockResolvedValue(emptyPluginListResponse);
 
       await toolService.getDiscoverPluginList({ category: 'tools', page: 2, pageSize: 10 });
 
@@ -44,7 +52,7 @@ describe('ToolService', () => {
 
     it('should default page and pageSize', async () => {
       vi.mocked(globalHelpers.getCurrentLanguage).mockReturnValue('zh-CN');
-      vi.mocked(lambdaClient.market.getPluginList.query).mockResolvedValue({ items: [] });
+      vi.mocked(lambdaClient.market.getPluginList.query).mockResolvedValue(emptyPluginListResponse);
 
       await toolService.getDiscoverPluginList({});
 

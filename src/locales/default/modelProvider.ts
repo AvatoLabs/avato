@@ -93,6 +93,7 @@ export default {
   'createNewAiProvider.basicTitle': 'Basic Information',
   'createNewAiProvider.configTitle': 'Configuration Information',
   'createNewAiProvider.confirm': 'Create',
+  'createNewAiProvider.createError': 'Failed to create provider. Please try again.',
   'createNewAiProvider.createSuccess': 'Creation successful',
   'createNewAiProvider.description.placeholder': 'Provider description (optional)',
   'createNewAiProvider.description.title': 'Provider Description',
@@ -128,6 +129,8 @@ export default {
   'list.title.custom': 'Custom provider not enabled',
   'list.title.disabled': 'Disabled',
   'list.title.enabled': 'Enabled',
+  'detail.loadError': 'Failed to load provider details. Please retry.',
+  'detail.notFound': 'This provider does not exist or is no longer available.',
   'menu.addCustomProvider': 'Add Custom Provider',
   'menu.all': 'All',
   'menu.list.custom': 'Custom not enabled',
@@ -190,10 +193,14 @@ export default {
   'providerModels.config.checker.desc': 'Test if the API Key and proxy URL are correctly filled',
   'providerModels.config.checker.pass': 'Check passed',
   'providerModels.config.checker.title': 'Connectivity Check',
+  'providerModels.config.checker.updateError':
+    'Failed to update the checker model. Please try again.',
   'providerModels.config.fetchOnClient.desc':
     'Client request mode will initiate session requests directly from the browser, which can improve response speed',
   'providerModels.config.fetchOnClient.title': 'Use Client Request Mode',
   'providerModels.config.helpDoc': 'Configuration Guide',
+  'providerModels.config.updateError':
+    'Failed to update the provider configuration. Please try again.',
   'providerModels.config.oauth.authError': 'Authorization failed. Please try again.',
   'providerModels.config.oauth.authorized': 'Authorized',
   'providerModels.config.oauth.authorizedDesc':
@@ -209,6 +216,8 @@ export default {
   'providerModels.config.oauth.desc':
     'Authorize with your {{name}} account to access models through your subscription.',
   'providerModels.config.oauth.disconnect': 'Disconnect',
+  'providerModels.config.oauth.disconnectError':
+    'Failed to disconnect authorization. Please try again.',
   'providerModels.config.oauth.disconnectConfirm':
     'Are you sure you want to disconnect? You will need to re-authorize to use this provider.',
   'providerModels.config.oauth.enterCode': 'Enter the code on the opened page:',
@@ -223,13 +232,16 @@ export default {
   'providerModels.config.waitingForMore':
     'More models are currently <1>planned for integration</1>, please stay tuned',
   'providerModels.createNew.title': 'Create Custom AI Model',
+  'providerModels.createNew.createError': 'Failed to create the model. Please try again.',
   'providerModels.item.config': 'Configure Model',
   'providerModels.item.customModelCards.addNew': 'Create and add {{id}} model',
   'providerModels.item.customModelCards.confirmDelete':
     'You are about to delete this custom model. Once deleted, it cannot be recovered. Please proceed with caution.',
   'providerModels.item.delete.confirm': 'Are you sure you want to delete model {{displayName}}?',
+  'providerModels.item.delete.error': 'Failed to delete model. Please try again.',
   'providerModels.item.delete.success': 'Deletion successful',
   'providerModels.item.delete.title': 'Delete Model',
+  'providerModels.item.toggleError': 'Failed to update model status. Please try again.',
   'providerModels.item.modelConfig.azureDeployName.extra':
     'Field used for actual requests in Azure OpenAI',
   'providerModels.item.modelConfig.azureDeployName.placeholder':
@@ -314,6 +326,8 @@ export default {
     "This setting enables the model's image generation capability only. The actual performance depends entirely on the model itself. Please test the model to determine if it supports image generation.",
   'providerModels.item.modelConfig.imageOutput.title': 'Supports Image Generation',
   'providerModels.item.modelConfig.modalTitle': 'Custom Model Configuration',
+  'providerModels.item.modelConfig.updateError':
+    'Failed to update the model configuration. Please try again.',
   'providerModels.item.modelConfig.reasoning.extra':
     "This configuration will enable the model's deep thinking capabilities, and the specific effects depend entirely on the model itself. Please test whether this model has usable deep thinking abilities.",
   'providerModels.item.modelConfig.reasoning.title': 'Support Deep Thinking',
@@ -363,16 +377,21 @@ export default {
   'providerModels.list.enabledActions.disableAll': 'Disable All',
   'providerModels.list.enabledActions.enableAll': 'Enable All',
   'providerModels.list.enabledActions.sort': 'Custom Model Sorting',
+  'providerModels.list.enabledActions.toggleError':
+    'Failed to update model statuses. Please try again.',
   'providerModels.list.enabledEmpty':
     'No enabled models available. Please enable your preferred models from the list below~',
   'providerModels.list.fetcher.clear': 'Clear fetched models',
+  'providerModels.list.fetcher.clearError': 'Failed to clear fetched models. Please try again.',
   'providerModels.list.fetcher.fetch': 'Fetch models',
+  'providerModels.list.fetcher.fetchError': 'Failed to fetch models. Please try again.',
   'providerModels.list.fetcher.fetching': 'Fetching model list...',
   'providerModels.list.fetcher.latestTime': 'Last updated: {{time}}',
   'providerModels.list.fetcher.noLatestTime': 'Model list not yet fetched',
   'providerModels.list.noModelsInCategory': 'No enabled models in this category',
   'providerModels.list.resetAll.conform':
     'Are you sure you want to reset all modifications to the current model? After resetting, the current model list will return to its default state.',
+  'providerModels.list.resetAll.error': 'Failed to reset models. Please try again.',
   'providerModels.list.resetAll.success': 'Reset successful',
   'providerModels.list.resetAll.title': 'Reset All Modifications',
   'providerModels.list.search': 'Search Models...',
@@ -388,12 +407,16 @@ export default {
   'providerModels.tabs.tts': 'TTS',
   'providerModels.tabs.video': 'Video',
   'sortModal.success': 'Sort update successful',
+  'sortModal.error': 'Failed to update the sort order. Please try again.',
   'sortModal.title': 'Custom Order',
   'sortModal.update': 'Update',
   'updateAiProvider.confirmDelete':
     'You are about to delete this AI provider. Once deleted, it cannot be retrieved. Are you sure you want to delete?',
+  'updateAiProvider.deleteError': 'Failed to delete provider. Please try again.',
   'updateAiProvider.deleteSuccess': 'Deletion successful',
+  'updateAiProvider.toggleError': 'Failed to update provider status. Please try again.',
   'updateAiProvider.tooltip': 'Update provider basic configuration',
+  'updateAiProvider.updateError': 'Failed to update provider. Please try again.',
   'updateAiProvider.updateSuccess': 'Update successful',
   'updateCustomAiProvider.title': 'Update Custom AI Provider Configuration',
   'vertexai.apiKey.desc': 'Enter your Vertex AI Keys',

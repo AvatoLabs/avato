@@ -233,11 +233,11 @@ export default {
   'plans.image.count': 'Approximately {{number}} images',
   'plans.includes': 'Benefits include:',
   'plans.includesExtra': 'All benefits in {{name}}, plus:',
-  'plans.knowledgeBase.desc': 'Use files and knowledge base in conversations',
-  'plans.knowledgeBase.filetype': 'Supports PDF / MD / DOC / XLS / PPT and other formats',
-  'plans.knowledgeBase.title': 'Files & Knowledge Base',
-  'plans.knowledgeBase.tooltip':
-    'Supports file upload and knowledge base features. Upload files, images, audio, video and more. Create knowledge bases for easy file management. Use files and knowledge base in conversations for richer experiences.',
+  'plans.sourceSet.desc': 'Use files and reference sets in conversations',
+  'plans.sourceSet.filetype': 'Supports PDF / MD / DOC / XLS / PPT and other formats',
+  'plans.sourceSet.title': 'Files & Reference Sets',
+  'plans.sourceSet.tooltip':
+    'Supports file upload and reference-set features. Upload files, images, audio, video and more. Create reference sets for clearer file management. Use files and reference sets in conversations for richer experiences.',
   'plans.llm.customAPI': 'Global mainstream model custom API service',
   'plans.llm.messageRequest': 'Unlimited message requests',
   'plans.llm.title': 'Model Service',

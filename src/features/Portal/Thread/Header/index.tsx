@@ -5,16 +5,17 @@ import { memo } from 'react';
 
 import NavHeader from '@/features/NavHeader';
 import { useChatStore } from '@/store/chat';
+import { portalThreadSelectors } from '@/store/chat/selectors';
 
 import Title from './Title';
 
 const Header = memo(() => {
-  const [hasPortal, portalThreadId, closeThreadPortal, switchThread] = useChatStore((s) => [
-    !!s.portalThreadId,
-    s.portalThreadId,
+  const [portalThreadId, closeThreadPortal, switchThread] = useChatStore((s) => [
+    portalThreadSelectors.portalThreadId(s),
     s.closeThreadPortal,
     s.switchThread,
   ]);
+  const hasPortal = !!portalThreadId;
 
   return (
     <NavHeader

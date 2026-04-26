@@ -5,11 +5,13 @@ import { INBOX_SESSION_ID } from '@/const/session';
 import { DEFAULT_AGENT_CONFIG } from '@/const/settings';
 import { AgentModel } from '@/database/models/agent';
 import { FileModel } from '@/database/models/file';
-import { KnowledgeBaseModel } from '@/database/models/knowledgeBase';
 import { SessionModel } from '@/database/models/session';
+import { SourceSetModel } from '@/database/models/sourceSet';
+import { SpaceModel } from '@/database/models/space';
 import { UserModel } from '@/database/models/user';
 import { AgentService } from '@/server/services/agent';
-import { KnowledgeType } from '@/types/knowledgeBase';
+import { ContentAuthorizer } from '@/server/services/content';
+import { AgentSourceKind } from '@/types/sourceSet';
 
 import { agentRouter } from '../agent';
 
@@ -31,12 +33,20 @@ vi.mock('@/database/models/file', () => ({
   FileModel: vi.fn(),
 }));
 
-vi.mock('@/database/models/knowledgeBase', () => ({
-  KnowledgeBaseModel: vi.fn(),
+vi.mock('@/database/models/sourceSet', () => ({
+  SourceSetModel: vi.fn(),
+}));
+
+vi.mock('@/database/models/space', () => ({
+  SpaceModel: vi.fn(),
 }));
 
 vi.mock('@/server/services/agent', () => ({
   AgentService: vi.fn(),
+}));
+
+vi.mock('@/server/services/content', () => ({
+  ContentAuthorizer: vi.fn(),
 }));
 
 describe('agentRouter', () => {
@@ -45,21 +55,23 @@ describe('agentRouter', () => {
   let agentModelMock: any;
   let sessionModelMock: any;
   let fileModelMock: any;
-  let knowledgeBaseModelMock: any;
+  let sourceSetModelMock: any;
+  let contentAuthorizerMock: any;
   let agentServiceMock: any;
+  let spaceModelMock: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     agentModelMock = {
       createAgentFiles: vi.fn(),
-      createAgentKnowledgeBase: vi.fn(),
+      attachSourceSetToAgent: vi.fn(),
       deleteAgentFile: vi.fn(),
-      deleteAgentKnowledgeBase: vi.fn(),
+      detachSourceSetFromAgent: vi.fn(),
       findBySessionId: vi.fn(),
-      getAgentAssignedKnowledge: vi.fn(),
+      getAgentAssignedSources: vi.fn(),
       toggleFile: vi.fn(),
-      toggleKnowledgeBase: vi.fn(),
+      setSourceSetEnabled: vi.fn(),
       update: vi.fn(),
     };
     vi.mocked(AgentModel).mockImplementation(() => agentModelMock);
@@ -74,10 +86,21 @@ describe('agentRouter', () => {
     };
     vi.mocked(FileModel).mockImplementation(() => fileModelMock);
 
-    knowledgeBaseModelMock = {
+    sourceSetModelMock = {
       query: vi.fn(),
     };
-    vi.mocked(KnowledgeBaseModel).mockImplementation(() => knowledgeBaseModelMock);
+    vi.mocked(SourceSetModel).mockImplementation(() => sourceSetModelMock);
+
+    contentAuthorizerMock = {
+      filterVisibleFileIdsForList: vi.fn(),
+      filterVisibleSourceSetIdsForList: vi.fn(),
+    };
+    vi.mocked(ContentAuthorizer).mockImplementation(() => contentAuthorizerMock);
+
+    spaceModelMock = {
+      findAccessibleSpaceById: vi.fn(),
+    };
+    vi.mocked(SpaceModel).mockImplementation(() => spaceModelMock);
 
     agentServiceMock = {
       createInbox: vi.fn(),
@@ -89,8 +112,10 @@ describe('agentRouter', () => {
       agentModel: agentModelMock,
       agentService: agentServiceMock,
       fileModel: fileModelMock,
-      knowledgeBaseModel: knowledgeBaseModelMock,
+      knowledgeBaseModel: sourceSetModelMock,
+      contentAuthorizer: contentAuthorizerMock,
       sessionModel: sessionModelMock,
+      spaceModel: spaceModelMock,
     };
   });
 
@@ -110,9 +135,7 @@ describe('agentRouter', () => {
       const mockSession = { id: 'inboxSessionId' };
 
       vi.mocked(UserModel.findById).mockResolvedValue(mockUser as any);
-      sessionModelMock.findByIdOrSlug
-        .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce(mockSession);
+      sessionModelMock.findByIdOrSlug.mockResolvedValue(mockSession);
       agentModelMock.findBySessionId.mockResolvedValue(DEFAULT_AGENT_CONFIG);
 
       const caller = agentRouter.createCaller(mockCtx);
@@ -135,29 +158,43 @@ describe('agentRouter', () => {
     });
   });
 
-  describe('getKnowledgeBasesAndFiles', () => {
+  describe('listAvailableSources', () => {
     it('should return combined knowledge bases and files', async () => {
       const mockFiles = [
-        { id: 'file1', name: 'File 1', fileType: 'text' },
-        { id: 'file2', name: 'File 2', fileType: 'pdf' },
+        { fileType: 'text', id: 'file1', name: 'File 1', spaceId: 'space-1' },
+        { fileType: 'pdf', id: 'file2', name: 'File 2', spaceId: 'space-2' },
       ];
 
-      const mockKnowledgeBases = [
-        { id: 'kb1', name: 'KB 1', description: 'desc 1', avatar: 'avatar1' },
-        { id: 'kb2', name: 'KB 2', description: 'desc 2', avatar: 'avatar2' },
+      const mockSourceSets = [
+        {
+          avatar: 'avatar1',
+          description: 'desc 1',
+          id: 'kb1',
+          name: 'Source Set 1',
+          spaceId: 'space-1',
+        },
+        {
+          avatar: 'avatar2',
+          description: 'desc 2',
+          id: 'kb2',
+          name: 'Source Set 2',
+          spaceId: 'space-2',
+        },
       ];
 
       const mockKnowledge = {
         files: [{ id: 'file1', enabled: true }],
-        knowledgeBases: [{ id: 'kb1', enabled: true }],
+        sourceSets: [{ id: 'kb1', enabled: true }],
       };
 
       fileModelMock.query.mockResolvedValue(mockFiles);
-      knowledgeBaseModelMock.query.mockResolvedValue(mockKnowledgeBases);
-      agentModelMock.getAgentAssignedKnowledge.mockResolvedValue(mockKnowledge);
+      sourceSetModelMock.query.mockResolvedValue(mockSourceSets);
+      agentModelMock.getAgentAssignedSources.mockResolvedValue(mockKnowledge);
+      contentAuthorizerMock.filterVisibleFileIdsForList.mockResolvedValue(['file1', 'file2']);
+      contentAuthorizerMock.filterVisibleSourceSetIdsForList.mockResolvedValue(['kb1']);
 
       const caller = agentRouter.createCaller(mockCtx);
-      const result = await caller.getKnowledgeBasesAndFiles({ agentId: 'agent1' });
+      const result = await caller.listAvailableSources({ agentId: 'agent1' });
 
       expect(result).toEqual([
         {
@@ -165,32 +202,90 @@ describe('agentRouter', () => {
           fileType: 'text',
           id: 'file1',
           name: 'File 1',
-          type: KnowledgeType.File,
+          spaceId: 'space-1',
+          type: AgentSourceKind.File,
         },
         {
           enabled: false,
           fileType: 'pdf',
           id: 'file2',
           name: 'File 2',
-          type: KnowledgeType.File,
+          spaceId: 'space-2',
+          type: AgentSourceKind.File,
         },
         {
           avatar: 'avatar1',
           description: 'desc 1',
           enabled: true,
           id: 'kb1',
-          name: 'KB 1',
-          type: KnowledgeType.KnowledgeBase,
-        },
-        {
-          avatar: 'avatar2',
-          description: 'desc 2',
-          enabled: false,
-          id: 'kb2',
-          name: 'KB 2',
-          type: KnowledgeType.KnowledgeBase,
+          name: 'Source Set 1',
+          spaceId: 'space-1',
+          type: AgentSourceKind.SourceSet,
         },
       ]);
+    });
+
+    it('should keep disabled assigned items disabled in the modal data', async () => {
+      fileModelMock.query.mockResolvedValue([
+        { fileType: 'text', id: 'file1', name: 'File 1', spaceId: 'space-1' },
+      ]);
+      sourceSetModelMock.query.mockResolvedValue([
+        {
+          avatar: 'avatar1',
+          description: 'desc 1',
+          id: 'kb1',
+          name: 'Source Set 1',
+          spaceId: 'space-1',
+        },
+      ]);
+      agentModelMock.getAgentAssignedSources.mockResolvedValue({
+        files: [{ id: 'file1', enabled: false }],
+        sourceSets: [{ id: 'kb1', enabled: false }],
+      });
+      contentAuthorizerMock.filterVisibleFileIdsForList.mockResolvedValue(['file1']);
+      contentAuthorizerMock.filterVisibleSourceSetIdsForList.mockResolvedValue(['kb1']);
+
+      const caller = agentRouter.createCaller(mockCtx);
+      const result = await caller.listAvailableSources({ agentId: 'agent1' });
+
+      expect(result).toEqual([
+        {
+          enabled: false,
+          fileType: 'text',
+          id: 'file1',
+          name: 'File 1',
+          spaceId: 'space-1',
+          type: AgentSourceKind.File,
+        },
+        {
+          avatar: 'avatar1',
+          description: 'desc 1',
+          enabled: false,
+          id: 'kb1',
+          name: 'Source Set 1',
+          spaceId: 'space-1',
+          type: AgentSourceKind.SourceSet,
+        },
+      ]);
+    });
+
+    it('should scope knowledge and files by the provided space', async () => {
+      spaceModelMock.findAccessibleSpaceById.mockResolvedValue({ id: 'space-1' });
+      fileModelMock.query.mockResolvedValue([]);
+      sourceSetModelMock.query.mockResolvedValue([]);
+      agentModelMock.getAgentAssignedSources.mockResolvedValue({ files: [], sourceSets: [] });
+      contentAuthorizerMock.filterVisibleFileIdsForList.mockResolvedValue([]);
+      contentAuthorizerMock.filterVisibleSourceSetIdsForList.mockResolvedValue([]);
+
+      const caller = agentRouter.createCaller(mockCtx);
+      await caller.listAvailableSources({ agentId: 'agent1', spaceId: 'space-1' });
+
+      expect(spaceModelMock.findAccessibleSpaceById).toHaveBeenCalledWith('space-1');
+      expect(sourceSetModelMock.query).toHaveBeenCalledWith('space-1');
+      expect(fileModelMock.query).toHaveBeenCalledWith({
+        showFilesInSourceSet: false,
+        spaceId: 'space-1',
+      });
     });
   });
 
@@ -249,56 +344,56 @@ describe('agentRouter', () => {
     });
   });
 
-  describe('createAgentKnowledgeBase', () => {
+  describe('attachSourceSetToAgent', () => {
     it('should create agent knowledge base', async () => {
       const mockInput = {
         agentId: 'agent1',
-        knowledgeBaseId: 'kb1',
+        sourceSetId: 'kb1',
         enabled: true,
       };
 
       const caller = agentRouter.createCaller(mockCtx);
-      await caller.createAgentKnowledgeBase(mockInput);
+      await caller.attachSourceSetToAgent(mockInput);
 
-      expect(agentModelMock.createAgentKnowledgeBase).toHaveBeenCalledWith(
+      expect(agentModelMock.attachSourceSetToAgent).toHaveBeenCalledWith(
         mockInput.agentId,
-        mockInput.knowledgeBaseId,
+        mockInput.sourceSetId,
         mockInput.enabled,
       );
     });
   });
 
-  describe('deleteAgentKnowledgeBase', () => {
+  describe('detachSourceSetFromAgent', () => {
     it('should delete agent knowledge base', async () => {
       const mockInput = {
         agentId: 'agent1',
-        knowledgeBaseId: 'kb1',
+        sourceSetId: 'kb1',
       };
 
       const caller = agentRouter.createCaller(mockCtx);
-      await caller.deleteAgentKnowledgeBase(mockInput);
+      await caller.detachSourceSetFromAgent(mockInput);
 
-      expect(agentModelMock.deleteAgentKnowledgeBase).toHaveBeenCalledWith(
+      expect(agentModelMock.detachSourceSetFromAgent).toHaveBeenCalledWith(
         mockInput.agentId,
-        mockInput.knowledgeBaseId,
+        mockInput.sourceSetId,
       );
     });
   });
 
-  describe('toggleKnowledgeBase', () => {
+  describe('setSourceSetEnabled', () => {
     it('should toggle knowledge base', async () => {
       const mockInput = {
         agentId: 'agent1',
-        knowledgeBaseId: 'kb1',
+        sourceSetId: 'kb1',
         enabled: true,
       };
 
       const caller = agentRouter.createCaller(mockCtx);
-      await caller.toggleKnowledgeBase(mockInput);
+      await caller.setSourceSetEnabled(mockInput);
 
-      expect(agentModelMock.toggleKnowledgeBase).toHaveBeenCalledWith(
+      expect(agentModelMock.setSourceSetEnabled).toHaveBeenCalledWith(
         mockInput.agentId,
-        mockInput.knowledgeBaseId,
+        mockInput.sourceSetId,
         mockInput.enabled,
       );
     });

@@ -4,8 +4,8 @@ import { cssVar } from 'antd-style';
 import { memo } from 'react';
 
 import Loading from '@/components/Loading/BrandTextLoading';
-import { useAgentStore } from '@/store/agent';
 import { builtinAgentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
 import { useGroupProfileStore } from '@/store/groupProfile';

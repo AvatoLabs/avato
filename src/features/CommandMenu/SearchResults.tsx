@@ -18,6 +18,18 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { type SearchResult } from '@/database/repositories/search';
+import { isCanonicalDocumentEntry } from '@/features/ContentManager/utils/isCanonicalDocumentEntry';
+import { buildPageScopeSearch, createSourceSetPageScope } from '@/features/Pages/usePageScope';
+import {
+  buildFilesFolderPath,
+  buildFilesPreviewPath,
+  buildFilesRootPath,
+  buildSourceSetFolderPath,
+  buildSourceSetPath,
+} from '@/features/ResourceSpaces';
+import { usePageStore } from '@/store/docs';
+import { listSelectors } from '@/store/docs/slices/list/selectors';
+import { getPageDetailPath, getPageKindFromDocument } from '@/utils/docs';
 import { markdownToTxt } from '@/utils/markdownToTxt';
 
 import { CommandItem } from './components';
@@ -69,10 +81,13 @@ const SearchResults = memo<SearchResultsProps>(
           break;
         }
         case 'file': {
-          // Navigate to resource library with file parameter
-          const fileUrl = result.knowledgeBaseId
-            ? `/resource/library/${result.knowledgeBaseId}?file=${result.id}`
-            : `/resource?file=${result.id}`;
+          const canonicalDocPath = getPageDetailPath(result.id, 'doc', result.spaceId);
+          const canonicalDocSearch = result.sourceSetId
+            ? buildPageScopeSearch(createSourceSetPageScope(result.sourceSetId))
+            : '';
+          const fileUrl = isCanonicalDocumentEntry({ id: result.id })
+            ? `${canonicalDocPath}${canonicalDocSearch}`
+            : buildFilesPreviewPath(result.spaceId, result.id, result.sourceSetId);
           console.info('[SearchResults] File navigation:', {
             fileDetails: result,
             url: fileUrl,
@@ -81,19 +96,30 @@ const SearchResults = memo<SearchResultsProps>(
           break;
         }
         case 'folder': {
-          // Navigate to folder by slug
-          if (result.knowledgeBaseId && result.slug) {
-            navigate(`/resource/library/${result.knowledgeBaseId}/${result.slug}`);
+          if (result.sourceSetId && result.slug) {
+            navigate(buildSourceSetFolderPath(result.spaceId, result.sourceSetId, result.slug));
           } else if (result.slug) {
-            navigate(`/resource/library/${result.slug}`);
+            navigate(buildFilesFolderPath(result.spaceId, result.slug));
           } else {
-            // Fallback to library root if no slug
-            navigate(`/resource/library`);
+            navigate(
+              result.sourceSetId
+                ? buildSourceSetPath(result.spaceId, result.sourceSetId)
+                : buildFilesRootPath(result.spaceId),
+            );
           }
           break;
         }
         case 'page': {
-          navigate(`/page/${result.id.split('_')[1]}`);
+          const document = listSelectors.getDocumentById(result.id)(usePageStore.getState());
+          const pagePath = getPageDetailPath(
+            result.id,
+            getPageKindFromDocument(document),
+            document?.spaceId,
+          );
+          const pageSearch = document?.sourceSetId
+            ? buildPageScopeSearch(createSourceSetPageScope(document.sourceSetId))
+            : '';
+          navigate(`${pagePath}${pageSearch}`);
           break;
         }
         case 'mcp': {
@@ -112,8 +138,8 @@ const SearchResults = memo<SearchResultsProps>(
           navigate(`/memory/preferences?preferenceId=${result.id}`);
           break;
         }
-        case 'knowledgeBase': {
-          navigate(`/resource/library/${result.id}`);
+        case 'sourceSet': {
+          navigate(buildSourceSetPath(result.spaceId, result.id));
           break;
         }
       }
@@ -152,7 +178,7 @@ const SearchResults = memo<SearchResultsProps>(
         case 'memory': {
           return <Brain size={16} />;
         }
-        case 'knowledgeBase': {
+        case 'sourceSet': {
           return <Library size={16} />;
         }
       }
@@ -190,8 +216,8 @@ const SearchResults = memo<SearchResultsProps>(
         case 'memory': {
           return t('cmdk.search.memory');
         }
-        case 'knowledgeBase': {
-          return t('cmdk.search.knowledgeBase');
+        case 'sourceSet': {
+          return t('cmdk.search.sourceSet');
         }
       }
     };
@@ -243,7 +269,7 @@ const SearchResults = memo<SearchResultsProps>(
     const memoryResults = results.filter((r) => r.type === 'memory');
     const mcpResults = results.filter((r) => r.type === 'mcp');
     const pluginResults = results.filter((r) => r.type === 'plugin');
-    const knowledgeBaseResults = results.filter((r) => r.type === 'knowledgeBase');
+    const sourceSetResults = results.filter((r) => r.type === 'sourceSet');
     const assistantResults = results.filter((r) => r.type === 'communityAgent');
 
     // Don't render anything if no results and not loading
@@ -373,10 +399,10 @@ const SearchResults = memo<SearchResultsProps>(
           </Command.Group>
         )}
 
-        {knowledgeBaseResults.length > 0 && (
+        {sourceSetResults.length > 0 && (
           <Command.Group forceMount>
-            {knowledgeBaseResults.map((result) => renderResultItem(result))}
-            {renderSearchMore('knowledgeBase', knowledgeBaseResults.length)}
+            {sourceSetResults.map((result) => renderResultItem(result))}
+            {renderSearchMore('sourceSet', sourceSetResults.length)}
           </Command.Group>
         )}
 

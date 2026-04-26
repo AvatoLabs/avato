@@ -40,6 +40,6 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     }
   `,
   url: css`
-    color: ${cssVar.colorTextDescription};
+    color: color-mix(in srgb, ${cssVar.colorTextDescription} 72%, ${cssVar.colorText} 28%);
   `,
 }));

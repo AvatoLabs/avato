@@ -17,8 +17,8 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import PublishedTime from '@/components/PublishedTime';
-import { useToolStore } from '@/store/tool';
 import { agentSkillsSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 import {
   isSkillAggregatorInstallable,
   SkillAggregatorInstallabilityLevel,

@@ -13,11 +13,11 @@ import GroupManagementSpeakStreaming from './groupManagement/streamings/Speak';
 import GTDCreatePlanStreaming from './gtd/streamings/CreatePlan';
 import GTDExecTaskStreaming from './gtd/streamings/ExecTask';
 import GTDExecTasksStreaming from './gtd/streamings/ExecTasks';
-import KnowledgeBaseSearchKnowledgeBaseStreaming from './knowledgeBase/streamings/SearchKnowledgeBase';
 import MemoryAddExperienceStreaming from './memory/streamings/AddExperienceMemory';
 import MemoryAddPreferenceStreaming from './memory/streamings/AddPreferenceMemory';
 import NotebookCreateDocumentStreaming from './notebook/streamings/CreateDocument';
 import SkillStoreSearchSkillStreaming from './skillStore/streamings/SearchSkill';
+import SourceSetSearchStreaming from './sourceSet/streamings/SearchSourceSet';
 import type { MobileBuiltinStreamingProps } from './types';
 import WebBrowsingSearchStreaming from './webBrowsing/streamings/Search';
 
@@ -31,7 +31,7 @@ const NOTEBOOK_ID = 'lobe-notebook';
 const MEMORY_ID = 'lobe-user-memory';
 const CLOUD_SANDBOX_ID = 'lobe-cloud-sandbox';
 const WEB_BROWSING_ID = 'lobe-web-browsing';
-const KNOWLEDGE_BASE_ID = 'lobe-knowledge-base';
+const SOURCE_SET_ID = 'lobe-source-set';
 const SKILL_STORE_ID = 'lobe-skill-store';
 const SKILLS_ID = 'lobe-skills';
 
@@ -53,7 +53,7 @@ const GroupManagementApiName = {
   speak: 'speak',
 } as const;
 const WebBrowsingApiName = { search: 'search' } as const;
-const KnowledgeBaseApiName = { searchKnowledgeBase: 'searchKnowledgeBase' } as const;
+const SourceSetApiName = { searchSourceSet: 'searchSourceSet' } as const;
 const SkillStoreApiName = { searchSkill: 'searchSkill' } as const;
 const SkillsApiName = { searchSkill: 'searchSkill' } as const;
 
@@ -85,8 +85,8 @@ const BUILTIN_STREAMINGS: Record<
   [WEB_BROWSING_ID]: {
     [WebBrowsingApiName.search]: WebBrowsingSearchStreaming,
   },
-  [KNOWLEDGE_BASE_ID]: {
-    [KnowledgeBaseApiName.searchKnowledgeBase]: KnowledgeBaseSearchKnowledgeBaseStreaming,
+  [SOURCE_SET_ID]: {
+    [SourceSetApiName.searchSourceSet]: SourceSetSearchStreaming,
   },
   [SKILL_STORE_ID]: {
     [SkillStoreApiName.searchSkill]: SkillStoreSearchSkillStreaming,

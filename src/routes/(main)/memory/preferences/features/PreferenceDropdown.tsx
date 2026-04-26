@@ -6,6 +6,8 @@ import { type KeyboardEvent, type MouseEvent } from 'react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useQueryState } from '@/hooks/useQueryParam';
+import { useGlobalStore } from '@/store/global';
 import { useUserMemoryStore } from '@/store/userMemory';
 
 interface PreferenceDropdownProps {
@@ -15,7 +17,9 @@ interface PreferenceDropdownProps {
 
 const PreferenceDropdown = memo<PreferenceDropdownProps>(({ id, size = 'small' }) => {
   const { t } = useTranslation(['memory', 'common']);
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
+  const [preferenceId, setPreferenceId] = useQueryState('preferenceId', { clearOnDefault: true });
+  const toggleRightPanel = useGlobalStore((s) => s.toggleRightPanel);
 
   const preferences = useUserMemoryStore((s) => s.preferences);
   const deletePreference = useUserMemoryStore((s) => s.deletePreference);
@@ -36,7 +40,16 @@ const PreferenceDropdown = memo<PreferenceDropdownProps>(({ id, size = 'small' }
         okButtonProps: { danger: true },
         okText: t('confirm', { ns: 'common' }),
         onOk: async () => {
-          await deletePreference(id);
+          try {
+            await deletePreference(id);
+            if (preferenceId === id) {
+              setPreferenceId(null);
+              toggleRightPanel(false);
+            }
+          } catch (error) {
+            console.error('Failed to delete preference memory:', error);
+            message.error(t('preference.deleteError'));
+          }
         },
         title: t('preference.deleteTitle'),
         type: 'warning',

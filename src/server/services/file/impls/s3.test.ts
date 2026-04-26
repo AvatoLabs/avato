@@ -18,21 +18,29 @@ vi.mock('@/envs/file', () => ({
   },
 }));
 
-// 模拟 S3 类
-vi.mock('@/server/modules/S3', () => ({
-  FileS3: vi.fn().mockImplementation(() => ({
-    createPreSignedUrlForPreview: vi
-      .fn()
-      .mockResolvedValue('https://presigned.example.com/test.jpg'),
-    getFileContent: vi.fn().mockResolvedValue('file content'),
-    getFileByteArray: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
-    getFileMetadata: vi.fn().mockResolvedValue({ contentLength: 1024, contentType: 'image/png' }),
-    deleteFile: vi.fn().mockResolvedValue({}),
-    deleteFiles: vi.fn().mockResolvedValue({}),
-    createPreSignedUrl: vi.fn().mockResolvedValue('https://upload.example.com/test.jpg'),
-    uploadContent: vi.fn().mockResolvedValue({}),
-    uploadMedia: vi.fn().mockResolvedValue({}),
-  })),
+vi.mock('@/envs/app', () => ({
+  appEnv: {
+    APP_URL: 'https://app.example.com',
+    INTERNAL_APP_URL: 'https://internal.example.com',
+  },
+}));
+
+const mockBlobProvider = {
+  createDownloadUrl: vi.fn().mockResolvedValue('https://presigned.example.com/test.jpg'),
+  createUploadUrl: vi.fn().mockResolvedValue('https://upload.example.com/test.jpg'),
+  deleteObject: vi.fn().mockResolvedValue({}),
+  deleteObjects: vi.fn().mockResolvedValue({}),
+  getObjectByteArray: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
+  getObjectContent: vi.fn().mockResolvedValue('file content'),
+  getObjectMetadata: vi.fn().mockResolvedValue({ contentLength: 1024, contentType: 'image/png' }),
+  uploadBody: vi.fn().mockResolvedValue({ key: 'body-key' }),
+  uploadBuffer: vi.fn().mockResolvedValue({ key: 'buffer-key' }),
+  uploadContent: vi.fn().mockResolvedValue({}),
+  uploadMedia: vi.fn().mockResolvedValue({}),
+};
+
+vi.mock('@/server/modules/BlobProvider', () => ({
+  getBlobProvider: vi.fn(() => mockBlobProvider),
 }));
 
 // Mock db
@@ -42,6 +50,7 @@ describe('S3StaticFileImpl', () => {
   let fileService: S3StaticFileImpl;
 
   beforeEach(() => {
+    Object.values(mockBlobProvider).forEach((mock) => mock.mockClear());
     fileService = new S3StaticFileImpl(mockDb);
   });
 
@@ -108,6 +117,40 @@ describe('S3StaticFileImpl', () => {
         expect(result).toBe('https://presigned.example.com/test.jpg');
       });
 
+      it('should preserve relative file proxy URLs instead of re-signing them', async () => {
+        const proxyUrl = '/f/abc123';
+
+        const result = await fileService.getFullFileUrl(proxyUrl);
+
+        expect(result).toBe('https://app.example.com/f/abc123');
+      });
+
+      it('should preserve file share proxy URLs instead of re-signing them', async () => {
+        const proxyUrl = '/share/f/share-token-1?password=secret';
+
+        const result = await fileService.getFullFileUrl(proxyUrl);
+
+        expect(result).toBe('https://app.example.com/share/f/share-token-1?password=secret');
+      });
+
+      it('should preserve same-origin absolute stable proxy URLs', async () => {
+        const proxyUrl = 'https://app.example.com/skills/skill-1/zip';
+
+        const result = await fileService.getFullFileUrl(proxyUrl);
+
+        expect(result).toBe(proxyUrl);
+      });
+
+      it('should throw for unknown relative app paths instead of signing them as keys', async () => {
+        const relativeAppUrl = '/not-a-file-proxy/path';
+
+        vi.spyOn(fileService, 'getKeyFromFullUrl').mockResolvedValue(null);
+
+        await expect(fileService.getFullFileUrl(relativeAppUrl)).rejects.toThrow(
+          'Key not found from url: ' + relativeAppUrl,
+        );
+      });
+
       it('should handle http:// URLs for legacy compatibility', async () => {
         const httpUrl = 'http://s3.example.com/bucket/path/to/file.jpg';
 
@@ -148,14 +191,14 @@ describe('S3StaticFileImpl', () => {
   describe('deleteFile', () => {
     it('应该调用S3的deleteFile方法', async () => {
       await fileService.deleteFile('test.jpg');
-      expect(fileService['s3'].deleteFile).toHaveBeenCalledWith('test.jpg');
+      expect(mockBlobProvider.deleteObject).toHaveBeenCalledWith('test.jpg');
     });
   });
 
   describe('deleteFiles', () => {
     it('应该调用S3的deleteFiles方法', async () => {
       await fileService.deleteFiles(['test1.jpg', 'test2.jpg']);
-      expect(fileService['s3'].deleteFiles).toHaveBeenCalledWith(['test1.jpg', 'test2.jpg']);
+      expect(mockBlobProvider.deleteObjects).toHaveBeenCalledWith(['test1.jpg', 'test2.jpg']);
     });
   });
 
@@ -170,13 +213,13 @@ describe('S3StaticFileImpl', () => {
     it('should call S3 getFileMetadata and return metadata', async () => {
       const result = await fileService.getFileMetadata('test.png');
 
-      expect(fileService['s3'].getFileMetadata).toHaveBeenCalledWith('test.png');
+      expect(mockBlobProvider.getObjectMetadata).toHaveBeenCalledWith('test.png');
       expect(result).toEqual({ contentLength: 1024, contentType: 'image/png' });
     });
 
     it('should handle S3 errors', async () => {
       const error = new Error('File not found');
-      fileService['s3'].getFileMetadata = vi.fn().mockRejectedValue(error);
+      mockBlobProvider.getObjectMetadata.mockRejectedValueOnce(error);
 
       await expect(fileService.getFileMetadata('non-existent.txt')).rejects.toThrow(
         'File not found',
@@ -187,11 +230,19 @@ describe('S3StaticFileImpl', () => {
   describe('uploadContent', () => {
     it('应该调用S3的uploadContent方法', async () => {
       await fileService.uploadContent('test.jpg', 'content');
-      expect(fileService['s3'].uploadContent).toHaveBeenCalledWith('test.jpg', 'content');
+      expect(mockBlobProvider.uploadContent).toHaveBeenCalledWith('test.jpg', 'content');
     });
   });
 
   describe('getKeyFromFullUrl', () => {
+    it('should treat canonical blob keys as first-class internal keys', async () => {
+      const key = 'v2/spaces/spc_1/blobs/images/test.png';
+
+      const result = await fileService.getKeyFromFullUrl(key);
+
+      expect(result).toBe(key);
+    });
+
     it('should extract fileId from proxy URL and return S3 key from database', async () => {
       const proxyUrl = 'http://localhost:3010/f/abc123';
       const expectedKey = 'ppp/491067/image.jpg';
@@ -227,6 +278,18 @@ describe('S3StaticFileImpl', () => {
       expect(result).toBe(expectedKey);
     });
 
+    it('should extract fileId from topic share proxy URL and return S3 key from database', async () => {
+      const proxyUrl = 'https://example.com/share/t/share-1/f/file789';
+      const expectedKey = 'uploads/topic-share.png';
+
+      vi.spyOn(FileModel, 'getFileById').mockResolvedValue({ url: expectedKey } as any);
+
+      const result = await fileService.getKeyFromFullUrl(proxyUrl);
+
+      expect(FileModel.getFileById).toHaveBeenCalledWith(mockDb, 'file789');
+      expect(result).toBe(expectedKey);
+    });
+
     it('should extract key from legacy S3 URL (non /f/ path)', async () => {
       const s3Url = 'https://example.com/path/to/file.jpg';
 
@@ -244,6 +307,12 @@ describe('S3StaticFileImpl', () => {
 
       expect(result).toBe('my-bucket/path/to/file.jpg');
       config.S3_ENABLE_PATH_STYLE = false;
+    });
+
+    it('should return null for untrusted external absolute urls', async () => {
+      const result = await fileService.getKeyFromFullUrl('https://untrusted.example.org/path/to/file.jpg');
+
+      expect(result).toBeNull();
     });
 
     it('should return null for invalid URL', async () => {
@@ -266,13 +335,11 @@ describe('S3StaticFileImpl', () => {
       const testKey = 'images/test.jpg';
       const testBuffer = Buffer.from('fake image data');
 
-      fileService['s3'].uploadMedia = vi.fn().mockResolvedValue(undefined);
-
       // 执行
       const result = await fileService.uploadMedia(testKey, testBuffer);
 
       // 验证
-      expect(fileService['s3'].uploadMedia).toHaveBeenCalledWith(testKey, testBuffer);
+      expect(mockBlobProvider.uploadMedia).toHaveBeenCalledWith(testKey, testBuffer);
       expect(result).toEqual({ key: testKey });
     });
 
@@ -281,13 +348,11 @@ describe('S3StaticFileImpl', () => {
       const testKey = 'videos/test.mp4';
       const testBuffer = Buffer.from('fake video data');
 
-      fileService['s3'].uploadMedia = vi.fn().mockResolvedValue(undefined);
-
       // 执行
       const result = await fileService.uploadMedia(testKey, testBuffer);
 
       // 验证
-      expect(fileService['s3'].uploadMedia).toHaveBeenCalledWith(testKey, testBuffer);
+      expect(mockBlobProvider.uploadMedia).toHaveBeenCalledWith(testKey, testBuffer);
       expect(result).toEqual({ key: testKey });
     });
 
@@ -296,14 +361,13 @@ describe('S3StaticFileImpl', () => {
       const testKey = 'images/test.jpg';
       const testBuffer = Buffer.from('fake image data');
       const uploadError = new Error('S3 upload failed');
-
-      fileService['s3'].uploadMedia = vi.fn().mockRejectedValue(uploadError);
+      mockBlobProvider.uploadMedia.mockRejectedValueOnce(uploadError);
 
       // 执行和验证
       await expect(fileService.uploadMedia(testKey, testBuffer)).rejects.toThrow(
         'S3 upload failed',
       );
-      expect(fileService['s3'].uploadMedia).toHaveBeenCalledWith(testKey, testBuffer);
+      expect(mockBlobProvider.uploadMedia).toHaveBeenCalledWith(testKey, testBuffer);
     });
   });
 });

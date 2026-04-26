@@ -9,7 +9,10 @@ import { useTranslation } from 'react-i18next';
 import { ACTION_ENTRY_ICONS, APP_ENTRY_ICONS, SETTINGS_ENTRY_ICONS } from '@/config/entryIcons';
 import { getNavigableRoutes, getRouteById } from '@/config/routes';
 import { FEEDBACK } from '@/const/url';
+import { buildFilesRootPath, isWorkspaceFilesSurfacePath } from '@/features/ResourceSpaces';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useFeedbackModal } from '@/hooks/useFeedbackModal';
+import { getPageRootPath } from '@/utils/docs';
 
 import { useCommandMenuContext } from './CommandMenuContext';
 import { CommandItem } from './components';
@@ -20,11 +23,12 @@ const MainMenu = memo(() => {
   const { pathname, menuContext, setPages, pages } = useCommandMenuContext();
   const { t } = useTranslation('common');
   const { open: openFeedbackModal } = useFeedbackModal();
+  const activeSpaceId = resolveWorkspaceSpaceId();
 
   const {
     handleCreateSession,
     handleCreateTopic,
-    handleCreateLibrary,
+    handleCreateSourceSet,
     handleCreatePage,
     handleNavigate,
     handleExternalLink,
@@ -76,10 +80,10 @@ const MainMenu = memo(() => {
         <CommandItem
           icon={<APP_ENTRY_ICONS.resource />}
           unpinned={menuContext !== 'resource'}
-          value="create new library"
-          onSelect={handleCreateLibrary}
+          value="create new source set"
+          onSelect={handleCreateSourceSet}
         >
-          {t('cmdk.newLibrary')}
+          {t('cmdk.newSourceSet')}
         </CommandItem>
 
         {menuContext !== 'settings' &&
@@ -116,14 +120,26 @@ const MainMenu = memo(() => {
           const keywords = route.keywordsKey
             ? t(route.keywordsKey as any).split(' ')
             : route.keywords;
+          const routePath =
+            route.id === 'resource'
+              ? buildFilesRootPath(activeSpaceId)
+              : route.id === 'page'
+                ? getPageRootPath('doc', activeSpaceId)
+                : route.path;
+          const isCurrentRoute =
+            route.id === 'resource'
+              ? isWorkspaceFilesSurfacePath(pathname)
+              : route.id === 'page'
+                ? /^\/spaces\/[^/]+\/docs(?:\/|$|\?)/.test(pathname || '')
+                : pathname?.startsWith(route.pathPrefix);
           return (
-            !pathname?.startsWith(route.pathPrefix) && (
+            !isCurrentRoute && (
               <CommandItem
                 icon={<Icon icon={RouteIcon} />}
                 key={route.id}
                 keywords={keywords}
                 value={route.id}
-                onSelect={() => handleNavigate(route.path)}
+                onSelect={() => handleNavigate(routePath)}
               >
                 {t(route.cmdkKey as any)}
               </CommandItem>

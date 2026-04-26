@@ -1,41 +1,72 @@
 // @vitest-environment node
-import { FilesTabs, SortType } from '@lobechat/types';
+import {
+  FileAssetClassification,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+  FilesTabs,
+  SortType,
+} from '@lobechat/types';
 import { eq, inArray } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getTestDB } from '../../core/getTestDB';
-import { agentSkills } from '../../schemas/agentSkill';
 import {
   chunks,
+  documents,
   embeddings,
+  fileAssets,
   fileChunks,
   files,
+  filesToSessions,
   globalFiles,
-  knowledgeBaseFiles,
-  knowledgeBases,
+  sessions,
+  sourceSetFiles,
+  sourceSets,
+  spaces,
   users,
 } from '../../schemas';
+import { agentSkills } from '../../schemas/agentSkill';
 import type { LobeChatDatabase } from '../../type';
+import { DocumentModel } from '../document';
 import { FileModel } from '../file';
 
 const serverDB: LobeChatDatabase = await getTestDB();
 
 const userId = 'file-model-test-user-id';
 const fileModel = new FileModel(serverDB, userId);
+const documentModel = new DocumentModel(serverDB, userId);
 
-const knowledgeBase = { id: 'kb1', userId, name: 'knowledgeBase' };
-beforeEach(async () => {
+const sourceSet = { id: 'kb1', userId, name: 'sourceSet' };
+
+const resetFileTestDb = async () => {
   await serverDB.delete(agentSkills);
+  await serverDB.delete(filesToSessions);
+  await serverDB.delete(fileAssets);
+  await serverDB.delete(fileChunks);
+  await serverDB.delete(embeddings);
+  await serverDB.delete(chunks);
+  await serverDB.delete(documents);
+  await serverDB.delete(sourceSetFiles);
+  await serverDB.delete(sessions);
+  await serverDB.delete(sourceSets);
+  await serverDB.delete(files);
+  await serverDB.delete(globalFiles);
+  await serverDB.delete(spaces);
   await serverDB.delete(users);
+};
+
+beforeEach(async () => {
+  await resetFileTestDb();
   await serverDB.insert(users).values([{ id: userId }, { id: 'user2' }]);
-  await serverDB.insert(knowledgeBases).values(knowledgeBase);
+  await serverDB.insert(spaces).values([
+    { createdBy: userId, id: 'spc_file_a', kind: 'team', name: 'File Space A' },
+    { createdBy: userId, id: 'spc_file_b', kind: 'team', name: 'File Space B' },
+  ]);
+  await serverDB.insert(sourceSets).values(sourceSet);
 });
 
 afterEach(async () => {
-  await serverDB.delete(agentSkills);
-  await serverDB.delete(users);
-  await serverDB.delete(files);
-  await serverDB.delete(globalFiles);
+  await resetFileTestDb();
 });
 
 describe('FileModel', () => {
@@ -55,21 +86,21 @@ describe('FileModel', () => {
       expect(file).toMatchObject({ ...params, userId });
     });
 
-    it('should create a file with knowledgeBaseId', async () => {
+    it('should create a file with sourceSetId', async () => {
       const params = {
         name: 'test-file.txt',
         url: 'https://example.com/test-file.txt',
         size: 100,
         fileType: 'text/plain',
-        knowledgeBaseId: 'kb1',
+        sourceSetId: 'kb1',
       };
 
       const { id } = await fileModel.create(params);
 
-      const kbFile = await serverDB.query.knowledgeBaseFiles.findFirst({
-        where: eq(knowledgeBaseFiles.fileId, id),
+      const kbFile = await serverDB.query.sourceSetFiles.findFirst({
+        where: eq(sourceSetFiles.fileId, id),
       });
-      expect(kbFile).toMatchObject({ fileId: id, knowledgeBaseId: 'kb1' });
+      expect(kbFile).toMatchObject({ fileId: id, sourceSetId: 'kb1' });
     });
 
     it('should create a new file with hash', async () => {
@@ -113,6 +144,25 @@ describe('FileModel', () => {
       const result = await fileModel.createGlobalFile(globalFile);
       expect(result[0]).toMatchObject(globalFile);
     });
+
+    it('should ignore duplicate hashes without throwing', async () => {
+      const globalFile = {
+        hashId: 'dup-hash',
+        fileType: 'text/plain',
+        size: 100,
+        url: 'https://example.com/global-file.txt',
+        metadata: { key: 'value' },
+        creator: userId,
+      };
+
+      await expect(fileModel.createGlobalFile(globalFile)).resolves.toHaveLength(1);
+      await expect(fileModel.createGlobalFile(globalFile)).resolves.toEqual([]);
+
+      const rows = await serverDB.query.globalFiles.findMany({
+        where: eq(globalFiles.hashId, 'dup-hash'),
+      });
+      expect(rows).toHaveLength(1);
+    });
   });
 
   describe('checkHash', () => {
@@ -144,9 +194,9 @@ describe('FileModel', () => {
     });
   });
 
-  describe('canAccessGlobalFileByHash', () => {
+  describe('canAccessGlobalFileBySha256', () => {
     it('should deny when hash missing', async () => {
-      await expect(fileModel.canAccessGlobalFileByHash('missing')).resolves.toBe(false);
+      await expect(fileModel.canAccessGlobalFileBySha256('missing')).resolves.toBe(false);
     });
 
     it('should allow creator', async () => {
@@ -157,7 +207,7 @@ describe('FileModel', () => {
         size: 1,
         url: 'u',
       });
-      await expect(fileModel.canAccessGlobalFileByHash('h-creator')).resolves.toBe(true);
+      await expect(fileModel.canAccessGlobalFileBySha256('h-creator')).resolves.toBe(true);
     });
 
     it('should deny other user without link', async () => {
@@ -168,7 +218,7 @@ describe('FileModel', () => {
         size: 1,
         url: 'u',
       });
-      await expect(fileModel.canAccessGlobalFileByHash('h-other')).resolves.toBe(false);
+      await expect(fileModel.canAccessGlobalFileBySha256('h-other')).resolves.toBe(false);
     });
 
     it('should allow when user owns a file row with same hash', async () => {
@@ -186,7 +236,7 @@ describe('FileModel', () => {
         size: 1,
         url: 'u2',
       });
-      await expect(fileModel.canAccessGlobalFileByHash('h-shared')).resolves.toBe(true);
+      await expect(fileModel.canAccessGlobalFileBySha256('h-shared')).resolves.toBe(true);
     });
 
     it('should allow when skill resources reference hash', async () => {
@@ -200,13 +250,13 @@ describe('FileModel', () => {
       await serverDB.insert(agentSkills).values({
         description: 'd',
         identifier: 'id1',
-        manifest: {},
+        manifest: { description: 'd', name: 'n1' },
         name: 'n1',
-        resources: { '/a.md': { fileHash: 'h-res', size: 1 } },
+        resources: { '/a.md': { sha256: 'h-res', size: 1 } },
         source: 'user',
         userId,
       });
-      await expect(fileModel.canAccessGlobalFileByHash('h-res')).resolves.toBe(true);
+      await expect(fileModel.canAccessGlobalFileBySha256('h-res')).resolves.toBe(true);
     });
   });
 
@@ -264,6 +314,86 @@ describe('FileModel', () => {
 
       expect(file).toBeUndefined();
       expect(globalFile).toBeDefined();
+    });
+  });
+
+  describe('conversation-scope files', () => {
+    it('should only list files with parsed text content for conversation selection', async () => {
+      const { id: validFileId } = await fileModel.create({
+        fileType: 'text/plain',
+        name: 'notes.txt',
+        size: 100,
+        url: 'https://example.com/notes.txt',
+      });
+      const { id: emptyFileId } = await fileModel.create({
+        fileType: 'text/plain',
+        name: 'empty.txt',
+        size: 100,
+        url: 'https://example.com/empty.txt',
+      });
+      await fileModel.create({
+        fileType: 'image/png',
+        name: 'diagram.png',
+        size: 100,
+        url: 'https://example.com/diagram.png',
+      });
+
+      await documentModel.create({
+        content: 'meeting notes',
+        fileId: validFileId,
+        fileType: 'text/plain',
+        source: 'https://example.com/notes.txt',
+        sourceType: 'file',
+        totalCharCount: 13,
+        totalLineCount: 1,
+      });
+      await documentModel.create({
+        content: '',
+        fileId: emptyFileId,
+        fileType: 'text/plain',
+        source: 'https://example.com/empty.txt',
+        sourceType: 'file',
+        totalCharCount: 0,
+        totalLineCount: 0,
+      });
+
+      const result = await fileModel.getConversationAvailableFiles();
+
+      expect(result.map((file) => file.id)).toEqual([validFileId]);
+    });
+
+    it('should only attach files with parsed text content to a conversation', async () => {
+      const { id: validFileId } = await fileModel.create({
+        fileType: 'text/plain',
+        name: 'guide.txt',
+        size: 100,
+        url: 'https://example.com/guide.txt',
+      });
+      const { id: invalidFileId } = await fileModel.create({
+        fileType: 'text/plain',
+        name: 'pending.txt',
+        size: 100,
+        url: 'https://example.com/pending.txt',
+      });
+
+      await documentModel.create({
+        content: 'guide content',
+        fileId: validFileId,
+        fileType: 'text/plain',
+        source: 'https://example.com/guide.txt',
+        sourceType: 'file',
+        totalCharCount: 13,
+        totalLineCount: 1,
+      });
+      await serverDB.insert(sessions).values({ id: 'session-1', userId });
+
+      await fileModel.createSessionFiles('session-1', [validFileId, invalidFileId]);
+
+      const attachedRows = await serverDB.query.filesToSessions.findMany({
+        where: eq(filesToSessions.sessionId, 'session-1'),
+      });
+
+      expect(attachedRows.map((row) => row.fileId)).toEqual([validFileId]);
     });
   });
 
@@ -389,6 +519,132 @@ describe('FileModel', () => {
       const userFiles = await serverDB.query.files.findMany({ where: eq(files.userId, userId) });
       expect(userFiles).toHaveLength(0);
     });
+
+    it('should preserve global files when removeGlobalFile is disabled', async () => {
+      await fileModel.create(
+        {
+          fileHash: 'hash-clear-1',
+          fileType: 'text/plain',
+          name: 'hashed-1.txt',
+          size: 100,
+          url: 'https://example.com/hashed-1.txt',
+        },
+        true,
+      );
+      await fileModel.create(
+        {
+          fileHash: 'hash-clear-2',
+          fileType: 'text/plain',
+          name: 'hashed-2.txt',
+          size: 200,
+          url: 'https://example.com/hashed-2.txt',
+        },
+        true,
+      );
+
+      const cleared = await fileModel.clear(false);
+
+      expect(cleared).toHaveLength(2);
+      await expect(
+        serverDB.query.globalFiles.findMany({
+          where: inArray(globalFiles.hashId, ['hash-clear-1', 'hash-clear-2']),
+        }),
+      ).resolves.toHaveLength(2);
+    });
+
+    it('should remove orphaned global files when removeGlobalFile is enabled', async () => {
+      await fileModel.create(
+        {
+          fileHash: 'hash-clear-3',
+          fileType: 'text/plain',
+          name: 'hashed-3.txt',
+          size: 100,
+          url: 'https://example.com/hashed-3.txt',
+        },
+        true,
+      );
+
+      const cleared = await fileModel.clear(true);
+
+      expect(cleared).toHaveLength(1);
+      await expect(
+        serverDB.query.globalFiles.findFirst({
+          where: eq(globalFiles.hashId, 'hash-clear-3'),
+        }),
+      ).resolves.toBeUndefined();
+    });
+
+    it('should only clear files within the scoped space', async () => {
+      await serverDB.insert(files).values([
+        {
+          fileType: 'text/plain',
+          id: 'clear-space-a',
+          name: 'space-a.txt',
+          size: 100,
+          spaceId: 'spc_file_a',
+          url: 'https://example.com/space-a.txt',
+          userId,
+        },
+        {
+          fileType: 'text/plain',
+          id: 'clear-space-b',
+          name: 'space-b.txt',
+          size: 100,
+          spaceId: 'spc_file_b',
+          url: 'https://example.com/space-b.txt',
+          userId,
+        },
+      ]);
+
+      const cleared = await fileModel.clear(true, { spaceId: 'spc_file_a' });
+
+      expect(cleared.map((item) => item.id)).toEqual(['clear-space-a']);
+      await expect(
+        serverDB.query.files.findMany({
+          where: eq(files.userId, userId),
+        }),
+      ).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'clear-space-b',
+            spaceId: 'spc_file_b',
+          }),
+        ]),
+      );
+    });
+
+    it('should include legacy unscoped files when requested', async () => {
+      await serverDB.insert(files).values([
+        {
+          fileType: 'text/plain',
+          id: 'clear-unscoped',
+          name: 'unscoped.txt',
+          size: 100,
+          spaceId: null,
+          url: 'https://example.com/unscoped.txt',
+          userId,
+        },
+        {
+          fileType: 'text/plain',
+          id: 'clear-personal-scoped',
+          name: 'scoped.txt',
+          size: 100,
+          spaceId: 'spc_file_a',
+          url: 'https://example.com/scoped.txt',
+          userId,
+        },
+      ]);
+
+      const cleared = await fileModel.clear(true, {
+        includeUnscoped: true,
+        spaceId: 'spc_file_a',
+      });
+
+      expect(cleared.map((item) => item.id).sort()).toEqual([
+        'clear-personal-scoped',
+        'clear-unscoped',
+      ]);
+    });
   });
 
   describe('Query', () => {
@@ -451,6 +707,34 @@ describe('FileModel', () => {
       const filteredFiles = await fileModel.query({ q: 'DOC' });
       expect(filteredFiles).toHaveLength(1);
       expect(filteredFiles[0].name).toBe('document.pdf');
+    });
+
+    it('should query files within the provided space', async () => {
+      await serverDB.insert(files).values([
+        {
+          fileType: 'text/plain',
+          id: 'space-file-1',
+          name: 'space-a.txt',
+          size: 100,
+          spaceId: 'spc_file_a',
+          url: 'https://example.com/space-a.txt',
+          userId: 'user2',
+        },
+        {
+          fileType: 'text/plain',
+          id: 'space-file-2',
+          name: 'space-b.txt',
+          size: 100,
+          spaceId: 'spc_file_b',
+          url: 'https://example.com/space-b.txt',
+          userId,
+        },
+      ]);
+
+      const result = await fileModel.query({ spaceId: 'spc_file_a' });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('space-file-1');
     });
 
     it('should filter files by category', async () => {
@@ -546,25 +830,125 @@ describe('FileModel', () => {
           },
         ]);
         await serverDB
-          .insert(knowledgeBaseFiles)
-          .values([{ fileId: 'file1', knowledgeBaseId: 'kb1', userId }]);
+          .insert(sourceSetFiles)
+          .values([{ fileId: 'file1', sourceSetId: 'kb1', userId }]);
       });
 
       it('should query files in a specific knowledge base', async () => {
-        const result = await fileModel.query({ knowledgeBaseId: 'kb1' });
+        const result = await fileModel.query({ sourceSetId: 'kb1' });
         expect(result).toHaveLength(1);
         expect(result[0].id).toBe('file1');
       });
 
-      it('should exclude files in knowledge bases when showFilesInKnowledgeBase is false', async () => {
-        const result = await fileModel.query({ showFilesInKnowledgeBase: false });
+      it('should exclude files in knowledge bases when showFilesInSourceSet is false', async () => {
+        const result = await fileModel.query({ showFilesInSourceSet: false });
         expect(result).toHaveLength(1);
         expect(result[0].id).toBe('file2');
       });
 
-      it('should include all files when showFilesInKnowledgeBase is true', async () => {
-        const result = await fileModel.query({ showFilesInKnowledgeBase: true });
+      it('should include all files when showFilesInSourceSet is true', async () => {
+        const result = await fileModel.query({ showFilesInSourceSet: true });
         expect(result).toHaveLength(2);
+      });
+
+      it('should filter files by asset classification', async () => {
+        await serverDB.insert(fileAssets).values({
+          classification: FileAssetClassification.Brand,
+          createdBy: userId,
+          fileId: 'file2',
+          spaceId: 'spc_file_a',
+        });
+
+        const result = await fileModel.query({
+          assetClassification: FileAssetClassification.Brand,
+          showFilesInSourceSet: true,
+        });
+
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('file2');
+      });
+
+      it('should filter files by asset usage policy', async () => {
+        await serverDB.insert(fileAssets).values({
+          createdBy: userId,
+          fileId: 'file2',
+          spaceId: 'spc_file_a',
+          usagePolicy: FileAssetUsagePolicy.Restricted,
+        });
+
+        const result = await fileModel.query({
+          assetUsagePolicy: FileAssetUsagePolicy.Restricted,
+          showFilesInSourceSet: true,
+        });
+
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('file2');
+      });
+
+      it('should filter files by asset review status', async () => {
+        await serverDB.insert(fileAssets).values({
+          createdBy: userId,
+          fileId: 'file2',
+          reviewStatus: FileAssetReviewStatus.Approved,
+          spaceId: 'spc_file_a',
+        });
+
+        const result = await fileModel.query({
+          assetReviewStatus: FileAssetReviewStatus.Approved,
+          showFilesInSourceSet: true,
+        });
+
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('file2');
+      });
+
+      it('should filter files by asset rights owner', async () => {
+        await serverDB.insert(fileAssets).values({
+          createdBy: userId,
+          fileId: 'file2',
+          rightsOwner: 'Brand Team',
+          spaceId: 'spc_file_a',
+        });
+
+        const result = await fileModel.query({
+          assetRightsOwner: 'Brand',
+          showFilesInSourceSet: true,
+        });
+
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('file2');
+      });
+
+      it('should return lightweight governance rows with default null metadata', async () => {
+        await serverDB.insert(fileAssets).values({
+          classification: FileAssetClassification.Brand,
+          createdBy: userId,
+          fileId: 'file2',
+          reviewStatus: FileAssetReviewStatus.Approved,
+          spaceId: 'spc_file_a',
+          usagePolicy: FileAssetUsagePolicy.Restricted,
+        });
+
+        const result = await fileModel.queryGovernanceRows({
+          showFilesInSourceSet: true,
+        });
+
+        expect(result).toEqual(
+          expect.arrayContaining([
+            {
+              assetClassification: null,
+              assetReviewStatus: null,
+              assetUsagePolicy: null,
+              id: 'file1',
+            },
+            {
+              assetClassification: FileAssetClassification.Brand,
+              assetReviewStatus: FileAssetReviewStatus.Approved,
+              assetUsagePolicy: FileAssetUsagePolicy.Restricted,
+              id: 'file2',
+            },
+          ]),
+        );
       });
     });
   });
@@ -896,34 +1280,34 @@ describe('FileModel', () => {
         expect(globalFile).toBeUndefined();
       });
 
-      it('should create file with knowledgeBase within transaction', async () => {
+      it('should create file with sourceSet within transaction', async () => {
         const params = {
           name: 'test-kb-file.txt',
           url: 'https://example.com/test-kb-file.txt',
           size: 100,
           fileType: 'text/plain',
-          knowledgeBaseId: 'kb1',
+          sourceSetId: 'kb1',
         };
 
         const result = await serverDB.transaction(async (trx) => {
           const { id } = await fileModel.create(params, false, trx);
 
           // 验证知识库文件关联已创建
-          const kbFile = await trx.query.knowledgeBaseFiles.findFirst({
-            where: eq(knowledgeBaseFiles.fileId, id),
+          const kbFile = await trx.query.sourceSetFiles.findFirst({
+            where: eq(sourceSetFiles.fileId, id),
           });
-          expect(kbFile).toMatchObject({ fileId: id, knowledgeBaseId: 'kb1', userId });
+          expect(kbFile).toMatchObject({ fileId: id, sourceSetId: 'kb1', userId });
 
           return { id };
         });
 
         // 事务提交后验证
-        const kbFile = await serverDB.query.knowledgeBaseFiles.findFirst({
-          where: eq(knowledgeBaseFiles.fileId, result.id),
+        const kbFile = await serverDB.query.sourceSetFiles.findFirst({
+          where: eq(sourceSetFiles.fileId, result.id),
         });
         expect(kbFile).toMatchObject({
           fileId: result.id,
-          knowledgeBaseId: 'kb1',
+          sourceSetId: 'kb1',
           userId,
         });
       });
@@ -1124,7 +1508,7 @@ describe('FileModel', () => {
         {
           id: 'page-file',
           name: 'page.html',
-          url: 'https://example.com/page.html',
+          url: 'https://example.com/docs.html',
           size: 500,
           fileType: 'text/html',
           userId,
@@ -1146,7 +1530,7 @@ describe('FileModel', () => {
       expect(result[0].id).toBe('video-file');
     });
 
-    it('should filter website/page files correctly', async () => {
+    it('should filter website/docs files correctly', async () => {
       const result = await fileModel.query({ category: FilesTabs.Websites });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('page-file');
@@ -1210,14 +1594,14 @@ describe('FileModel', () => {
   });
 
   describe('deleteFileChunks error handling', () => {
-    let consoleWarnSpy: any;
+    let consoleWarnSpy: ReturnType<typeof vi.spyOn> | undefined;
 
     beforeEach(() => {
       consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     });
 
     afterEach(() => {
-      consoleWarnSpy.mockRestore();
+      consoleWarnSpy?.mockRestore();
     });
 
     it('should delete file even when chunks deletion fails', async () => {
@@ -1350,7 +1734,7 @@ describe('FileModel', () => {
         size: 100,
         fileType: 'text/plain',
         fileHash: 'kb-file-hash',
-        knowledgeBaseId: 'kb1',
+        sourceSetId: 'kb1',
       };
 
       const { id: fileId } = await fileModel.create(testFile, true);
@@ -1371,8 +1755,8 @@ describe('FileModel', () => {
         .values([{ chunkId, embeddings: testEmbedding, model: 'test-model', userId }]);
 
       // 验证文件确实在知识库中
-      const kbFile = await serverDB.query.knowledgeBaseFiles.findFirst({
-        where: eq(knowledgeBaseFiles.fileId, fileId),
+      const kbFile = await serverDB.query.sourceSetFiles.findFirst({
+        where: eq(sourceSetFiles.fileId, fileId),
       });
       expect(kbFile).toBeDefined();
 

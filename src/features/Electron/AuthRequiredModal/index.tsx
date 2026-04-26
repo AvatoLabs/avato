@@ -1,8 +1,8 @@
 'use client';
 
 import { useWatchBroadcast } from '@lobechat/electron-client-ipc';
-import { type ModalInstance } from '@lobehub/ui';
-import { Button, createModal, Flexbox, Icon } from '@lobehub/ui';
+import { Button, Flexbox, Icon } from '@lobehub/ui';
+import { createModal, type ModalInstance } from '@lobehub/ui/base-ui';
 import { AlertCircle, LogIn } from 'lucide-react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -102,10 +102,8 @@ export const useAuthRequiredModal = () => {
     };
 
     const handleSigningInChange = (isSigningIn: boolean) => {
+      void isSigningIn;
       instanceRef.current?.update?.({
-        closable: !isSigningIn,
-        keyboard: !isSigningIn,
-        maskClosable: !isSigningIn,
       });
     };
 
@@ -113,10 +111,7 @@ export const useAuthRequiredModal = () => {
       children: (
         <AuthRequiredModalContent onClose={handleClose} onSigningInChange={handleSigningInChange} />
       ),
-      closable: false,
       footer: null,
-      keyboard: false,
-      maskClosable: false,
       title: (
         <Flexbox horizontal align="center" gap={8}>
           <Icon icon={AlertCircle} />

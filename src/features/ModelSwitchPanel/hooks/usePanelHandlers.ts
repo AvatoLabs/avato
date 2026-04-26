@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 
 interface UsePanelHandlersProps {
   onModelChange?: (params: { model: string; provider: string }) => Promise<void>;

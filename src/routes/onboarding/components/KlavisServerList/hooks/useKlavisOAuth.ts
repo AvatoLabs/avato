@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { useToolStore } from '@/store/tool';
 import { KlavisServerStatus } from '@/store/tool/slices/klavisStore';
+import { useToolStore } from '@/store/tool/store';
 
 const POLL_INTERVAL_MS = 1000;
 const POLL_TIMEOUT_MS = 15_000;

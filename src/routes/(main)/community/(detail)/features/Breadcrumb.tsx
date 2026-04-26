@@ -12,6 +12,7 @@ import { DiscoverTab } from '@/types/discover';
 
 const Breadcrumb = memo<{ identifier: string; tab: DiscoverTab }>(({ tab, identifier }) => {
   const { t } = useTranslation('discover');
+  const { t: tCommon } = useTranslation('common');
 
   const tabLabel = useMemo(() => {
     if (tab === DiscoverTab.Mcp) return 'MCP Servers';
@@ -24,7 +25,7 @@ const Breadcrumb = memo<{ identifier: string; tab: DiscoverTab }>(({ tab, identi
     if (tab === DiscoverTab.User) {
       return [
         {
-          title: <Link to="/community">Community</Link>,
+          title: <Link to="/community">{tCommon('tab.community')}</Link>,
         },
         {
           title: (
@@ -45,7 +46,7 @@ const Breadcrumb = memo<{ identifier: string; tab: DiscoverTab }>(({ tab, identi
 
     return [
       {
-        title: <Link to="/community">Community</Link>,
+        title: <Link to="/community">{tCommon('tab.community')}</Link>,
       },
       {
         title: <Link to={`/community/${tab}`}>{tabLabel}</Link>,
@@ -72,7 +73,7 @@ const Breadcrumb = memo<{ identifier: string; tab: DiscoverTab }>(({ tab, identi
         ),
       },
     ];
-  }, [tab, identifier, tabLabel]);
+  }, [tab, identifier, tabLabel, tCommon]);
 
   return <AntdBreadcrumb items={items} />;
 });

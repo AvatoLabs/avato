@@ -10,8 +10,8 @@ import { createStaticStyles, cssVar } from 'antd-style';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { revealChatContextPanel } from '@/features/ChatInput/utils/revealChatContextPanel';
 import { useFileStore } from '@/store/file';
-import { useGlobalStore } from '@/store/global';
 
 import { usePageEditorStore } from '../store';
 
@@ -29,7 +29,7 @@ const styles = createStaticStyles(({ css }) => ({
 export const useAskCopilotItem = (editor: IEditor | undefined): ChatInputActionsProps['items'] => {
   const { t } = useTranslation('common');
   const addSelectionContext = useFileStore((s) => s.addChatContextSelection);
-  const pageId = usePageEditorStore((s) => s.documentId);
+  const docId = usePageEditorStore((s) => s.documentId);
 
   return useMemo(() => {
     if (!editor) return [];
@@ -65,27 +65,15 @@ export const useAskCopilotItem = (editor: IEditor | undefined): ChatInputActions
               // Store action handles deduplication
               addSelectionContext({
                 content,
+                docId,
                 format,
                 id: `selection-${nanoid(6)}`,
-                pageId,
                 preview,
                 title: 'Selection',
                 type: 'text',
               });
 
-              // Open right panel if not opened
-              useGlobalStore.getState().toggleRightPanel(true);
-
-              // Focus on chat input after a short delay to ensure panel is opened
-              setTimeout(() => {
-                // Find the chat input editor within the right panel
-                // Query all lexical editors and get the last one (which should be the chat input)
-                const allEditors = [...document.querySelectorAll('[data-lexical-editor="true"]')];
-                const chatInputEditor = allEditors.at(-1) as HTMLElement;
-                if (chatInputEditor) {
-                  chatInputEditor.focus();
-                }
-              }, 300);
+              revealChatContextPanel();
 
               editor.dispatchCommand(HIDE_TOOLBAR_COMMAND, undefined);
               editor.blur();
@@ -100,5 +88,5 @@ export const useAskCopilotItem = (editor: IEditor | undefined): ChatInputActions
         onClick: () => {},
       },
     ];
-  }, [addSelectionContext, editor, pageId, t]);
+  }, [addSelectionContext, docId, editor, t]);
 };

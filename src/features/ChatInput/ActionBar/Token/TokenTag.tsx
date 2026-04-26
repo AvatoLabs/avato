@@ -11,12 +11,12 @@ import { createAgentToolsEngine } from '@/helpers/toolEngineering';
 import { useModelContextWindowTokens } from '@/hooks/useModelContextWindowTokens';
 import { useModelSupportToolUse } from '@/hooks/useModelSupportToolUse';
 import { useTokenCount } from '@/hooks/useTokenCount';
-import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors, chatConfigByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { dbMessageSelectors, topicSelectors } from '@/store/chat/selectors';
-import { useToolStore } from '@/store/tool';
 import { pluginHelpers } from '@/store/tool/helpers';
+import { useToolStore } from '@/store/tool/store';
 
 import { useAgentId } from '../../hooks/useAgentId';
 import ActionPopover from '../components/ActionPopover';

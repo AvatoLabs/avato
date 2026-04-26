@@ -98,7 +98,7 @@ const EditorDataMode = memo<EditorDataModeProps>(
       <div style={{ position: 'relative', ...style }}>
         <InternalEditor
           editor={editor}
-          placeholder={editorProps.placeholder || t('pageEditor.editorPlaceholder')}
+          placeholder={editorProps.placeholder || t('docEditor.editorPlaceholder')}
           onContentChange={onContentChange}
           onInit={handleInit}
           {...editorProps}

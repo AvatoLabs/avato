@@ -8,7 +8,7 @@ import { DiscoverService } from './index';
 // Mock external dependencies
 vi.mock('@lobehub/market-sdk');
 vi.mock('@/utils/toolManifest');
-vi.mock('@/locales/resources', () => ({
+vi.mock('@/locales/contents', () => ({
   normalizeLocale: vi.fn((locale) => {
     if (locale === 'en-US') return 'en';
     return locale || 'en';
@@ -100,7 +100,7 @@ const mockMarketAssistantList = [
     tokenUsage: 256,
     config: {
       systemRole: 'You are a productive assistant.',
-      knowledgeBases: [{ id: 'kb-1' }],
+      sourceSets: [{ id: 'kb-1' }],
       plugins: [{ id: 'plugin-1' }],
     },
   },
@@ -119,7 +119,7 @@ const mockMarketAssistantList = [
     tokenUsage: 128,
     config: {
       systemRole: 'You are a creative assistant.',
-      knowledgeBases: [],
+      sourceSets: [],
       plugins: [],
     },
   },

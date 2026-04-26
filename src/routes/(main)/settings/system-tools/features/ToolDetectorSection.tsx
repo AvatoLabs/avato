@@ -3,6 +3,7 @@
 import { type ToolStatus } from '@lobechat/electron-client-ipc';
 import { type FormGroupItemType } from '@lobehub/ui';
 import { Button, CopyButton, Flexbox, Form, Icon, Skeleton, Tag, Text, Tooltip } from '@lobehub/ui';
+import { App } from 'antd';
 import { CheckCircle2, Loader2Icon, RefreshCw, XCircle } from 'lucide-react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -107,6 +108,7 @@ const ToolStatusDisplay = memo<ToolStatusDisplayProps>(({ status, isDetecting })
 
 const ToolDetectorSection = memo(() => {
   const { t } = useTranslation('setting');
+  const { message } = App.useApp();
   const [toolStatuses, setToolStatuses] = useState<Record<string, ToolStatus>>({});
   const [loading, setLoading] = useState(true);
   const [detecting, setDetecting] = useState(false);
@@ -120,11 +122,12 @@ const ToolDetectorSection = memo(() => {
       setToolStatuses(statuses);
     } catch (error) {
       console.error('Failed to detect tools:', error);
+      message.error(t('settingSystemTools.detectFailed'));
     } finally {
       setLoading(false);
       setDetecting(false);
     }
-  }, []);
+  }, [message, t]);
 
   // Auto-detect on mount
   useEffect(() => {

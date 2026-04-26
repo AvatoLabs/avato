@@ -9,6 +9,8 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 
+import { ensureElectronIpc } from '@/utils/electron/ipc';
+
 import { useDetailContext } from '../../DetailProvider';
 
 const styles = createStaticStyles(({ css }) => ({
@@ -25,7 +27,6 @@ const ProviderConfig = memo(() => {
   const navigate = useNavigate();
   const openSettings = async () => {
     if (isDesktop) {
-      const { ensureElectronIpc } = await import('@/utils/electron/ipc');
       await ensureElectronIpc().windows.openSettingsWindow({
         path: `/settings/provider/${identifier}`,
       });

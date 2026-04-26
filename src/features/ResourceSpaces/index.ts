@@ -1,5 +1,18 @@
+export { default as MemoryScopeSection } from './MemoryScopeSection';
 export * from './paths';
+export { default as QuickAccessSection } from './QuickAccessSection';
 export { default as SharedWithMePage } from './SharedWithMePage';
+export { default as SpaceList } from './SpaceList';
+export { default as SpaceListSection } from './SpaceListSection';
+export { default as SpaceMembersPage } from './SpaceMembersPage';
+export { default as SpaceMemoryPage } from './SpaceMemoryPage';
 export { default as SpaceRedirectPage } from './SpaceRedirectPage';
+export { default as SpaceRootRedirectPage } from './SpaceRootRedirectPage';
 export { default as SpaceSection } from './SpaceSection';
 export { default as SpaceSettingsPage } from './SpaceSettingsPage';
+export { default as SpaceSurfaceTitle } from './SpaceSurfaceTitle';
+export { default as SpaceTrashRedirectPage } from './SpaceTrashRedirectPage';
+export type { SurfaceBreadcrumbSegment } from './SurfaceBreadcrumb';
+export { default as SurfaceBreadcrumb } from './SurfaceBreadcrumb';
+export * from './useSpaceMemoryCandidateTargets';
+export * from './useSpaceName';

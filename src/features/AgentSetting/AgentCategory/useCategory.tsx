@@ -5,8 +5,8 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type MenuProps } from '@/components/Menu';
-import { useAgentStore } from '@/store/agent';
 import { builtinAgentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { ChatSettingsTabs } from '@/store/global/initialState';
 
 interface UseCategoryOptions {

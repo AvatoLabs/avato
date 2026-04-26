@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { type LobeChatDatabase } from '@lobechat/database';
 import {
   type SkillResourceContent,
@@ -11,6 +13,7 @@ import { sha256 } from 'js-sha256';
 import { FileService } from '@/server/services/file';
 
 import { SkillResourceError } from './errors';
+import { buildSkillResourceStorageKey } from './storage';
 
 const log = debug('lobe-chat:service:skill-resource');
 
@@ -37,7 +40,7 @@ export class SkillResourceService {
 
   /**
    * Store resource files to S3/globalFiles
-   * Uses zipHash as path prefix for deduplication
+   * Uses a deterministic opaque directory derived from zipHash
    * Only creates globalFiles records (no user files)
    *
    * @param zipHash - ZIP package hash for deduplication
@@ -53,9 +56,9 @@ export class SkillResourceService {
 
     for (const [virtualPath, buffer] of resources) {
       log('storeResources: storing resource path=%s, size=%d bytes', virtualPath, buffer.length);
-      const fileHash = await this.storeResource(zipHash, virtualPath, buffer);
-      result[virtualPath] = { fileHash, size: buffer.length };
-      log('storeResources: stored resource path=%s, fileHash=%s', virtualPath, fileHash);
+      const resourceSha256 = await this.storeResource(zipHash, virtualPath, buffer);
+      result[virtualPath] = { sha256: resourceSha256, size: buffer.length };
+      log('storeResources: stored resource path=%s, sha256=%s', virtualPath, resourceSha256);
     }
 
     log('storeResources: completed, stored %d resources', Object.keys(result).length);
@@ -78,34 +81,34 @@ export class SkillResourceService {
       log('readResource: resource not found in mapping, path=%s', virtualPath);
       throw new SkillResourceError(`Resource not found: ${virtualPath}`);
     }
-    log('readResource: found fileHash=%s', meta.fileHash);
+    log('readResource: found sha256=%s', meta.sha256);
 
     const fileType = getMimeType(virtualPath);
 
     if (isTextMimeType(fileType)) {
-      const content = await this.fileService.getFileContentByHash(meta.fileHash);
+      const content = await this.fileService.getFileContentBySha256(meta.sha256);
       log('readResource: fetched text content length=%d, fileType=%s', content.length, fileType);
 
       return {
         content,
         encoding: 'utf8',
-        fileHash: meta.fileHash,
         fileType,
         path: virtualPath,
+        sha256: meta.sha256,
         size: Buffer.byteLength(content, 'utf8'),
       };
     }
 
-    const bytes = await this.fileService.getFileByteArrayByHash(meta.fileHash);
+    const bytes = await this.fileService.getFileByteArrayBySha256(meta.sha256);
     const content = Buffer.from(bytes).toString('base64');
     log('readResource: fetched binary content size=%d, fileType=%s', bytes.length, fileType);
 
     return {
       content,
       encoding: 'base64',
-      fileHash: meta.fileHash,
       fileType,
       path: virtualPath,
+      sha256: meta.sha256,
       size: bytes.length,
     };
   }
@@ -164,7 +167,7 @@ export class SkillResourceService {
         if (!isTextMimeType(mimeType)) return;
 
         try {
-          node.content = await this.fileService.getFileContentByHash(meta.fileHash);
+          node.content = await this.fileService.getFileContentBySha256(meta.sha256);
         } catch (error) {
           log('populateContent: failed to read content for %s: %o', node.path, error);
         }
@@ -179,8 +182,9 @@ export class SkillResourceService {
     virtualPath: string,
     buffer: Buffer,
   ): Promise<string> {
-    // Use zipHash as path prefix, same ZIP resources share same path
-    const key = `skills/source_files/${zipHash}/${virtualPath}`;
+    const ext = path.posix.extname(virtualPath).replace(/^\./, '') || 'bin';
+    const opaqueName = `${sha256(virtualPath).slice(0, 16)}.${ext}`;
+    const key = buildSkillResourceStorageKey(zipHash, opaqueName);
     log('storeResource: uploading to key=%s', key);
 
     // Determine content type from file extension
@@ -191,8 +195,8 @@ export class SkillResourceService {
     log('storeResource: uploaded to S3 with contentType=%s', fileType);
 
     // Create globalFiles record only (no user files)
-    const fileHash = sha256(buffer);
-    log('storeResource: creating global file record hash=%s, type=%s', fileHash, fileType);
+    const resourceSha256 = sha256(buffer);
+    log('storeResource: creating global file record sha256=%s, type=%s', resourceSha256, fileType);
 
     // Extract filename and dirname from key (actual storage path)
     const lastSlash = key.lastIndexOf('/');
@@ -200,15 +204,15 @@ export class SkillResourceService {
     const dirname = lastSlash >= 0 ? key.slice(0, lastSlash) : '';
 
     await this.fileService.createGlobalFile({
-      fileHash,
       fileType,
-      metadata: { dirname, filename, path: key },
+      metadata: { dirname, filename, originalPath: virtualPath, path: key },
+      sha256: resourceSha256,
       size: buffer.length,
-      url: key,
+      storageKey: key,
     });
 
-    log('storeResource: created global file record fileHash=%s', fileHash);
-    return fileHash;
+    log('storeResource: created global file record sha256=%s', resourceSha256);
+    return resourceSha256;
   }
 
   private buildTree(paths: string[]): SkillResourceTreeNode[] {

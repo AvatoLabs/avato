@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { ChatToolPayload, ToolIntervention } from '../types';
 import {
   mergeResolvedToolPayloads,
   mergeToolPayloads,
@@ -18,17 +19,8 @@ vi.mock('./user', () => ({ getUserMemorySettings: vi.fn() }));
 vi.mock('../lib/session', () => ({ isGroupSessionLike: () => false }));
 
 const baseTool = (
-  overrides: Partial<{
-    id: string;
-    identifier: string;
-    apiName: string;
-    arguments: string;
-    result_content: string;
-    result_msg_id: string;
-    intervention: { status: string };
-    pluginState: Record<string, unknown>;
-  }> = {},
-) => ({
+  overrides: Partial<ChatToolPayload> & { intervention?: ToolIntervention } = {},
+): ChatToolPayload => ({
   apiName: 'search',
   arguments: '{}',
   id: 'tc-1',
@@ -87,9 +79,7 @@ describe('chatHelpers', () => {
     });
 
     it('merges by id, preferring incoming result_content', () => {
-      const previous = [
-        baseTool({ id: 'tc-1', result_content: undefined, intervention: { status: 'pending' } }),
-      ];
+      const previous = [baseTool({ id: 'tc-1', result_content: undefined, intervention: { status: 'pending' } })];
       const incoming = [
         baseTool({
           id: 'tc-1',

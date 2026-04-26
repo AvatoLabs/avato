@@ -1,1 +1,0 @@
--- Skipped: pg_search extension requires ParadeDB

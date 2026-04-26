@@ -4,7 +4,7 @@ import { Flexbox, SearchBar } from '@lobehub/ui';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 
 import { SkillStoreTab } from '../SkillStoreContent';
 

@@ -67,7 +67,7 @@ const TokenDetail = memo<TokenDetailProps>(({ usage, performance, model, provide
         : detailTokens.outputReasoning.token,
     },
     !!detailTokens.outputImage && {
-      color: cssVar.purple,
+      color: cssVar.gold,
       id: 'outputImage',
       title: t('messages.tokenDetails.outputImage'),
       value: isShowCredit ? detailTokens.outputImage.credit : detailTokens.outputImage.token,
@@ -155,7 +155,12 @@ const TokenDetail = memo<TokenDetailProps>(({ usage, performance, model, provide
                   justify={'space-between'}
                   width={'100%'}
                 >
-                  <div style={{ color: cssVar.colorTextDescription, fontSize: 12 }}>
+                  <div
+                    style={{
+                      color: `color-mix(in srgb, ${cssVar.colorTextDescription} 72%, ${cssVar.colorText} 28%)`,
+                      fontSize: 12,
+                    }}
+                  >
                     {t('messages.tokenDetails.inputTitle')}
                   </div>
                 </Flexbox>
@@ -171,7 +176,12 @@ const TokenDetail = memo<TokenDetailProps>(({ usage, performance, model, provide
                   justify={'space-between'}
                   width={'100%'}
                 >
-                  <div style={{ color: cssVar.colorTextDescription, fontSize: 12 }}>
+                  <div
+                    style={{
+                      color: `color-mix(in srgb, ${cssVar.colorTextDescription} 72%, ${cssVar.colorText} 28%)`,
+                      fontSize: 12,
+                    }}
+                  >
                     {t('messages.tokenDetails.outputTitle')}
                   </div>
                 </Flexbox>
@@ -182,14 +192,22 @@ const TokenDetail = memo<TokenDetailProps>(({ usage, performance, model, provide
               <TokenProgress showIcon data={totalDetail} />
               <Divider style={{ marginBlock: 8 }} />
               <Flexbox horizontal align={'center'} gap={4} justify={'space-between'}>
-                <div style={{ color: cssVar.colorTextSecondary }}>
+                <div
+                  style={{
+                    color: `color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%)`,
+                  }}
+                >
                   {t('messages.tokenDetails.total')}
                 </div>
                 <div style={{ fontWeight: 500 }}>{detailTotal}</div>
               </Flexbox>
               {isShowCredit && (
                 <Flexbox horizontal align={'center'} gap={4} justify={'space-between'}>
-                  <div style={{ color: cssVar.colorTextSecondary }}>
+                  <div
+                    style={{
+                      color: `color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%)`,
+                    }}
+                  >
                     {t('messages.tokenDetails.average')}
                   </div>
                   <div style={{ fontWeight: 500 }}>{averagePricing}</div>
@@ -198,7 +216,11 @@ const TokenDetail = memo<TokenDetailProps>(({ usage, performance, model, provide
               {tps && (
                 <Flexbox horizontal align={'center'} gap={4} justify={'space-between'}>
                   <Flexbox horizontal gap={8}>
-                    <div style={{ color: cssVar.colorTextSecondary }}>
+                    <div
+                      style={{
+                        color: `color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%)`,
+                      }}
+                    >
                       {t('messages.tokenDetails.speed.tps.title')}
                     </div>
                     <InfoTooltip title={t('messages.tokenDetails.speed.tps.tooltip')} />
@@ -209,7 +231,11 @@ const TokenDetail = memo<TokenDetailProps>(({ usage, performance, model, provide
               {ttft && (
                 <Flexbox horizontal align={'center'} gap={4} justify={'space-between'}>
                   <Flexbox horizontal gap={8}>
-                    <div style={{ color: cssVar.colorTextSecondary }}>
+                    <div
+                      style={{
+                        color: `color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%)`,
+                      }}
+                    >
                       {t('messages.tokenDetails.speed.ttft.title')}
                     </div>
                     <InfoTooltip title={t('messages.tokenDetails.speed.ttft.tooltip')} />

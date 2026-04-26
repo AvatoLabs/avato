@@ -6,7 +6,12 @@ import utc from 'dayjs/plugin/utc';
 import { enableMapSet } from 'immer';
 import { scan } from 'react-scan';
 
-import { isChunkLoadError, notifyChunkError } from '@/utils/chunkError';
+import {
+  cleanupChunkReloadMarker,
+  isChunkLoadError,
+  notifyChunkError,
+  tryHardReloadForChunkError,
+} from '@/utils/chunkError';
 
 enableMapSet();
 
@@ -18,19 +23,25 @@ dayjs.extend(isYesterday);
 
 // Global fallback: catch async chunk-load failures that escape Error Boundaries
 if (typeof window !== 'undefined') {
+  cleanupChunkReloadMarker();
+
   window.addEventListener('vite:preloadError', (event) => {
     event.preventDefault();
-    notifyChunkError();
+    if (!tryHardReloadForChunkError()) {
+      notifyChunkError();
+    }
   });
 
   window.addEventListener('unhandledrejection', (event) => {
     if (isChunkLoadError(event.reason)) {
       event.preventDefault();
-      notifyChunkError();
+      if (!tryHardReloadForChunkError()) {
+        notifyChunkError();
+      }
     }
   });
 }
 
-if (__DEV__) {
+if (__DEV__ && process.env.NEXT_PUBLIC_ENABLE_REACT_SCAN === '1') {
   scan({ enabled: true });
 }

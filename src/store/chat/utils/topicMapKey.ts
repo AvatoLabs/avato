@@ -19,6 +19,11 @@ export interface TopicMapKeyInput {
    * Explicit scope override (auto-detected if not provided)
    */
   scope?: TopicMapScope;
+  /**
+   * Optional space scope for workspace-specific topic caches.
+   * When omitted, preserves the legacy key format.
+   */
+  spaceId?: string | null;
 }
 
 /**
@@ -33,9 +38,10 @@ export interface TopicMapKeyInput {
  * - Agent session: `agent_{agentId}`
  * - Group session: `group_{groupId}`
  * - Agent within group: `group_agent_{groupId}_{agentId}`
+ * - Space-scoped cache: `{baseKey}__space_{spaceId}`
  */
 export const topicMapKey = (input: TopicMapKeyInput): string => {
-  const { agentId, groupId, scope: explicitScope } = input;
+  const { agentId, groupId, scope: explicitScope, spaceId } = input;
 
   // Auto-detect scope if not explicitly provided
   let scope: TopicMapScope;
@@ -49,16 +55,21 @@ export const topicMapKey = (input: TopicMapKeyInput): string => {
     scope = 'agent';
   }
 
+  let baseKey: string;
   switch (scope) {
     case 'group_agent': {
-      return `group_agent_${groupId}_${agentId}`;
+      baseKey = `group_agent_${groupId}_${agentId}`;
+      break;
     }
     case 'group': {
-      return `group_${groupId}`;
+      baseKey = `group_${groupId}`;
+      break;
     }
 
     default: {
-      return `agent_${agentId}`;
+      baseKey = `agent_${agentId}`;
     }
   }
+
+  return spaceId ? `${baseKey}__space_${spaceId}` : baseKey;
 };

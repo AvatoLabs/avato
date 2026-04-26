@@ -19,7 +19,7 @@ import { useFileStore } from '@/store/file';
 import { useServerConfigStore } from '@/store/serverConfig';
 import { serverConfigSelectors } from '@/store/serverConfig/selectors';
 import { useSessionStore } from '@/store/session';
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 import { useUserStore } from '@/store/user';
 import { settingsSelectors } from '@/store/user/selectors';
 
@@ -48,14 +48,19 @@ const AdvancedActions = () => {
         danger: true,
       },
       onOk: async () => {
-        await clearSessions();
-        await removeAllPlugins();
-        await clearTopics();
-        await removeAllFiles();
-        await clearAllMessages();
-        await clearSessionGroups();
+        try {
+          await clearSessions();
+          await removeAllPlugins();
+          await clearTopics();
+          await removeAllFiles();
+          await clearAllMessages();
+          await clearSessionGroups();
 
-        message.success(t('danger.clear.success'));
+          message.success(t('danger.clear.success'));
+        } catch (error) {
+          console.error('Failed to clear application data:', error);
+          message.error(t('danger.clear.error'));
+        }
       },
       title: t('danger.clear.confirm'),
     });

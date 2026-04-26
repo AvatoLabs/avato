@@ -433,14 +433,16 @@ describe('klavisStore actions', () => {
         });
       });
 
+      let success;
       await act(async () => {
-        await result.current.removeKlavisServer('non-existent');
+        success = await result.current.removeKlavisServer('non-existent');
       });
 
+      expect(success).toBe(true);
       expect(lambdaClient.klavis.deleteServerInstance.mutate).not.toHaveBeenCalled();
     });
 
-    it('should handle API error gracefully', async () => {
+    it('should restore server state when API delete fails', async () => {
       const { result } = renderHook(() => useToolStore());
 
       act(() => {
@@ -465,11 +467,14 @@ describe('klavisStore actions', () => {
         new Error('Delete failed'),
       );
 
+      let success;
       await act(async () => {
-        await result.current.removeKlavisServer('gmail');
+        success = await result.current.removeKlavisServer('gmail');
       });
 
-      expect(result.current.servers).toHaveLength(0);
+      expect(success).toBe(false);
+      expect(result.current.servers).toHaveLength(1);
+      expect(result.current.servers[0].identifier).toBe('gmail');
     });
   });
 

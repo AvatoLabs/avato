@@ -3,13 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { MessageModel } from '@/database/models/message';
 import { TopicModel } from '@/database/models/topic';
-import { FileService } from '@/server/services/file';
 
 import { AiChatService } from '.';
 
 vi.mock('@/database/models/message');
 vi.mock('@/database/models/topic');
-vi.mock('@/server/services/file');
 
 describe('AiChatService', () => {
   it('getMessagesAndTopics should fetch messages and topics concurrently', async () => {
@@ -20,9 +18,6 @@ describe('AiChatService', () => {
 
     vi.mocked(MessageModel).mockImplementation(() => ({ query: mockQueryMessages }) as any);
     vi.mocked(TopicModel).mockImplementation(() => ({ query: mockQueryTopics }) as any);
-    vi.mocked(FileService).mockImplementation(
-      () => ({ getFullFileUrl: vi.fn().mockResolvedValue('url') }) as any,
-    );
 
     const service = new AiChatService(serverDB, 'u1');
 
@@ -37,6 +32,10 @@ describe('AiChatService', () => {
       { agentId: 'agent-1', groupId: 'group-1', includeTopic: true, sessionId: 's1' },
       expect.objectContaining({ postProcessUrl: expect.any(Function) }),
     );
+    const queryOptions = mockQueryMessages.mock.calls[0][1];
+    await expect(
+      queryOptions.postProcessUrl('internal://file', { fileType: 'image/png', id: 'file-1' }),
+    ).resolves.toBe('/f/file-1');
     expect(mockQueryTopics).toHaveBeenCalledWith({ agentId: 'agent-1', groupId: 'group-1' });
     expect(res.messages).toEqual([{ id: 'm1' }]);
     expect(res.topics).toEqual([{ id: 't1' }]);
@@ -48,9 +47,6 @@ describe('AiChatService', () => {
     const mockQueryMessages = vi.fn().mockResolvedValue([]);
     vi.mocked(MessageModel).mockImplementation(() => ({ query: mockQueryMessages }) as any);
     vi.mocked(TopicModel).mockImplementation(() => ({ query: vi.fn() }) as any);
-    vi.mocked(FileService).mockImplementation(
-      () => ({ getFullFileUrl: vi.fn().mockResolvedValue('url') }) as any,
-    );
 
     const service = new AiChatService(serverDB, 'u1');
 

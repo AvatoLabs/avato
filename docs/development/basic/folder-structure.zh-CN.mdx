@@ -11,29 +11,28 @@ tags:
 
 # 目录架构
 
-LobeHub 采用 Monorepo 架构（`@lobechat/` 命名空间），
-顶层目录结构如下：
+LobeHub 采用 Monorepo 架构（`@lobechat/` 命名空间），顶层目录结构如下：
 
 ```bash
 lobe-chat/
 ├── apps/
-│   └── desktop/               # Electron 桌面应用
-├── packages/                  # 共享包（@lobechat/*）
-│   ├── agent-runtime/         # Agent 运行时
-│   ├── database/              # 数据库 schemas、models、repositories
-│   ├── model-runtime/         # 模型运行时（各 AI 提供商适配）
-│   ├── builtin-tool-*/        # 内置工具包
-│   ├── business/              # Cloud 业务插槽 packages
-│   ├── context-engine/        # 上下文引擎
-│   ├── conversation-flow/     # 会话流程
-│   ├── editor-runtime/        # 编辑器运行时
-│   ├── file-loaders/          # 文件加载器
-│   ├── prompts/               # Prompt 模板
-│   └── ...                    # 更多共享包
-├── src/                       # 主应用源码（见下方详细说明）
-├── locales/                   # i18n 翻译文件（zh-CN、en-US 等）
-├── e2e/                       # E2E 测试（Cucumber + Playwright）
-└── docs/                      # 文档
+│ └── desktop/           # Electron 桌面应用
+├── packages/            # 共享包（@lobechat/*）
+│ ├── agent-runtime/     # Agent 运行时
+│ ├── database/          # 数据库 schemas、models、repositories
+│ ├── model-runtime/     # 模型运行时（各 AI 提供商适配）
+│ ├── builtin-tool-*/    # 内置工具包
+│ ├── business/          # Cloud 业务插槽 packages
+│ ├── context-engine/    # 上下文引擎
+│ ├── conversation-flow/ # 会话流程
+│ ├── editor-runtime/    # 编辑器运行时
+│ ├── file-loaders/      # 文件加载器
+│ ├── prompts/           # Prompt 模板
+│ └── ...                # 更多共享包
+├── src/                 # 主应用源码（见下方详细说明）
+├── locales/             # i18n 翻译文件（zh-CN、en-US 等）
+├── e2e/                 # E2E 测试（Cucumber + Playwright）
+└── docs/                # 文档
 ```
 
 ## src 目录
@@ -53,11 +52,11 @@ src/
 ├── libs/              # 第三方集成（better-auth、OIDC、tRPC、MCP 等）
 ├── locales/           # 国际化默认语言文件（英文）
 ├── server/            # 服务端模块
-│   ├── featureFlags/  # Feature Flags
-│   ├── globalConfig/  # 全局配置
-│   ├── modules/       # 服务端模块（不访问数据库）
-│   ├── routers/       # tRPC 路由（async、lambda、mobile、tools）
-│   └── services/      # 服务端服务（可访问数据库）
+│ ├── featureFlags/    # Feature Flags
+│ ├── globalConfig/    # 全局配置
+│ ├── modules/         # 服务端模块（不访问数据库）
+│ ├── routers/         # tRPC 路由（async、lambda、mobile、tools）
+│ └── services/        # 服务端服务（可访问数据库）
 ├── services/          # 客户端服务接口
 ├── store/             # zustand 状态管理
 ├── styles/            # 全局样式和 CSS-in-JS 配置
@@ -71,9 +70,7 @@ src/
 
 ## app 目录
 
-`app` 目录遵循 Next.js App Router 约定，
-使用[路由组](https://nextjs.org/docs/app/building-your-application/routing/route-groups)
-来组织后端服务、平台变体和应用路由：
+`app` 目录遵循 Next.js App Router 约定，使用[路由组](https://nextjs.org/docs/app/building-your-application/routing/route-groups) 来组织后端服务、平台变体和应用路由：
 
 ```bash
 app/
@@ -99,7 +96,7 @@ app/
 │   │   ├── image/             # 图像生成
 │   │   ├── memory/            # 记忆管理
 │   │   ├── resource/          # 资源管理
-│   │   └── settings/          # 应用设置
+│   │   └── settings/          # 设置
 │   ├── (mobile)/              # 移动端专用路由
 │   ├── onboarding/            # 新用户引导
 │   ├── router/                # SPA 路由配置
@@ -129,8 +126,7 @@ app/
 
 - REST API：`(backend)/api/` 和 `(backend)/webapi/`
 - tRPC 端点（`src/server/routers/`）：按运行时分组
-  - `lambda/` — 主要业务路由（agent、session、message、
-    topic、file、knowledge、settings 等）
+  - `lambda/` — 主要业务路由（agent、session、message、topic、file、knowledge、settings 等）
   - `async/` — 耗时异步操作（文件处理、图像生成、RAG 评估）
   - `tools/` — 工具调用（search、MCP、market、klavis）
   - `mobile/` — 移动端专用路由
@@ -165,12 +161,9 @@ PostgreSQL
 
 ### 路由架构
 
-项目采用混合路由：
-Next.js App Router 处理静态页面（如认证页），
-React Router DOM 承载主应用 SPA。
+项目采用混合路由：Next.js App Router 处理静态页面（如认证页），React Router DOM 承载主应用 SPA。
 
-**入口**：`src/app/[variants]/page.tsx`
-根据设备类型分发到桌面端或移动端路由。
+**入口**：`src/app/[variants]/page.tsx` 根据设备类型分发到桌面端或移动端路由。
 
 **关键配置文件：**
 
@@ -181,40 +174,40 @@ React Router DOM 承载主应用 SPA。
 **桌面端 SPA 路由（React Router DOM）：**
 
 ```bash
-/                          # 首页
-/agent/:aid                # Agent 会话
-/agent/:aid/profile        # Agent 详情
-/agent/:aid/cron/:cronId   # 定时任务详情
-/group/:gid                # 群组会话
-/group/:gid/profile        # 群组详情
-/community                 # 社区发现（agent、model、provider、mcp）
-/community/agent/:slug     # Agent 详情页
-/community/model/:slug     # 模型详情页
-/community/provider/:slug  # 提供商详情页
-/community/mcp/:slug       # MCP 详情页
-/resource                  # 资源管理
-/resource/library/:id      # 知识库详情
-/settings/:tab             # 设置（profile、provider 等）
-/settings/provider/:id     # 模型提供商配置
-/memory                    # 记忆管理
-/image                     # 图像生成
-/page/:id                  # 页面详情
-/share/t/:id               # 分享话题
-/onboarding                # 新用户引导
+/                         # 首页
+/agent/:aid               # Agent 会话
+/agent/:aid/profile       # Agent 详情
+/agent/:aid/cron/:cronId  # 定时任务详情
+/group/:gid               # 群组会话
+/group/:gid/profile       # 群组详情
+/community                # 社区发现（agent、model、provider、mcp）
+/community/agent/:slug    # Agent 详情页
+/community/model/:slug    # 模型详情页
+/community/provider/:slug # 提供商详情页
+/community/mcp/:slug      # MCP 详情页
+/resource                 # 资源管理
+/resource/library/:id     # 知识库详情
+/settings/:tab            # 设置（profile、provider 等）
+/settings/provider/:id    # 模型提供商配置
+/memory                   # 记忆管理
+/image                    # 图像生成
+/page/:id                 # 页面详情
+/share/t/:id              # 分享话题
+/onboarding               # 新用户引导
 ```
 
 **移动端 SPA 路由（React Router DOM）：**
 
 ```bash
-/                          # 首页
-/agent/:aid                # Agent 会话
-/community                 # 社区发现
-/settings                  # 设置首页
-/settings/:tab             # 设置详情
-/settings/provider/:id     # 模型提供商配置
-/me                        # 个人中心
-/me/profile                # 个人资料
-/me/settings               # 个人设置
-/share/t/:id               # 分享话题
-/onboarding                # 新用户引导
+/                      # 首页
+/agent/:aid            # Agent 会话
+/community             # 社区发现
+/settings              # 设置首页
+/settings/:tab         # 设置详情
+/settings/provider/:id # 模型提供商配置
+/me                    # 个人中心
+/me/profile            # 个人资料
+/me/settings           # 个人设置
+/share/t/:id           # 分享话题
+/onboarding            # 新用户引导
 ```

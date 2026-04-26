@@ -4,7 +4,7 @@ import { index, integer, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core'
 
 import { createNanoId } from '../utils/idGenerator';
 import { timestamps } from './_helpers';
-import { knowledgeBases } from './file';
+import { sourceSets } from './file';
 import { embeddings } from './rag';
 import { users } from './user';
 
@@ -19,7 +19,7 @@ export const evalDatasets = pgTable(
     description: text('description'),
     name: text('name').notNull(),
 
-    knowledgeBaseId: text('knowledge_base_id').references(() => knowledgeBases.id, {
+    sourceSetId: text('source_set_id').references(() => sourceSets.id, {
       onDelete: 'cascade',
     }),
     userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
@@ -76,7 +76,7 @@ export const evalEvaluation = pgTable(
     datasetId: text('dataset_id')
       .references(() => evalDatasets.id, { onDelete: 'cascade' })
       .notNull(),
-    knowledgeBaseId: text('knowledge_base_id').references(() => knowledgeBases.id, {
+    sourceSetId: text('source_set_id').references(() => sourceSets.id, {
       onDelete: 'cascade',
     }),
     languageModel: text('language_model').$defaultFn(() => DEFAULT_MODEL),

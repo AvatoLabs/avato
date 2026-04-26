@@ -10,9 +10,9 @@ import { useTranslation } from 'react-i18next';
 
 import SkillSourceTag from '@/components/SkillSourceTag';
 import { createKlavisSkillDetailModal } from '@/features/SkillStore/SkillDetail';
-import { useToolStore } from '@/store/tool';
 import { type KlavisServer } from '@/store/tool/slices/klavisStore';
 import { KlavisServerStatus } from '@/store/tool/slices/klavisStore';
+import { useToolStore } from '@/store/tool/store';
 import { useUserStore } from '@/store/user';
 import { userProfileSelectors } from '@/store/user/selectors';
 
@@ -28,7 +28,7 @@ interface KlavisSkillItemProps {
 
 const KlavisSkillItem = memo<KlavisSkillItemProps>(({ serverType, server }) => {
   const { t } = useTranslation('setting');
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isWaitingAuth, setIsWaitingAuth] = useState(false);
 
@@ -148,15 +148,21 @@ const KlavisSkillItem = memo<KlavisSkillItemProps>(({ serverType, server }) => {
         userId,
       });
 
-      if (newServer) {
-        if (newServer.isAuthenticated) {
-          await refreshKlavisServerTools(newServer.identifier);
-        } else if (newServer.oauthUrl) {
-          openOAuthWindow(newServer.oauthUrl, newServer.identifier);
-        }
+      if (!newServer) {
+        message.error(t('tools.klavis.connectFailed'));
+        return;
+      }
+
+      if (newServer.isAuthenticated) {
+        await refreshKlavisServerTools(newServer.identifier);
+      } else if (newServer.oauthUrl) {
+        openOAuthWindow(newServer.oauthUrl, newServer.identifier);
+      } else {
+        message.error(t('tools.klavis.connectFailed'));
       }
     } catch (error) {
       console.error('[Klavis] Failed to connect server:', error);
+      message.error(t('tools.klavis.connectFailed'));
     } finally {
       setIsConnecting(false);
     }
@@ -171,7 +177,10 @@ const KlavisSkillItem = memo<KlavisSkillItemProps>(({ serverType, server }) => {
       okButtonProps: { danger: true },
       okText: t('tools.avatohubSkill.disconnect'),
       onOk: async () => {
-        await removeKlavisServer(server.identifier);
+        const success = await removeKlavisServer(server.identifier);
+        if (!success) {
+          message.error(t('tools.klavis.disconnectFailed'));
+        }
       },
       title: t('tools.avatohubSkill.disconnectConfirm.title', { name: serverType.label }),
     });
@@ -250,6 +259,7 @@ const KlavisSkillItem = memo<KlavisSkillItemProps>(({ serverType, server }) => {
     if (server.status === KlavisServerStatus.CONNECTED) {
       return (
         <DropdownMenu
+          nativeButton
           placement="bottomRight"
           items={[
             {

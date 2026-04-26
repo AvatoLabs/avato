@@ -3,12 +3,17 @@
 import { type CSSProperties } from 'react';
 import { memo } from 'react';
 
+import {
+  MARKDOWN_EXTENSIONS,
+  MARKDOWN_MIME_TYPES,
+} from '@/features/ContentManager/utils/isMarkdownContentFile';
 import { type FileListItem } from '@/types/files';
 
 import NotSupport from './NotSupport';
 import CodeViewer from './Renderer/Code';
+import ExcelViewer from './Renderer/Excel';
 import ImageViewer from './Renderer/Image';
-import MSDocViewer from './Renderer/MSDoc';
+import MarkdownViewer from './Renderer/Markdown';
 import PDFViewer from './Renderer/PDF';
 import VideoViewer from './Renderer/Video';
 
@@ -25,6 +30,8 @@ const IMAGE_MIME_TYPES = new Set([
 
 const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.ogg'];
 const VIDEO_MIME_TYPES = new Set(['video/mp4', 'video/webm', 'video/ogg', 'mp4', 'webm', 'ogg']);
+
+// MARKDOWN_EXTENSIONS and MARKDOWN_MIME_TYPES imported from @/features/ContentManager/utils/isMarkdownContentFile
 
 const CODE_EXTENSIONS = [
   // JavaScript/TypeScript
@@ -87,14 +94,14 @@ const CODE_EXTENSIONS = [
   '.clj',
   '.cljs',
   '.cljc',
-  // Markdown
-  '.md',
-  '.mdx',
+  // Note: .mdx moved to MARKDOWN_EXTENSIONS for proper handling
   // Other
   '.vim',
   '.graphql',
   '.gql',
   '.txt',
+  '.mmd',
+  '.mermaid',
 ];
 
 const CODE_MIME_TYPES = new Set([
@@ -157,33 +164,37 @@ const CODE_MIME_TYPES = new Set([
   'toml',
   'sql',
   'text/x-sql',
-  // Markdown
-  'md',
-  'mdx',
-  'text/markdown',
-  'text/x-markdown',
+  // Note: mdx moved to MARKDOWN_MIME_TYPES for proper handling
   // Other
   'graphql',
+  'mermaid',
+  'mmd',
   'txt',
   'text/plain',
+  'text/vnd.mermaid',
+  'application/vnd.mermaid',
 ]);
 
-const MSDOC_EXTENSIONS = ['.doc', '.docx', '.odt', '.ppt', '.pptx', '.xls', '.xlsx'];
-const MSDOC_MIME_TYPES = new Set([
+const EXCEL_EXTENSIONS = ['.xls', '.xlsx'];
+const EXCEL_MIME_TYPES = new Set([
+  'xls',
+  'xlsx',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]);
+
+const OFFICE_EXTENSIONS = ['.doc', '.docx', '.odt', '.ppt', '.pptx'];
+const OFFICE_MIME_TYPES = new Set([
   'doc',
   'docx',
   'odt',
   'ppt',
   'pptx',
-  'xls',
-  'xlsx',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.oasis.opendocument.text',
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ]);
 
 // Archive file types - not supported for preview
@@ -233,47 +244,84 @@ const matchesFileType = (
 
 interface FileViewerProps extends FileListItem {
   className?: string;
+  docsAgentContextKey?: string;
+  enableDocsAgentContext?: boolean;
   style?: CSSProperties;
 }
 
 /**
  * Preview any file type.
  */
-const FileViewer = memo<FileViewerProps>(({ id, style, fileType, url, name }) => {
-  // PDF files
-  if (fileType?.toLowerCase() === 'pdf' || name?.toLowerCase().endsWith('.pdf')) {
-    return <PDFViewer fileId={id} url={url} />;
-  }
+const FileViewer = memo<FileViewerProps>(
+  ({ enableDocsAgentContext, id, docsAgentContextKey, style, fileType, url, name }) => {
+    // PDF files
+    if (fileType?.toLowerCase() === 'pdf' || name?.toLowerCase().endsWith('.pdf')) {
+      return <PDFViewer fileId={id} url={url} />;
+    }
 
-  // Image files
-  if (matchesFileType(fileType, name, IMAGE_EXTENSIONS, IMAGE_MIME_TYPES)) {
-    return <ImageViewer fileId={id} url={url} />;
-  }
+    // Image files
+    if (matchesFileType(fileType, name, IMAGE_EXTENSIONS, IMAGE_MIME_TYPES)) {
+      return <ImageViewer fileId={id} url={url} />;
+    }
 
-  // Video files
-  if (matchesFileType(fileType, name, VIDEO_EXTENSIONS, VIDEO_MIME_TYPES)) {
-    return <VideoViewer fileId={id} url={url} />;
-  }
+    // Video files
+    if (matchesFileType(fileType, name, VIDEO_EXTENSIONS, VIDEO_MIME_TYPES)) {
+      return <VideoViewer fileId={id} url={url} />;
+    }
 
-  // Archive files (zip, rar, 7z, etc.) - not supported for preview
-  // Check before code files to avoid false matches
-  if (matchesFileType(fileType, name, ARCHIVE_EXTENSIONS, ARCHIVE_MIME_TYPES)) {
+    // Archive files (zip, rar, 7z, etc.) - not supported for preview
+    // Check before code files to avoid false matches
+    if (matchesFileType(fileType, name, ARCHIVE_EXTENSIONS, ARCHIVE_MIME_TYPES)) {
+      return <NotSupport fileName={name} style={style} url={url} />;
+    }
+
+    // Excel spreadsheets - render locally instead of delegating to Office Online.
+    if (matchesFileType(fileType, name, EXCEL_EXTENSIONS, EXCEL_MIME_TYPES)) {
+      return (
+        <ExcelViewer
+          docsAgentContextKey={docsAgentContextKey}
+          enableDocsAgentContext={enableDocsAgentContext}
+          fileId={id}
+          fileName={name}
+          url={url}
+        />
+      );
+    }
+
+    // Other Office documents are currently download-only until a local renderer is added.
+    if (matchesFileType(fileType, name, OFFICE_EXTENSIONS, OFFICE_MIME_TYPES)) {
+      return <NotSupport fileName={name} style={style} url={url} />;
+    }
+
+    // Markdown files
+    if (matchesFileType(fileType, name, MARKDOWN_EXTENSIONS, MARKDOWN_MIME_TYPES)) {
+      return (
+        <MarkdownViewer
+          docsAgentContextKey={docsAgentContextKey}
+          enableDocsAgentContext={enableDocsAgentContext}
+          fileId={id}
+          fileName={name}
+          url={url}
+        />
+      );
+    }
+
+    // Code files (JavaScript, TypeScript, Python, Java, C++, Go, Rust, Markdown, etc.)
+    if (matchesFileType(fileType, name, CODE_EXTENSIONS, CODE_MIME_TYPES)) {
+      return (
+        <CodeViewer
+          docsAgentContextKey={docsAgentContextKey}
+          enableDocsAgentContext={enableDocsAgentContext}
+          fileId={id}
+          fileName={name}
+          url={url}
+        />
+      );
+    }
+
+    // Unsupported file type
     return <NotSupport fileName={name} style={style} url={url} />;
-  }
-
-  // Microsoft Office documents - check before code files to avoid false matches
-  // (e.g., 'doc' contains 'c' which would match CODE_EXTENSIONS)
-  if (matchesFileType(fileType, name, MSDOC_EXTENSIONS, MSDOC_MIME_TYPES)) {
-    return <MSDocViewer fileId={id} url={url} />;
-  }
-
-  // Code files (JavaScript, TypeScript, Python, Java, C++, Go, Rust, Markdown, etc.)
-  if (matchesFileType(fileType, name, CODE_EXTENSIONS, CODE_MIME_TYPES)) {
-    return <CodeViewer fileId={id} fileName={name} url={url} />;
-  }
-
-  // Unsupported file type
-  return <NotSupport fileName={name} style={style} url={url} />;
-});
+  },
+);
 
 export default FileViewer;

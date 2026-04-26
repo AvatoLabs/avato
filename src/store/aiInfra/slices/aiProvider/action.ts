@@ -300,32 +300,36 @@ export class AiProviderActionImpl {
 
   toggleProviderEnabled = async (id: string, enabled: boolean): Promise<void> => {
     this.#get().internal_toggleAiProviderLoading(id, true);
-    await aiProviderService.toggleProviderEnabled(id, enabled);
+    try {
+      await aiProviderService.toggleProviderEnabled(id, enabled);
 
-    // Immediately update local aiProviderList to reflect the change
-    // This ensures the switch displays correctly without waiting for SWR refresh
-    this.#set(
-      (state) => ({
-        aiProviderList: state.aiProviderList.map((item) =>
-          item.id === id ? { ...item, enabled } : item,
-        ),
-      }),
-      false,
-      'toggleProviderEnabled/syncEnabled',
-    );
+      // Immediately update local aiProviderList to reflect the change
+      // This ensures the switch displays correctly without waiting for SWR refresh
+      this.#set(
+        (state) => ({
+          aiProviderList: state.aiProviderList.map((item) =>
+            item.id === id ? { ...item, enabled } : item,
+          ),
+        }),
+        false,
+        'toggleProviderEnabled/syncEnabled',
+      );
 
-    await this.#get().refreshAiProviderList();
-
-    this.#get().internal_toggleAiProviderLoading(id, false);
+      await this.#get().refreshAiProviderList();
+    } finally {
+      this.#get().internal_toggleAiProviderLoading(id, false);
+    }
   };
 
   updateAiProvider = async (id: string, value: UpdateAiProviderParams): Promise<void> => {
     this.#get().internal_toggleAiProviderLoading(id, true);
-    await aiProviderService.updateAiProvider(id, value);
-    await this.#get().refreshAiProviderList();
-    await this.#get().refreshAiProviderDetail();
-
-    this.#get().internal_toggleAiProviderLoading(id, false);
+    try {
+      await aiProviderService.updateAiProvider(id, value);
+      await this.#get().refreshAiProviderList();
+      await this.#get().refreshAiProviderDetail();
+    } finally {
+      this.#get().internal_toggleAiProviderLoading(id, false);
+    }
   };
 
   updateAiProviderConfig = async (
@@ -333,65 +337,68 @@ export class AiProviderActionImpl {
     value: UpdateAiProviderConfigParams,
   ): Promise<void> => {
     this.#get().internal_toggleAiProviderConfigUpdating(id, true);
-    await aiProviderService.updateAiProviderConfig(id, value);
+    try {
+      await aiProviderService.updateAiProviderConfig(id, value);
 
-    // Immediately update local state for instant UI feedback
-    this.#set(
-      (state) => {
-        const currentRuntimeConfig = state.aiProviderRuntimeConfig[id];
-        const currentDetailConfig = state.aiProviderDetailMap[id];
+      // Immediately update local state for instant UI feedback
+      this.#set(
+        (state) => {
+          const currentRuntimeConfig = state.aiProviderRuntimeConfig[id];
+          const currentDetailConfig = state.aiProviderDetailMap[id];
 
-        const updates: Partial<typeof currentRuntimeConfig> = {};
-        const detailUpdates: Partial<typeof currentDetailConfig> = {};
+          const updates: Partial<typeof currentRuntimeConfig> = {};
+          const detailUpdates: Partial<typeof currentDetailConfig> = {};
 
-        // Update fetchOnClient if changed
-        if (typeof value.fetchOnClient !== 'undefined') {
-          // Convert null to undefined to match the interface definition
-          const fetchOnClientValue = value.fetchOnClient === null ? undefined : value.fetchOnClient;
-          updates.fetchOnClient = fetchOnClientValue;
-          detailUpdates.fetchOnClient = fetchOnClientValue;
-        }
+          // Update fetchOnClient if changed
+          if (typeof value.fetchOnClient !== 'undefined') {
+            // Convert null to undefined to match the interface definition
+            const fetchOnClientValue =
+              value.fetchOnClient === null ? undefined : value.fetchOnClient;
+            updates.fetchOnClient = fetchOnClientValue;
+            detailUpdates.fetchOnClient = fetchOnClientValue;
+          }
 
-        // Update config.enableResponseApi if changed
-        if (value.config?.enableResponseApi !== undefined && currentRuntimeConfig?.config) {
-          updates.config = {
-            ...currentRuntimeConfig.config,
-            enableResponseApi: value.config.enableResponseApi,
+          // Update config.enableResponseApi if changed
+          if (value.config?.enableResponseApi !== undefined && currentRuntimeConfig?.config) {
+            updates.config = {
+              ...currentRuntimeConfig.config,
+              enableResponseApi: value.config.enableResponseApi,
+            };
+          }
+
+          return {
+            // Update detail map for form display
+            aiProviderDetailMap:
+              currentDetailConfig && Object.keys(detailUpdates).length > 0
+                ? {
+                    ...state.aiProviderDetailMap,
+                    [id]: {
+                      ...currentDetailConfig,
+                      ...detailUpdates,
+                    },
+                  }
+                : state.aiProviderDetailMap,
+            // Update runtime config for selectors
+            aiProviderRuntimeConfig:
+              currentRuntimeConfig && Object.keys(updates).length > 0
+                ? {
+                    ...state.aiProviderRuntimeConfig,
+                    [id]: {
+                      ...currentRuntimeConfig,
+                      ...updates,
+                    },
+                  }
+                : state.aiProviderRuntimeConfig,
           };
-        }
+        },
+        false,
+        'updateAiProviderConfig/syncChanges',
+      );
 
-        return {
-          // Update detail map for form display
-          aiProviderDetailMap:
-            currentDetailConfig && Object.keys(detailUpdates).length > 0
-              ? {
-                  ...state.aiProviderDetailMap,
-                  [id]: {
-                    ...currentDetailConfig,
-                    ...detailUpdates,
-                  },
-                }
-              : state.aiProviderDetailMap,
-          // Update runtime config for selectors
-          aiProviderRuntimeConfig:
-            currentRuntimeConfig && Object.keys(updates).length > 0
-              ? {
-                  ...state.aiProviderRuntimeConfig,
-                  [id]: {
-                    ...currentRuntimeConfig,
-                    ...updates,
-                  },
-                }
-              : state.aiProviderRuntimeConfig,
-        };
-      },
-      false,
-      'updateAiProviderConfig/syncChanges',
-    );
-
-    await this.#get().refreshAiProviderDetail();
-
-    this.#get().internal_toggleAiProviderConfigUpdating(id, false);
+      await this.#get().refreshAiProviderDetail();
+    } finally {
+      this.#get().internal_toggleAiProviderConfigUpdating(id, false);
+    }
   };
 
   updateAiProviderSort = async (items: AiProviderSortMap[]): Promise<void> => {

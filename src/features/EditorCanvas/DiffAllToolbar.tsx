@@ -36,6 +36,23 @@ const styles = createStaticStyles(({ css }) => ({
   `,
 }));
 
+const waitForAnimationFrames = () =>
+  new Promise<void>((resolve) => {
+    if (typeof globalThis.requestAnimationFrame === 'function') {
+      globalThis.requestAnimationFrame(() => {
+        globalThis.requestAnimationFrame(() => resolve());
+      });
+      return;
+    }
+
+    setTimeout(resolve, 16);
+  });
+
+const waitForCommandStability = () =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, 250);
+  });
+
 const useIsEditorInit = (editor: IEditor) => {
   const [isEditInit, setEditInit] = useState<boolean>(!!editor?.getLexicalEditor());
 
@@ -118,6 +135,35 @@ const DiffAllToolbar = memo<DiffAllToolbarProps>(({ documentId }) => {
     await performSave();
   };
 
+  const waitForCommandUpdate = async () => {
+    const lexicalEditor = storeEditor?.getLexicalEditor?.();
+
+    if (!lexicalEditor) {
+      await waitForAnimationFrames();
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      let settled = false;
+
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+
+      const unregister = lexicalEditor.registerUpdateListener(() => {
+        unregister();
+        void waitForAnimationFrames().then(waitForCommandStability).then(finish);
+      });
+
+      setTimeout(() => {
+        unregister();
+        void waitForAnimationFrames().then(waitForCommandStability).then(finish);
+      }, 300);
+    });
+  };
+
   return (
     <div className={styles.container}>
       <Block
@@ -133,9 +179,11 @@ const DiffAllToolbar = memo<DiffAllToolbarProps>(({ documentId }) => {
             size={'small'}
             type="text"
             onClick={async () => {
+              const pendingUpdate = waitForCommandUpdate();
               storeEditor?.dispatchCommand(LITEXML_DIFFNODE_ALL_COMMAND, {
                 action: DiffAction.Reject,
               });
+              await pendingUpdate;
               await handleSave();
             }}
           >
@@ -147,9 +195,11 @@ const DiffAllToolbar = memo<DiffAllToolbarProps>(({ documentId }) => {
             size={'small'}
             variant="filled"
             onClick={async () => {
+              const pendingUpdate = waitForCommandUpdate();
               storeEditor?.dispatchCommand(LITEXML_DIFFNODE_ALL_COMMAND, {
                 action: DiffAction.Accept,
               });
+              await pendingUpdate;
               await handleSave();
             }}
           >

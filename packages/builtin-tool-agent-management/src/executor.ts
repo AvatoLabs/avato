@@ -15,7 +15,7 @@ import {
 
 import { agentService } from '@/services/agent';
 import { discoverService } from '@/services/discover';
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { dbMessageSelectors } from '@/store/chat/slices/message/selectors';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
@@ -67,8 +67,14 @@ class AgentManagementExecutor extends BaseExecutor<typeof AgentManagementApiName
     params: CallAgentParams,
     ctx: BuiltinToolContext,
   ): Promise<BuiltinToolResult> => {
-    const { agentId, instruction, runAsTask, taskTitle, timeout, skipCallSupervisor = false } =
-      params;
+    const {
+      agentId,
+      instruction,
+      runAsTask,
+      taskTitle,
+      timeout,
+      skipCallSupervisor = false,
+    } = params;
 
     if (runAsTask) {
       // Execute as async task using GTD exec_task pattern

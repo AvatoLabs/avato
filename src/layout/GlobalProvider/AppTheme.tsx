@@ -7,17 +7,24 @@ import { type NeutralColors, type PrimaryColors } from '@lobehub/ui';
 import { ConfigProvider, FontLoader, ThemeProvider } from '@lobehub/ui';
 import { message as antdMessage } from 'antd';
 import { AppConfigContext } from 'antd/es/app/context';
-import { createStaticStyles, cx, useTheme } from 'antd-style';
+import { createStaticStyles, type CustomTokenParams, cx, useTheme } from 'antd-style';
 import * as motion from 'motion/react-m';
 import { useTheme as useNextThemesTheme } from 'next-themes';
 import { type ReactNode } from 'react';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import AntdStaticMethods from '@/components/AntdStaticMethods';
 import Link from '@/components/Link';
+import { getChatgptDarkSurfaceTokenOverrides } from '@/const/chatgptDarkSurfaces';
 import { LOBE_THEME_NEUTRAL_COLOR, LOBE_THEME_PRIMARY_COLOR } from '@/const/theme';
 import { isDesktop } from '@/const/version';
 import { useIsDark } from '@/hooks/useIsDark';
+import {
+  resolveAppearanceThemeColors,
+  resolveSolidTextColor,
+  resolveThemeAppearance,
+  resolveThemeMode,
+} from '@/layout/GlobalProvider/themeShared';
 import { getUILocaleAndResources } from '@/libs/getUILocaleAndResources';
 import Image from '@/libs/next/Image';
 import { useGlobalStore } from '@/store/global';
@@ -87,8 +94,8 @@ export interface AppThemeProps {
   children?: ReactNode;
   customFontFamily?: string;
   customFontURL?: string;
-  defaultNeutralColor?: NeutralColors;
-  defaultPrimaryColor?: PrimaryColors;
+  defaultNeutralColor?: NeutralColors | string;
+  defaultPrimaryColor?: PrimaryColors | string;
   globalCDN?: boolean;
 }
 
@@ -153,28 +160,61 @@ const AppTheme = memo<AppThemeProps>(
       antdMessage.config({ top: messageTop });
     }, [messageTop]);
 
+    /** Sync server-loaded theme into next-themes once per init cycle — not on every themeMode change (avoids fighting ThemeButton / setSettings). */
+    const initialThemeSyncedRef = useRef(false);
     useEffect(() => {
-      if (isUserStateInit && themeMode) {
-        setTheme(themeMode);
+      if (!isUserStateInit) {
+        initialThemeSyncedRef.current = false;
+        return;
       }
+      if (!themeMode || initialThemeSyncedRef.current) return;
+      setTheme(themeMode);
+      initialThemeSyncedRef.current = true;
     }, [isUserStateInit, themeMode, setTheme]);
 
-    const currentAppearence = isDark ? 'dark' : 'light';
+    const currentAppearence = useMemo(
+      () => resolveThemeAppearance({ isDark, themeMode }),
+      [isDark, themeMode],
+    );
+
+    /** antd-style ThemeSwitcher uses light | dark | auto (auto = follow system). */
+    const antdThemeMode = useMemo(() => resolveThemeMode(themeMode), [themeMode]);
+    const resolvedThemeColors = useMemo(
+      () =>
+        resolveAppearanceThemeColors({
+          appearance: currentAppearence,
+          neutralColor: neutralColor ?? defaultNeutralColor,
+          primaryColor: primaryColor ?? defaultPrimaryColor,
+        }),
+      [currentAppearence, defaultNeutralColor, defaultPrimaryColor, neutralColor, primaryColor],
+    );
+    const solidTextColor = useMemo(
+      () => resolveSolidTextColor(resolvedThemeColors.primaryColor),
+      [resolvedThemeColors.primaryColor],
+    );
+
+    const customToken = useCallback(
+      ({ isDarkMode }: CustomTokenParams) =>
+        getChatgptDarkSurfaceTokenOverrides(isDarkMode, solidTextColor),
+      [solidTextColor],
+    );
 
     return (
       <AppConfigContext value={appConfig}>
         <ThemeProvider
           appearance={currentAppearence}
           className={cx(styles.app, styles.scrollbar, styles.scrollbarPolyfill)}
-          defaultAppearance={currentAppearence}
-          defaultThemeMode={currentAppearence}
+          customToken={customToken}
+          themeMode={antdThemeMode}
           customTheme={{
-            neutralColor: neutralColor ?? defaultNeutralColor,
-            primaryColor: primaryColor ?? defaultPrimaryColor,
+            neutralColor: resolvedThemeColors.neutralColor as any,
+            primaryColor: resolvedThemeColors.primaryColor as any,
           }}
           theme={{
             cssVar: { key: 'lobe-vars' },
             token: {
+              // Keep solid primary surfaces legible across bright and dark accents.
+              colorTextLightSolid: solidTextColor,
               fontFamily: customFontFamily
                 ? `${customFontFamily},${antdTheme.fontFamily}`
                 : undefined,

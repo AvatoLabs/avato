@@ -1,77 +1,37 @@
 'use client';
 
-import { Accordion, AccordionItem, ContextMenuTrigger, Flexbox, Text } from '@lobehub/ui';
-import React, { memo, Suspense } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Flexbox } from '@lobehub/ui';
+import { memo, Suspense, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
-import PageEmpty from '@/features/PageEmpty';
-import { pageSelectors, usePageStore } from '@/store/page';
+import { usePageKind } from '@/features/Pages/usePageKind';
+import { SpaceListSection } from '@/features/ResourceSpaces';
+import { getPageRootPath } from '@/utils/docs';
 
-import Actions from './Actions';
-import AllPagesDrawer from './AllPagesDrawer';
-import List from './List';
-import { useDropdownMenu } from './useDropdownMenu';
-
-export enum GroupKey {
-  AllPages = 'all-pages',
-}
+import ScopeNavigation from './ScopeNavigation';
 
 /**
  * Page list sidebar
  */
 const Body = memo(() => {
-  const { t } = useTranslation('file');
+  const navigate = useNavigate();
+  const pageKind = usePageKind();
+  const { spaceId: currentSpaceId } = useParams<{ spaceId?: string }>();
 
-  // Initialize documents list via SWR
-  const useFetchDocuments = usePageStore((s) => s.useFetchDocuments);
-  useFetchDocuments();
-
-  const isLoading = usePageStore(pageSelectors.isDocumentsLoading);
-
-  const filteredDocumentsCount = usePageStore(pageSelectors.filteredDocumentsCount);
-  const filteredDocuments = usePageStore(pageSelectors.getFilteredDocumentsLimited);
-  const searchKeywords = usePageStore((s) => s.searchKeywords);
-  const dropdownMenu = useDropdownMenu();
-  const [allPagesDrawerOpen, closeAllPagesDrawer] = usePageStore((s) => [
-    s.allPagesDrawerOpen,
-    s.closeAllPagesDrawer,
-  ]);
+  const handleSelectSpace = useCallback(
+    (spaceId: string) => {
+      navigate(getPageRootPath(pageKind, spaceId));
+    },
+    [navigate, pageKind],
+  );
 
   return (
-    <Flexbox gap={1} paddingInline={4}>
-      <Accordion defaultExpandedKeys={[GroupKey.AllPages]} gap={2}>
-        <AccordionItem
-          action={<Actions />}
-          itemKey={GroupKey.AllPages}
-          paddingBlock={4}
-          paddingInline={'8px 4px'}
-          headerWrapper={(header) => (
-            <ContextMenuTrigger items={dropdownMenu}>{header}</ContextMenuTrigger>
-          )}
-          title={
-            <Text ellipsis fontSize={12} type={'secondary'} weight={500}>
-              {t('pageList.title')}
-              {filteredDocumentsCount > 0 && ` ${filteredDocumentsCount}`}
-            </Text>
-          }
-        >
-          <Suspense fallback={<SkeletonList />}>
-            {isLoading ? (
-              <SkeletonList />
-            ) : (
-              <Flexbox gap={1} paddingBlock={1}>
-                {filteredDocuments.length === 0 ? (
-                  <PageEmpty search={Boolean(searchKeywords.trim())} />
-                ) : (
-                  <List />
-                )}
-              </Flexbox>
-            )}
-          </Suspense>
-        </AccordionItem>
-      </Accordion>
-      <AllPagesDrawer open={allPagesDrawerOpen} onClose={closeAllPagesDrawer} />
+    <Flexbox gap={6} paddingInline={8}>
+      <Suspense fallback={<SkeletonList />}>
+        <SpaceListSection currentSpaceId={currentSpaceId} onSelectSpace={handleSelectSpace} />
+        <ScopeNavigation />
+      </Suspense>
     </Flexbox>
   );
 });

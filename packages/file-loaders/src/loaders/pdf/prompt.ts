@@ -7,7 +7,7 @@ export const promptTemplate = (pages: DocumentPage[]) => {
 
       return `<page pageNumber="${pageNumber}">
 ${page.pageContent}
-</page>`;
+</docs>`;
     })
     .join('\n\n');
 };

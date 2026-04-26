@@ -183,8 +183,11 @@ describe('generationRouter', () => {
         id: 'gen-1',
         asset: { thumbnailUrl: 'thumb-key' },
       };
-      const mockDelete = vi.fn().mockResolvedValue(mockDeletedGeneration);
-      const mockDeleteFile = vi.fn().mockResolvedValue(true);
+      const mockDelete = vi.fn().mockResolvedValue({
+        deletedGeneration: mockDeletedGeneration,
+        filesToDelete: ['thumb-key'],
+      });
+      const mockDeleteFiles = vi.fn().mockResolvedValue(true);
 
       vi.mocked(GenerationModel).mockImplementation(
         () =>
@@ -195,7 +198,7 @@ describe('generationRouter', () => {
       vi.mocked(FileService).mockImplementation(
         () =>
           ({
-            deleteFile: mockDeleteFile,
+            deleteFiles: mockDeleteFiles,
           }) as any,
       );
 
@@ -205,16 +208,19 @@ describe('generationRouter', () => {
 
       expect(result).toEqual(mockDeletedGeneration);
       expect(mockDelete).toHaveBeenCalledWith('gen-1');
-      expect(mockDeleteFile).toHaveBeenCalledWith('thumb-key');
+      expect(mockDeleteFiles).toHaveBeenCalledWith(['thumb-key']);
     });
 
-    it('should delete generation without thumbnail', async () => {
+    it('should delete generation without cleanup files', async () => {
       const mockDeletedGeneration = {
         id: 'gen-1',
         asset: { url: 'main-url' },
       };
-      const mockDelete = vi.fn().mockResolvedValue(mockDeletedGeneration);
-      const mockDeleteFile = vi.fn().mockResolvedValue(true);
+      const mockDelete = vi.fn().mockResolvedValue({
+        deletedGeneration: mockDeletedGeneration,
+        filesToDelete: [],
+      });
+      const mockDeleteFiles = vi.fn().mockResolvedValue(true);
 
       vi.mocked(GenerationModel).mockImplementation(
         () =>
@@ -225,7 +231,7 @@ describe('generationRouter', () => {
       vi.mocked(FileService).mockImplementation(
         () =>
           ({
-            deleteFile: mockDeleteFile,
+            deleteFiles: mockDeleteFiles,
           }) as any,
       );
 
@@ -235,12 +241,12 @@ describe('generationRouter', () => {
 
       expect(result).toEqual(mockDeletedGeneration);
       expect(mockDelete).toHaveBeenCalledWith('gen-1');
-      expect(mockDeleteFile).not.toHaveBeenCalled();
+      expect(mockDeleteFiles).not.toHaveBeenCalled();
     });
 
     it('should handle when generation not found', async () => {
       const mockDelete = vi.fn().mockResolvedValue(null);
-      const mockDeleteFile = vi.fn().mockResolvedValue(true);
+      const mockDeleteFiles = vi.fn().mockResolvedValue(true);
 
       vi.mocked(GenerationModel).mockImplementation(
         () =>
@@ -251,7 +257,7 @@ describe('generationRouter', () => {
       vi.mocked(FileService).mockImplementation(
         () =>
           ({
-            deleteFile: mockDeleteFile,
+            deleteFiles: mockDeleteFiles,
           }) as any,
       );
 
@@ -261,7 +267,48 @@ describe('generationRouter', () => {
 
       expect(result).toBeUndefined();
       expect(mockDelete).toHaveBeenCalledWith('gen-1');
-      expect(mockDeleteFile).not.toHaveBeenCalled();
+      expect(mockDeleteFiles).not.toHaveBeenCalled();
+    });
+
+    it('should return deleted generation when cleanup fails', async () => {
+      const mockDeletedGeneration = {
+        id: 'gen-1',
+        asset: { thumbnailUrl: 'thumb-key', url: 'main-url' },
+      };
+      const mockDelete = vi.fn().mockResolvedValue({
+        deletedGeneration: mockDeletedGeneration,
+        filesToDelete: ['thumb-key', 'main-url'],
+      });
+      const mockDeleteFiles = vi
+        .fn()
+        .mockRejectedValue(new Error('Some generation files could not be deleted from S3'));
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      vi.mocked(GenerationModel).mockImplementation(
+        () =>
+          ({
+            delete: mockDelete,
+          }) as any,
+      );
+      vi.mocked(FileService).mockImplementation(
+        () =>
+          ({
+            deleteFiles: mockDeleteFiles,
+          }) as any,
+      );
+
+      const caller = generationRouter.createCaller(mockCtx);
+      const result = await caller.deleteGeneration({ generationId: 'gen-1' });
+
+      expect(result).toEqual(mockDeletedGeneration);
+      expect(mockDelete).toHaveBeenCalledWith('gen-1');
+      expect(mockDeleteFiles).toHaveBeenCalledWith(['thumb-key', 'main-url']);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to delete generation files from S3:',
+        expect.any(Error),
+      );
+
+      consoleSpy.mockRestore();
     });
   });
 });

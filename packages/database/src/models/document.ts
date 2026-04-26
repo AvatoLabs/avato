@@ -7,9 +7,11 @@ import type { LobeChatDatabase } from '../type';
 export interface QueryDocumentParams {
   current?: number;
   fileTypes?: string[];
-  knowledgeBaseId?: string;
+  ids?: string[];
   pageSize?: number;
+  sourceSetId?: string;
   sourceTypes?: string[];
+  spaceId?: string;
   /** When true, only soft-deleted rows for this user (recycle bin). */
   trash?: boolean;
 }
@@ -41,11 +43,7 @@ export class DocumentModel {
       .update(documents)
       .set({ deletedAt: now, updatedAt: now })
       .where(
-        and(
-          eq(documents.id, id),
-          eq(documents.userId, this.userId),
-          DocumentModel.notDeleted,
-        ),
+        and(eq(documents.id, id), eq(documents.userId, this.userId), DocumentModel.notDeleted),
       );
   };
 
@@ -64,6 +62,32 @@ export class DocumentModel {
     }
   };
 
+  /** Hard delete by ids only. Caller must enforce authorization first. */
+  hardDeleteManyAny = async (ids: string[]) => {
+    if (ids.length === 0) return;
+
+    const CHUNK = 200;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      await this.db.delete(documents).where(inArray(documents.id, chunk));
+    }
+  };
+
+  /** Restore soft-deleted rows by ids only. Caller must enforce authorization first. */
+  restoreManyAny = async (ids: string[]) => {
+    if (ids.length === 0) return;
+
+    const now = new Date();
+    const CHUNK = 200;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      await this.db
+        .update(documents)
+        .set({ deletedAt: null, updatedAt: now })
+        .where(and(inArray(documents.id, chunk), isNotNull(documents.deletedAt)));
+    }
+  };
+
   deleteAll = async () => {
     const now = new Date();
     return this.db
@@ -72,22 +96,22 @@ export class DocumentModel {
       .where(and(eq(documents.userId, this.userId), DocumentModel.notDeleted));
   };
 
-  query = async ({
-    current = 0,
-    pageSize = 9999,
+  private buildQueryConditions = ({
     fileTypes,
-    knowledgeBaseId,
+    ids,
+    sourceSetId,
+    spaceId,
     sourceTypes,
     trash,
-  }: QueryDocumentParams = {}): Promise<{
-    items: DocumentItem[];
-    total: number;
-  }> => {
-    const offset = current * pageSize;
+  }: Omit<QueryDocumentParams, 'current' | 'pageSize'>) => {
     const conditions = [
-      eq(documents.userId, this.userId),
+      spaceId ? eq(documents.spaceId, spaceId) : eq(documents.userId, this.userId),
       trash ? isNotNull(documents.deletedAt) : DocumentModel.notDeleted,
     ];
+
+    if (ids?.length) {
+      conditions.push(inArray(documents.id, ids));
+    }
 
     if (fileTypes?.length) {
       conditions.push(inArray(documents.fileType, fileTypes));
@@ -97,11 +121,39 @@ export class DocumentModel {
       conditions.push(inArray(documents.sourceType, sourceTypes as ('file' | 'web' | 'api')[]));
     }
 
-    if (knowledgeBaseId) {
-      conditions.push(eq(documents.knowledgeBaseId, knowledgeBaseId));
+    if (sourceSetId) {
+      conditions.push(eq(documents.sourceSetId, sourceSetId));
     }
 
-    const whereCondition = and(...conditions);
+    return conditions;
+  };
+
+  query = async ({
+    current = 0,
+    pageSize = 9999,
+    fileTypes,
+    ids,
+    sourceSetId,
+    spaceId,
+    sourceTypes,
+    trash,
+  }: QueryDocumentParams = {}): Promise<{
+    items: DocumentItem[];
+    total: number;
+  }> => {
+    if (ids && ids.length === 0) return { items: [], total: 0 };
+
+    const offset = current * pageSize;
+    const whereCondition = and(
+      ...this.buildQueryConditions({
+        fileTypes,
+        ids,
+        sourceSetId,
+        spaceId,
+        sourceTypes,
+        trash,
+      }),
+    );
 
     // Fetch items and total count in parallel
     // Optimize: Exclude large JSONB fields (content, pages, editorData) for better performance
@@ -115,11 +167,13 @@ export class DocumentModel {
           fileType: documents.fileType,
           filename: documents.filename,
           id: documents.id,
+          sourceSetId: documents.sourceSetId,
           metadata: documents.metadata,
           parentId: documents.parentId,
           slug: documents.slug,
           source: documents.source,
           sourceType: documents.sourceType,
+          spaceId: documents.spaceId,
           title: documents.title,
           totalCharCount: documents.totalCharCount,
           totalLineCount: documents.totalLineCount,
@@ -149,13 +203,39 @@ export class DocumentModel {
     return { items, total: totalResult[0].count };
   };
 
+  queryIds = async ({
+    fileTypes,
+    ids,
+    sourceSetId,
+    spaceId,
+    sourceTypes,
+    trash,
+  }: Omit<QueryDocumentParams, 'current' | 'pageSize'> = {}) => {
+    if (ids && ids.length === 0) return [];
+
+    const rows = await this.db
+      .select({ id: documents.id })
+      .from(documents)
+      .where(
+        and(
+          ...this.buildQueryConditions({
+            fileTypes,
+            ids,
+            sourceSetId,
+            spaceId,
+            sourceTypes,
+            trash,
+          }),
+        ),
+      )
+      .orderBy(desc(trash ? documents.deletedAt : documents.updatedAt));
+
+    return rows.map((row) => row.id);
+  };
+
   findById = async (id: string): Promise<DocumentItem | undefined> => {
     return this.db.query.documents.findFirst({
-      where: and(
-        eq(documents.userId, this.userId),
-        eq(documents.id, id),
-        DocumentModel.notDeleted,
-      ),
+      where: and(eq(documents.userId, this.userId), eq(documents.id, id), DocumentModel.notDeleted),
     });
   };
 
@@ -187,6 +267,21 @@ export class DocumentModel {
   };
 
   /**
+   * Resolve a slug within a specific space, regardless of the document owner.
+   */
+  findBySlugInSpace = async (slug: string, spaceId: string): Promise<DocumentItem | undefined> => {
+    const [document] = await this.db
+      .select()
+      .from(documents)
+      .where(
+        and(eq(documents.slug, slug), eq(documents.spaceId, spaceId), DocumentModel.notDeleted),
+      )
+      .limit(1);
+
+    return document;
+  };
+
+  /**
    * All rows with this slug (unique per space). Caller must filter by authorization.
    */
   findManyBySlug = async (slug: string): Promise<DocumentItem[]> => {
@@ -200,11 +295,7 @@ export class DocumentModel {
       .update(documents)
       .set({ ...value, updatedAt: new Date() })
       .where(
-        and(
-          eq(documents.userId, this.userId),
-          eq(documents.id, id),
-          DocumentModel.notDeleted,
-        ),
+        and(eq(documents.userId, this.userId), eq(documents.id, id), DocumentModel.notDeleted),
       );
   };
 

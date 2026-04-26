@@ -4,7 +4,8 @@ import isEqual from 'fast-deep-equal';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
+import { OFFICIAL_URL } from '@/const/url';
+import { useToolStore } from '@/store/tool/store';
 
 import { DetailContext, type DetailContextValue } from './DetailContext';
 
@@ -40,7 +41,7 @@ export const BuiltinAgentSkillDetailProvider = ({
 
   const value: DetailContextValue = {
     author: 'Avato',
-    authorUrl: 'https://lobehub.com',
+    authorUrl: OFFICIAL_URL,
     config: null as any,
     description: skill.description,
     icon: skill.avatar || '',

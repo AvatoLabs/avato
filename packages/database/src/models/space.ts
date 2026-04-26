@@ -50,8 +50,7 @@ export class SpaceModel {
 
     if (existing[0]) return existing[0];
 
-    const user = await UserModel.findById(this.db, this.userId);
-    const name = user?.fullName || user?.username || 'Personal Space';
+    const name = 'My Space';
 
     return this.db.transaction(async (trx) => {
       const [created] = await trx
@@ -312,4 +311,9 @@ export class SpaceModel {
         ),
       );
   };
+
+  static findPersonalSpaceByOwnerId = async (db: LobeChatDatabase, userId: string) =>
+    db.query.spaces.findFirst({
+      where: and(eq(spaces.personalOwnerId, userId), isNull(spaces.deletedAt)),
+    });
 }

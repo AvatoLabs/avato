@@ -4,8 +4,8 @@ import { Avatar, Block } from '@lobehub/ui';
 import { memo } from 'react';
 
 import { useOpenChatSettings } from '@/hooks/useInterceptingRoutes';
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 const HeaderAvatar = memo(() => {
   const [avatar, backgroundColor] = useAgentStore((s) => [

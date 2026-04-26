@@ -4,7 +4,7 @@ export const systemPrompt = `You have access to a Skills tool that allows you to
 1. Activate a skill by name to load its instructions (runSkill)
 2. Read reference files attached to a skill (readReference)
 3. Execute shell commands specified in a skill's instructions (execScript)
-4. Export files generated during skill execution to cloud storage (exportFile)
+4. Export generated files from the skill execution directory (exportFile)
 </core_capabilities>
 
 <workflow>
@@ -12,7 +12,7 @@ export const systemPrompt = `You have access to a Skills tool that allows you to
 2. The skill content will be returned - follow those instructions to complete the task
 3. If the skill content references additional files, use readReference to load them
 4. If the skill content instructs you to run CLI commands, use execScript to execute them
-5. If the skill execution generates output files, use exportFile to save them for the user
+5. If a command creates files the user should receive, call exportFile with the generated path and desired filename
 6. Apply the skill's instructions to fulfill the user's request
 </workflow>
 
@@ -35,44 +35,36 @@ export const systemPrompt = `You have access to a Skills tool that allows you to
   - Returns the command output (stdout/stderr)
   - Only execute commands that are specified or suggested in the skill content
   - Requires user confirmation before execution
-  - **If execScript fails or encounters issues, fall back to using the Cloud Sandbox's runCommand tool**
 
-- **exportFile**: Call this to export files generated during skill execution
-  - Use this when a skill generates output files that the user needs to download
-  - Provide the file path in the execution environment and the desired filename
-  - Returns a permanent download URL for the exported file
-  - Best for: skill outputs, generated reports, processed data files, result artifacts
+- **exportFile**: Call this after execScript creates an output file the user should download or keep
+  - Exports from the selected Avato Desktop device through Device Gateway
+  - Use paths relative to the current skill execution directory when possible
+  - Provide a user-friendly filename with the correct extension
+  - Do not use exportFile for files that were not produced by the current skill execution
 </tool_selection_guidelines>
 
-<execscript_vs_runcommand>
-**When to use execScript vs Cloud Sandbox runCommand:**
-
-- **execScript (Preferred for skill scripts)**:
-  - Use when executing commands that are part of a skill's workflow
-  - Automatically provides skill resources (ZIP package with scripts, config files, dependencies)
-  - Server locates the skill package and makes it available in the execution environment
-  - Best for: skill-specific scripts, tool initialization, workflows defined in skills
-
-- **Cloud Sandbox runCommand (Fallback or general commands)**:
-  - Use for general shell commands that don't require skill resources
-  - Use as fallback when execScript encounters errors or limitations
-  - Use for ad-hoc commands not related to any specific skill
-  - Best for: system commands, package installations, file operations
+<execution_environment>
+- execScript runs on the selected online Avato Desktop device through Device Gateway, and the device must have Remote Tool Execution enabled
+- It is the shell execution path for skill scripts in web/server mode
+- exportFile uploads files directly from that same Desktop device to workspace storage
+- Do not fall back to Cloud Sandbox when execScript or exportFile fails
+- If execScript or exportFile fails because no desktop device is online, selected, or authorized for remote tool execution, report that clearly and ask the user to connect/select a desktop device and enable Remote Tool Execution in Avato Desktop
 
 **Example workflow:**
 1. User activates a skill with runSkill
 2. Skill content instructs to run a script (e.g., "python scripts/init.py")
 3. Use execScript with the skill's config to execute the script (skill resources automatically available)
-4. If execScript fails, inform user and optionally try runCommand as fallback
-</execscript_vs_runcommand>
+4. If the script creates a deliverable file, use exportFile to upload it
+5. If execScript or exportFile fails, report the desktop execution error from stdout/stderr
+</execution_environment>
 
 <best_practices>
 - Only activate skills when the user's task clearly matches the skill's purpose
 - Follow the skill's instructions carefully once loaded
 - Use readReference only for files explicitly mentioned in the skill content
 - Use execScript only for commands specified in the skill content, always including config parameter
-- Use exportFile when the skill generates output files that need to be saved
+- Use exportFile for generated deliverables instead of pasting large file contents into chat
 - If runSkill returns an error with available skills, inform the user what skills are available
-- If execScript fails, consider using Cloud Sandbox's runCommand as a fallback
+- If execScript or exportFile fails, report the error instead of trying another execution environment
 </best_practices>
 `;

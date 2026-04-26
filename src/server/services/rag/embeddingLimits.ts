@@ -1,9 +1,9 @@
-const EMBEDDING_BATCH_SIZE_LIMITS = {
+const EMBEDDING_BATCH_SIZE_LIMITS: Record<string, Record<string, number>> = {
   qwen: {
     // DashScope rejects text-embedding-v4 requests when input.contents exceeds 10 items.
     'text-embedding-v4': 10,
   },
-} as const satisfies Record<string, Record<string, number>>;
+};
 
 interface GetEffectiveEmbeddingBatchSizeParams {
   configuredBatchSize: number;

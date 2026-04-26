@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { getTestDB } from '../../core/getTestDB';
-import { documents, files, users } from '../../schemas';
+import { documents, files, sourceSets, spaces, users } from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
 import { DocumentModel } from '../document';
 import { FileModel } from '../file';
@@ -17,14 +17,16 @@ const fileModel = new FileModel(serverDB, userId);
 const fileModel2 = new FileModel(serverDB, userId2);
 
 beforeEach(async () => {
+  await serverDB.delete(spaces);
   await serverDB.delete(users);
   await serverDB.insert(users).values([{ id: userId }, { id: userId2 }]);
 });
 
 afterEach(async () => {
-  await serverDB.delete(users);
-  await serverDB.delete(files);
   await serverDB.delete(documents);
+  await serverDB.delete(files);
+  await serverDB.delete(spaces);
+  await serverDB.delete(users);
 });
 
 // Helper to create a minimal valid document
@@ -187,7 +189,7 @@ describe('DocumentModel', () => {
         content: 'Web document',
         fileId: file2.id,
         fileType: 'text/html',
-        source: 'https://example.com/page',
+        source: 'https://example.com/docs',
         sourceType: 'web',
         totalCharCount: 12,
         totalLineCount: 1,
@@ -295,6 +297,57 @@ describe('DocumentModel', () => {
       expect(result.items[0].id).toBe(doc1Id);
       expect(result.items[1].id).toBe(doc2Id);
     });
+
+    it('should scope documents by spaceId across members and expose space fields in results', async () => {
+      await serverDB.insert(spaces).values([
+        { createdBy: userId, id: 'spc_docs_a', kind: 'team', name: 'Docs Space A' },
+        { createdBy: userId, id: 'spc_docs_b', kind: 'team', name: 'Docs Space B' },
+      ]);
+      await serverDB.insert(sourceSets).values({
+        id: 'kb-space-a',
+        name: 'KB Space A',
+        spaceId: 'spc_docs_a',
+        userId,
+      });
+
+      await documentModel.create({
+        content: 'Space A document',
+        fileType: 'custom/document',
+        sourceSetId: 'kb-space-a',
+        source: 'document',
+        sourceType: 'api',
+        spaceId: 'spc_docs_a',
+        totalCharCount: 16,
+        totalLineCount: 1,
+      });
+
+      await documentModel2.create({
+        content: 'Space A teammate document',
+        fileType: 'custom/document',
+        source: 'document',
+        sourceType: 'api',
+        spaceId: 'spc_docs_a',
+        totalCharCount: 24,
+        totalLineCount: 1,
+      });
+
+      await documentModel.create({
+        content: 'Space B document',
+        fileType: 'custom/document',
+        source: 'document',
+        sourceType: 'api',
+        spaceId: 'spc_docs_b',
+        totalCharCount: 16,
+        totalLineCount: 1,
+      });
+
+      const result = await documentModel.query({ spaceId: 'spc_docs_a' });
+
+      expect(result.items).toHaveLength(2);
+      expect(result.total).toBe(2);
+      expect(result.items.every((item) => item.spaceId === 'spc_docs_a')).toBe(true);
+      expect(result.items.some((item) => item.sourceSetId === 'kb-space-a')).toBe(true);
+    });
   });
 
   describe('findById', () => {
@@ -382,6 +435,41 @@ describe('DocumentModel', () => {
     it('should return undefined for non-existent slug', async () => {
       const found = await documentModel.findBySlug('non-existent-slug');
       expect(found).toBeUndefined();
+    });
+
+    it('should resolve slug by space regardless of owner', async () => {
+      await serverDB.insert(spaces).values([
+        { createdBy: userId, id: 'spc_slug_a', kind: 'team', name: 'Slug Space A' },
+        { createdBy: userId2, id: 'spc_slug_b', kind: 'team', name: 'Slug Space B' },
+      ]);
+
+      await documentModel.create({
+        content: 'Owner document',
+        fileType: 'custom/document',
+        slug: 'shared-slug',
+        source: 'document',
+        sourceType: 'api',
+        spaceId: 'spc_slug_a',
+        totalCharCount: 14,
+        totalLineCount: 1,
+      });
+
+      await documentModel2.create({
+        content: 'Teammate document',
+        fileType: 'custom/document',
+        slug: 'shared-slug',
+        source: 'document',
+        sourceType: 'api',
+        spaceId: 'spc_slug_b',
+        totalCharCount: 17,
+        totalLineCount: 1,
+      });
+
+      const found = await documentModel.findBySlugInSpace('shared-slug', 'spc_slug_b');
+
+      expect(found).toBeDefined();
+      expect(found?.spaceId).toBe('spc_slug_b');
+      expect(found?.content).toBe('Teammate document');
     });
   });
 

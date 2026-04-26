@@ -321,7 +321,7 @@ describe('agentGroup actions', () => {
           await result.current.sendGroupMessage({
             context,
             message: TEST_CONTENT.GROUP_MESSAGE,
-            files: [{ id: 'file-1' } as any],
+            files: [{ id: 'upload-1', fileId: 'file-1' } as any],
           });
         });
 
@@ -716,7 +716,10 @@ describe('agentGroup actions', () => {
           await result.current.sendGroupMessage({
             context: createTestContext(),
             message: TEST_CONTENT.EMPTY,
-            files: [{ id: 'file-1' } as any, { id: 'file-2' } as any],
+            files: [
+              { id: 'upload-1', fileId: 'file-1' } as any,
+              { id: 'upload-2', fileId: 'file-2' } as any,
+            ],
           });
         });
 
@@ -740,7 +743,7 @@ describe('agentGroup actions', () => {
           await result.current.sendGroupMessage({
             context: createTestContext(),
             message: TEST_CONTENT.GROUP_MESSAGE,
-            files: [{ id: 'file-1' } as any],
+            files: [{ id: 'upload-1', fileId: 'file-1' } as any],
           });
         });
 

@@ -20,6 +20,7 @@ import { fetchMobileAuthConfig, getValidAuthSession } from './src/lib/auth';
 import { useI18n } from './src/lib/i18n';
 import { AppErrorBoundary, initAppLogger } from './src/lib/logger';
 import { resetToLogin } from './src/lib/navigation';
+import { syncOtaUpdateOnLaunch } from './src/lib/ota';
 import { getApiUrl, hasConfiguredUrl } from './src/lib/server';
 import RootNavigator from './src/navigation';
 import type { BootstrapRoute } from './src/navigation/types';
@@ -141,6 +142,8 @@ export default function App() {
       try {
         await initAppLogger();
         await loadLocale();
+        const reloadedWithFreshUpdate = await syncOtaUpdateOnLaunch();
+        if (reloadedWithFreshUpdate) return;
 
         const onboardingDone = await AsyncStorage.getItem(ONBOARDING_KEY);
         const hasUrl = await hasConfiguredUrl();

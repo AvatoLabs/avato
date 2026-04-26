@@ -1,3 +1,4 @@
+import { BRANDING_NAME } from '@lobechat/business-const';
 import { Icon, Tag } from '@lobehub/ui';
 import { BadgeCheck, CircleUser, Package } from 'lucide-react';
 import { memo } from 'react';
@@ -20,7 +21,8 @@ const PluginTag = memo<PluginTagProps>(
     const { t } = useTranslation('plugin');
     const isCustom = type === 'customPlugin';
     const authorName = normalizePluginAuthor(author);
-    const isOfficial = authorName === 'LobeHub';
+    const isOfficial = authorName === BRANDING_NAME || authorName === 'LobeHub';
+    const displayAuthor = isOfficial ? BRANDING_NAME : authorName;
 
     const customTag = (
       <Tag color={'warning'} icon={showIcon && <Icon icon={Package} />} size={'small'}>
@@ -45,7 +47,7 @@ const PluginTag = memo<PluginTagProps>(
         icon={showIcon && <Icon icon={isOfficial ? BadgeCheck : CircleUser} />}
         size={'small'}
       >
-        {showText && (authorName || t('store.communityPlugin'))}
+        {showText && (displayAuthor || t('store.communityPlugin'))}
       </Tag>
     );
   },

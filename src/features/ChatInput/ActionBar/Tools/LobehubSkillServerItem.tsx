@@ -1,13 +1,14 @@
 import { Checkbox, Flexbox, Icon, stopPropagation } from '@lobehub/ui';
+import { App } from 'antd';
 import { Loader2, SquareArrowOutUpRight } from 'lucide-react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
-import { useToolStore } from '@/store/tool';
+import { useAgentStore } from '@/store/agent/store';
 import { lobehubSkillStoreSelectors } from '@/store/tool/selectors';
 import { LobehubSkillStatus } from '@/store/tool/slices/lobehubSkillStore/types';
+import { useToolStore } from '@/store/tool/store';
 
 const POLL_INTERVAL_MS = 1000;
 const POLL_TIMEOUT_MS = 15_000;
@@ -30,6 +31,7 @@ interface LobehubSkillServerItemProps {
 
 const LobehubSkillServerItem = memo<LobehubSkillServerItemProps>(({ provider, label, agentId }) => {
   const { t } = useTranslation('setting');
+  const { message } = App.useApp();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
   const [isWaitingAuth, setIsWaitingAuth] = useState(false);
@@ -98,7 +100,7 @@ const LobehubSkillServerItem = memo<LobehubSkillServerItemProps>(({ provider, la
 
   const startWindowMonitor = useCallback(
     (oauthWindow: Window) => {
-      windowCheckIntervalRef.current = setInterval(() => {
+      windowCheckIntervalRef.current = setInterval(async () => {
         try {
           if (oauthWindow.closed) {
             if (windowCheckIntervalRef.current) {
@@ -106,9 +108,10 @@ const LobehubSkillServerItem = memo<LobehubSkillServerItemProps>(({ provider, la
               windowCheckIntervalRef.current = null;
             }
             oauthWindowRef.current = null;
-            checkStatus(provider);
+            await checkStatus(provider);
           }
-        } catch {
+        } catch (error) {
+          console.error('[LobehubSkill] Failed to refresh status after OAuth:', error);
           console.info('[LobehubSkill] COOP blocked window.closed access, falling back to polling');
           if (windowCheckIntervalRef.current) {
             clearInterval(windowCheckIntervalRef.current);
@@ -184,7 +187,12 @@ const LobehubSkillServerItem = memo<LobehubSkillServerItemProps>(({ provider, la
           const isAlreadyEnabled = currentAgentPlugins.includes(newPluginId);
           if (!isAlreadyEnabled) {
             console.info('[LobehubSkill] Auto-enabling plugin:', newPluginId);
-            togglePlugin(newPluginId);
+            try {
+              await togglePlugin(newPluginId);
+            } catch (error) {
+              console.error('[LobehubSkill] Failed to auto-enable plugin:', error);
+              message.error(t('tools.avatohubSkill.togglePluginFailed'));
+            }
           }
         }
       }
@@ -192,7 +200,7 @@ const LobehubSkillServerItem = memo<LobehubSkillServerItemProps>(({ provider, la
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [provider, cleanup, checkStatus, togglePlugin, effectiveAgentId]);
+  }, [provider, cleanup, checkStatus, togglePlugin, effectiveAgentId, message, t]);
 
   const handleConnect = async () => {
     // Only block reconnection when already connected
@@ -206,6 +214,7 @@ const LobehubSkillServerItem = memo<LobehubSkillServerItemProps>(({ provider, la
       openOAuthWindow(authorizeUrl);
     } catch (error) {
       console.error('[LobehubSkill] Failed to get authorize URL:', error);
+      message.error(t('tools.avatohubSkill.connectError'));
     } finally {
       setIsConnecting(false);
     }
@@ -214,8 +223,14 @@ const LobehubSkillServerItem = memo<LobehubSkillServerItemProps>(({ provider, la
   const handleToggle = async () => {
     if (!server) return;
     setIsToggling(true);
-    await togglePlugin(pluginId);
-    setIsToggling(false);
+    try {
+      await togglePlugin(pluginId);
+    } catch (error) {
+      console.error('[LobehubSkill] Failed to toggle plugin:', error);
+      message.error(t('tools.avatohubSkill.togglePluginFailed'));
+    } finally {
+      setIsToggling(false);
+    }
   };
 
   const renderRightControl = () => {
@@ -239,7 +254,7 @@ const LobehubSkillServerItem = memo<LobehubSkillServerItemProps>(({ provider, la
             handleConnect();
           }}
         >
-          {t('tools.lobehubSkill.connect', { defaultValue: 'Connect' })}
+          {t('tools.avatohubSkill.connect', { defaultValue: 'Connect' })}
           <Icon icon={SquareArrowOutUpRight} size="small" />
         </Flexbox>
       );
@@ -282,10 +297,11 @@ const LobehubSkillServerItem = memo<LobehubSkillServerItemProps>(({ provider, la
                 openOAuthWindow(authorizeUrl);
               } catch (error) {
                 console.error('[LobehubSkill] Failed to get authorize URL:', error);
+                message.error(t('tools.avatohubSkill.connectError'));
               }
             }}
           >
-            {t('tools.lobehubSkill.authorize', { defaultValue: 'Authorize' })}
+            {t('tools.avatohubSkill.authorize', { defaultValue: 'Authorize' })}
             <Icon icon={SquareArrowOutUpRight} size="small" />
           </Flexbox>
         );
@@ -302,7 +318,7 @@ const LobehubSkillServerItem = memo<LobehubSkillServerItemProps>(({ provider, la
               handleConnect();
             }}
           >
-            {t('tools.lobehubSkill.connect', { defaultValue: 'Connect' })}
+            {t('tools.avatohubSkill.connect', { defaultValue: 'Connect' })}
             <Icon icon={SquareArrowOutUpRight} size="small" />
           </Flexbox>
         );
@@ -310,7 +326,7 @@ const LobehubSkillServerItem = memo<LobehubSkillServerItemProps>(({ provider, la
       case LobehubSkillStatus.ERROR: {
         return (
           <span style={{ color: 'red', fontSize: 12 }}>
-            {t('tools.lobehubSkill.error', { defaultValue: 'Error' })}
+            {t('tools.avatohubSkill.error', { defaultValue: 'Error' })}
           </span>
         );
       }
@@ -329,7 +345,7 @@ const LobehubSkillServerItem = memo<LobehubSkillServerItemProps>(({ provider, la
       onClick={(e) => {
         e.stopPropagation();
         if (server?.status === LobehubSkillStatus.CONNECTED) {
-          handleToggle();
+          void handleToggle();
         }
       }}
     >

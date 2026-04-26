@@ -1,6 +1,7 @@
 import { type PartialDeep } from 'type-fest';
 
 import { type AgentSettingsInstance } from '@/features/AgentSetting';
+import { type ChatSettingsTabs } from '@/store/global/initialState';
 import { type AgentItem } from '@/types/agent';
 import { type MetaData } from '@/types/meta';
 
@@ -9,6 +10,7 @@ export type SaveStatus = 'idle' | 'saving' | 'saved';
 
 export interface AgentSliceState {
   activeAgentId?: string;
+  activeAgentSettingTab?: ChatSettingsTabs;
   agentMap: Record<string, PartialDeep<AgentItem>>;
   agentSettingInstance?: AgentSettingsInstance | null;
   /**
@@ -42,6 +44,7 @@ export interface AgentSliceState {
 }
 
 export const initialAgentSliceState: AgentSliceState = {
+  activeAgentSettingTab: undefined,
   agentMap: {},
   isAgentPinned: false,
   lastUpdatedTime: null,

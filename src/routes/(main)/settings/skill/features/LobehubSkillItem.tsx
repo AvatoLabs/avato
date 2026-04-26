@@ -10,9 +10,9 @@ import { useTranslation } from 'react-i18next';
 
 import SkillSourceTag from '@/components/SkillSourceTag';
 import { createLobehubSkillDetailModal } from '@/features/SkillStore/SkillDetail';
-import { useToolStore } from '@/store/tool';
 import { type LobehubSkillServer } from '@/store/tool/slices/lobehubSkillStore/types';
 import { LobehubSkillStatus } from '@/store/tool/slices/lobehubSkillStore/types';
+import { useToolStore } from '@/store/tool/store';
 
 import { styles } from './style';
 
@@ -26,7 +26,7 @@ interface LobehubSkillItemProps {
 
 const LobehubSkillItem = memo<LobehubSkillItemProps>(({ provider, server }) => {
   const { t } = useTranslation('setting');
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isWaitingAuth, setIsWaitingAuth] = useState(false);
 
@@ -157,6 +157,7 @@ const LobehubSkillItem = memo<LobehubSkillItemProps>(({ provider, server }) => {
       openOAuthWindow(authorizeUrl);
     } catch (error) {
       console.error('[LobehubSkill] Failed to get authorize URL:', error);
+      message.error(t('tools.avatohubSkill.connectError'));
     } finally {
       setIsConnecting(false);
     }
@@ -171,7 +172,10 @@ const LobehubSkillItem = memo<LobehubSkillItemProps>(({ provider, server }) => {
       okButtonProps: { danger: true },
       okText: t('tools.avatohubSkill.disconnect'),
       onOk: async () => {
-        await revokeConnect(server.identifier);
+        const success = await revokeConnect(server.identifier);
+        if (!success) {
+          message.error(t('tools.avatohubSkill.disconnectError'));
+        }
       },
       title: t('tools.avatohubSkill.disconnectConfirm.title', { name: provider.label }),
     });
@@ -234,12 +238,13 @@ const LobehubSkillItem = memo<LobehubSkillItemProps>(({ provider, server }) => {
 
     return (
       <DropdownMenu
+        nativeButton
         placement="bottomRight"
         items={[
           {
             icon: <Icon icon={Unplug} />,
             key: 'disconnect',
-            label: t('tools.lobehubSkill.disconnect', { defaultValue: 'Disconnect' }),
+            label: t('tools.avatohubSkill.disconnect', { defaultValue: 'Disconnect' }),
             onClick: handleDisconnect,
           },
         ]}

@@ -1,11 +1,11 @@
 import { ActionIcon } from '@lobehub/ui';
-import { Bot } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ACTION_ENTRY_ICONS } from '@/config/entryIcons';
 import { useAgentId } from '@/features/ChatInput/hooks/useAgentId';
-import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 const AgentModeToggle = memo(() => {
   const { t } = useTranslation('chat');
@@ -21,7 +21,7 @@ const AgentModeToggle = memo(() => {
 
   return (
     <ActionIcon
-      icon={Bot}
+      icon={ACTION_ENTRY_ICONS.createAgent}
       title={t('agentMode.title', { defaultValue: 'Agent Mode' })}
       style={{
         color: enableAgentMode ? 'var(--colorPrimary)' : undefined,

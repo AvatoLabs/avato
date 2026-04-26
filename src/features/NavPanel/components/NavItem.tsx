@@ -7,23 +7,54 @@ import { type ReactNode } from 'react';
 import { memo } from 'react';
 
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
+import { ENTRY_ICON_STROKE } from '@/config/entryIcons';
+import { WORKSPACE_NAV_ROW_HEIGHT_PX } from '@/const/workspaceVisualTokens';
 import { isModifierClick } from '@/utils/navigation';
+
+import { useGlassNavVisual } from '../GlassNavVisualContext';
 
 const ACTION_CLASS_NAME = 'nav-item-actions';
 
-const styles = createStaticStyles(({ css }) => ({
+const styles = createStaticStyles(({ css, cssVar }) => ({
   container: css`
     user-select: none;
+
     overflow: hidden;
+
     min-width: 32px;
+    border-radius: ${cssVar.borderRadiusSM};
+
+    transition:
+      background-color ${cssVar.motionDurationFast} ${cssVar.motionEaseOut},
+      box-shadow ${cssVar.motionDurationFast} ${cssVar.motionEaseOut},
+      transform ${cssVar.motionDurationFast} ${cssVar.motionEaseOut};
+
+    &:active {
+      transform: scale(0.99);
+    }
+
+    &:focus-visible {
+      outline: 2px solid ${cssVar.colorPrimary};
+      outline-offset: 2px;
+    }
+
+    /** 未选中：hover 次级高亮（同色带，亮度低于选中底） */
+    &:not([data-selected='true'], [data-disabled='true']):hover:not(:active) {
+      background: color-mix(in srgb, ${cssVar.colorText} 12%, transparent) !important;
+
+      [data-glass-icon-well] {
+        transform: scale(1.04);
+        background: color-mix(in srgb, ${cssVar.colorText} 17%, transparent) !important;
+      }
+    }
 
     .${ACTION_CLASS_NAME} {
-      transform: translateX(2px);
+      transform: translateX(0);
       margin-inline-end: 2px;
-      opacity: 0.56;
+      opacity: 0.72;
       transition:
-        opacity 0.2s ${cssVar.motionEaseOut},
-        transform 0.2s ${cssVar.motionEaseOut};
+        opacity ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+        transform ${cssVar.motionDurationMid} ${cssVar.motionEaseOut};
 
       &:has([data-popup-open]) {
         transform: translateX(0);
@@ -38,6 +69,47 @@ const styles = createStaticStyles(({ css }) => ({
         opacity: 1;
       }
     }
+  `,
+  /**
+   * Selected row: neutral pill — 正式、克制，避免主题色描边/侧条带来的「霓虹」感。
+   */
+  chatgptSelected: css`
+    margin-inline: 8px;
+    border-radius: ${cssVar.borderRadiusLG};
+
+    background: color-mix(in srgb, ${cssVar.colorText} 14%, transparent) !important;
+    box-shadow: inset 0 0 0 1px ${cssVar.colorBorderSecondary};
+
+    transition:
+      background-color ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      box-shadow ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      transform ${cssVar.motionDurationFast} ${cssVar.motionEaseOut};
+
+    &:hover {
+      background: color-mix(in srgb, ${cssVar.colorText} 18%, transparent) !important;
+      box-shadow: inset 0 0 0 1px ${cssVar.colorBorder};
+    }
+  `,
+  glassIconWell: css`
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+
+    width: 32px;
+    height: 32px;
+    border-radius: ${cssVar.borderRadiusLG};
+
+    background: ${cssVar.colorFillQuaternary};
+
+    transition:
+      background-color ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      box-shadow ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      transform ${cssVar.motionDurationFast} ${cssVar.motionEaseOut};
+  `,
+  /** 选中时去掉 icon 井字底，避免「大灰底套小灰底」 */
+  glassIconWellSelected: css`
+    background: transparent !important;
   `,
 }));
 
@@ -71,7 +143,7 @@ const NavItem = memo<NavItemProps>(
     active,
     href,
     icon,
-    iconSize = 18,
+    iconSize: iconSizeProp,
     title,
     onClick,
     disabled,
@@ -80,9 +152,13 @@ const NavItem = memo<NavItemProps>(
     slots,
     ...rest
   }) => {
-    const iconColor = active ? cssVar.colorText : cssVar.colorTextDescription;
-    const textColor = active ? cssVar.colorText : cssVar.colorTextSecondary;
-    const variant = active ? 'filled' : 'borderless';
+    const glass = useGlassNavVisual();
+    const iconSize = iconSizeProp ?? (glass ? 20 : 18);
+    const iconSizeForLobeIcon = { size: iconSize, strokeWidth: ENTRY_ICON_STROKE };
+    const labelColor = cssVar.colorText;
+    const titleText =
+      typeof title === 'number' || typeof title === 'string' ? String(title) : undefined;
+    const variant = 'borderless';
 
     const { titlePrefix, iconPostfix } = slots || {};
     // Link props for cmd+click support
@@ -98,11 +174,12 @@ const NavItem = memo<NavItemProps>(
       <Block
         horizontal
         align={'center'}
-        className={cx(styles.container, className)}
         clickable={!disabled}
-        gap={8}
-        height={36}
-        paddingInline={4}
+        data-disabled={disabled || loading ? 'true' : undefined}
+        data-selected={active ? 'true' : undefined}
+        gap={10}
+        height={WORKSPACE_NAV_ROW_HEIGHT_PX}
+        paddingInline={8}
         variant={variant}
         onClick={(e) => {
           if (disabled || loading) return;
@@ -115,25 +192,42 @@ const NavItem = memo<NavItemProps>(
         }}
         {...linkProps}
         {...rest}
+        className={cx(styles.container, active && styles.chatgptSelected, className)}
       >
-        {icon && (
-          <Center flex={'none'} height={28} width={28}>
-            {loading ? (
-              <NeuralNetworkLoading size={iconSize} />
-            ) : (
-              <Icon color={iconColor} icon={icon} size={iconSize} />
-            )}
-          </Center>
-        )}
+        {icon &&
+          (glass ? (
+            <div
+              className={cx(styles.glassIconWell, active && styles.glassIconWellSelected)}
+              data-glass-icon-well=""
+            >
+              {loading ? (
+                <NeuralNetworkLoading size={iconSize} />
+              ) : (
+                <Icon color={labelColor} icon={icon} size={iconSizeForLobeIcon} />
+              )}
+            </div>
+          ) : (
+            <Center flex={'none'} height={30} width={30}>
+              {loading ? (
+                <NeuralNetworkLoading size={iconSize} />
+              ) : (
+                <Icon color={labelColor} icon={icon} size={iconSizeForLobeIcon} />
+              )}
+            </Center>
+          ))}
 
         {iconPostfix}
         <Flexbox horizontal align={'center'} flex={1} gap={8} style={{ overflow: 'hidden' }}>
           {titlePrefix}
           <Text
-            color={textColor}
-            style={{ flex: 1 }}
-            ellipsis={{
-              tooltipWhenOverflow: true,
+            ellipsis
+            color={labelColor}
+            title={titleText}
+            style={{
+              flex: 1,
+              fontSize: cssVar.fontSize,
+              fontWeight: active ? 450 : 400,
+              lineHeight: 1.3,
             }}
           >
             {title}

@@ -6,8 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { ACTION_ENTRY_ICONS, APP_ENTRY_ICONS } from '@/config/entryIcons';
-import { useHomeStore } from '@/store/home';
 import { homeAgentListSelectors } from '@/store/home/selectors';
+import { useHomeStore } from '@/store/home/store';
 
 import { useCommandMenuContext } from './CommandMenuContext';
 import { CommandItem } from './components';
@@ -28,22 +28,28 @@ const AskAIMenu = memo(() => {
     ? t('cmdk.askAIHeading', { query: `"${search.trim()}"` })
     : t('cmdk.askAIHeadingEmpty');
 
-  const handleAgentBuilder = () => {
+  const handleBuilderAction = (
+    action: 'sendAsAgent' | 'sendAsGroup',
+    label: 'agent builder' | 'group builder',
+  ) => {
     const trimmedSearch = search.trim();
-    closeCommandMenu(); // Close immediately
-    if (trimmedSearch) {
-      // Use sendAsAgent to create a blank agent and open agent builder
-      useHomeStore.getState().sendAsAgent(trimmedSearch);
-    }
+    closeCommandMenu();
+    if (!trimmedSearch) return;
+
+    void useHomeStore
+      .getState()
+      [action](trimmedSearch)
+      .catch((error) => {
+        console.error(`[AskAIMenu] Failed to open ${label}:`, error);
+      });
+  };
+
+  const handleAgentBuilder = () => {
+    handleBuilderAction('sendAsAgent', 'agent builder');
   };
 
   const handleGroupBuilder = () => {
-    const trimmedSearch = search.trim();
-    closeCommandMenu(); // Close immediately
-    if (trimmedSearch) {
-      // Use sendAsGroup to create a blank group and open group builder
-      useHomeStore.getState().sendAsGroup(trimmedSearch);
-    }
+    handleBuilderAction('sendAsGroup', 'group builder');
   };
 
   const handleAgentSelect = (agentId: string) => {

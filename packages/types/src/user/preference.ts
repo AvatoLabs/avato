@@ -29,9 +29,9 @@ export const UserGuideSchema = z.object({
   topic: z.boolean().optional(),
 
   /**
-   * tell user that uploaded files can be found in knowledge base
+   * tell user that uploaded files can be found in source sets
    */
-  uploadFileInKnowledgeBase: z.boolean().optional(),
+  uploadFileInSourceSet: z.boolean().optional(),
 });
 
 export type UserGuide = z.infer<typeof UserGuideSchema>;

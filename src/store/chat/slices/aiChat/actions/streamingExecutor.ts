@@ -6,7 +6,7 @@ import {
   type Usage,
 } from '@lobechat/agent-runtime';
 import { AgentRuntime, computeStepContext, GeneralChatAgent } from '@lobechat/agent-runtime';
-import { PageAgentIdentifier } from '@lobechat/builtin-tool-page-agent';
+import { DocsAgentIdentifier } from '@lobechat/builtin-tool-docs-agent';
 import { dynamicInterventionAudits } from '@lobechat/builtin-tools/dynamicInterventionAudits';
 import { isDesktop } from '@lobechat/const';
 import { type ToolsEngine } from '@lobechat/context-engine';
@@ -22,11 +22,11 @@ import { createAgentToolsEngine } from '@/helpers/toolEngineering';
 import { type ResolvedAgentConfig } from '@/services/chat/mecha';
 import { resolveAgentConfig } from '@/services/chat/mecha';
 import { messageService } from '@/services/message';
-import { getAgentStoreState } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { getAgentStoreState } from '@/store/agent/store';
 import { createAgentExecutors } from '@/store/chat/agents/createAgentExecutors';
 import { type ChatStore } from '@/store/chat/store';
-import { pageAgentRuntime } from '@/store/tool/slices/builtin/executors/lobe-page-agent';
+import { docsAgentRuntime } from '@/store/tool/slices/builtin/executors/lobe-docs-agent';
 import { type StoreSetter } from '@/store/types';
 import { toolInterventionSelectors } from '@/store/user/selectors';
 import { getUserStoreState } from '@/store/user/store';
@@ -111,6 +111,15 @@ export class StreamingExecutorActionImpl {
     const operation = operationId ? this.#get().operations[operationId] : undefined;
     const scope = operation?.context.scope;
     const groupId = operation?.context.groupId;
+    const docContextKey =
+      scope === 'doc'
+        ? messageMapKey({
+            agentId: operation?.context.agentId || effectiveAgentId || '',
+            scope: 'doc',
+            threadId: operation?.context.threadId,
+            topicId: operation?.context.topicId ?? topicId,
+          })
+        : undefined;
 
     // Resolve agent config with builtin agent runtime config merged
     // This ensures runtime plugins (e.g., 'lobe-agent-builder' for Agent Builder) are included
@@ -218,33 +227,36 @@ export class StreamingExecutorActionImpl {
         userInterventionConfig,
       });
 
-    // Build initialContext for page editor if lobe-page-agent is enabled
+    // Build initialContext for the doc editor if lobe-docs-agent is enabled.
     let runtimeInitialContext: RuntimeInitialContext | undefined;
 
-    if (enabledToolIds.includes(PageAgentIdentifier)) {
+    if (enabledToolIds.includes(DocsAgentIdentifier)) {
       try {
-        // Get page content context from page agent runtime
-        const pageContentContext = pageAgentRuntime.getPageContentContext('both');
+        // Get doc content context from the docs-agent runtime.
+        const docContentContext = docsAgentRuntime.getScopedDocContentContext(
+          'both',
+          docContextKey,
+        );
 
         runtimeInitialContext = {
-          pageEditor: {
-            markdown: pageContentContext.markdown || '',
-            xml: pageContentContext.xml || '',
+          docEditor: {
+            markdown: docContentContext.markdown || '',
+            xml: docContentContext.xml || '',
             metadata: {
-              title: pageContentContext.metadata.title,
-              charCount: pageContentContext.metadata.charCount,
-              lineCount: pageContentContext.metadata.lineCount,
+              title: docContentContext.metadata.title,
+              charCount: docContentContext.metadata.charCount,
+              lineCount: docContentContext.metadata.lineCount,
             },
           },
         };
         log(
-          '[internal_createAgentState] Page Agent detected, injected initialContext.pageEditor with title: %s',
-          pageContentContext.metadata.title,
+          '[internal_createAgentState] Docs Agent detected, injected initialContext.docEditor with title: %s (contextKey=%s)',
+          docContentContext.metadata.title,
+          docContextKey,
         );
       } catch (error) {
-        // Page agent runtime may not be initialized (e.g., editor not set)
-        // This is expected in some scenarios, so we just log and continue
-        log('[internal_createAgentState] Failed to get page content context: %o', error);
+        // Docs-agent runtime may not be initialized yet, which is expected in some scenarios.
+        log('[internal_createAgentState] Failed to get doc content context: %o', error);
       }
     }
 
@@ -294,7 +306,7 @@ export class StreamingExecutorActionImpl {
     } = params;
 
     // Extract values from context
-    const { agentId, topicId, threadId, subAgentId, groupId, scope } = context;
+    const { agentId, topicId, threadId, subAgentId, groupId, scope, spaceId } = context;
 
     // Determine effectiveAgentId for agent config retrieval:
     // - subAgentId is used when present (behavior depends on scope)
@@ -422,7 +434,12 @@ export class StreamingExecutorActionImpl {
 
     // Execute the agent runtime loop
     let stepCount = 0;
-    while (state.status !== 'done' && state.status !== 'error') {
+    while (
+      state.status !== 'done' &&
+      state.status !== 'error' &&
+      state.status !== 'waiting_for_human' &&
+      state.status !== 'interrupted'
+    ) {
       // Check if operation has been cancelled
       const currentOperation = this.#get().operations[operationId];
       if (currentOperation?.status === 'cancelled') {
@@ -450,16 +467,16 @@ export class StreamingExecutorActionImpl {
       const activatedToolIds = selectActivatedToolIdsFromMessages(currentDBMessages);
       const stepContext = computeStepContext({ activatedToolIds, todos });
 
-      // If page agent is enabled, get the latest XML for stepPageEditor
-      if (nextContext.initialContext?.pageEditor) {
+      // If Docs Agent is enabled, get the latest XML for stepDocEditor.
+      if (nextContext.initialContext?.docEditor) {
         try {
-          const pageContentContext = pageAgentRuntime.getPageContentContext('xml');
-          stepContext.stepPageEditor = {
-            xml: pageContentContext.xml || '',
+          const docContentContext = docsAgentRuntime.getDocContentContext('xml');
+          stepContext.stepDocEditor = {
+            xml: docContentContext.xml || '',
           };
         } catch (error) {
-          // Page agent runtime may not be available, ignore errors
-          log('[internal_execAgentRuntime] Failed to get page XML for step: %o', error);
+          // Docs-agent runtime may not be available yet, ignore errors.
+          log('[internal_execAgentRuntime] Failed to get doc XML for step: %o', error);
         }
       }
 
@@ -636,7 +653,7 @@ export class StreamingExecutorActionImpl {
           // Use topic title or agent title as notification title
           let notificationTitle = t('notification.finishChatGeneration', { ns: 'electron' });
           if (topicId) {
-            const key = topicMapKey({ agentId, groupId });
+            const key = topicMapKey({ agentId, groupId, spaceId });
             const topicData = this.#get().topicDataMap[key];
             const topic = topicData?.items?.find((item) => item.id === topicId);
             if (topic?.title) notificationTitle = topic.title;

@@ -32,9 +32,9 @@ const EditorError = memo<{ error: Error }>(({ error }) => {
   return (
     <Alert
       showIcon
-      description={error.message || t('pageEditor.loadError', 'Failed to load document')}
+      description={error.message || t('docEditor.loadError', 'Failed to load document')}
       style={{ margin: 16 }}
-      title={t('pageEditor.error', 'Error')}
+      title={t('docEditor.error', 'Error')}
       type="error"
     />
   );
@@ -60,6 +60,7 @@ const DocumentIdMode = memo<DocumentIdModeProps>(
     ...editorProps
   }) => {
     const { t } = useTranslation(['file', 'ui']);
+    const shouldGuardUnsavedChanges = unsavedChangesGuard?.enabled ?? false;
 
     const storeUpdater = createStoreUpdater(useDocumentStore);
     storeUpdater('activeDocumentId', documentId);
@@ -78,22 +79,31 @@ const DocumentIdMode = memo<DocumentIdModeProps>(
     useSaveDocumentHotkey(flushSave);
 
     // Use SWR hook for document fetching (auto-initializes via onSuccess in DocumentStore)
-    const { error } = useFetchDocument(documentId, { autoSave, editor, sourceType });
+    const { error } = useFetchDocument(documentId, {
+      autoSave,
+      editor,
+      sourceType,
+      syncPolicy: 'once',
+    });
 
     // Check loading state via selector (document not yet in store)
     const isLoading = useDocumentStore(editorSelectors.isDocumentLoading(documentId));
-    const isDirty = useDocumentStore(editorSelectors.isDirty(documentId));
-    const shouldGuardUnsavedChanges = unsavedChangesGuard?.enabled ?? false;
+    const isDirty = useDocumentStore((s) =>
+      shouldGuardUnsavedChanges ? editorSelectors.isDirty(documentId)(s) : false,
+    );
 
     const handleAutoSaveBeforeLeave = useCallback(async () => {
       if (!shouldGuardUnsavedChanges) return true;
 
-      handleContentChangeStore();
+      await unsavedChangesGuard?.beforeAutoSave?.();
       await performSave(documentId);
 
       const latestDocument = useDocumentStore.getState().documents[documentId];
-      return latestDocument ? !latestDocument.isDirty : true;
-    }, [documentId, handleContentChangeStore, performSave, shouldGuardUnsavedChanges]);
+
+      if (!latestDocument || !latestDocument.isDirty) return true;
+
+      throw new Error(latestDocument.lastSaveError || t('docEditor.saveFailed'));
+    }, [documentId, performSave, shouldGuardUnsavedChanges, t, unsavedChangesGuard]);
 
     const unsavedGuardNode = (
       <UnsavedChangesGuard
@@ -105,43 +115,75 @@ const DocumentIdMode = memo<DocumentIdModeProps>(
     );
 
     // Handle content change
-    const handleChange = () => {
+    const handleChange = useCallback(() => {
       handleContentChangeStore();
       onContentChange?.();
-    };
+    }, [handleContentChangeStore, onContentChange]);
 
     const isEditorInitialized = !!editor?.getLexicalEditor();
     const contentChangeLockRef = useRef(false);
     const initRunIdRef = useRef(0);
-
-    // 追踪已经为哪个 documentId 调用过 onEditorInit
     const initializedDocIdRef = useRef<string | null>(null);
+    const releaseContentChangeLock = useCallback((runId: number) => {
+      queueMicrotask(() => {
+        if (initRunIdRef.current === runId) {
+          contentChangeLockRef.current = false;
+        }
+      });
+    }, []);
 
-    // 关键修复：如果 editor 已经初始化，需要主动调用 onEditorInit
-    // 因为 onInit 回调只在 editor 首次初始化时触发
-    useEffect(() => {
-      // 避免重复调用：只在 documentId 变化且 editor 已初始化时调用
-      if (
-        editor &&
-        isEditorInitialized &&
-        !isLoading &&
-        initializedDocIdRef.current !== documentId
-      ) {
+    const runEditorInit = useCallback(
+      (targetEditor: IEditor) => {
+        if (initializedDocIdRef.current === documentId) return;
+
         const runId = ++initRunIdRef.current;
-        initializedDocIdRef.current = documentId;
+        const scheduledDocumentId = documentId;
 
-        // Lock content-change callback while hydrating document content into editor.
+        initializedDocIdRef.current = scheduledDocumentId;
         contentChangeLockRef.current = true;
 
-        void onEditorInit(editor).finally(() => {
-          queueMicrotask(() => {
-            if (initRunIdRef.current === runId) {
-              contentChangeLockRef.current = false;
-            }
+        queueMicrotask(() => {
+          if (initializedDocIdRef.current !== scheduledDocumentId) {
+            releaseContentChangeLock(runId);
+            return;
+          }
+
+          void onEditorInit(targetEditor).finally(() => {
+            releaseContentChangeLock(runId);
           });
         });
-      }
-    }, [documentId, editor, isEditorInitialized, isLoading, onEditorInit]);
+      },
+      [documentId, onEditorInit, releaseContentChangeLock],
+    );
+
+    const handleEditorInit = useCallback(
+      (targetEditor: IEditor) => {
+        runEditorInit(targetEditor);
+      },
+      [runEditorInit],
+    );
+
+    // If the shared editor instance is already ready for a new document,
+    // re-hydrate content without waiting for a fresh onInit callback.
+    useEffect(() => {
+      if (!editor || !isEditorInitialized || isLoading) return;
+
+      queueMicrotask(() => {
+        if (initializedDocIdRef.current === documentId) return;
+        runEditorInit(editor);
+      });
+    }, [documentId, editor, isEditorInitialized, isLoading, runEditorInit]);
+
+    if (error) {
+      return (
+        <>
+          {unsavedGuardNode}
+          <EditorError error={error as Error} />
+        </>
+      );
+    }
+
+    if (!editor) return unsavedGuardNode;
 
     // Show loading state
     if (isLoading) {
@@ -153,19 +195,16 @@ const DocumentIdMode = memo<DocumentIdModeProps>(
       );
     }
 
-    if (!editor) return unsavedGuardNode;
-
     return (
       <>
         {unsavedGuardNode}
-        {error && <EditorError error={error as Error} />}
         <InternalEditor
           contentChangeLockRef={contentChangeLockRef}
           editor={editor}
-          placeholder={editorProps.placeholder || t('pageEditor.editorPlaceholder')}
+          placeholder={editorProps.placeholder || t('docEditor.editorPlaceholder')}
           style={style}
           onContentChange={handleChange}
-          onInit={onEditorInit}
+          onInit={handleEditorInit}
           {...editorProps}
         />
       </>

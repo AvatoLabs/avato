@@ -113,6 +113,8 @@ export class UserSettingsActionImpl {
       await userService.updateUserSettings(diffs, abortController.signal);
       await this.#get().refreshUserState();
     } catch (e) {
+      // Superseded by a newer setSettings call — keep optimistic UI (e.g. theme) instead of reverting.
+      if (abortController.signal.aborted) return;
       this.#set({ settings: prevSettings }, false, 'setSettings/revert');
       throw e;
     }

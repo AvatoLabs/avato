@@ -19,8 +19,8 @@ import { useTranslation } from 'react-i18next';
 import SkillSourceTag from '@/components/SkillSourceTag';
 import { createBuiltinAgentSkillDetailModal } from '@/features/SkillStore/SkillDetail';
 import { agentSkillService } from '@/services/skill';
-import { useToolStore } from '@/store/tool';
 import { builtinToolSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 import { downloadFile } from '@/utils/client/downloadFile';
 
 import { styles } from './style';
@@ -62,7 +62,7 @@ const AgentSkillItem = memo<AgentSkillItemProps>(({ skill }) => {
   // ===== Handlers =====
 
   const handleDownload = async () => {
-    if (isBuiltin || !skill.zipFileHash) return;
+    if (isBuiltin || !skill.zipSha256) return;
     setLoading(true);
     try {
       const result = await agentSkillService.getZipUrl(skill.id);
@@ -110,6 +110,7 @@ const AgentSkillItem = memo<AgentSkillItemProps>(({ skill }) => {
       if (isBuiltinInstalled) {
         return (
           <DropdownMenu
+            nativeButton
             placement="bottomRight"
             items={[
               {
@@ -136,9 +137,10 @@ const AgentSkillItem = memo<AgentSkillItemProps>(({ skill }) => {
       <Space.Compact>
         <Button onClick={() => setEditOpen(true)}>{tp('store.actions.configure')}</Button>
         <DropdownMenu
+          nativeButton
           placement="bottomRight"
           items={[
-            ...(skill.zipFileHash
+            ...(skill.zipSha256
               ? [
                   {
                     icon: <DownloadIcon size={16} />,

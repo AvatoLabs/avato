@@ -23,7 +23,10 @@ import {
 import {
   AgentBuilderContextInjector,
   AgentManagementContextInjector,
+  ConversationFilesInjector,
   DiscordContextProvider,
+  DocEditorContextInjector,
+  DocSelectionsInjector,
   EvalContextSystemInjector,
   ForceFinishSummaryInjector,
   GroupAgentBuilderContextInjector,
@@ -32,8 +35,6 @@ import {
   GTDTodoInjector,
   HistorySummaryProvider,
   KnowledgeInjector,
-  PageEditorContextInjector,
-  PageSelectionsInjector,
   SkillContextProvider,
   SystemDateProvider,
   SystemRoleInjector,
@@ -141,7 +142,7 @@ export class MessagesEngine {
       userMemory,
       initialContext,
       stepContext,
-      pageContentContext,
+      docContentContext,
       enableSystemDate,
       timezone,
     } = this.params;
@@ -154,8 +155,8 @@ export class MessagesEngine {
     const isGroupContextEnabled =
       isAgentGroupEnabled || !!agentGroup?.currentAgentId || !!agentGroup?.members;
     const isUserMemoryEnabled = userMemory?.enabled && userMemory?.memories;
-    // Page editor is enabled if either direct pageContentContext or initialContext.pageEditor is provided
-    const isPageEditorEnabled = !!pageContentContext || !!initialContext?.pageEditor;
+    // Doc editor is enabled if either direct docContentContext or initialContext.docEditor is provided.
+    const isDocEditorEnabled = !!docContentContext || !!initialContext?.docEditor;
     // GTD is enabled if gtd.enabled is true and either plan or todos is provided
     const isGTDPlanEnabled = gtd?.enabled && gtd?.plan;
     const isGTDTodoEnabled = gtd?.enabled && gtd?.todos;
@@ -209,13 +210,18 @@ export class MessagesEngine {
       // 6. GTD Plan injection (conditionally added, after user memory, before knowledge)
       ...(isGTDPlanEnabled ? [new GTDPlanInjector({ enabled: true, plan: gtd.plan })] : []),
 
-      // 7. Knowledge injection (full content for agent files + metadata for knowledge bases)
-      new KnowledgeInjector({
-        fileContents: knowledge?.fileContents,
-        knowledgeBases: knowledge?.knowledgeBases,
+      // 7. Conversation-scoped files injection (shared only within the current conversation)
+      new ConversationFilesInjector({
+        fileContents: knowledge?.conversationFileContents,
       }),
 
-      // 8. Tool Discovery context injection (available tools for dynamic activation)
+      // 8. Knowledge injection (full content for agent files + metadata for source sets)
+      new KnowledgeInjector({
+        fileContents: knowledge?.fileContents,
+        sourceSets: knowledge?.sourceSets,
+      }),
+
+      // 9. Tool Discovery context injection (available tools for dynamic activation)
       ...(toolDiscoveryConfig?.availableTools && toolDiscoveryConfig.availableTools.length > 0
         ? [new ToolDiscoveryProvider({ availableTools: toolDiscoveryConfig.availableTools })]
         : []),
@@ -269,27 +275,27 @@ export class MessagesEngine {
         historySummary,
       }),
 
-      // 14. Page Selections injection (inject user-selected text into each user message that has them)
-      new PageSelectionsInjector({ enabled: isPageEditorEnabled }),
+      // 14. Doc selections injection (inject user-selected text into each user message that has them)
+      new DocSelectionsInjector({ enabled: isDocEditorEnabled }),
 
-      // 15. Page Editor context injection (inject current page content to last user message)
-      new PageEditorContextInjector({
-        enabled: isPageEditorEnabled,
-        // Use direct pageContentContext if provided (server-side), otherwise build from initialContext + stepContext (frontend)
-        pageContentContext: pageContentContext
-          ? pageContentContext
-          : initialContext?.pageEditor
+      // 15. Doc editor context injection (inject current doc content to the last user message)
+      new DocEditorContextInjector({
+        // Use direct docContentContext if provided (server-side), otherwise build from initialContext + stepContext (frontend)
+        docContentContext:
+          docContentContext ||
+          (initialContext?.docEditor
             ? {
-                markdown: initialContext.pageEditor.markdown,
+                markdown: initialContext.docEditor.markdown,
                 metadata: {
-                  charCount: initialContext.pageEditor.metadata.charCount,
-                  lineCount: initialContext.pageEditor.metadata.lineCount,
-                  title: initialContext.pageEditor.metadata.title,
+                  charCount: initialContext.docEditor.metadata.charCount,
+                  lineCount: initialContext.docEditor.metadata.lineCount,
+                  title: initialContext.docEditor.metadata.title,
                 },
                 // Use latest XML from stepContext if available, otherwise fallback to initial XML
-                xml: stepContext?.stepPageEditor?.xml || initialContext.pageEditor.xml,
+                xml: stepContext?.stepDocEditor?.xml || initialContext.docEditor.xml,
               }
-            : undefined,
+            : undefined),
+        enabled: isDocEditorEnabled,
       }),
 
       // 16. GTD Todo injection (conditionally added, at end of last user message)

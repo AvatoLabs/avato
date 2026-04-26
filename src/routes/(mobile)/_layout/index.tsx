@@ -5,11 +5,12 @@ import { Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 
 import Loading from '@/components/Loading/BrandTextLoading';
+import { isWorkspaceResourcePath } from '@/features/ResourceSpaces';
 import { MarketAuthProvider } from '@/layout/AuthProvider/MarketAuth';
 import dynamic from '@/libs/next/dynamic';
 import { featureFlagsSelectors, useServerConfigStore } from '@/store/serverConfig';
-import { NavigatorRegistrar } from '@/utils/router';
 
+import { NavigatorRegistrar } from '../../../utils/router';
 import NavBar from './NavBar';
 
 const CloudBanner = dynamic(() => import('@/features/AlertBanner/CloudBanner'));
@@ -21,12 +22,11 @@ const MOBILE_NAV_ROUTES = new Set([
   '/community/plugin',
   '/community/model',
   '/community/provider',
-  '/resource',
+  '/spaces',
   '/me',
 ]);
 
-const isResourceRoute = (pathname: string) =>
-  pathname === '/resource' || pathname.startsWith('/resource/');
+const isResourceRoute = (pathname: string) => isWorkspaceResourcePath(pathname);
 
 const MobileMainLayout: FC = () => {
   const { showCloudPromotion } = useServerConfigStore(featureFlagsSelectors);

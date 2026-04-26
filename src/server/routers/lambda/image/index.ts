@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server';
 import debug from 'debug';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -10,6 +11,7 @@ import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { keyVaults, serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { createAsyncCaller } from '@/server/routers/async/caller';
 import { FileService } from '@/server/services/file';
+import { resolveRuntimeFileInput } from '@/server/services/file/resolveRuntimeFileInput';
 import {
   AsyncTaskError,
   AsyncTaskErrorType,
@@ -71,29 +73,44 @@ export const imageRouter = router({
 
     // Normalize reference image addresses, store S3 keys uniformly (avoid storing expiring presigned URLs in database)
     let configForDatabase = { ...params };
+    let generationParams = { ...params };
     // 1) Process multiple images in imageUrls
     if (Array.isArray(params.imageUrls) && params.imageUrls.length > 0) {
       log('Converting imageUrls to S3 keys for database storage: %O', params.imageUrls);
       try {
-        const imageKeysWithNull = await Promise.all(
-          params.imageUrls.map(async (url) => {
-            const key = await fileService.getKeyFromFullUrl(url);
-            if (key) {
-              log('Converted URL %s to key %s', url, key);
-            } else {
-              log('Failed to extract key from URL: %s', url);
-            }
-            return key;
-          }),
-        );
-        const imageKeys = imageKeysWithNull.filter((key): key is string => key !== null);
+        const imageKeys: string[] = [];
+        const resolvedImageUrls = [...params.imageUrls];
+
+        for (const [index, url] of params.imageUrls.entries()) {
+          const resolvedInput = await resolveRuntimeFileInput({
+            db: serverDB,
+            fileService,
+            sourceIp: ctx.clientIp ?? null,
+            url,
+            userAgent: ctx.userAgent ?? null,
+            userId,
+            via: 'image_generation_input',
+          });
+
+          if (resolvedInput) {
+            imageKeys.push(resolvedInput.key);
+            resolvedImageUrls[index] = resolvedInput.url;
+            continue;
+          }
+          log('Failed to extract key from URL: %s', url);
+        }
 
         configForDatabase = {
           ...configForDatabase,
           imageUrls: imageKeys,
         };
+        generationParams = {
+          ...generationParams,
+          imageUrls: resolvedImageUrls,
+        };
         log('Successfully converted imageUrls to keys for database: %O', imageKeys);
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error('Error converting imageUrls to keys: %O', error);
         console.error('Keeping original imageUrls due to conversion error');
       }
@@ -101,44 +118,27 @@ export const imageRouter = router({
     // 2) Process single image in imageUrl
     if (typeof params.imageUrl === 'string' && params.imageUrl) {
       try {
-        const key = await fileService.getKeyFromFullUrl(params.imageUrl);
-        if (key) {
-          log('Converted single imageUrl to key: %s -> %s', params.imageUrl, key);
-          configForDatabase = { ...configForDatabase, imageUrl: key };
+        const resolvedInput = await resolveRuntimeFileInput({
+          db: serverDB,
+          fileService,
+          sourceIp: ctx.clientIp ?? null,
+          url: params.imageUrl,
+          userAgent: ctx.userAgent ?? null,
+          userId,
+          via: 'image_generation_input',
+        });
+
+        if (resolvedInput) {
+          log('Resolved internal imageUrl to provider-readable URL: %s', params.imageUrl);
+          configForDatabase = { ...configForDatabase, imageUrl: resolvedInput.key };
+          generationParams = { ...generationParams, imageUrl: resolvedInput.url };
         } else {
           log('Failed to extract key from single imageUrl: %s', params.imageUrl);
         }
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error('Error converting imageUrl to key: %O', error);
         // Keep original value if conversion fails
-      }
-    }
-
-    // In development, convert localhost proxy URLs to S3 URLs for async task access
-    let generationParams = params;
-    if (process.env.NODE_ENV === 'development') {
-      const updates: Record<string, unknown> = {};
-
-      // Handle single imageUrl: localhost/f/{id} -> S3 URL
-      if (typeof params.imageUrl === 'string' && params.imageUrl) {
-        const s3Url = await fileService.getFullFileUrl(configForDatabase.imageUrl as string);
-        if (s3Url) {
-          log('Dev: converted proxy URL to S3 URL: %s -> %s', params.imageUrl, s3Url);
-          updates.imageUrl = s3Url;
-        }
-      }
-
-      // Handle multiple imageUrls
-      if (Array.isArray(params.imageUrls) && params.imageUrls.length > 0) {
-        const s3Urls = await Promise.all(
-          (configForDatabase.imageUrls as string[]).map((key) => fileService.getFullFileUrl(key)),
-        );
-        log('Dev: converted proxy URLs to S3 URLs: %O', s3Urls);
-        updates.imageUrls = s3Urls;
-      }
-
-      if (Object.keys(updates).length > 0) {
-        generationParams = { ...params, ...updates };
       }
     }
 

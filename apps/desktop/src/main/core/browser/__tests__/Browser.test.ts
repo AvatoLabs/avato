@@ -94,7 +94,7 @@ vi.mock('@/utils/logger', () => ({
 vi.mock('@/const/dir', () => ({
   buildDir: '/mock/build',
   preloadDir: '/mock/preload',
-  resourcesDir: '/mock/resources',
+  resourcesDir: '/mock/contents',
 }));
 
 vi.mock('@/const/env', () => ({
@@ -423,7 +423,7 @@ describe('Browser', () => {
 
       await browser.loadUrl('/test-path');
 
-      expect(mockBrowserWindow.loadFile).toHaveBeenCalledWith('/mock/resources/error.html');
+      expect(mockBrowserWindow.loadFile).toHaveBeenCalledWith('/mock/contents/error.html');
     });
 
     it('should setup retry handler on error', async () => {
@@ -441,7 +441,7 @@ describe('Browser', () => {
       mockBrowserWindow.loadURL.mockRejectedValueOnce(new Error('Load failed'));
       mockBrowserWindow.loadURL.mockResolvedValueOnce(undefined);
       mockBrowserWindow.loadFile.mockImplementation(async (filePath: string) => {
-        if (filePath === '/mock/resources/error.html') throw new Error('Error page failed');
+        if (filePath === '/mock/contents/error.html') throw new Error('Error page failed');
         return undefined;
       });
 
@@ -457,7 +457,7 @@ describe('Browser', () => {
     it('should load splash screen', async () => {
       await browser.loadPlaceholder();
 
-      expect(mockBrowserWindow.loadFile).toHaveBeenCalledWith('/mock/resources/splash.html');
+      expect(mockBrowserWindow.loadFile).toHaveBeenCalledWith('/mock/contents/splash.html');
     });
   });
 

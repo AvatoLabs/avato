@@ -6,14 +6,15 @@
  * without pulling in Next.js / Node dependencies.
  *
  * All endpoints follow the tRPC HTTP convention:
- *   GET  /trpc/mobile/<procedure>?input=<json>
- *   POST /trpc/mobile/<procedure>  body: { json: input }
+ *   GET  /trpc/<namespace>/<procedure>?input=<json>
+ *   POST /trpc/<namespace>/<procedure>  body: { json: input }
  */
 
 import { createSSEChunkParser } from '@lobechat/fetch-sse/sseParser';
 import * as FileSystem from 'expo-file-system/legacy';
 import { sha256 } from 'js-sha256';
 
+import { INBOX_SESSION_ID } from '../constants/session';
 import type {
   AgentSkillItem,
   AiProviderDetailItem,
@@ -27,8 +28,10 @@ import type {
   ChatPluginPayload,
   ChatSession,
   ChatToolPayload,
+  ConversationFileItem,
   CreateSessionConfig,
   DiscoverModel,
+  FileAssetCapabilities,
   FileListItem,
   GenerationBatch,
   GenerationTopic,
@@ -36,7 +39,6 @@ import type {
   HeatmapDay,
   ImageGenerationParams,
   InstalledPlugin,
-  KnowledgeBaseItem,
   MarketAgent,
   MemoryActivityItem,
   MemoryContextItem,
@@ -48,11 +50,22 @@ import type {
   MemoryPreferenceItem,
   MessageContentPart,
   MobileMemoryEffort,
+  MobileSpaceItem,
+  MobileSpaceMemoryAuditBatchBundle,
+  MobileSpaceMemoryAuditBundle,
+  MobileSpaceMemoryEntryPreview,
+  MobileSpaceMemoryEntryResult,
+  MobileSpaceMemoryRecallFilter,
+  MobileSpaceMemorySection,
+  MobileSpaceMemorySectionResult,
+  MobileSpaceMemorySummary,
   MobileSSOProvider,
+  MobileThreadItem,
   MobileUserState,
   ModelRankItem,
   RecentTopic,
   SessionRankItem,
+  SourceSetItem,
   Tag,
   Topic,
   TopicRankItem,
@@ -61,6 +74,12 @@ import type {
 } from '../types';
 import { clearStoredAuthSession, getAuthHeaders } from './auth';
 import { useI18n } from './i18n';
+import { getCanonicalResourceKind, isRawFileResourceId } from './resourceList';
+import {
+  normalizeContentShareTarget,
+  normalizePublicSharedContent,
+  normalizeSharedWithMeItem,
+} from './resourceShare';
 import {
   getApiUrl,
   hasConfiguredUrl,
@@ -124,12 +143,12 @@ const buildCommunityMarketCacheKey = (
 ) => {
   const normalizedParams = params
     ? JSON.stringify(
-        Object.fromEntries(
-          Object.entries(params)
-            .filter(([, value]) => value !== undefined && value !== null && value !== '')
-            .sort(([left], [right]) => left.localeCompare(right)),
-        ),
-      )
+      Object.fromEntries(
+        Object.entries(params)
+          .filter(([, value]) => value !== undefined && value !== null && value !== '')
+          .sort(([left], [right]) => left.localeCompare(right)),
+      ),
+    )
     : '';
 
   return `${baseUrl}::${scope}::${normalizedParams}`;
@@ -243,6 +262,8 @@ const toIsoString = (value: unknown): string => {
 };
 
 const sanitizeFilename = (name: string) => name.replaceAll(/[^\w.-]+/g, '_');
+const joinBaseUrlPath = (baseUrl: string, path: `/${string}`) =>
+  `${baseUrl.replace(/\/+$/, '')}${path}`;
 
 const ensureDirectoryAsync = async (uri: string) => {
   if (!uri) throw new Error('filesystem directory unavailable');
@@ -278,6 +299,7 @@ const resolveRemoteFileUrl = (baseUrl: string, id: string, url?: string) => {
 };
 
 const SHA256_CHUNK_BYTES = 4 * 1024 * 1024;
+const UPLOAD_SESSION_ID_HEADER = 'x-lobe-upload-session-id';
 
 const base64ToUint8Array = (base64: string): Uint8Array => {
   const binaryString = globalThis.atob(base64);
@@ -357,25 +379,26 @@ const putLocalFileToPresignedUrl = async (
   }
 };
 
-/** Same-origin multipart fallback when PUT to the presigned URL is not viable. */
+/** Same-origin raw binary fallback when PUT to the presigned URL is not viable. */
 const uploadLocalFileViaUploadSession = async (
   baseUrl: string,
   fileUri: string,
-  name: string,
   fileType: string,
   uploadSessionId: string,
   onProgress?: (progress: number) => void,
 ): Promise<void> => {
+  const headers = await getAuthHeaders(baseUrl);
   const uploadTask = FileSystem.createUploadTask(
-    new URL('/api/file/upload-session', `${baseUrl}/`).toString(),
+    joinBaseUrlPath(baseUrl, '/api/file/upload-session'),
     fileUri,
     {
-      fieldName: 'file',
-      headers: await getAuthHeaders(baseUrl),
+      headers: {
+        ...headers,
+        'Content-Type': fileType,
+        [UPLOAD_SESSION_ID_HEADER]: uploadSessionId,
+      },
       httpMethod: 'POST',
-      mimeType: fileType,
-      parameters: { uploadSessionId },
-      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
     },
     (progressData) => {
       const { totalBytesExpectedToSend, totalBytesSent } = progressData;
@@ -461,9 +484,9 @@ const normalizeMessageContent = (content: unknown) => {
     metadata:
       hasImages && normalizedParts.length > 0
         ? ({
-            isMultimodal: true,
-            tempDisplayContent: JSON.stringify(normalizedParts),
-          } satisfies Partial<ChatMessageMetadata>)
+          isMultimodal: true,
+          tempDisplayContent: JSON.stringify(normalizedParts),
+        } satisfies Partial<ChatMessageMetadata>)
         : undefined,
   };
 };
@@ -475,9 +498,9 @@ const normalizeMessage = (message: any, parentSessionId?: string): ChatMessage =
   const metadata =
     baseMetadata || derivedMetadata
       ? ({
-          ...baseMetadata,
-          ...derivedMetadata,
-        } as ChatMessageMetadata)
+        ...baseMetadata,
+        ...derivedMetadata,
+      } as ChatMessageMetadata)
       : null;
 
   const sessionId = String(message?.sessionId ?? parentSessionId ?? '');
@@ -520,6 +543,7 @@ const normalizeMessage = (message: any, parentSessionId?: string): ChatMessage =
     role: message?.role,
     search: (message?.search as GroundingSearch | null | undefined) ?? null,
     sessionId,
+    threadId: message?.threadId ?? message?.thread_id ?? null,
     toolCallId: message?.tool_call_id ?? undefined,
     tools: (message?.tools as ChatToolPayload[] | null | undefined) ?? null,
     taskDetail: message?.taskDetail ?? message?.task_detail ?? undefined,
@@ -634,16 +658,18 @@ const unwrapTrpcPayload = <T>(payload: any) => {
 async function requestTrpc<T = any>(params: {
   action: 'mutation' | 'query';
   input?: unknown;
+  namespace?: 'lambda' | 'mobile';
   procedure: string;
 }): Promise<T> {
   const base = await getBaseUrl();
   const envelope = params.input !== undefined ? { json: params.input } : undefined;
+  const namespace = params.namespace ?? 'mobile';
   const url =
     params.action === 'query'
       ? envelope
-        ? `${base}/trpc/mobile/${params.procedure}?input=${encodeURIComponent(JSON.stringify(envelope))}`
-        : `${base}/trpc/mobile/${params.procedure}`
-      : `${base}/trpc/mobile/${params.procedure}`;
+        ? `${base}/trpc/${namespace}/${params.procedure}?input=${encodeURIComponent(JSON.stringify(envelope))}`
+        : `${base}/trpc/${namespace}/${params.procedure}`
+      : `${base}/trpc/${namespace}/${params.procedure}`;
 
   const res = await fetch(url, {
     body: params.action === 'mutation' ? JSON.stringify(envelope ?? { json: undefined }) : undefined,
@@ -668,13 +694,23 @@ async function requestTrpc<T = any>(params: {
   return unwrapTrpcPayload<T>(payload);
 }
 
-async function trpcQuery<T = any>(procedure: string, input?: unknown): Promise<T> {
-  return requestTrpc<T>({ action: 'query', input, procedure });
+async function trpcQuery<T = any>(
+  procedure: string,
+  input?: unknown,
+  options?: { namespace?: 'lambda' | 'mobile' },
+): Promise<T> {
+  return requestTrpc<T>({ action: 'query', input, namespace: options?.namespace, procedure });
 }
 
-async function trpcMutate<T = any>(procedure: string, input?: unknown): Promise<T> {
-  return requestTrpc<T>({ action: 'mutation', input, procedure });
+async function trpcMutate<T = any>(
+  procedure: string,
+  input?: unknown,
+  options?: { namespace?: 'lambda' | 'mobile' },
+): Promise<T> {
+  return requestTrpc<T>({ action: 'mutation', input, namespace: options?.namespace, procedure });
 }
+
+const LAMBDA_TRPC_OPTIONS = { namespace: 'lambda' } as const;
 
 const pickFirstNonEmptyString = (...values: Array<string | null | undefined>) => {
   for (const value of values) {
@@ -752,14 +788,14 @@ export const agentApi = {
 
   /** Get agent config by session ID. Returns the agent config including plugins. */
   getConfigBySession: (sessionId: string) =>
-    trpcQuery<{ id: string; plugins?: string[]; [key: string]: any } | null>(
+    trpcQuery<{ id: string; plugins?: string[];[key: string]: any } | null>(
       'agent.getAgentConfig',
       { sessionId },
     ),
 
   /** Get agent config by agent ID (for editing without session). */
   getConfigByAgentId: (agentId: string) =>
-    trpcQuery<{ id: string; plugins?: string[]; [key: string]: any } | null>(
+    trpcQuery<{ id: string; plugins?: string[];[key: string]: any } | null>(
       'agent.getAgentConfigById',
       { agentId },
     ),
@@ -847,6 +883,21 @@ export const sessionApi = {
   },
   updateChatConfig: (id: string, config: Record<string, unknown>) =>
     trpcMutate('session.updateSessionChatConfig', { id, value: config }),
+  getConversationFiles: (context: { agentId?: string; groupId?: string | null; sessionId?: string | null }) =>
+    trpcQuery<ConversationFileItem[]>('session.getConversationFiles', context),
+  addConversationFiles: (
+    fileIds: string[],
+    context: { agentId?: string; groupId?: string | null; sessionId?: string | null },
+  ) => trpcMutate('session.createConversationFiles', { ...context, fileIds }),
+  deleteConversationFile: (
+    fileId: string,
+    context: { agentId?: string; groupId?: string | null; sessionId?: string | null },
+  ) => trpcMutate('session.deleteConversationFile', { ...context, fileId }),
+  toggleConversationFile: (
+    fileId: string,
+    enabled: boolean,
+    context: { agentId?: string; groupId?: string | null; sessionId?: string | null },
+  ) => trpcMutate('session.toggleConversationFile', { ...context, enabled, fileId }),
 
   /** Update session-level agent config (for session-only chats with no linked agent). */
   updateSessionConfig: (id: string, config: Record<string, unknown>) =>
@@ -858,7 +909,7 @@ export const sessionApi = {
 // ── Agent Group API (multi-agent chat) ───────────────────────────────
 export interface AgentGroupDetail {
   [key: string]: any;
-  agents?: Array<{ id: string; title?: string; [key: string]: any }>;
+  agents?: Array<{ id: string; title?: string;[key: string]: any }>;
   config?: Record<string, any>;
   id: string;
   meta?: { avatar?: string; description?: string; title?: string };
@@ -916,8 +967,7 @@ export const agentGroupApi = {
 };
 
 // ── AI Agent API (group chat execution) ───────────────────────────────
-const isValidChatFileId = (fileId?: string | null): fileId is string =>
-  typeof fileId === 'string' && fileId.trim().length > 0 && !fileId.startsWith('docs_');
+const isValidChatFileId = (fileId?: string | null): fileId is string => isRawFileResourceId(fileId);
 
 const hasInvalidChatFileIds = (fileIds?: string[]) =>
   !!fileIds?.some((fileId) => !isValidChatFileId(fileId));
@@ -1063,6 +1113,7 @@ export interface CreateMessageParams {
   role: 'user' | 'assistant';
   search?: GroundingSearch | null;
   sessionId?: string | null;
+  threadId?: string | null;
   tools?: ChatToolPayload[] | null;
   topicId?: string;
   traceId?: string;
@@ -1088,16 +1139,26 @@ const normalizeCreateMessageParams = (params: CreateMessageParams): CreateMessag
   return params;
 };
 
+const normalizeThreadCreateMessageParams = (params: CreateMessageParams): CreateMessageParams => {
+  const normalized = normalizeCreateMessageParams(params);
+
+  if (normalized.sessionId === INBOX_SESSION_ID) {
+    return { ...normalized, sessionId: null };
+  }
+
+  return normalized;
+};
+
 export const messageApi = {
   list: (
     sessionId: string,
     topicId?: string,
-    options?: { sessionType?: 'agent' | 'group' },
+    options?: { sessionType?: 'agent' | 'group'; threadId?: string },
   ) => {
     const params =
       options?.sessionType === 'group'
-        ? { groupId: sessionId, topicId }
-        : { sessionId, topicId };
+        ? { groupId: sessionId, threadId: options?.threadId, topicId }
+        : { sessionId, threadId: options?.threadId, topicId };
     return trpcQuery<any[]>('message.getMessages', params).then((messages) =>
       (messages ?? []).map((message) => normalizeMessage(message)),
     );
@@ -1112,6 +1173,15 @@ export const messageApi = {
       messages: (result.messages ?? []).map((message) => normalizeMessage(message)),
     })),
 
+  listThreadDraftMessages: (params: {
+    sourceMessageId: string;
+    threadType: 'continuation' | 'isolation' | 'standalone';
+    topicId: string;
+  }) =>
+    trpcQuery<any[]>('message.getThreadDraftMessages', params).then((messages) =>
+      (messages ?? []).map((message) => normalizeMessage(message)),
+    ),
+
   remove: (id: string) => trpcMutate('message.removeMessage', { id }),
   /** Remove all messages in a topic (agent session). Aligns with Web clearMessage. */
   removeMessagesByAssistant: (sessionId: string, topicId?: string | null) =>
@@ -1122,6 +1192,8 @@ export const messageApi = {
   /** Server procedure is `message.update`, NOT `message.updateMessage` */
   update: (id: string, content: string) =>
     trpcMutate('message.update', { id, value: { content } }),
+  updateMetadata: (id: string, value: Record<string, unknown>) =>
+    trpcMutate('message.updateMetadata', { id, value }),
   /** Server expects `{ ids: string[] }`, NOT `{ sessionId, topicId }` */
   removeAll: (ids: string[]) =>
     trpcMutate('message.removeMessages', { ids }),
@@ -1129,8 +1201,42 @@ export const messageApi = {
     trpcQuery<MessageSearchResult[]>('message.searchMessages', { keywords }),
 };
 
+export const threadApi = {
+  create: (params: {
+    parentThreadId?: string;
+    sourceMessageId?: string;
+    title?: string;
+    topicId: string;
+    type: 'continuation' | 'isolation' | 'standalone';
+  }) => trpcMutate<string>('thread.createThread', params, { namespace: 'lambda' }),
+  createWithMessage: (params: {
+    message: CreateMessageParams;
+    parentThreadId?: string;
+    sourceMessageId?: string;
+    title?: string;
+    topicId: string;
+    type: 'continuation' | 'isolation' | 'standalone';
+  }) =>
+    trpcMutate<{ messageId: string; threadId: string }>(
+      'thread.createThreadWithMessage',
+      {
+        ...params,
+        message: normalizeThreadCreateMessageParams(params.message),
+      },
+      { namespace: 'lambda' },
+    ),
+  list: (topicId: string) =>
+    trpcQuery<MobileThreadItem[]>('thread.getThreads', { topicId }, { namespace: 'lambda' }),
+  generateTitle: (id: string) =>
+    trpcMutate<string | null>('thread.generateThreadTitle', { id }, { namespace: 'lambda' }),
+  remove: (id: string) => trpcMutate('thread.removeThread', { id }, { namespace: 'lambda' }),
+  update: (id: string, value: Record<string, unknown>) =>
+    trpcMutate('thread.updateThread', { id, value }, { namespace: 'lambda' }),
+};
+
 // ── AI Chat API ─────────────────────────────────────────────────────
 export interface ChatRequestOptions {
+  activeDeviceId?: string;
   enabledSearch?: boolean;
   enableSearch?: boolean;
   frequency_penalty?: number;
@@ -1418,10 +1524,10 @@ const buildMarketCloudMcpManifest = (item: Record<string, any>) => {
     Array.isArray(item.api) && item.api.length > 0
       ? item.api
       : tools?.map((tool) => ({
-          description: tool?.description || '',
-          name: tool?.name,
-          parameters: tool?.inputSchema || {},
-        }));
+        description: tool?.description || '',
+        name: tool?.name,
+        parameters: tool?.inputSchema || {},
+      }));
 
   return {
     api: Array.isArray(api) ? api : [],
@@ -1534,6 +1640,7 @@ export const aiChatApi = {
         if (options?.max_tokens !== undefined) payload.max_tokens = options.max_tokens;
         if (options?.enabledSearch ?? options?.enableSearch) payload.enabledSearch = true;
         if (options?.memory) payload.memory = options.memory;
+        if (options?.activeDeviceId) payload.activeDeviceId = options.activeDeviceId;
         if (options?.sessionId) payload.sessionId = options.sessionId;
         if (options?.topicId) payload.topicId = options.topicId;
         if (options?.plugins?.length) payload.plugins = options.plugins;
@@ -1600,10 +1707,10 @@ export const aiChatApi = {
           callbacks.onReasoning?.(
             hasReasoningImages
               ? {
-                  content: accReasoning,
-                  isMultimodal: true,
-                  tempDisplayContent: reasoningParts,
-                }
+                content: accReasoning,
+                isMultimodal: true,
+                tempDisplayContent: reasoningParts,
+              }
               : { content: accReasoning },
           );
         };
@@ -1614,9 +1721,9 @@ export const aiChatApi = {
 
           contentMetadata = hasContentImages
             ? {
-                isMultimodal: true,
-                tempDisplayContent: serializeContentParts(contentParts),
-              }
+              isMultimodal: true,
+              tempDisplayContent: serializeContentParts(contentParts),
+            }
             : undefined;
 
           callbacks.onContent?.({
@@ -1863,12 +1970,12 @@ export const aiChatApi = {
             reasoning:
               reasoningParts.length > 0
                 ? {
-                    content: accReasoning,
-                    isMultimodal: reasoningParts.some((part) => part.type === 'image'),
-                    ...(reasoningParts.some((part) => part.type === 'image')
-                      ? { tempDisplayContent: reasoningParts }
-                      : {}),
-                  }
+                  content: accReasoning,
+                  isMultimodal: reasoningParts.some((part) => part.type === 'image'),
+                  ...(reasoningParts.some((part) => part.type === 'image')
+                    ? { tempDisplayContent: reasoningParts }
+                    : {}),
+                }
                 : accReasoning
                   ? { content: accReasoning }
                   : undefined,
@@ -2005,15 +2112,15 @@ export const aiChatApi = {
         const body =
           'approvedToolCall' in params
             ? {
-                approvedToolCall: params.approvedToolCall,
-                sessionId: params.sessionId,
-                topicId: params.topicId,
-              }
+              approvedToolCall: params.approvedToolCall,
+              sessionId: params.sessionId,
+              topicId: params.topicId,
+            }
             : {
-                rejectedToolCall: params.rejectedToolCall,
-                sessionId: params.sessionId,
-                topicId: params.topicId,
-              };
+              rejectedToolCall: params.rejectedToolCall,
+              sessionId: params.sessionId,
+              topicId: params.topicId,
+            };
 
         xhr.send(JSON.stringify(body));
       });
@@ -2043,11 +2150,11 @@ export const topicApi = {
       options?.sessionType === 'group'
         ? { groupId: containerId, messages: options?.messageIds, tagId: options?.tagId, title }
         : {
-            messages: options?.messageIds,
-            sessionId: containerId,
-            tagId: options?.tagId,
-            title,
-          };
+          messages: options?.messageIds,
+          sessionId: containerId,
+          tagId: options?.tagId,
+          title,
+        };
     return trpcMutate<string>('topic.createTopic', params);
   },
   remove: (id: string) => trpcMutate('topic.removeTopic', { id }),
@@ -2119,47 +2226,59 @@ export const aiProviderApi = {
     trpcMutate('aiProvider.updateAiProviderConfig', { id, value }),
 };
 
-// ── Knowledge Base API ──────────────────────────────────────────────
+// ── Source Set API ──────────────────────────────────────────────────
 
-export const knowledgeBaseApi = {
+export const sourceSetApi = {
   list: (params?: { spaceId?: string }) =>
-    trpcQuery<KnowledgeBaseItem[]>('knowledgeBase.getKnowledgeBases', params),
+    trpcQuery<SourceSetItem[]>('sourceSet.getSourceSets', params),
 
-  getById: (id: string) => trpcQuery<KnowledgeBaseItem | undefined>('knowledgeBase.getKnowledgeBaseById', { id }),
+  getById: (id: string) => trpcQuery<SourceSetItem | undefined>('sourceSet.getSourceSetById', { id }),
 
   create: (params: { avatar?: string; description?: string; name: string; spaceId?: string }) =>
-    trpcMutate<string | undefined>('knowledgeBase.createKnowledgeBase', params),
+    trpcMutate<string | undefined>('sourceSet.createSourceSet', params),
 
   update: (id: string, value: Record<string, unknown>) =>
-    trpcMutate('knowledgeBase.updateKnowledgeBase', { id, value }),
+    trpcMutate('sourceSet.updateSourceSet', { id, value }),
 
-  addFiles: (knowledgeBaseId: string, ids: string[]) =>
-    trpcMutate('knowledgeBase.addFilesToKnowledgeBase', { ids, knowledgeBaseId }),
+  addFiles: (sourceSetId: string, ids: string[]) =>
+    trpcMutate('sourceSet.addFilesToSourceSet', { ids, sourceSetId }),
 
-  removeFiles: (knowledgeBaseId: string, ids: string[]) =>
-    trpcMutate('knowledgeBase.removeFilesFromKnowledgeBase', { ids, knowledgeBaseId }),
+  removeFiles: (sourceSetId: string, ids: string[]) =>
+    trpcMutate('sourceSet.removeFilesFromSourceSet', { ids, sourceSetId }),
 
   remove: (id: string, removeFiles?: boolean) =>
-    trpcMutate('knowledgeBase.removeKnowledgeBase', { id, removeFiles }),
+    trpcMutate('sourceSet.deleteSourceSet', { id, removeFiles }),
+};
+
+export const spaceApi = {
+  create: (value: { description?: string; name: string }) =>
+    trpcMutate<MobileSpaceItem>('space.createTeamSpace', value, LAMBDA_TRPC_OPTIONS),
+  getById: (id: string) => trpcQuery<MobileSpaceItem>('space.getSpace', { id }, LAMBDA_TRPC_OPTIONS),
+  list: () => trpcQuery<MobileSpaceItem[]>('space.listSpaces', undefined, LAMBDA_TRPC_OPTIONS),
 };
 
 // ── Resource API (unified files + documents with folder support) ─────
 
 export interface ResourceQueryParams {
+  assetClassification?: FileListItem['assetClassification'];
+  assetReviewStatus?: FileListItem['assetReviewStatus'];
+  assetRightsOwner?: string;
+  assetUsagePolicy?: FileListItem['assetUsagePolicy'];
   category?: string;
-  knowledgeBaseId?: string;
   limit?: number;
   offset?: number;
   parentId?: string | null;
   q?: string | null;
-  showFilesInKnowledgeBase?: boolean;
+  showFilesInSourceSet?: boolean;
   sorter?: 'createdAt' | 'size' | 'name';
   sortType?: 'asc' | 'desc';
-  /** When set with a library context, matches server `getKnowledgeItems` space scoping. */
+  sourceSetId?: string;
+  /** When set with a source set context, matches server `getKnowledgeItems` space scoping. */
   spaceId?: string;
 }
 
 export interface ResourceListResponse {
+  governanceCapabilities?: FileAssetCapabilities;
   hasMore: boolean;
   items: FileListItem[];
   total?: number;
@@ -2179,17 +2298,47 @@ export interface TrashedDocumentItem {
   title: string | null;
 }
 
+interface PreviewFileDocumentPage {
+  pageContent?: string | null;
+}
+
+interface PreviewFileDocument {
+  content?: string | null;
+  id: string;
+  pages?: PreviewFileDocumentPage[] | null;
+  title?: string | null;
+}
+
 export const resourceApi = {
+  getRecentFiles: (limit: number = 6) =>
+    trpcQuery<FileListItem[]>('file.recentFiles', { limit }).then((items) =>
+      (items ?? []).map((item) => ({
+        ...item,
+        sourceType: 'file' as const,
+      })),
+    ),
+
+  getRecentPages: (limit: number = 6) =>
+    trpcQuery<FileListItem[]>('file.recentPages', { limit }).then((items) =>
+      (items ?? []).map((item) => ({
+        ...item,
+        sourceType: 'document' as const,
+      })),
+    ),
+
   getKnowledgeItems: (params: ResourceQueryParams) =>
     trpcQuery<ResourceListResponse>('file.getKnowledgeItems', {
       limit: 50,
       offset: 0,
-      showFilesInKnowledgeBase: false,
+      showFilesInSourceSet: false,
       ...params,
     }),
 
-  getFolderBreadcrumb: (slug: string) =>
-    trpcQuery<FolderCrumb[]>('document.getFolderBreadcrumb', { slug }),
+  getFolderBreadcrumb: (slug: string, spaceId?: string) =>
+    trpcQuery<FolderCrumb[]>(
+      'document.getFolderBreadcrumb',
+      spaceId ? { slug, spaceId } : { slug },
+    ),
 
   getDocument: (id: string) =>
     trpcQuery<{
@@ -2197,21 +2346,28 @@ export const resourceApi = {
       editorData?: Record<string, any> | null;
       fileType?: string | null;
       id: string;
-      knowledgeBaseId?: string | null;
+      metadata?: Record<string, any> | null;
+      sourceSetId?: string | null;
       parentId?: string | null;
       slug?: string | null;
       title?: string | null;
     }>('document.getDocumentById', { id }),
 
+  ensureFileDocument: (id: string) =>
+    trpcMutate<{ id: string }>('document.ensureFileDocument', { id }),
+
+  previewFileContent: (id: string) =>
+    trpcQuery<PreviewFileDocument>('document.previewFileContent', { id }),
+
   createFolder: (params: {
-    knowledgeBaseId: string;
+    sourceSetId: string;
     parentId?: string;
     title: string;
   }) =>
     trpcMutate<{ id: string }>('document.createDocument', {
       editorData: '{}',
       fileType: 'custom/folder',
-      knowledgeBaseId: params.knowledgeBaseId,
+      sourceSetId: params.sourceSetId,
       parentId: params.parentId,
       title: params.title,
     }),
@@ -2221,7 +2377,7 @@ export const resourceApi = {
     parentId: string | null,
     sourceType: 'file' | 'document',
   ) => {
-    if (sourceType === 'file') {
+    if (getCanonicalResourceKind({ id, sourceType }) === 'file') {
       return trpcMutate('file.updateFile', { id, parentId });
     }
     return trpcMutate('document.updateDocument', { id, parentId });
@@ -2231,48 +2387,61 @@ export const resourceApi = {
     id: string,
     updates: {
       content?: string;
+      editorData?: Record<string, any> | null;
       fileType?: string;
       parentId?: string | null;
       title?: string;
     },
   ) =>
-    trpcMutate('document.updateDocument', { id, ...updates }),
+    trpcMutate('document.updateDocument', {
+      id,
+      ...updates,
+      ...(updates.editorData !== undefined
+        ? { editorData: JSON.stringify(updates.editorData) }
+        : {}),
+    }),
 
-  deleteDocument: (id: string) => trpcMutate('document.deleteDocument', { id }),
+  deleteDocument: (id: string, trash: boolean = true) =>
+    trpcMutate('document.deleteDocument', { id, trash }),
+
+  deleteDocuments: (ids: string[], trash: boolean = true) =>
+    trpcMutate('document.deleteDocuments', { ids, trash }),
 
   queryTrashedDocuments: (params?: {
     current?: number;
-    knowledgeBaseId?: string;
+    sourceSetId?: string;
     pageSize?: number;
+    spaceId?: string;
   }) =>
     trpcQuery<{ items: TrashedDocumentItem[]; total: number }>('document.queryDocuments', {
       current: params?.current ?? 0,
       pageSize: params?.pageSize ?? 100,
       trash: true,
-      ...(params?.knowledgeBaseId ? { knowledgeBaseId: params.knowledgeBaseId } : {}),
+      ...(params?.sourceSetId ? { sourceSetId: params.sourceSetId } : {}),
+      ...(params?.spaceId ? { spaceId: params.spaceId } : {}),
     }),
 
   restoreDocument: (id: string) => trpcMutate('document.restoreDocument', { id }),
 };
 
-export type ResourceShareKind = 'document' | 'file' | 'knowledge_base';
+export type ContentShareKind = 'document' | 'file' | 'source_set';
 
 export interface ExplainAccessResult {
   authzEpoch: number;
   canAccess: boolean;
+  contentUid: string;
   matchedBy?: string;
   reason?: string;
-  resourceUid: string;
   spaceId: string;
 }
 
-export interface ResourcePermissionListItem {
+export interface ContentPermissionListItem {
   canReshare?: boolean;
+  contentUid?: string;
   createdAt?: string | Date | null;
   expiresAt?: string | Date | null;
   id: string;
   inheritsToChildren?: boolean;
-  resourceUid?: string;
   role: 'owner' | 'editor' | 'viewer';
   spaceId?: string;
   subjectId?: string;
@@ -2281,91 +2450,109 @@ export interface ResourcePermissionListItem {
   subjectUsername?: string | null;
 }
 
-export interface ResourceShareLinkListItem {
+export interface ContentShareLinkListItem {
+  contentUid?: string;
   createdAt?: string | Date | null;
   disabledAt?: string | Date | null;
   expiresAt?: string | Date | null;
   id: string;
-  resourceUid?: string;
   spaceId?: string;
 }
 
 export interface SharedWithMeListItem {
-  kind: 'document' | 'file' | 'knowledge_base';
+  contentUid: string;
+  kind: 'document' | 'file' | 'source_set';
   localId: string;
   name: string;
   parentId?: string | null;
-  resourceUid: string;
   sharedExpiresAt?: string | Date | null;
   sharedInheritsToChildren?: boolean;
   sharedRole?: 'owner' | 'editor' | 'viewer';
   spaceId: string | null;
 }
 
-/** Payload from `getSharedResourceByToken` (shape varies by `kind`). */
-export interface PublicSharedResourcePayload {
+/** Payload from `getSharedContentByToken` (shape varies by `kind`). */
+export interface PublicSharedContentPayload {
   avatar?: string | null;
   content?: string;
-  /** Knowledge base summary text when `kind === 'knowledge_base'`. */
+  contentUid: string;
+  /** Source set summary text when `kind === 'source_set'`. */
   description?: string | null;
   expiresAt: string | Date;
   fileType?: string;
-  kind: 'document' | 'file' | 'knowledge_base';
+  kind: 'document' | 'file' | 'source_set';
   localId: string;
   metadata?: unknown;
   name: string;
-  resourceUid: string;
   role: 'viewer';
   spaceId: string | null;
   /** Present for shared documents. */
   title?: string;
 }
 
-export const resourceShareApi = {
-  createResourceShareLink: (params: {
+export const contentShareApi = {
+  createContentShareLink: (params: {
     expiresInDays?: 1 | 7 | 30;
     id?: string;
-    kind?: ResourceShareKind;
+    kind?: ContentShareKind;
     password?: string;
-    resourceUid?: string;
+    contentUid?: string;
   }) =>
     trpcMutate<{
       expiresAt: string;
       fileShareDownloadUrl?: string;
       id: string;
       shareUrl: string;
-    }>('resourceShare.createResourceShareLink', params),
+    }>('contentShare.createContentShareLink', normalizeContentShareTarget(params)),
 
-  disableResourceShareLink: (shareLinkId: string) =>
-    trpcMutate<{ success: boolean }>('resourceShare.disableResourceShareLink', { shareLinkId }),
+  disableContentShareLink: (shareLinkId: string) =>
+    trpcMutate<{ success: boolean }>('contentShare.disableContentShareLink', { shareLinkId }),
 
-  explainAccess: (params: { id?: string; kind?: ResourceShareKind; resourceUid?: string }) =>
-    trpcQuery<ExplainAccessResult>('resourceShare.explainAccess', params),
+  explainContentAccess: (params: { id?: string; kind?: ContentShareKind; contentUid?: string }) =>
+    trpcQuery<ExplainAccessResult>(
+      'contentShare.explainContentAccess',
+      normalizeContentShareTarget(params),
+    ),
 
-  getSharedResourceByToken: (params: { password?: string; token: string }) =>
-    trpcQuery<PublicSharedResourcePayload>('resourceShare.getSharedResourceByToken', params),
+  getSharedContentByToken: (params: { password?: string; token: string }) =>
+    trpcQuery<PublicSharedContentPayload>('contentShare.getSharedContentByToken', params).then(
+      normalizePublicSharedContent,
+    ),
 
-  grantResourcePermission: (params: {
+  grantContentPermission: (params: {
     canReshare?: boolean;
+    contentUid?: string;
     expiresAt?: Date | string;
     id?: string;
     inheritsToChildren?: boolean;
-    kind?: ResourceShareKind;
-    resourceUid?: string;
+    kind?: ContentShareKind;
     role: 'owner' | 'editor' | 'viewer';
     username: string;
-  }) => trpcMutate<ResourcePermissionListItem>('resourceShare.grantResourcePermission', params),
+  }) =>
+    trpcMutate<ContentPermissionListItem>(
+      'contentShare.grantContentPermission',
+      normalizeContentShareTarget(params),
+    ),
 
-  listResourcePermissions: (params: { id?: string; kind?: ResourceShareKind; resourceUid?: string }) =>
-    trpcQuery<ResourcePermissionListItem[]>('resourceShare.listResourcePermissions', params),
+  listContentPermissions: (params: { id?: string; kind?: ContentShareKind; contentUid?: string }) =>
+    trpcQuery<ContentPermissionListItem[]>(
+      'contentShare.listContentPermissions',
+      normalizeContentShareTarget(params),
+    ),
 
-  listResourceShareLinks: (params: { id?: string; kind?: ResourceShareKind; resourceUid?: string }) =>
-    trpcQuery<ResourceShareLinkListItem[]>('resourceShare.listResourceShareLinks', params),
+  listContentShareLinks: (params: { id?: string; kind?: ContentShareKind; contentUid?: string }) =>
+    trpcQuery<ContentShareLinkListItem[]>(
+      'contentShare.listContentShareLinks',
+      normalizeContentShareTarget(params),
+    ),
 
-  listSharedWithMe: () => trpcQuery<SharedWithMeListItem[]>('resourceShare.listSharedWithMe'),
+  listSharedWithMe: () =>
+    trpcQuery<SharedWithMeListItem[]>('contentShare.listSharedWithMe').then((items) =>
+      items.map(normalizeSharedWithMeItem),
+    ),
 
-  revokeResourcePermission: (permissionId: string) =>
-    trpcMutate<{ success: boolean }>('resourceShare.revokeResourcePermission', { permissionId }),
+  revokeContentPermission: (permissionId: string) =>
+    trpcMutate<{ success: boolean }>('contentShare.revokeContentPermission', { permissionId }),
 };
 
 // ── File / Upload API ──────────────────────────────────────────────
@@ -2380,7 +2567,7 @@ export const fileApi = {
     trpcQuery<FileListItem[]>('file.getFiles', {
       limit: 50,
       offset: 0,
-      showFilesInKnowledgeBase: false,
+      showFilesInSourceSet: false,
       ...params,
     }),
 
@@ -2395,10 +2582,9 @@ export const fileApi = {
     options?: {
       agentId?: string;
       directory?: string;
-      knowledgeBaseId?: string;
+      sourceSetId?: string;
       onProgress?: (progress: number) => void;
       parentId?: string;
-      sessionId?: string;
       skipCheckFileType?: boolean;
       skipDeduplication?: boolean;
       spaceId?: string;
@@ -2406,25 +2592,34 @@ export const fileApi = {
   ): Promise<{ id: string; url: string }> => {
     const baseUrl = await getBaseUrl();
     const uploadUri = await ensureUploadableUri(uri, name);
-    const size = await getLocalFileSize(uploadUri);
     const fileType = type || 'application/octet-stream';
+    const size = await getLocalFileSize(uploadUri);
     const sha256Hex = await computeSha256HexFromFileUri(uploadUri, size);
 
     let storagePath: string | undefined;
     let metadata: ReturnType<typeof fileMetadataFromStorageKey> | undefined;
 
     if (!options?.skipDeduplication) {
-      const hashCheck = await trpcMutate<{
-        isExist: boolean;
-        metadata?: { path?: string };
-        url?: string;
-      }>('file.checkFileHash', { hash: sha256Hex, spaceId: options?.spaceId });
+      try {
+        const hashCheck = await trpcMutate<{
+          isExist: boolean;
+          metadata?: { path?: string };
+          storageKey?: string;
+        }>(
+          'file.checkSpaceBlob',
+          { sha256: sha256Hex, spaceId: options?.spaceId },
+          LAMBDA_TRPC_OPTIONS,
+        );
 
-      if (hashCheck.isExist) {
-        storagePath = hashCheck.metadata?.path || hashCheck.url;
-        if (storagePath) {
-          metadata = fileMetadataFromStorageKey(storagePath, name);
+        if (hashCheck.isExist) {
+          storagePath = hashCheck.metadata?.path || hashCheck.storageKey;
+          if (storagePath) {
+            metadata = fileMetadataFromStorageKey(storagePath, name);
+          }
         }
+      } catch {
+        // Space-level deduplication is an optimization. Fall through to a normal upload if the
+        // lookup is temporarily unavailable.
       }
     }
 
@@ -2437,12 +2632,12 @@ export const fileApi = {
       }>('upload.prepareResourceUpload', {
         filename: name,
         fileType,
-        knowledgeBaseId: options?.knowledgeBaseId,
+        sourceSetId: options?.sourceSetId,
         parentId: options?.parentId,
         sha256: sha256Hex,
         size,
         spaceId: options?.spaceId,
-      });
+      }, LAMBDA_TRPC_OPTIONS);
 
       metadata = fileMetadataFromStorageKey(prep.storageKey, name);
 
@@ -2457,14 +2652,17 @@ export const fileApi = {
         await uploadLocalFileViaUploadSession(
           baseUrl,
           uploadUri,
-          name,
           fileType,
           prep.sessionId,
           options?.onProgress,
         );
       }
 
-      await trpcMutate('upload.completeResourceUpload', { uploadSessionId: prep.sessionId });
+      await trpcMutate(
+        'upload.completeResourceUpload',
+        { uploadSessionId: prep.sessionId },
+        LAMBDA_TRPC_OPTIONS,
+      );
       storagePath = prep.storageKey;
     }
 
@@ -2475,17 +2673,21 @@ export const fileApi = {
     const fileMetadata =
       metadata ?? fileMetadataFromStorageKey(storagePath, name);
 
-    const created = await trpcMutate<{ id: string; url: string }>('file.createFile', {
-      fileType,
-      hash: sha256Hex,
-      knowledgeBaseId: options?.knowledgeBaseId,
-      metadata: fileMetadata,
-      name,
-      parentId: options?.parentId,
-      size,
-      spaceId: options?.spaceId,
-      url: storagePath,
-    });
+    const created = await trpcMutate<{ id: string; url: string }>(
+      'file.createFile',
+      {
+        fileType,
+        sha256: sha256Hex,
+        sourceSetId: options?.sourceSetId,
+        metadata: fileMetadata,
+        name,
+        parentId: options?.parentId,
+        size,
+        spaceId: options?.spaceId,
+        storageKey: storagePath,
+      },
+      LAMBDA_TRPC_OPTIONS,
+    );
 
     const resolvedUrl = resolveRemoteFileUrl(baseUrl, created.id, created.url);
 
@@ -2536,7 +2738,10 @@ export const fileApi = {
     };
   },
 
-  remove: (id: string) => trpcMutate('file.removeFile', { id }),
+  remove: (id: string, trash: boolean = true) => trpcMutate('file.removeFile', { id, trash }),
+
+  removeFiles: (ids: string[], trash: boolean = true) =>
+    trpcMutate('file.removeFiles', { ids, trash }),
 
   update: (id: string, updates: { name?: string; parentId?: string | null }) =>
     trpcMutate('file.updateFile', { id, ...updates }),
@@ -2853,15 +3058,15 @@ export const marketSkillApi = {
             : input.page,
         items: Array.isArray(mcpResult?.items)
           ? mcpResult.items.map((m: any) => ({
-              ...m,
-              _source: 'mcp' as const,
-              avatar: m.meta?.avatar || m.avatar,
-              category: m.category ?? m.meta?.category,
-              description: m.meta?.description || m.description || '',
-              identifier: m.identifier,
-              manifestUrl: m.manifestUrl,
-              name: m.meta?.title || m.name || m.title || m.identifier,
-            }))
+            ...m,
+            _source: 'mcp' as const,
+            avatar: m.meta?.avatar || m.avatar,
+            category: m.category ?? m.meta?.category,
+            description: m.meta?.description || m.description || '',
+            identifier: m.identifier,
+            manifestUrl: m.manifestUrl,
+            name: m.meta?.title || m.name || m.title || m.identifier,
+          }))
           : [],
         pageSize,
         totalCount: resolveMarketTotalCount(mcpResult ?? {}),
@@ -2909,14 +3114,14 @@ export const marketSkillApi = {
             : input.page,
         items: Array.isArray(result?.items)
           ? result.items.map((s: any) => ({
-              ...s,
-              _source: 'skill' as const,
-              avatar: s.icon || s.logo || s.avatar,
-              category: s.category ?? s.meta?.category,
-              description: s.description || s.meta?.description || '',
-              identifier: s.identifier,
-              name: s.name || s.meta?.title || s.identifier,
-            }))
+            ...s,
+            _source: 'skill' as const,
+            avatar: s.icon || s.logo || s.avatar,
+            category: s.category ?? s.meta?.category,
+            description: s.description || s.meta?.description || '',
+            identifier: s.identifier,
+            name: s.name || s.meta?.title || s.identifier,
+          }))
           : [],
         pageSize,
         totalCount: resolveMarketTotalCount(result ?? {}),
@@ -3267,6 +3472,86 @@ export const memoryApi = {
     trpcQuery<Array<{ content: string; id: string; role: string; title: string }>>('userMemories.queryIdentitiesForInjection'),
 };
 
+export const spaceMemoryApi = {
+  createCandidate: (
+    spaceId: string,
+    draft: {
+      category?: 'general' | 'playbook' | 'policy';
+      content?: string | null;
+      summary?: string | null;
+      title: string;
+    },
+  ) =>
+    trpcMutate<MobileSpaceMemoryEntryPreview>('spaceMemory.createCandidate', {
+      category: draft.category,
+      content: draft.content,
+      spaceId,
+      summary: draft.summary,
+      title: draft.title,
+    }),
+  exportAuditBundle: (
+    spaceId: string,
+    id: string,
+    recallFilter: MobileSpaceMemoryRecallFilter = 'all',
+  ) =>
+    trpcQuery<MobileSpaceMemoryAuditBundle>('spaceMemory.exportAuditBundle', {
+      id,
+      recallFilter,
+      spaceId,
+    }),
+  exportAuditBundles: (
+    spaceId: string,
+    ids: string[],
+    recallFilter: MobileSpaceMemoryRecallFilter = 'all',
+  ) =>
+    trpcQuery<MobileSpaceMemoryAuditBatchBundle>('spaceMemory.exportAuditBundles', {
+      ids,
+      recallFilter,
+      spaceId,
+    }),
+  getEntry: (spaceId: string, id: string) =>
+    trpcQuery<MobileSpaceMemoryEntryResult>('spaceMemory.getEntry', { id, spaceId }),
+  getSummary: (spaceId: string) =>
+    trpcQuery<MobileSpaceMemorySummary>('spaceMemory.getSummary', { spaceId }),
+  listEntries: (
+    spaceId: string,
+    section: MobileSpaceMemorySection,
+    recallFilter: MobileSpaceMemoryRecallFilter = 'all',
+  ) =>
+    trpcQuery<MobileSpaceMemorySectionResult>('spaceMemory.listEntries', {
+      recallFilter,
+      section,
+      spaceId,
+    }),
+  publishEntry: (spaceId: string, id: string) =>
+    trpcMutate('spaceMemory.publishEntry', { id, spaceId }),
+  rejectEntry: (spaceId: string, id: string) =>
+    trpcMutate('spaceMemory.rejectEntry', { id, spaceId }),
+  markEntryStale: (spaceId: string, id: string) =>
+    trpcMutate('spaceMemory.markEntriesStale', { ids: [id], spaceId }),
+  revalidateEntry: (spaceId: string, id: string) =>
+    trpcMutate('spaceMemory.revalidateEntries', { ids: [id], spaceId }),
+  mergeEntry: (
+    spaceId: string,
+    params: {
+      candidateId: string;
+      merge?: {
+        appendSources?: boolean;
+        applyContent?: boolean;
+        applySummary?: boolean;
+        applyTitle?: boolean;
+      };
+      targetEntryId: string;
+    },
+  ) =>
+    trpcMutate('spaceMemory.mergeEntry', {
+      candidateId: params.candidateId,
+      merge: params.merge,
+      spaceId,
+      targetEntryId: params.targetEntryId,
+    }),
+};
+
 // ── Artwork / Image Generation API ─────────────────────────────────
 export const artworkApi = {
   // ── Topics ──
@@ -3350,6 +3635,7 @@ export interface NotebookDocument {
   content?: string | null;
   createdAt?: string;
   description?: string | null;
+  editorData?: Record<string, any> | null;
   fileType?: string | null;
   id: string;
   metadata?: Record<string, any> | null;

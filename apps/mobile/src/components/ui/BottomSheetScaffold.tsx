@@ -6,12 +6,14 @@ import {
   Platform,
   Pressable,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { getResponsiveLayoutMetrics } from '../../lib/responsiveLayout';
 import { useThemeColors } from '../../theme/colors';
 import { enteringModalContent } from '../../theme/motion';
 
@@ -22,6 +24,7 @@ interface BottomSheetScaffoldProps {
   keyboardAvoiding?: boolean;
   maxHeight?: DimensionValue;
   onClose: () => void;
+  preferredWidth?: number;
   title?: string;
   visible: boolean;
 }
@@ -33,16 +36,31 @@ export function BottomSheetScaffold({
   keyboardAvoiding = false,
   maxHeight = '72%',
   onClose,
+  preferredWidth = 560,
   title,
   visible,
 }: BottomSheetScaffoldProps) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const isFloatingPanel = responsiveMetrics.isTablet;
+  const panelWidth = Math.min(
+    Math.max(screenWidth - 32, 0),
+    responsiveMetrics.isWideTablet ? Math.max(preferredWidth, 680) : preferredWidth,
+  );
 
   const content = (
-    <Animated.View entering={enteringModalContent()} style={{ maxHeight }}>
+    <Animated.View
+      entering={enteringModalContent()}
+      style={{
+        alignSelf: 'center',
+        maxHeight,
+        width: isFloatingPanel ? panelWidth : '100%',
+      }}
+    >
       <View
-        className="rounded-t-2xl"
+        className={isFloatingPanel ? 'rounded-3xl' : 'rounded-t-2xl'}
         style={{
           backgroundColor: colors.card,
           paddingBottom: Math.max(insets.bottom, 16),
@@ -93,7 +111,12 @@ export function BottomSheetScaffold({
         {keyboardAvoiding ? (
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1, justifyContent: 'flex-end' }}
+            style={{
+              flex: 1,
+              justifyContent: isFloatingPanel ? 'center' : 'flex-end',
+              paddingHorizontal: isFloatingPanel ? 16 : 0,
+              paddingVertical: isFloatingPanel ? 24 : 0,
+            }}
           >
             <Pressable
               className="absolute inset-0"
@@ -103,7 +126,14 @@ export function BottomSheetScaffold({
             {content}
           </KeyboardAvoidingView>
         ) : (
-          <View className="flex-1 justify-end">
+          <View
+            className="flex-1"
+            style={{
+              justifyContent: isFloatingPanel ? 'center' : 'flex-end',
+              paddingHorizontal: isFloatingPanel ? 16 : 0,
+              paddingVertical: isFloatingPanel ? 24 : 0,
+            }}
+          >
             <Pressable
               className="absolute inset-0"
               style={{ backgroundColor: colors.modalOverlay }}

@@ -7,8 +7,9 @@ import { LucideToyBrick } from 'lucide-react';
 import { memo } from 'react';
 
 import Avatar from '@/components/Plugins/PluginAvatar';
-import { pluginHelpers, useToolStore } from '@/store/tool';
+import { pluginHelpers } from '@/store/tool/helpers';
 import { toolSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import PluginStatus from './PluginStatus';
 

@@ -436,7 +436,7 @@ describe('AiModelAction', () => {
       expect(serviceSpy).not.toHaveBeenCalled();
     });
 
-    it('should handle service errors and throw without clearing loading state', async () => {
+    it('should handle service errors and still clear loading state', async () => {
       const { result } = renderHook(() => useStore());
       const toggleLoadingSpy = vi
         .spyOn(result.current, 'internal_toggleAiModelLoading')
@@ -451,8 +451,7 @@ describe('AiModelAction', () => {
       }).rejects.toThrow('Service error');
 
       expect(toggleLoadingSpy).toHaveBeenCalledWith('model-1', true);
-      // Loading state is not cleared when error occurs since there's no try-finally
-      expect(toggleLoadingSpy).toHaveBeenCalledTimes(1);
+      expect(toggleLoadingSpy).toHaveBeenCalledWith('model-1', false);
     });
   });
 

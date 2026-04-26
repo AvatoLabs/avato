@@ -50,7 +50,7 @@ export const SSOProvidersList = memo(() => {
     // Prevent unlink if this is the only login method
     if (!allowUnlink) {
       notification.error({
-        message: t('profile.sso.unlink.forbidden'),
+        title: t('profile.sso.unlink.forbidden'),
       });
       return;
     }
@@ -60,9 +60,16 @@ export const SSOProvidersList = memo(() => {
         danger: true,
       },
       onOk: async () => {
-        const { unlinkAccount } = await import('@/libs/better-auth/auth-client');
-        await unlinkAccount({ providerId: provider });
-        refreshAuthProviders();
+        try {
+          const { unlinkAccount } = await import('@/libs/better-auth/auth-client');
+          await unlinkAccount({ providerId: provider });
+          await refreshAuthProviders();
+        } catch (error) {
+          console.error('Failed to unlink SSO provider:', error);
+          notification.error({
+            title: t('profile.sso.unlink.error', { provider }),
+          });
+        }
       },
       title: <span style={providerNameStyle}>{t('profile.sso.unlink.title', { provider })}</span>,
     });
@@ -72,21 +79,27 @@ export const SSOProvidersList = memo(() => {
     if (!enableAuthActions) return;
 
     const normalizedProvider = normalizeProviderId(provider);
-    const { linkSocial, oauth2 } = await import('@/libs/better-auth/auth-client');
+    try {
+      const { linkSocial, oauth2 } = await import('@/libs/better-auth/auth-client');
 
-    if (isBuiltinProvider(normalizedProvider)) {
-      // Use better-auth native linkSocial API for built-in providers
-      await linkSocial({
+      if (isBuiltinProvider(normalizedProvider)) {
+        await linkSocial({
+          callbackURL: '/profile',
+          provider: normalizedProvider as any,
+        });
+        return;
+      }
+
+      await oauth2.link({
         callbackURL: '/profile',
-        provider: normalizedProvider as any,
+        providerId: normalizedProvider,
       });
-      return;
+    } catch (error) {
+      console.error('Failed to link SSO provider:', error);
+      notification.error({
+        title: t('profile.sso.link.error', { provider }),
+      });
     }
-
-    await oauth2.link({
-      callbackURL: '/profile',
-      providerId: normalizedProvider,
-    });
   };
 
   // Dropdown menu items for linking new providers
@@ -94,7 +107,9 @@ export const SSOProvidersList = memo(() => {
     icon: AuthIcons(provider, 16),
     key: provider,
     label: <span style={providerNameStyle}>{provider}</span>,
-    onClick: () => handleLinkSSO(provider),
+    onClick: () => {
+      void handleLinkSSO(provider);
+    },
   }));
 
   return (

@@ -6,20 +6,26 @@
 import type React from 'react';
 
 export interface MobileBuiltinRenderProps {
-  /** Tool identifier (e.g. 'lobe-gtd') */
-  identifier: string;
   /** API name (e.g. 'createTodos') */
   apiName: string;
-  /** Result content (string from tool execution) */
-  content?: string;
-  /** Plugin state (if backend returns it; may be parsed from content) */
-  pluginState?: Record<string, unknown>;
   /** Request arguments (JSON string) */
   arguments?: string;
-  /** Tool call ID */
-  toolCallId?: string;
+  /** Result content (string from tool execution) */
+  content?: string;
   /** Error if tool failed */
   error?: unknown;
+  /** Tool identifier (e.g. 'lobe-gtd') */
+  identifier: string;
+  /** Plugin state (if backend returns it; may be parsed from content) */
+  pluginState?: Record<string, unknown>;
+  /** Source chat session for return navigation */
+  sessionId?: string;
+  /** Source thread for return navigation */
+  threadId?: string;
+  /** Tool call ID */
+  toolCallId?: string;
+  /** Source topic for return navigation */
+  topicId?: string;
 }
 
 export type MobileBuiltinRender = React.ComponentType<MobileBuiltinRenderProps>;
@@ -40,12 +46,12 @@ export type MobileBuiltinIntervention<T = Record<string, unknown>> = React.Compo
 
 /** Props for Streaming placeholder (tool executing, no result yet) */
 export interface MobileBuiltinStreamingProps {
+  /** API name */
+  apiName?: string;
   /** Parsed args from tool.arguments */
   args?: Record<string, unknown>;
   /** Tool identifier */
   identifier?: string;
-  /** API name */
-  apiName?: string;
 }
 
 export type MobileBuiltinStreaming = React.ComponentType<MobileBuiltinStreamingProps>;

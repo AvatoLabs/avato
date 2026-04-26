@@ -2,7 +2,7 @@ import { type LobeAgentConfig } from '@lobechat/types';
 import { type PartialDeep } from 'type-fest';
 
 import { chatGroupService } from '@/services/chatGroup';
-import { getAgentStoreState } from '@/store/agent';
+import { getAgentStoreState } from '@/store/agent/store';
 import { type ChatGroupStore } from '@/store/agentGroup/store';
 
 type ChatGroupStoreWithRefresh = ChatGroupStore & {

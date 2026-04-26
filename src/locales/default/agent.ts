@@ -12,6 +12,7 @@ export default {
   'channel.connectionConfig': 'Connection Configuration',
   'channel.copied': 'Copied to clipboard',
   'channel.copy': 'Copy',
+  'channel.copyFailed': 'Failed to copy webhook URL',
   'channel.deleteConfirm': 'Are you sure you want to remove this channel?',
   'channel.devWebhookProxyUrl': 'HTTPS Tunnel URL',
   'channel.devWebhookProxyUrlHint':

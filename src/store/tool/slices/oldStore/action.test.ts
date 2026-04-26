@@ -56,7 +56,7 @@ const pluginManifestMock = {
       },
     },
   ],
-  author: 'LobeHub',
+  author: 'Avato',
   createAt: '2023-08-12',
   homepage: 'https://github.com/lobehub/chat-plugin-realtime-weather',
   identifier: 'realtime-weather',

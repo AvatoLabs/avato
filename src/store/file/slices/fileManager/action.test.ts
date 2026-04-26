@@ -1,3 +1,8 @@
+import {
+  FileAssetClassification,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+} from '@lobechat/types';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -59,10 +64,14 @@ vi.mock('@/libs/swr', async () => {
 vi.mock('@/libs/trpc/client', () => ({
   lambdaClient: {
     file: {
+      approveFileAsset: { mutate: vi.fn() },
+      archiveFileAsset: { mutate: vi.fn() },
+      getFileAssetById: { query: vi.fn() },
       getFileItemById: { query: vi.fn() },
       getFiles: { query: vi.fn() },
       getKnowledgeItems: { query: vi.fn() },
       removeFileAsyncTask: { mutate: vi.fn() },
+      updateFileAssetGovernance: { mutate: vi.fn() },
     },
   },
 }));
@@ -80,6 +89,12 @@ beforeEach(() => {
     false,
   );
 });
+
+const mockGovernanceCapabilities = {
+  canApprove: false,
+  canArchive: false,
+  canEditGovernance: false,
+};
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -197,6 +212,22 @@ describe('FileManagerActions', () => {
       expect(refreshSpy).toHaveBeenCalled();
       expect(toggleSpy).toHaveBeenCalledWith(['file-1'], false);
     });
+
+    it('should ignore docs_* canonical document ids', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const createTaskSpy = vi.spyOn(ragService, 'createEmbeddingChunksTask');
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+      const toggleSpy = vi.spyOn(result.current, 'toggleEmbeddingIds');
+
+      await act(async () => {
+        await result.current.embeddingChunks(['docs_derived_1']);
+      });
+
+      expect(createTaskSpy).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
+      expect(toggleSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('parseFilesToChunks', () => {
@@ -252,6 +283,22 @@ describe('FileManagerActions', () => {
       expect(refreshSpy).toHaveBeenCalled();
       expect(toggleSpy).toHaveBeenCalledWith(['file-1'], false);
     });
+
+    it('should ignore docs_* canonical document ids', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const createTaskSpy = vi.spyOn(ragService, 'createParseFileTask');
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+      const toggleSpy = vi.spyOn(result.current, 'toggleParsingIds');
+
+      await act(async () => {
+        await result.current.parseFilesToChunks(['docs_derived_1']);
+      });
+
+      expect(createTaskSpy).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
+      expect(toggleSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('pushDockFileList', () => {
@@ -278,7 +325,7 @@ describe('FileManagerActions', () => {
       expect(dispatchSpy).toHaveBeenCalledWith({
         atStart: true,
         files: [
-          expect.objectContaining({ file: validFile, id: validFile.name, status: 'pending' }),
+          expect.objectContaining({ file: validFile, id: expect.any(String), status: 'pending' }),
         ],
         type: 'addFiles',
       });
@@ -286,15 +333,16 @@ describe('FileManagerActions', () => {
       expect(uploadSpy).toHaveBeenCalledWith({
         abortController: expect.any(AbortController),
         file: validFile,
-        knowledgeBaseId: undefined,
+        sourceSetId: undefined,
         onStatusUpdate: expect.any(Function),
+        uploadId: expect.any(String),
       });
       expect(refreshSpy).toHaveBeenCalled();
       // Should auto-parse text files
-      expect(parseSpy).toHaveBeenCalledWith(['file-1'], { skipExist: false });
+      expect(parseSpy).toHaveBeenCalledWith(['file-1'], { skipExist: true });
     });
 
-    it('should upload files with knowledgeBaseId', async () => {
+    it('should upload files with sourceSetId', async () => {
       const { result } = renderHook(() => useStore());
 
       const file = new File(['content'], 'test.txt', { type: 'text/plain' });
@@ -312,8 +360,9 @@ describe('FileManagerActions', () => {
       expect(uploadSpy).toHaveBeenCalledWith({
         abortController: expect.any(AbortController),
         file,
-        knowledgeBaseId: 'kb-123',
+        sourceSetId: 'kb-123',
         onStatusUpdate: expect.any(Function),
+        uploadId: expect.any(String),
       });
     });
 
@@ -324,8 +373,12 @@ describe('FileManagerActions', () => {
 
       const uploadSpy = vi
         .spyOn(result.current, 'uploadWithProgress')
-        .mockImplementation(async ({ onStatusUpdate }) => {
-          onStatusUpdate?.({ id: file.name, type: 'updateFile', value: { status: 'uploading' } });
+        .mockImplementation(async ({ onStatusUpdate, uploadId }) => {
+          onStatusUpdate?.({
+            id: uploadId!,
+            type: 'updateFile',
+            value: { status: 'uploading' },
+          });
           return { id: 'file-1', url: 'http://example.com/file-1' };
         });
       vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
@@ -357,6 +410,38 @@ describe('FileManagerActions', () => {
       expect(parseSpy).not.toHaveBeenCalled();
     });
 
+    it('should assign different upload ids for files with the same name', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const firstFile = new File(['first'], 'duplicate.txt', { type: 'text/plain' });
+      const secondFile = new File(['second'], 'duplicate.txt', { type: 'text/plain' });
+
+      vi.spyOn(result.current, 'uploadWithProgress')
+        .mockResolvedValueOnce({ id: 'file-1', url: 'http://example.com/file-1' })
+        .mockResolvedValueOnce({ id: 'file-2', url: 'http://example.com/file-2' });
+      vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+      vi.spyOn(result.current, 'parseFilesToChunks').mockResolvedValue();
+      const dispatchSpy = vi.spyOn(result.current, 'dispatchDockFileList');
+
+      await act(async () => {
+        await result.current.pushDockFileList([firstFile, secondFile]);
+      });
+
+      const addFilesCall = dispatchSpy.mock.calls.find((call) => call[0].type === 'addFiles');
+      expect(addFilesCall).toBeDefined();
+      if (!addFilesCall) return;
+
+      expect(addFilesCall[0]).toMatchObject({
+        atStart: true,
+        type: 'addFiles',
+      });
+      if (!('files' in addFilesCall[0])) return;
+
+      const uploadIds = addFilesCall[0].files.map((item) => item.id);
+      expect(uploadIds).toHaveLength(2);
+      expect(Array.from(new Set(uploadIds))).toHaveLength(2);
+    });
+
     it('should auto-embed files that support chunking', async () => {
       const { result } = renderHook(() => useStore());
 
@@ -374,7 +459,7 @@ describe('FileManagerActions', () => {
       });
 
       // Should auto-parse both files that support chunking
-      expect(parseSpy).toHaveBeenCalledWith(['file-1', 'file-2'], { skipExist: false });
+      expect(parseSpy).toHaveBeenCalledWith(['file-1', 'file-2'], { skipExist: true });
     });
 
     it('should skip auto-embed for unsupported file types (images/videos/audio)', async () => {
@@ -418,7 +503,7 @@ describe('FileManagerActions', () => {
       });
 
       // Should only auto-parse text and pdf files, skip image
-      expect(parseSpy).toHaveBeenCalledWith(['file-1', 'file-3'], { skipExist: false });
+      expect(parseSpy).toHaveBeenCalledWith(['file-1', 'file-3'], { skipExist: true });
     });
 
     it('should skip auto-embed when upload fails', async () => {
@@ -436,6 +521,36 @@ describe('FileManagerActions', () => {
 
       // Should not auto-parse when upload returns undefined
       expect(parseSpy).not.toHaveBeenCalled();
+    });
+
+    it('should keep the batch moving when one upload throws', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const firstFile = new File(['text content'], 'first.txt', { type: 'text/plain' });
+      const secondFile = new File(['text content'], 'second.txt', { type: 'text/plain' });
+
+      const uploadSpy = vi
+        .spyOn(result.current, 'uploadWithProgress')
+        .mockRejectedValueOnce(new Error('Upload failed'))
+        .mockResolvedValueOnce({ id: 'file-2', url: 'http://example.com/file-2' });
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+      const parseSpy = vi.spyOn(result.current, 'parseFilesToChunks').mockResolvedValue();
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const dispatchSpy = vi.spyOn(result.current, 'dispatchDockFileList');
+
+      await act(async () => {
+        await result.current.pushDockFileList([firstFile, secondFile]);
+      });
+
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      const failedUploadId = vi.mocked(uploadSpy).mock.calls[0]?.[0]?.uploadId;
+      expect(dispatchSpy).toHaveBeenCalledWith({
+        id: failedUploadId,
+        type: 'updateFile',
+        value: { status: 'error' },
+      });
+      expect(refreshSpy).toHaveBeenCalled();
+      expect(parseSpy).toHaveBeenCalledWith(['file-2'], { skipExist: true });
     });
 
     it('should enforce file count limit and queue excess files', async () => {
@@ -506,7 +621,7 @@ describe('FileManagerActions', () => {
       expect(dispatchSpy).toHaveBeenCalledWith({
         atStart: true,
         files: extractedFiles.map((file) =>
-          expect.objectContaining({ file, id: file.name, status: 'pending' }),
+          expect.objectContaining({ file, id: expect.any(String), status: 'pending' }),
         ),
         type: 'addFiles',
       });
@@ -537,7 +652,9 @@ describe('FileManagerActions', () => {
       // Should fallback to uploading the ZIP file itself
       expect(dispatchSpy).toHaveBeenCalledWith({
         atStart: true,
-        files: [expect.objectContaining({ file: zipFile, id: zipFile.name, status: 'pending' })],
+        files: [
+          expect.objectContaining({ file: zipFile, id: expect.any(String), status: 'pending' }),
+        ],
         type: 'addFiles',
       });
     });
@@ -584,6 +701,23 @@ describe('FileManagerActions', () => {
       expect(refreshSpy).toHaveBeenCalledTimes(2);
       expect(toggleSpy).toHaveBeenCalledWith(['file-1'], false);
     });
+
+    it('should ignore docs_* canonical document ids', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const toggleSpy = vi.spyOn(result.current, 'toggleEmbeddingIds');
+      const createTaskSpy = vi.spyOn(ragService, 'createEmbeddingChunksTask');
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.reEmbeddingChunks('docs_derived_1');
+      });
+
+      expect(toggleSpy).not.toHaveBeenCalled();
+      expect(lambdaClient.file.removeFileAsyncTask.mutate).not.toHaveBeenCalled();
+      expect(createTaskSpy).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('reParseFile', () => {
@@ -602,6 +736,22 @@ describe('FileManagerActions', () => {
       expect(retrySpy).toHaveBeenCalledWith('file-1');
       expect(refreshSpy).toHaveBeenCalled();
       expect(toggleSpy).toHaveBeenCalledWith(['file-1'], false);
+    });
+
+    it('should ignore docs_* canonical document ids', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const toggleSpy = vi.spyOn(result.current, 'toggleParsingIds');
+      const retrySpy = vi.spyOn(ragService, 'retryParseFile');
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.reParseFile('docs_derived_1');
+      });
+
+      expect(toggleSpy).not.toHaveBeenCalled();
+      expect(retrySpy).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -648,6 +798,20 @@ describe('FileManagerActions', () => {
       expect(removeSpy).toHaveBeenCalledWith('file-1');
       expect(refreshSpy).toHaveBeenCalled();
     });
+
+    it('should ignore docs_* canonical document ids', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const removeSpy = vi.spyOn(fileService, 'removeFile').mockResolvedValue(undefined);
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.removeFileItem('docs_derived_1');
+      });
+
+      expect(removeSpy).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('removeFiles', () => {
@@ -663,6 +827,34 @@ describe('FileManagerActions', () => {
 
       expect(removeSpy).toHaveBeenCalledWith(['file-1', 'file-2']);
       expect(refreshSpy).toHaveBeenCalled();
+    });
+
+    it('should filter out docs_* canonical document ids', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const removeSpy = vi.spyOn(fileService, 'removeFiles').mockResolvedValue(undefined);
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.removeFiles(['docs_derived_1', 'file-2']);
+      });
+
+      expect(removeSpy).toHaveBeenCalledWith(['file-2']);
+      expect(refreshSpy).toHaveBeenCalled();
+    });
+
+    it('should no-op when all ids are docs_* canonical documents', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const removeSpy = vi.spyOn(fileService, 'removeFiles').mockResolvedValue(undefined);
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.removeFiles(['docs_derived_1']);
+      });
+
+      expect(removeSpy).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -834,6 +1026,240 @@ describe('FileManagerActions', () => {
     });
   });
 
+  describe('useFetchFileAsset', () => {
+    it('should not fetch when id is undefined', () => {
+      const { result } = renderHook(() => useStore());
+
+      renderHook(() => result.current.useFetchFileAsset(undefined));
+
+      expect(lambdaClient.file.getFileAssetById.query).not.toHaveBeenCalled();
+    });
+
+    it('should fetch file asset sidecar when id is provided', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const mockAsset = {
+        capabilities: { canApprove: true, canArchive: true, canEditGovernance: true },
+        item: {
+          fileId: 'file-1',
+          reviewStatus: 'approved',
+          rightsOwner: 'Brand Team',
+          spaceId: 'spc_team',
+          usagePolicy: FileAssetUsagePolicy.Restricted,
+        },
+      };
+
+      vi.mocked(lambdaClient.file.getFileAssetById.query).mockResolvedValue(mockAsset as any);
+
+      const { result: swrResult } = renderHook(() => result.current.useFetchFileAsset('file-1'), {
+        wrapper: withSWR,
+      });
+
+      await waitFor(() => {
+        expect(swrResult.current.data).toEqual(mockAsset);
+      });
+    });
+  });
+
+  describe('updateFileAssetGovernance', () => {
+    it('should update the file asset cache after mutation', async () => {
+      const { result } = renderHook(() => useStore());
+      const mockAsset = {
+        capabilities: { canApprove: true, canArchive: true, canEditGovernance: true },
+        item: {
+          fileId: 'file-1',
+          reviewStatus: 'approved',
+          rightsOwner: 'Legal',
+          spaceId: 'spc_team',
+          usagePolicy: FileAssetUsagePolicy.Restricted,
+        },
+      };
+
+      vi.mocked(lambdaClient.file.updateFileAssetGovernance.mutate).mockResolvedValue(
+        mockAsset as any,
+      );
+
+      await expect(
+        result.current.updateFileAssetGovernance('file-1', {
+          rightsOwner: 'Legal',
+          usagePolicy: FileAssetUsagePolicy.Restricted,
+        }),
+      ).resolves.toEqual(mockAsset);
+
+      expect(mutate).toHaveBeenCalledWith(['useFetchFileAsset', 'file-1'], mockAsset, {
+        revalidate: false,
+      });
+    });
+  });
+
+  describe('updateFileAssetsGovernance', () => {
+    it('should update selected assets and refresh once', async () => {
+      const { result } = renderHook(() => useStore());
+
+      vi.mocked(lambdaClient.file.updateFileAssetGovernance.mutate).mockResolvedValue({} as any);
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.updateFileAssetsGovernance(['file-1', 'file-2'], {
+          classification: FileAssetClassification.Legal,
+          reviewStatus: FileAssetReviewStatus.Draft,
+          rightsOwner: 'Brand Team',
+          usagePolicy: FileAssetUsagePolicy.Restricted,
+        });
+      });
+
+      expect(lambdaClient.file.updateFileAssetGovernance.mutate).toHaveBeenCalledTimes(2);
+      expect(lambdaClient.file.updateFileAssetGovernance.mutate).toHaveBeenNthCalledWith(1, {
+        classification: FileAssetClassification.Legal,
+        id: 'file-1',
+        reviewStatus: FileAssetReviewStatus.Draft,
+        rightsOwner: 'Brand Team',
+        usagePolicy: FileAssetUsagePolicy.Restricted,
+      });
+      expect(lambdaClient.file.updateFileAssetGovernance.mutate).toHaveBeenNthCalledWith(2, {
+        classification: FileAssetClassification.Legal,
+        id: 'file-2',
+        reviewStatus: FileAssetReviewStatus.Draft,
+        rightsOwner: 'Brand Team',
+        usagePolicy: FileAssetUsagePolicy.Restricted,
+      });
+      expect(refreshSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should skip batch governance update when selection is empty', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.updateFileAssetsGovernance([], {
+          classification: FileAssetClassification.Brand,
+        });
+      });
+
+      expect(lambdaClient.file.updateFileAssetGovernance.mutate).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('approveFileAsset', () => {
+    it('should update the file asset cache after approval', async () => {
+      const { result } = renderHook(() => useStore());
+      const mockAsset = {
+        capabilities: { canApprove: true, canArchive: true, canEditGovernance: true },
+        item: {
+          fileId: 'file-1',
+          reviewStatus: 'approved',
+          rightsOwner: 'Legal',
+          spaceId: 'spc_team',
+          usagePolicy: FileAssetUsagePolicy.Restricted,
+        },
+      };
+
+      vi.mocked(lambdaClient.file.approveFileAsset.mutate).mockResolvedValue(mockAsset as any);
+
+      await expect(result.current.approveFileAsset('file-1')).resolves.toEqual(mockAsset);
+
+      expect(mutate).toHaveBeenCalledWith(['useFetchFileAsset', 'file-1'], mockAsset, {
+        revalidate: false,
+      });
+    });
+  });
+
+  describe('approveFileAssets', () => {
+    it('should approve selected assets and refresh once', async () => {
+      const { result } = renderHook(() => useStore());
+
+      vi.mocked(lambdaClient.file.approveFileAsset.mutate).mockResolvedValue({} as any);
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.approveFileAssets(['file-1', 'file-2']);
+      });
+
+      expect(lambdaClient.file.approveFileAsset.mutate).toHaveBeenCalledTimes(2);
+      expect(lambdaClient.file.approveFileAsset.mutate).toHaveBeenNthCalledWith(1, {
+        id: 'file-1',
+      });
+      expect(lambdaClient.file.approveFileAsset.mutate).toHaveBeenNthCalledWith(2, {
+        id: 'file-2',
+      });
+      expect(refreshSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should skip batch approve when selection is empty', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.approveFileAssets([]);
+      });
+
+      expect(lambdaClient.file.approveFileAsset.mutate).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('archiveFileAsset', () => {
+    it('should update the file asset cache after archive', async () => {
+      const { result } = renderHook(() => useStore());
+      const mockAsset = {
+        capabilities: { canApprove: true, canArchive: true, canEditGovernance: true },
+        item: {
+          fileId: 'file-1',
+          reviewStatus: 'archived',
+          rightsOwner: 'Legal',
+          spaceId: 'spc_team',
+          usagePolicy: FileAssetUsagePolicy.Restricted,
+        },
+      };
+
+      vi.mocked(lambdaClient.file.archiveFileAsset.mutate).mockResolvedValue(mockAsset as any);
+
+      await expect(result.current.archiveFileAsset('file-1')).resolves.toEqual(mockAsset);
+
+      expect(mutate).toHaveBeenCalledWith(['useFetchFileAsset', 'file-1'], mockAsset, {
+        revalidate: false,
+      });
+    });
+  });
+
+  describe('archiveFileAssets', () => {
+    it('should archive selected assets and refresh once', async () => {
+      const { result } = renderHook(() => useStore());
+
+      vi.mocked(lambdaClient.file.archiveFileAsset.mutate).mockResolvedValue({} as any);
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.archiveFileAssets(['file-1', 'file-2']);
+      });
+
+      expect(lambdaClient.file.archiveFileAsset.mutate).toHaveBeenCalledTimes(2);
+      expect(lambdaClient.file.archiveFileAsset.mutate).toHaveBeenNthCalledWith(1, {
+        id: 'file-1',
+      });
+      expect(lambdaClient.file.archiveFileAsset.mutate).toHaveBeenNthCalledWith(2, {
+        id: 'file-2',
+      });
+      expect(refreshSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should skip batch archive when selection is empty', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.archiveFileAssets([]);
+      });
+
+      expect(lambdaClient.file.archiveFileAsset.mutate).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('useFetchKnowledgeItems', () => {
     it('should fetch file list with params', async () => {
       const { result } = renderHook(() => useStore());
@@ -870,6 +1296,7 @@ describe('FileManagerActions', () => {
       ];
 
       vi.mocked(lambdaClient.file.getKnowledgeItems.query).mockResolvedValue({
+        governanceCapabilities: mockGovernanceCapabilities,
         hasMore: false,
         items: mockFiles,
       });
@@ -906,6 +1333,7 @@ describe('FileManagerActions', () => {
       ];
 
       vi.mocked(lambdaClient.file.getKnowledgeItems.query).mockResolvedValue({
+        governanceCapabilities: mockGovernanceCapabilities,
         hasMore: false,
         items: mockFiles,
       });

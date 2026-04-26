@@ -4,8 +4,9 @@ import { filePrompts } from './file';
 import { imagesPrompts } from './image';
 import { videosPrompts } from './video';
 
-export type { KnowledgeBaseInfo, PromptKnowledgeOptions } from './knowledgeBase';
-export { promptAgentKnowledge } from './knowledgeBase';
+export { promptConversationFiles } from './conversationFiles';
+export type { PromptAgentSourcesOptions, SourceSetInfo } from './sourceSet';
+export { promptAgentSources } from './sourceSet';
 
 export const filesPrompts = ({
   imageList,

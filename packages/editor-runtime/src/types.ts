@@ -9,7 +9,7 @@ export interface EditTitleArgs {
 }
 
 // ============ Query & Search Args ============
-export interface GetPageContentArgs {
+export interface GetDocContentArgs {
   format?: 'xml' | 'markdown' | 'both';
 }
 
@@ -66,7 +66,7 @@ export interface ModifyOperationResult {
   success: boolean;
 }
 
-export interface InitPageRuntimeResult {
+export interface InitDocRuntimeResult {
   extractedTitle?: string;
   nodeCount: number;
 }
@@ -76,7 +76,7 @@ export interface EditTitleRuntimeResult {
   previousTitle: string;
 }
 
-export interface GetPageContentRuntimeResult {
+export interface GetDocContentRuntimeResult {
   charCount?: number;
   documentId: string;
   lineCount?: number;

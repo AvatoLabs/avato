@@ -47,6 +47,15 @@ export interface UserInfoForAIGeneration {
   userName: string;
 }
 
+/** Escape %, _, \ for PostgreSQL LIKE/ILIKE to prevent wildcard injection */
+const escapeLikeWildcards = (value: string): string =>
+  value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
+
+const buildSubsequencePattern = (value: string): string =>
+  `%${Array.from(value)
+    .map((char) => escapeLikeWildcards(char))
+    .join('%')}%`;
+
 export class UserModel {
   private userId: string;
   private db: LobeChatDatabase;
@@ -292,6 +301,58 @@ export class UserModel {
 
   static findByEmail = async (db: LobeChatDatabase, email: string) => {
     return db.query.users.findFirst({ where: eq(users.email, email) });
+  };
+
+  static searchByKeyword = async (
+    db: LobeChatDatabase,
+    keyword: string,
+    options?: { limit?: number },
+  ) => {
+    const normalizedKeyword = keyword.trim();
+    if (!normalizedKeyword) return [];
+
+    const limit = options?.limit ?? 8;
+    const escapedKeyword = escapeLikeWildcards(normalizedKeyword);
+    const containsPattern = `%${escapedKeyword}%`;
+    const prefixPattern = `${escapedKeyword}%`;
+    const subsequencePattern = buildSubsequencePattern(normalizedKeyword);
+    const usernameExpr = sql<string>`COALESCE(${users.username}, '')`;
+    const fullNameExpr = sql<string>`COALESCE(${users.fullName}, '')`;
+    const relevance = sql<number>`
+      CASE
+        WHEN ${usernameExpr} ILIKE ${escapedKeyword} ESCAPE '\' THEN 0
+        WHEN ${fullNameExpr} ILIKE ${escapedKeyword} ESCAPE '\' THEN 1
+        WHEN ${usernameExpr} ILIKE ${prefixPattern} ESCAPE '\' THEN 2
+        WHEN ${fullNameExpr} ILIKE ${prefixPattern} ESCAPE '\' THEN 3
+        WHEN ${usernameExpr} ILIKE ${containsPattern} ESCAPE '\' THEN 4
+        WHEN ${fullNameExpr} ILIKE ${containsPattern} ESCAPE '\' THEN 5
+        WHEN ${usernameExpr} ILIKE ${subsequencePattern} ESCAPE '\' THEN 6
+        WHEN ${fullNameExpr} ILIKE ${subsequencePattern} ESCAPE '\' THEN 7
+        ELSE 8
+      END
+    `;
+
+    return db
+      .select({
+        avatar: users.avatar,
+        fullName: users.fullName,
+        id: users.id,
+        username: users.username,
+      })
+      .from(users)
+      .where(
+        and(
+          sql`${usernameExpr} <> ''`,
+          or(
+            sql`${usernameExpr} ILIKE ${containsPattern} ESCAPE '\'`,
+            sql`${fullNameExpr} ILIKE ${containsPattern} ESCAPE '\'`,
+            sql`${usernameExpr} ILIKE ${subsequencePattern} ESCAPE '\'`,
+            sql`${fullNameExpr} ILIKE ${subsequencePattern} ESCAPE '\'`,
+          ),
+        ),
+      )
+      .orderBy(relevance, asc(usernameExpr), asc(fullNameExpr))
+      .limit(limit);
   };
 
   static getUserApiKeys = async (

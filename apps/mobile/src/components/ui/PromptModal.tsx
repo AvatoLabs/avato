@@ -1,8 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { useI18n } from '../../lib/i18n';
+import { getResponsiveLayoutMetrics } from '../../lib/responsiveLayout';
 import { useThemeColors } from '../../theme/colors';
 import { enteringDialogContent } from '../../theme/motion';
 
@@ -32,6 +41,12 @@ export default function PromptModal({
   const [value, setValue] = useState(defaultValue);
   const inputRef = useRef<TextInput>(null);
   const finalSubmitLabel = submitLabel || t.confirm;
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const dialogWidth = Math.min(
+    Math.max(screenWidth - 32, 0),
+    responsiveMetrics.isTablet ? 520 : 320,
+  );
 
   useEffect(() => {
     if (visible) {
@@ -56,9 +71,9 @@ export default function PromptModal({
       onRequestClose={onCancel}
     >
       <Pressable className="flex-1 justify-center items-center bg-black/40" onPress={onCancel}>
-        <Animated.View entering={enteringDialogContent()}>
+        <Animated.View entering={enteringDialogContent()} style={{ width: dialogWidth }}>
           <Pressable
-            className="bg-card rounded-2xl mx-10 w-[300px] overflow-hidden"
+            className="bg-card rounded-2xl overflow-hidden"
             onPress={(e) => e.stopPropagation()}
           >
             <View className="px-5 pt-5 pb-3">
@@ -85,14 +100,18 @@ export default function PromptModal({
                 className="flex-1 py-3.5 items-center"
                 onPress={onCancel}
               >
-                <Text className="text-[16px] text-foreground/50 font-medium">{t.cancel}</Text>
+                <Text className="text-[16px] font-medium" style={{ color: colors.secondaryText }}>
+                  {t.cancel}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 activeOpacity={0.6}
                 className="flex-1 py-3.5 items-center"
                 onPress={handleSubmit}
               >
-                <Text className="text-[16px] font-semibold" style={{ color: colors.primary }}>{finalSubmitLabel}</Text>
+                <Text className="text-[16px] font-semibold" style={{ color: colors.primary }}>
+                  {finalSubmitLabel}
+                </Text>
               </TouchableOpacity>
             </View>
           </Pressable>

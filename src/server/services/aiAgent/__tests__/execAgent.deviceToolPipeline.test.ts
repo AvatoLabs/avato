@@ -193,7 +193,13 @@ describe('AiAgentService.execAgent - device tool pipeline (LOBE-5636)', () => {
       const { deviceProxy } = await import('@/server/services/toolExecution/deviceProxy');
       vi.spyOn(deviceProxy, 'isConfigured', 'get').mockReturnValue(true);
       mockQueryDeviceList.mockResolvedValue([
-        { deviceId: 'dev-1', deviceName: 'My PC', platform: 'win32' },
+        {
+          allowRemoteTools: true,
+          deviceId: 'dev-1',
+          deviceName: 'My PC',
+          online: true,
+          platform: 'win32',
+        },
       ]);
 
       mockGetAgentConfig.mockResolvedValue(createBaseAgentConfig());
@@ -203,6 +209,65 @@ describe('AiAgentService.execAgent - device tool pipeline (LOBE-5636)', () => {
       expect(mockCreateServerAgentToolsEngine).toHaveBeenCalledTimes(1);
       const params = mockCreateServerAgentToolsEngine.mock.calls[0][1];
       expect(params.deviceContext).toEqual({
+        activeDeviceReady: false,
+        boundDeviceId: undefined,
+        deviceOnline: true,
+        gatewayConfigured: true,
+      });
+    });
+
+    it('should report deviceOnline=false when all online devices have remote tools disabled', async () => {
+      const { deviceProxy } = await import('@/server/services/toolExecution/deviceProxy');
+      vi.spyOn(deviceProxy, 'isConfigured', 'get').mockReturnValue(true);
+      mockQueryDeviceList.mockResolvedValue([
+        {
+          allowRemoteTools: false,
+          deviceId: 'dev-1',
+          deviceName: 'My PC',
+          online: true,
+          platform: 'win32',
+        },
+      ]);
+
+      mockGetAgentConfig.mockResolvedValue(createBaseAgentConfig());
+
+      await service.execAgent({ agentId: 'agent-1', prompt: 'Hello' });
+
+      expect(mockCreateServerAgentToolsEngine).toHaveBeenCalledTimes(1);
+      const params = mockCreateServerAgentToolsEngine.mock.calls[0][1];
+      expect(params.deviceContext).toEqual({
+        activeDeviceReady: false,
+        boundDeviceId: undefined,
+        deviceOnline: false,
+        gatewayConfigured: true,
+      });
+    });
+
+    it('should mark activeDeviceReady when bot auto-activation selects one device', async () => {
+      const { deviceProxy } = await import('@/server/services/toolExecution/deviceProxy');
+      vi.spyOn(deviceProxy, 'isConfigured', 'get').mockReturnValue(true);
+      mockQueryDeviceList.mockResolvedValue([
+        {
+          allowRemoteTools: true,
+          deviceId: 'dev-1',
+          deviceName: 'My PC',
+          online: true,
+          platform: 'win32',
+        },
+      ]);
+
+      mockGetAgentConfig.mockResolvedValue(createBaseAgentConfig());
+
+      await service.execAgent({
+        agentId: 'agent-1',
+        botContext: { platform: 'discord' } as any,
+        prompt: 'Hello',
+      });
+
+      expect(mockCreateServerAgentToolsEngine).toHaveBeenCalledTimes(1);
+      const params = mockCreateServerAgentToolsEngine.mock.calls[0][1];
+      expect(params.deviceContext).toEqual({
+        activeDeviceReady: true,
         boundDeviceId: undefined,
         deviceOnline: true,
         gatewayConfigured: true,
@@ -228,7 +293,13 @@ describe('AiAgentService.execAgent - device tool pipeline (LOBE-5636)', () => {
       const { deviceProxy } = await import('@/server/services/toolExecution/deviceProxy');
       vi.spyOn(deviceProxy, 'isConfigured', 'get').mockReturnValue(true);
       mockQueryDeviceList.mockResolvedValue([
-        { deviceId: 'dev-1', deviceName: 'My PC', platform: 'win32' },
+        {
+          allowRemoteTools: true,
+          deviceId: 'dev-1',
+          deviceName: 'My PC',
+          online: true,
+          platform: 'win32',
+        },
       ]);
 
       // ToolsEngine returns RemoteDevice in manifestMap (enabled by enableChecker)

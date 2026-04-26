@@ -4,12 +4,11 @@ import debug from 'debug';
 import { sha256 } from 'js-sha256';
 import mime from 'mime';
 import { IMAGE_GENERATION_CONFIG } from 'model-bank';
-import { nanoid } from 'nanoid';
 import sharp from 'sharp';
 
 import { FileService } from '@/server/services/file';
+import { resolveRuntimeFileInput } from '@/server/services/file/resolveRuntimeFileInput';
 import { calculateThumbnailDimensions } from '@/utils/number';
-import { getYYYYmmddHHMMss } from '@/utils/time';
 import { inferFileExtensionFromImageUrl } from '@/utils/url';
 
 const log = debug('lobe-image:generation-service');
@@ -66,9 +65,9 @@ export async function fetchImageFromUrl(
 interface ImageForGeneration {
   buffer: Buffer;
   extension: string;
-  hash: string;
   height: number;
   mime: string;
+  sha256: string;
   size: number;
   width: number;
 }
@@ -78,10 +77,42 @@ interface ImageForGeneration {
  * Handles conversion, upload and cover creation for AI-generated images
  */
 export class GenerationService {
+  private db: LobeChatDatabase;
+
   private fileService: FileService;
 
+  private userId: string;
+
   constructor(db: LobeChatDatabase, userId: string) {
+    this.db = db;
     this.fileService = new FileService(db, userId);
+    this.userId = userId;
+  }
+
+  private createGenerationBlobPath(scope: 'covers' | 'images', extension: string) {
+    return this.fileService.createOpaqueUserBlobPath(`generations/${scope}`, extension);
+  }
+
+  private async resolveFetchableImageUrl(url: string, via: string) {
+    if (url.startsWith('data:')) return url;
+
+    const resolvedInput = await resolveRuntimeFileInput({
+      db: this.db,
+      fileService: this.fileService,
+      url,
+      userId: this.userId,
+      via,
+    });
+
+    if (resolvedInput) {
+      return resolvedInput.url;
+    }
+
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+
+    return this.fileService.getFullFileUrl(url);
   }
 
   /**
@@ -96,17 +127,19 @@ export class GenerationService {
   }> {
     log('Starting image transformation for:', url.startsWith('data:') ? 'base64 data' : url);
 
+    const fetchableUrl = await this.resolveFetchableImageUrl(url, 'image_generation_input');
+
     // Fetch image buffer and MIME type using utility function
     log('fetchImageFromUrl: start');
     const { buffer: originalImageBuffer, mimeType: originalMimeType } = await fetchImageFromUrl(
-      url,
+      fetchableUrl,
       fetchHeaders,
     );
     log('fetchImageFromUrl: done, buffer size:', originalImageBuffer.length);
 
     // Calculate hash for original image
     log('sha256: start');
-    const originalHash = sha256(originalImageBuffer);
+    const originalSha256 = sha256(originalImageBuffer);
     log('sha256: done');
 
     log('sharp metadata: start');
@@ -138,7 +171,7 @@ export class GenerationService {
       : originalImageBuffer;
 
     // Calculate hash for thumbnail
-    const thumbnailHash = sha256(thumbnailBuffer);
+    const thumbnailSha256 = sha256(thumbnailBuffer);
 
     log('Image transformation completed successfully');
 
@@ -184,18 +217,18 @@ export class GenerationService {
       image: {
         buffer: originalImageBuffer,
         extension,
-        hash: originalHash,
         height,
         mime: originalMimeType,
+        sha256: originalSha256,
         size: originalImageBuffer.length,
         width,
       },
       thumbnailImage: {
         buffer: thumbnailBuffer,
         extension: 'webp',
-        hash: thumbnailHash,
         height: thumbnailHeight,
         mime: 'image/webp',
+        sha256: thumbnailSha256,
         size: thumbnailBuffer.length,
         width: thumbnailWidth,
       },
@@ -204,14 +237,6 @@ export class GenerationService {
 
   async uploadImageForGeneration(image: ImageForGeneration, thumbnail: ImageForGeneration) {
     log('Starting image upload for generation');
-
-    const generationImagesFolder = 'generations/images';
-    const uuid = nanoid();
-    const dateTime = getYYYYmmddHHMMss(new Date());
-    const imageKey = `${generationImagesFolder}/${uuid}_${image.width}x${image.height}_${dateTime}_raw.${image.extension}`;
-    const thumbnailKey = `${generationImagesFolder}/${uuid}_${thumbnail.width}x${thumbnail.height}_${dateTime}_thumb.${thumbnail.extension}`;
-
-    log('Generated paths:', { imagePath: imageKey, thumbnailPath: thumbnailKey });
 
     // Check if image and thumbnail buffers are identical
     const isIdenticalBuffer = image.buffer.equals(thumbnail.buffer);
@@ -223,6 +248,7 @@ export class GenerationService {
 
     if (isIdenticalBuffer) {
       log('Buffers are identical, uploading single image');
+      const { key: imageKey } = await this.createGenerationBlobPath('images', image.extension);
       // If buffers are identical, only upload once
       const result = await this.fileService.uploadMedia(imageKey, image.buffer);
       log('Single image uploaded successfully:', result.key);
@@ -233,6 +259,10 @@ export class GenerationService {
       };
     } else {
       log('Buffers are different, uploading both images');
+      const [{ key: imageKey }, { key: thumbnailKey }] = await Promise.all([
+        this.createGenerationBlobPath('images', image.extension),
+        this.createGenerationBlobPath('images', thumbnail.extension),
+      ]);
       // If buffers are different, upload both
       const [imageResult, thumbnailResult] = await Promise.all([
         this.fileService.uploadMedia(imageKey, image.buffer),
@@ -253,14 +283,16 @@ export class GenerationService {
 
   /**
    * Create a cover image from a given URL and upload
-   * @param coverUrl - The source image URL (can be base64 or HTTP URL)
+   * @param coverUrl - The source image URL, internal proxy, blob key, or base64 data URI
    * @returns The key of the uploaded cover image
    */
   async createCoverFromUrl(coverUrl: string): Promise<string> {
     log('Creating cover image from URL:', coverUrl.startsWith('data:') ? 'base64 data' : coverUrl);
 
+    const fetchableUrl = await this.resolveFetchableImageUrl(coverUrl, 'generation_cover_input');
+
     // Fetch image buffer using utility function
-    const { buffer: originalImageBuffer } = await fetchImageFromUrl(coverUrl);
+    const { buffer: originalImageBuffer } = await fetchImageFromUrl(fetchableUrl);
 
     // Get image metadata to calculate proper cover dimensions
     const sharpInstance = sharp(originalImageBuffer);
@@ -290,10 +322,7 @@ export class GenerationService {
     log('Cover image processed, final size:', coverBuffer.length);
 
     // Upload using FileService
-    const coverFolder = 'generations/covers';
-    const uuid = nanoid();
-    const dateTime = getYYYYmmddHHMMss(new Date());
-    const coverKey = `${coverFolder}/${uuid}_${thumbnailWidth}x${thumbnailHeight}_${dateTime}_cover.webp`;
+    const { key: coverKey } = await this.createGenerationBlobPath('covers', 'webp');
 
     log('Uploading cover image:', coverKey);
     const result = await this.fileService.uploadMedia(coverKey, coverBuffer);

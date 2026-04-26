@@ -4,9 +4,9 @@ import { type ThemeMode } from '@lobechat/types';
 import { type FormGroupItemType } from '@lobehub/ui';
 import { Flexbox, Form, Icon, ImageSelect, Skeleton } from '@lobehub/ui';
 import { Select, Switch } from '@lobehub/ui/base-ui';
-import { message, Segmented } from 'antd';
+import { message } from 'antd';
 import isEqual from 'fast-deep-equal';
-import { Ban, Gauge, Loader2Icon, Monitor, Moon, Mouse, Sun, Waves } from 'lucide-react';
+import { Loader2Icon, Monitor, Moon, Sun } from 'lucide-react';
 import { useTheme as useNextThemesTheme } from 'next-themes';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { FORM_STYLE } from '@/const/layoutTokens';
 import { imageUrl } from '@/const/url';
 import { isDesktop } from '@/const/version';
-import { localeOptions } from '@/locales/resources';
+import { localeOptions } from '@/locales/contents';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
 import { useUserStore } from '@/store/user';
@@ -41,9 +41,11 @@ const Common = memo(() => {
   }, [general?.themeMode, setTheme, theme]);
 
   const handleThemeChange = (value: string) => {
-    const themeMode = (value === 'auto' ? 'system' : value) as ThemeMode;
-    setTheme(themeMode);
-    void setSettings({ general: { themeMode } });
+    const nextMode = (value === 'auto' ? 'system' : value) as ThemeMode;
+    setTheme(nextMode);
+    queueMicrotask(() => {
+      void setSettings({ general: { themeMode: nextMode } });
+    });
   };
 
   const handleLangChange = (value: LocaleMode) => {
@@ -107,56 +109,6 @@ const Common = memo(() => {
         ),
         label: t('settingCommon.lang.title'),
       },
-      {
-        children: (
-          <Segmented
-            options={[
-              {
-                icon: <Icon icon={Ban} size={16} />,
-                label: t('settingAppearance.animationMode.disabled'),
-                value: 'disabled',
-              },
-              {
-                icon: <Icon icon={Gauge} size={16} />,
-                label: t('settingAppearance.animationMode.agile'),
-                value: 'agile',
-              },
-              {
-                icon: <Icon icon={Waves} size={16} />,
-                label: t('settingAppearance.animationMode.elegant'),
-                value: 'elegant',
-              },
-            ]}
-          />
-        ),
-        desc: t('settingAppearance.animationMode.desc'),
-        label: t('settingAppearance.animationMode.title'),
-        minWidth: undefined,
-        name: 'animationMode',
-      },
-      {
-        children: (
-          <Segmented
-            options={[
-              {
-                icon: <Icon icon={Ban} size={16} />,
-                label: t('settingAppearance.contextMenuMode.disabled'),
-                value: 'disabled',
-              },
-              {
-                icon: <Icon icon={Mouse} size={16} />,
-                label: t('settingAppearance.contextMenuMode.default'),
-                value: 'default',
-              },
-            ]}
-          />
-        ),
-        desc: t('settingAppearance.contextMenuMode.desc'),
-        label: t('settingAppearance.contextMenuMode.title'),
-        minWidth: undefined,
-        name: 'contextMenuMode',
-      },
-
       {
         children: (
           <Flexbox horizontal justify={'flex-end'}>

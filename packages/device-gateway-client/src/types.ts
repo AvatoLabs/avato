@@ -1,6 +1,7 @@
 // ─── Device Info ───
 
 export interface DeviceAttachment {
+  allowRemoteTools: boolean;
   connectedAt: number;
   deviceId: string;
   hostname: string;
@@ -29,6 +30,7 @@ export interface AuthMessage {
 }
 
 export interface HeartbeatMessage {
+  allowRemoteTools?: boolean;
   type: 'heartbeat';
 }
 
@@ -79,10 +81,15 @@ export interface SystemInfoRequestMessage {
 // Client → Server
 export interface SystemInfoResponseMessage {
   requestId: string;
-  result: {
-    success: boolean;
-    systemInfo: DeviceSystemInfo;
-  };
+  result:
+    | {
+        error?: string;
+        success: false;
+      }
+    | {
+        success: true;
+        systemInfo: DeviceSystemInfo;
+      };
   type: 'system_info_response';
 }
 

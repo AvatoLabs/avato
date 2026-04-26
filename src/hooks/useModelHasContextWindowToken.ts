@@ -1,5 +1,5 @@
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { aiModelSelectors, useAiInfraStore } from '@/store/aiInfra';
 
 export const useModelHasContextWindowToken = () => {

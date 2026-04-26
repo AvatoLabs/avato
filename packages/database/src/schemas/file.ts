@@ -1,7 +1,6 @@
 import { and, isNotNull, isNull } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import {
-  boolean,
   index,
   integer,
   jsonb,
@@ -20,7 +19,7 @@ import type { FileSource } from '@/types/files';
 import { idGenerator, randomSlug } from '../utils/idGenerator';
 import { accessedAt, createdAt, timestamps, timestamptz } from './_helpers';
 import { asyncTasks } from './asyncTask';
-import { resourceRegistry, spaceBlobs, spaces } from './resource';
+import { contentRegistry, spaceBlobs, spaces } from './content';
 import { users } from './user';
 
 export const globalFiles = pgTable(
@@ -81,11 +80,11 @@ export const documents = pgTable(
 
     fileId: text('file_id').references((): AnyPgColumn => files.id, { onDelete: 'set null' }),
 
-    knowledgeBaseId: text('knowledge_base_id').references(() => knowledgeBases.id, {
+    sourceSetId: text('source_set_id').references(() => sourceSets.id, {
       onDelete: 'set null',
     }),
     spaceId: text('space_id').references(() => spaces.id, { onDelete: 'set null' }),
-    resourceUid: text('resource_uid').references(() => resourceRegistry.resourceUid, {
+    contentUid: text('content_uid').references(() => contentRegistry.contentUid, {
       onDelete: 'set null',
     }),
 
@@ -116,15 +115,15 @@ export const documents = pgTable(
     index('documents_user_id_idx').on(table.userId),
     index('documents_file_id_idx').on(table.fileId),
     index('documents_parent_id_idx').on(table.parentId),
-    index('documents_knowledge_base_id_idx').on(table.knowledgeBaseId),
+    index('documents_source_set_id_idx').on(table.sourceSetId),
     index('documents_space_id_idx').on(table.spaceId),
-    index('documents_resource_uid_idx').on(table.resourceUid),
+    index('documents_content_uid_idx').on(table.contentUid),
     uniqueIndex('documents_client_id_space_id_unique')
       .on(table.clientId, table.spaceId)
-      .where(and(isNotNull(table.clientId), isNull(table.deletedAt))),
+      .where(and(isNotNull(table.clientId), isNull(table.deletedAt))!),
     uniqueIndex('documents_slug_space_id_unique')
       .on(table.slug, table.spaceId)
-      .where(and(isNotNull(table.slug), isNull(table.deletedAt))),
+      .where(and(isNotNull(table.slug), isNull(table.deletedAt))!),
   ],
 );
 
@@ -157,7 +156,7 @@ export const files = pgTable(
     url: text('url').notNull(),
     source: text('source').$type<FileSource>(),
     spaceId: text('space_id').references(() => spaces.id, { onDelete: 'set null' }),
-    resourceUid: text('resource_uid').references(() => resourceRegistry.resourceUid, {
+    contentUid: text('content_uid').references(() => contentRegistry.contentUid, {
       onDelete: 'set null',
     }),
     blobId: text('blob_id').references(() => spaceBlobs.id, { onDelete: 'set null' }),
@@ -182,7 +181,7 @@ export const files = pgTable(
       fileHashIdx: index('file_hash_idx').on(table.fileHash),
       userIdIdx: index('files_user_id_idx').on(table.userId),
       spaceIdIdx: index('files_space_id_idx').on(table.spaceId),
-      resourceUidIdx: index('files_resource_uid_idx').on(table.resourceUid),
+      contentUidIdx: index('files_content_uid_idx').on(table.contentUid),
       blobIdIdx: index('files_blob_id_idx').on(table.blobId),
       parentIdIdx: index('files_parent_id_idx').on(table.parentId),
       chunkTaskIdIdx: index('files_chunk_task_id_idx').on(table.chunkTaskId),
@@ -197,21 +196,21 @@ export const files = pgTable(
 export type NewFile = typeof files.$inferInsert;
 export type FileItem = typeof files.$inferSelect;
 
-export const knowledgeBases = pgTable(
-  'knowledge_bases',
+export const sourceSets = pgTable(
+  'source_sets',
   {
     id: text('id')
-      .$defaultFn(() => idGenerator('knowledgeBases'))
+      .$defaultFn(() => idGenerator('sourceSets'))
       .primaryKey(),
 
     name: text('name').notNull(),
     description: text('description'),
     avatar: text('avatar'),
 
-    // different types of knowledge bases need to be distinguished
+    // different source set variants may use different retrieval strategies
     type: text('type'),
     spaceId: text('space_id').references(() => spaces.id, { onDelete: 'set null' }),
-    resourceUid: text('resource_uid').references(() => resourceRegistry.resourceUid, {
+    contentUid: text('content_uid').references(() => contentRegistry.contentUid, {
       onDelete: 'set null',
     }),
     userId: text('user_id')
@@ -225,23 +224,23 @@ export const knowledgeBases = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('knowledge_bases_client_id_space_id_unique').on(t.clientId, t.spaceId),
-    index('knowledge_bases_user_id_idx').on(t.userId),
-    index('knowledge_bases_space_id_idx').on(t.spaceId),
-    index('knowledge_bases_resource_uid_idx').on(t.resourceUid),
+    uniqueIndex('source_sets_client_id_space_id_unique').on(t.clientId, t.spaceId),
+    index('source_sets_user_id_idx').on(t.userId),
+    index('source_sets_space_id_idx').on(t.spaceId),
+    index('source_sets_content_uid_idx').on(t.contentUid),
   ],
 );
 
-export const insertKnowledgeBasesSchema = createInsertSchema(knowledgeBases);
+export const insertSourceSetsSchema = createInsertSchema(sourceSets);
 
-export type NewKnowledgeBase = typeof knowledgeBases.$inferInsert;
-export type KnowledgeBaseItem = typeof knowledgeBases.$inferSelect;
+export type NewSourceSet = typeof sourceSets.$inferInsert;
+export type SourceSetItem = typeof sourceSets.$inferSelect;
 
-export const knowledgeBaseFiles = pgTable(
-  'knowledge_base_files',
+export const sourceSetFiles = pgTable(
+  'source_set_files',
   {
-    knowledgeBaseId: text('knowledge_base_id')
-      .references(() => knowledgeBases.id, { onDelete: 'cascade' })
+    sourceSetId: text('source_set_id')
+      .references(() => sourceSets.id, { onDelete: 'cascade' })
       .notNull(),
 
     fileId: text('file_id')
@@ -257,10 +256,10 @@ export const knowledgeBaseFiles = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    primaryKey({ columns: [t.knowledgeBaseId, t.fileId] }),
-    index('knowledge_base_files_kb_id_idx').on(t.knowledgeBaseId),
-    index('knowledge_base_files_user_id_idx').on(t.userId),
-    index('knowledge_base_files_file_id_idx').on(t.fileId),
-    index('kbf_space_id_idx').on(t.spaceId),
+    primaryKey({ columns: [t.sourceSetId, t.fileId] }),
+    index('source_set_files_source_set_id_idx').on(t.sourceSetId),
+    index('source_set_files_user_id_idx').on(t.userId),
+    index('source_set_files_file_id_idx').on(t.fileId),
+    index('source_set_files_space_id_idx').on(t.spaceId),
   ],
 );

@@ -1,4 +1,4 @@
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { toolsClient } from '@/libs/trpc/client';
 import {
   type CallCodeInterpreterToolInput,
@@ -43,7 +43,7 @@ class CloudSandboxService {
     topicId: string,
     spaceId?: string,
   ): Promise<ExportAndUploadFileResult> {
-    const effectiveSpaceId = spaceId ?? getActiveWorkspaceSpaceId();
+    const effectiveSpaceId = resolveWorkspaceSpaceId({ spaceId });
     const input: ExportAndUploadFileInput = {
       filename,
       path,

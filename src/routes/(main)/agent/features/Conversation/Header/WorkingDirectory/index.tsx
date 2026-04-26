@@ -5,8 +5,8 @@ import { LaptopIcon, SquircleDashed } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { topicSelectors } from '@/store/chat/selectors';
 
@@ -20,7 +20,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       background-color: ${cssVar.colorFillTertiary};
 
       :hover {
-        color: ${cssVar.colorTextSecondary};
+        color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
         background-color: ${cssVar.colorFillSecondary};
       }
     `,

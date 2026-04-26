@@ -129,7 +129,7 @@ src/store/session
 ├── store.ts                           # SessionStore 的创建和使用
 ├── helpers.ts                         # 辅助函数
 └── slices                             # 各个独立的功能切片
-    ├── agent                          # 助理 Slice
+    ├── agent                          # 智能体 Slice
     │   ├── action.ts
     │   ├── index.ts
     │   └── selectors.ts
@@ -182,7 +182,6 @@ export const useSessionStore = createWithEqualityFn<SessionStore>()(
   ),
   shallow,
 );
-
 ```
 
 在这个 `store.ts` 文件中，我们创建了一个 `useSessionStore` 钩子，它使用 `zustand` 库来创建一个全局状态管理器。我们将 initialState 和每个 Slice 的动作合并，以创建完整的 SessionStore。

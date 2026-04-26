@@ -4,12 +4,12 @@ import { type ChatToolPayload, type MessageToolCall } from '@lobechat/types';
 import { type LobeChatPluginManifest } from '@lobehub/chat-plugin-sdk';
 
 import { type ChatStore } from '@/store/chat/store';
-import { useToolStore } from '@/store/tool';
 import {
   klavisStoreSelectors,
   lobehubSkillStoreSelectors,
   pluginSelectors,
 } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 import { type StoreSetter } from '@/store/types';
 
 /**

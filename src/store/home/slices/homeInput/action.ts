@@ -1,13 +1,17 @@
 import { type NavigateFunction } from 'react-router-dom';
 
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { chatGroupService } from '@/services/chatGroup';
 import { documentService } from '@/services/document';
-import { getAgentStoreState } from '@/store/agent';
 import { agentSelectors, builtinAgentSelectors } from '@/store/agent/selectors';
-import { getChatGroupStoreState } from '@/store/agentGroup';
+import { getAgentStoreState } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { type HomeStore } from '@/store/home/store';
 import { type StoreSetter } from '@/store/types';
+import { settingsSelectors } from '@/store/user/selectors';
+import { useUserStore } from '@/store/user/store';
+import { getPageDetailPath } from '@/utils/docs';
+import { resolveModelProviderWithFallback } from '@/utils/docsAgentModel';
 import { setNamespace } from '@/utils/storeDebug';
 
 import { type StarterMode } from './initialState';
@@ -37,14 +41,15 @@ export class HomeInputActionImpl {
 
     try {
       const agentState = getAgentStoreState();
+      const defaultAgentConfig = settingsSelectors.defaultAgentConfig(useUserStore.getState());
+      const resolvedSpaceId = resolveWorkspaceSpaceId();
 
       // 1. Get model/provider config from inbox agent
       const inboxAgentId = builtinAgentSelectors.inboxAgentId(agentState);
       const inboxConfig = inboxAgentId
         ? agentSelectors.getAgentConfigById(inboxAgentId)(agentState)
         : null;
-      const model = inboxConfig?.model;
-      const provider = inboxConfig?.provider;
+      const { model, provider } = resolveModelProviderWithFallback(inboxConfig, defaultAgentConfig);
 
       // 2. Create new Agent with inherited model/provider
       const result = await agentState.createAgent({
@@ -95,14 +100,15 @@ export class HomeInputActionImpl {
 
     try {
       const agentState = getAgentStoreState();
+      const defaultAgentConfig = settingsSelectors.defaultAgentConfig(useUserStore.getState());
+      const resolvedSpaceId = resolveWorkspaceSpaceId();
 
       // 1. Get model/provider config from inbox agent
       const inboxAgentId = builtinAgentSelectors.inboxAgentId(agentState);
       const inboxConfig = inboxAgentId
         ? agentSelectors.getAgentConfigById(inboxAgentId)(agentState)
         : null;
-      const model = inboxConfig?.model;
-      const provider = inboxConfig?.provider;
+      const { model, provider } = resolveModelProviderWithFallback(inboxConfig, defaultAgentConfig);
 
       // 2. Create new Group with inherited model/provider for orchestrator
       const { group } = await chatGroupService.createGroup({
@@ -113,6 +119,7 @@ export class HomeInputActionImpl {
       });
 
       // 3. Load groups and refresh
+      const { getChatGroupStoreState } = await import('@/store/agentGroup/store');
       const groupStore = getChatGroupStoreState();
       await groupStore.loadGroups();
 
@@ -163,40 +170,42 @@ export class HomeInputActionImpl {
 
     try {
       const agentState = getAgentStoreState();
+      const defaultAgentConfig = settingsSelectors.defaultAgentConfig(useUserStore.getState());
+      const resolvedSpaceId = resolveWorkspaceSpaceId();
 
       // 1. Get model/provider config from inbox agent
       const inboxAgentId = builtinAgentSelectors.inboxAgentId(agentState);
       const inboxConfig = inboxAgentId
         ? agentSelectors.getAgentConfigById(inboxAgentId)(agentState)
         : null;
-      const model = inboxConfig?.model;
-      const provider = inboxConfig?.provider;
+      const { model, provider } = resolveModelProviderWithFallback(inboxConfig, defaultAgentConfig);
 
       // 2. Create new Document
       const newDoc = await documentService.createDocument({
         editorData: '{}',
         fileType: 'custom/document',
+        spaceId: resolvedSpaceId,
         title: message?.slice(0, 50) || 'Untitled',
       });
 
       // 3. Navigate to Page
       const { navigate } = this.#get();
       if (navigate) {
-        navigate(`/page/${newDoc.id}`);
+        navigate(getPageDetailPath(newDoc.id, 'doc', newDoc.spaceId ?? resolvedSpaceId));
       }
 
-      // 4. Update pageAgent's model config and send initial message
-      const pageAgentId = builtinAgentSelectors.pageAgentId(agentState);
+      // 4. Update docsAgent's model config and send initial message
+      const docsAgentId = builtinAgentSelectors.docsAgentId(agentState);
 
-      if (pageAgentId) {
-        // Update pageAgent's model to match inbox selection
+      if (docsAgentId) {
+        // Update docsAgent's model to match inbox selection
         if (model && provider) {
-          await agentState.updateAgentConfigById(pageAgentId, { model, provider });
+          await agentState.updateAgentConfigById(docsAgentId, { model, provider });
         }
 
         const { sendMessage } = useChatStore.getState();
         await sendMessage({
-          context: { agentId: pageAgentId, scope: 'page' },
+          context: { agentId: docsAgentId, scope: 'doc' },
           message,
         });
       }

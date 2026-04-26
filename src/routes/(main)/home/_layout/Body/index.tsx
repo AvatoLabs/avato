@@ -1,22 +1,42 @@
 'use client';
 
 import { Accordion, Flexbox } from '@lobehub/ui';
+import { cx } from 'antd-style';
 import { memo } from 'react';
 
+import { useGlassNavVisual } from '@/features/NavPanel/GlassNavVisualContext';
+import { glassSidebarStyles } from '@/features/NavPanel/glassSidebar.styles';
+import { useFetchAgentList } from '@/hooks/useFetchAgentList';
+
 import Agent from './Agent';
-import BottomMenu from './BottomMenu';
+import GroupsPanel from './Groups';
+import RecentTopics from './RecentTopics';
 
 export enum GroupKey {
   Agent = 'agent',
+  Groups = 'groups',
   Project = 'project',
+  RecentTopics = 'recentTopics',
 }
 
 const Body = memo(() => {
+  const glass = useGlassNavVisual();
+  const { isRevalidating } = useFetchAgentList();
+
   return (
-    <Flexbox paddingInline={4}>
-      <Accordion defaultExpandedKeys={[GroupKey.Project, GroupKey.Agent]} gap={8}>
-        <Agent itemKey={GroupKey.Agent} />
-        <BottomMenu />
+    <Flexbox
+      className={cx(glass && glassSidebarStyles.scrollAccordionBody)}
+      flex={1}
+      paddingInline={8}
+      style={{ minHeight: 0 }}
+    >
+      <Accordion
+        defaultExpandedKeys={[GroupKey.Agent, GroupKey.Groups, GroupKey.RecentTopics]}
+        gap={10}
+      >
+        <Agent isRevalidating={isRevalidating} itemKey={GroupKey.Agent} />
+        <GroupsPanel itemKey={GroupKey.Groups} />
+        <RecentTopics itemKey={GroupKey.RecentTopics} />
       </Accordion>
     </Flexbox>
   );

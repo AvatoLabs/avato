@@ -71,9 +71,7 @@ const MarketAuthConfirmModal = memo<MarketAuthConfirmModalProps>(
         open={open}
         title={null}
         width={440}
-        classNames={{
-          container: cx(styles.container, isDarkMode && styles.container_dark),
-        }}
+        className={cx(styles.container, isDarkMode && styles.container_dark)}
         paddings={{
           desktop: 24,
         }}

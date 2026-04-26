@@ -7,7 +7,20 @@ import { SettingsTabs, SidebarTabKey } from '@/store/global/initialState';
  */
 export const useActiveTabKey = () => {
   const pathname = usePathname();
-  return (pathname.split('/').find(Boolean)! as SidebarTabKey) || SidebarTabKey.Home;
+  const segments = pathname.split('/').filter(Boolean);
+  const firstSegment = segments[0];
+
+  if (firstSegment === 'spaces') {
+    const surface = segments[2];
+
+    if (surface === 'docs') return 'docs' as SidebarTabKey;
+    if (surface === 'memory') return 'memory' as SidebarTabKey;
+    if (surface === 'files' || surface === 'settings' || surface === 'members') {
+      return 'content' as SidebarTabKey;
+    }
+  }
+
+  return (firstSegment as SidebarTabKey) || SidebarTabKey.Home;
 };
 
 /**

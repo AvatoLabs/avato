@@ -5,7 +5,7 @@ import semver from 'semver';
 import urlJoin from 'url-join';
 
 import { FetchCacheTag } from '@/const/cacheControl';
-import { type Locales } from '@/locales/resources';
+import { type Locales } from '@/locales/contents';
 import { type ChangelogIndexItem } from '@/types/changelog';
 import { markdownToTxt } from '@/utils/markdownToTxt';
 
@@ -216,7 +216,9 @@ export class ChangelogService {
   }
 
   private replaceCdnUrl(url: string) {
-    if (url?.startsWith('/blog')) return urlJoin('https://hub-apac-1.lobeobjects.space/', url);
+    if (url?.startsWith('/blog')) {
+      return urlJoin(docCdnPrefix || process.env.APP_URL || 'https://avato.turingmesh.com', url);
+    }
     return url;
   }
 }

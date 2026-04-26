@@ -19,7 +19,8 @@ export const PageEditorProvider = memo<PageEditorProviderProps>(
   ({
     children,
     pageId,
-    knowledgeBaseId,
+    pageKind,
+    sourceSetId,
     onDocumentIdChange,
     onEmojiChange,
     onSave,
@@ -39,13 +40,14 @@ export const PageEditorProvider = memo<PageEditorProviderProps>(
             documentId: pageId,
             editor,
             emoji,
-            knowledgeBaseId,
+            sourceSetId,
             onBack,
             onDelete,
             onDocumentIdChange,
             onEmojiChange,
             onSave,
             onTitleChange,
+            pageKind,
             parentId,
             title,
           })
@@ -53,9 +55,10 @@ export const PageEditorProvider = memo<PageEditorProviderProps>(
       >
         <StoreUpdater
           emoji={emoji}
-          knowledgeBaseId={knowledgeBaseId}
           pageId={pageId}
+          pageKind={pageKind}
           parentId={parentId}
+          sourceSetId={sourceSetId}
           title={title}
           onBack={onBack}
           onDelete={onDelete}

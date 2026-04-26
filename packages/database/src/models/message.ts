@@ -83,7 +83,7 @@ export interface QueryMessagesOptions {
   /**
    * Post-process function for file URLs
    */
-  postProcessUrl?: (path: string | null, file: { fileType: string }) => Promise<string>;
+  postProcessUrl?: (path: string | null, file: { fileType: string; id: string }) => Promise<string>;
   /**
    * Topic ID for MessageGroup aggregation queries
    */
@@ -133,7 +133,10 @@ export class MessageModel {
       threadId,
     }: QueryMessageParams = {},
     options: {
-      postProcessUrl?: (path: string | null, file: { fileType: string }) => Promise<string>;
+      postProcessUrl?: (
+        path: string | null,
+        file: { fileType: string; id: string },
+      ) => Promise<string>;
     } = {},
   ) => {
     // Build agent condition (handles legacy sessionId lookup and agentId-stored messages)
@@ -551,7 +554,10 @@ export class MessageModel {
   queryByIds = async (
     messageIds: string[],
     options: {
-      postProcessUrl?: (path: string | null, file: { fileType: string }) => Promise<string>;
+      postProcessUrl?: (
+        path: string | null,
+        file: { fileType: string; id: string },
+      ) => Promise<string>;
     } = {},
   ): Promise<UIChatMessage[]> => {
     if (messageIds.length === 0) return [];
@@ -808,7 +814,10 @@ export class MessageModel {
   private queryMessageGroupNodes = async (
     topicId: string,
     timeRange?: { endTime: Date; startTime: Date },
-    postProcessUrl?: (path: string | null, file: { fileType: string }) => Promise<string>,
+    postProcessUrl?: (
+      path: string | null,
+      file: { fileType: string; id: string },
+    ) => Promise<string>,
   ): Promise<UIChatMessage[]> => {
     // 1. Query MessageGroups for this topic, optionally filtered by time range
     const whereConditions = [

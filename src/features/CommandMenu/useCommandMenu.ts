@@ -6,17 +6,18 @@ import useSWR from 'swr';
 
 import { isDesktop } from '@/const/version';
 import { type SearchResult } from '@/database/repositories/search';
-import { useCreateNewModal } from '@/features/LibraryModal';
+import { useCreateSourceSetModal } from '@/features/SourceSetModal';
 import { useGroupWizard } from '@/layout/GlobalProvider/GroupWizardProvider';
 import { lambdaClient } from '@/libs/trpc/client';
 import { useCreateMenuItems } from '@/routes/(main)/home/_layout/hooks';
 import { electronSystemService } from '@/services/electron/system';
-import { useAgentStore } from '@/store/agent';
 import { builtinAgentSelectors } from '@/store/agent/selectors/builtinAgentSelectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { useGlobalStore } from '@/store/global';
 import { globalHelpers } from '@/store/global/helpers';
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
+import { useUserStore } from '@/store/user';
 
 import { useCommandMenuContext } from './CommandMenuContext';
 import { type ThemeMode } from './types';
@@ -49,7 +50,7 @@ export const useCommandMenu = () => {
   const inboxAgentId = useAgentStore(builtinAgentSelectors.inboxAgentId);
   const { openGroupWizard } = useGroupWizard();
   const { createGroupWithMembers, createGroupFromTemplate, createPage } = useCreateMenuItems();
-  const { open: openCreateLibraryModal } = useCreateNewModal();
+  const { open: openCreateSourceSetModal } = useCreateSourceSetModal();
 
   // Extract agentId from pathname when in agent context
   const agentId = useMemo(() => {
@@ -121,12 +122,17 @@ export const useCommandMenu = () => {
     [onClose],
   );
 
+  const setSettings = useUserStore((s) => s.setSettings);
+
   const handleThemeChange = useCallback(
-    (theme: ThemeMode) => {
-      setTheme(theme);
+    (next: ThemeMode) => {
+      setTheme(next);
+      queueMicrotask(() => {
+        void setSettings({ general: { themeMode: next } });
+      });
       onClose();
     },
-    [setTheme, onClose],
+    [onClose, setSettings, setTheme],
   );
 
   const handleAskLobeAI = useCallback(() => {
@@ -179,14 +185,10 @@ export const useCommandMenu = () => {
     onClose();
   }, [openNewTopicOrSaveTopic, onClose]);
 
-  const handleCreateLibrary = useCallback(() => {
+  const handleCreateSourceSet = useCallback(() => {
     onClose();
-    openCreateLibraryModal({
-      onSuccess: (id) => {
-        navigate(`/resource/library/${id}`);
-      },
-    });
-  }, [onClose, openCreateLibraryModal, navigate]);
+    openCreateSourceSetModal();
+  }, [onClose, openCreateSourceSetModal]);
 
   const handleCreatePage = useCallback(async () => {
     await createPage();
@@ -211,7 +213,7 @@ export const useCommandMenu = () => {
     handleAskLobeAI,
     handleBack,
     handleCreateAgentTeam,
-    handleCreateLibrary,
+    handleCreateSourceSet,
     handleCreatePage,
     handleCreateSession,
     handleCreateTopic,

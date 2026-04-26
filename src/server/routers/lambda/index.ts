@@ -24,6 +24,7 @@ import { apiKeyRouter } from './apiKey';
 import { chunkRouter } from './chunk';
 import { comfyuiRouter } from './comfyui';
 import { configRouter } from './config';
+import { contentShareRouter } from './contentShare';
 import { documentRouter } from './document';
 import { exporterRouter } from './exporter';
 import { fileRouter } from './file';
@@ -34,19 +35,20 @@ import { homeRouter } from './home';
 import { imageRouter } from './image';
 import { importerRouter } from './importer';
 import { klavisRouter } from './klavis';
-import { knowledgeBaseRouter } from './knowledgeBase';
 import { marketRouter } from './market';
 import { messageRouter } from './message';
 import { notebookRouter } from './notebook';
 import { oauthDeviceFlowRouter } from './oauthDeviceFlow';
 import { pluginRouter } from './plugin';
 import { ragEvalRouter } from './ragEval';
-import { resourceShareRouter } from './resourceShare';
+import { remoteDeviceRouter } from './remoteDevice';
 import { searchRouter } from './search';
 import { sessionRouter } from './session';
 import { sessionGroupRouter } from './sessionGroup';
 import { shareRouter } from './share';
+import { sourceSetRouter } from './sourceSet';
 import { spaceRouter } from './space';
+import { spaceMemoryRouter } from './spaceMemory';
 import { tagRouter } from './tag';
 import { threadRouter } from './thread';
 import { topicRouter } from './topic';
@@ -86,20 +88,22 @@ export const lambdaRouter = router({
   image: imageRouter,
   importer: importerRouter,
   klavis: klavisRouter,
-  knowledgeBase: knowledgeBaseRouter,
   market: marketRouter,
   message: messageRouter,
   notebook: notebookRouter,
   oauthDeviceFlow: oauthDeviceFlowRouter,
   plugin: pluginRouter,
   ragEval: ragEvalRouter,
-  resourceShare: resourceShareRouter,
+  contentShare: contentShareRouter,
+  remoteDevice: remoteDeviceRouter,
   search: searchRouter,
   session: sessionRouter,
   sessionGroup: sessionGroupRouter,
   tag: tagRouter,
   share: shareRouter,
+  sourceSet: sourceSetRouter,
   space: spaceRouter,
+  spaceMemory: spaceMemoryRouter,
   thread: threadRouter,
   topic: topicRouter,
   upload: uploadRouter,

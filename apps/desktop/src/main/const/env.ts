@@ -1,11 +1,14 @@
-import { dev, linux, macOS, windows } from 'electron-is';
 import os from 'node:os';
+
+import { dev, linux, macOS, windows } from 'electron-is';
 
 import { getDesktopEnv } from '@/env';
 
 export const isDev = dev();
 
 export const OFFICIAL_CLOUD_SERVER = getDesktopEnv().OFFICIAL_CLOUD_SERVER;
+export const DEVICE_GATEWAY_URL = getDesktopEnv().DEVICE_GATEWAY_URL;
+export const DESKTOP_CLOUD_SSO_PROVIDER = getDesktopEnv().DESKTOP_CLOUD_SSO_PROVIDER;
 
 export const isMac = macOS();
 export const isWindows = windows();

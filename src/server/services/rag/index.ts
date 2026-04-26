@@ -10,12 +10,13 @@ import pMap from 'p-map';
 
 import { ChunkModel } from '@/database/models/chunk';
 import { DocumentModel } from '@/database/models/document';
-import { knowledgeBaseFiles } from '@/database/schemas';
+import { sourceSetFiles } from '@/database/schemas';
 import type { LobeChatDatabase } from '@/database/type';
 import { getServerDefaultFilesConfig } from '@/server/globalConfig';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
+import { AuthorizedResourceResolver, ContentAuthorizer } from '@/server/services/content';
 import { DocumentService } from '@/server/services/document';
-import { AuthorizedResourceResolver, ResourceAuthorizer } from '@/server/services/resource';
+import { isRawFileContentId } from '@/types/content';
 
 import { assertRagEmbeddingDimensions, RAG_EMBEDDING_DIMENSIONS } from './constants';
 
@@ -29,6 +30,8 @@ interface FileContentResult {
   totalCharCount?: number;
   totalLineCount?: number;
 }
+
+const filterRawFileIds = (fileIds: string[]) => fileIds.filter(isRawFileContentId);
 
 const groupAndRankFiles = (
   chunks: ChatSemanticSearchChunk[],
@@ -121,7 +124,7 @@ export class ServerRagService {
   private readonly documentModel: DocumentModel;
   private readonly documentService: DocumentService;
   private readonly resolver: AuthorizedResourceResolver;
-  private readonly resourceAuthorizer: ResourceAuthorizer;
+  private readonly contentAuthorizer: ContentAuthorizer;
 
   constructor(
     private readonly serverDB: LobeChatDatabase,
@@ -131,14 +134,17 @@ export class ServerRagService {
     this.documentModel = new DocumentModel(serverDB, userId);
     this.documentService = new DocumentService(serverDB, userId);
     this.resolver = new AuthorizedResourceResolver(serverDB, userId);
-    this.resourceAuthorizer = new ResourceAuthorizer(serverDB, userId);
+    this.contentAuthorizer = new ContentAuthorizer(serverDB, userId);
   }
 
   getFileContents = async (
     fileIds: string[],
     _signal?: AbortSignal,
   ): Promise<FileContentResult[]> => {
-    const readableFileIds = await this.resourceAuthorizer.filterReadableFileIds(fileIds);
+    const rawFileIds = filterRawFileIds(fileIds);
+    if (rawFileIds.length === 0) return [];
+
+    const readableFileIds = await this.contentAuthorizer.filterReadableFileIds(rawFileIds);
 
     return pMap(
       readableFileIds,
@@ -186,11 +192,12 @@ export class ServerRagService {
     fileIds,
     query,
   }: Pick<SemanticSearchSchemaType, 'fileIds' | 'query'>) => {
-    const readableFileIds = fileIds
-      ? await this.resourceAuthorizer.filterReadableFileIds(fileIds)
+    const rawFileIds = fileIds ? filterRawFileIds(fileIds) : undefined;
+    const readableFileIds = rawFileIds
+      ? await this.contentAuthorizer.filterReadableFileIds(rawFileIds)
       : undefined;
 
-    if (fileIds && readableFileIds.length === 0) return [];
+    if (fileIds && (!readableFileIds || readableFileIds.length === 0)) return [];
 
     const { embedding, model } = await this.createQueryEmbedding(query);
 
@@ -204,7 +211,7 @@ export class ServerRagService {
   semanticSearchForChat = async (
     params: Pick<
       SemanticSearchSchemaType,
-      'chunkTopK' | 'fileIds' | 'fileTopK' | 'knowledgeIds' | 'query'
+      'chunkTopK' | 'fileIds' | 'fileTopK' | 'query' | 'sourceSetIds'
     >,
     _signal?: AbortSignal,
   ) => {
@@ -247,27 +254,28 @@ export class ServerRagService {
 
   private resolveSearchFileIds = async ({
     fileIds,
-    knowledgeIds,
-  }: Pick<SemanticSearchSchemaType, 'fileIds' | 'knowledgeIds'>) => {
-    const readableFileIds = fileIds
-      ? await this.resourceAuthorizer.filterReadableFileIds(fileIds)
+    sourceSetIds,
+  }: Pick<SemanticSearchSchemaType, 'fileIds' | 'sourceSetIds'>) => {
+    const rawFileIds = fileIds ? filterRawFileIds(fileIds) : undefined;
+    const readableFileIds = rawFileIds
+      ? await this.contentAuthorizer.filterReadableFileIds(rawFileIds)
       : [];
 
-    if (!knowledgeIds || knowledgeIds.length === 0) {
+    if (!sourceSetIds || sourceSetIds.length === 0) {
       return [...new Set(readableFileIds)];
     }
 
-    const readableKnowledgeIds =
-      await this.resourceAuthorizer.filterReadableKnowledgeBaseIds(knowledgeIds);
+    const readableSourceSetIds =
+      await this.contentAuthorizer.filterReadableSourceSetIds(sourceSetIds);
 
-    if (readableKnowledgeIds.length === 0) {
+    if (readableSourceSetIds.length === 0) {
       return [...new Set(readableFileIds)];
     }
 
-    const knowledgeFiles = await this.serverDB.query.knowledgeBaseFiles.findMany({
-      where: inArray(knowledgeBaseFiles.knowledgeBaseId, readableKnowledgeIds),
+    const sourceSetFileLinks = await this.serverDB.query.sourceSetFiles.findMany({
+      where: inArray(sourceSetFiles.sourceSetId, readableSourceSetIds),
     });
 
-    return [...new Set([...knowledgeFiles.map((file) => file.fileId), ...readableFileIds])];
+    return [...new Set([...sourceSetFileLinks.map((file) => file.fileId), ...readableFileIds])];
   };
 }

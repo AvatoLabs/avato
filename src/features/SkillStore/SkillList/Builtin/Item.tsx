@@ -14,8 +14,8 @@ import { MoreVerticalIcon, Plus, Trash2 } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
 import { builtinToolSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import { itemStyles } from '../style';
 
@@ -30,7 +30,7 @@ interface ItemProps {
 const Item = memo<ItemProps>(({ avatar, description, identifier, onOpenDetail, title }) => {
   const { t } = useTranslation(['setting', 'plugin']);
   const styles = itemStyles;
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
 
   const [installBuiltinTool, uninstallBuiltinTool, isInstalled] = useToolStore((s) => [
     s.installBuiltinTool,
@@ -39,7 +39,12 @@ const Item = memo<ItemProps>(({ avatar, description, identifier, onOpenDetail, t
   ]);
 
   const handleInstall = async () => {
-    await installBuiltinTool(identifier);
+    try {
+      await installBuiltinTool(identifier);
+    } catch (error) {
+      console.error('Failed to install builtin tool:', error);
+      message.error(t('store.actions.installFailed', { ns: 'plugin' }));
+    }
   };
 
   const handleUninstall = () => {
@@ -47,7 +52,12 @@ const Item = memo<ItemProps>(({ avatar, description, identifier, onOpenDetail, t
       centered: true,
       okButtonProps: { danger: true },
       onOk: async () => {
-        await uninstallBuiltinTool(identifier);
+        try {
+          await uninstallBuiltinTool(identifier);
+        } catch (error) {
+          console.error('Failed to uninstall builtin tool:', error);
+          message.error(t('store.actions.uninstallFailed', { ns: 'plugin' }));
+        }
       },
       title: t('store.actions.confirmUninstall', { ns: 'plugin' }),
       type: 'error',
@@ -58,7 +68,7 @@ const Item = memo<ItemProps>(({ avatar, description, identifier, onOpenDetail, t
     if (isInstalled) {
       return (
         <DropdownMenu
-          nativeButton={false}
+          nativeButton
           placement="bottomRight"
           items={[
             {

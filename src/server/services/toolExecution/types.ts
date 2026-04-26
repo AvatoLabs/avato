@@ -7,14 +7,18 @@ import { type ProcessContentBlocksFn } from '@/server/services/mcp/contentProces
 export interface ToolExecutionContext {
   /** Target device ID for device proxy tool calls */
   activeDeviceId?: string;
-  /** Knowledge base IDs enabled for the current agent/session */
-  knowledgeBaseIds?: string[];
   /** Memory tool permission from agent chat config */
   memoryToolPermission?: 'read-only' | 'read-write';
+  /** Current tool message id when available. */
+  messageId?: string;
+  /** Current agent runtime operation id. */
+  operationId?: string;
   /** Optional MCP content block post-processor for multimodal tool results */
   processContentBlocks?: ProcessContentBlocksFn;
   /** Server database for LobeHub Skills execution */
   serverDB?: LobeChatDatabase;
+  /** Knowledge base IDs enabled for the current agent/session */
+  sourceSetIds?: string[];
   /** When set, preferred Space for sandbox exports (`createFileRecord` / `space_blobs`); must be user-accessible. */
   spaceId?: string;
   toolManifestMap: Record<string, LobeToolManifest>;

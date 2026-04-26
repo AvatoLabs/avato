@@ -59,7 +59,7 @@ export default {
   'aggregator.skills.installabilityReason.fetchFailed':
     'The source package could not be fetched during verification, so one-click import is disabled.',
   'aggregator.skills.installabilityReason.invalidPackage':
-    'The downloaded package did not pass LobeHub skill parsing, so one-click import is disabled.',
+    'The downloaded package did not pass Avato skill parsing, so one-click import is disabled.',
   'aggregator.skills.installabilityReason.packageTooLarge':
     'The source package is larger than the current verification limit, so one-click import is disabled.',
   'aggregator.skills.meta.version': 'v{{version}}',
@@ -116,6 +116,7 @@ export default {
   'aggregator.warnings.title': 'Some sources could not be refreshed',
   'assistants.addAgent': 'Add Agent',
   'assistants.addAgentAndConverse': 'Add Agent & Chat',
+  'assistants.addAgentError': 'Failed to add agent',
   'assistants.addAgentSuccess': 'Added',
   'assistants.conversation.l1':
     'Hi, I’m **{{name}}**. Share your goal or Context—we’ll collaborate from here.',
@@ -124,8 +125,8 @@ export default {
   'assistants.description': 'About this Agent',
   'assistants.detail': 'Details',
   'assistants.details.capabilities.knowledge.desc':
-    'This Agent includes the following Libraries to help answer more questions.',
-  'assistants.details.capabilities.knowledge.title': 'Library',
+    'This Agent includes the following reference sets to help answer more questions.',
+  'assistants.details.capabilities.knowledge.title': 'Reference Sets',
   'assistants.details.capabilities.plugin.desc':
     'This Agent includes the following Skills to help you complete more tasks.',
   'assistants.details.capabilities.plugin.title': 'Built-in Skills',
@@ -158,6 +159,7 @@ export default {
   'assistants.empty.title': 'No Agents found',
   'assistants.list': 'Agent List',
   'assistants.more': 'More',
+  'assistants.noConfig': 'Agent configuration is not available',
   'assistants.plugins': 'Integrated Skills',
   'assistants.recentSubmits': 'Recent Updates',
   'assistants.sorts.haveSkills': 'Skilled',
@@ -184,7 +186,7 @@ export default {
   'assistants.systemRole': 'Agent Profile',
   'assistants.tokenUsage': 'Agent Prompt Token Usage',
   'assistants.try': 'Try',
-  'assistants.withKnowledge': 'This Agent includes Libraries',
+  'assistants.withSourceSet': 'This Agent includes Reference Sets',
   'assistants.withPlugin': 'This Agent includes Skills',
   'back': 'Back to Discovery',
   'category.assistant.academic': 'Academic',
@@ -235,7 +237,7 @@ export default {
   'filterBy.other.functionCall': 'Supports Function Calls',
   'filterBy.other.title': 'Other',
   'filterBy.other.vision': 'Supports Visual Recognition',
-  'filterBy.other.withKnowledge': 'Includes Libraries',
+  'filterBy.other.withSourceSet': 'Includes Reference Sets',
   'filterBy.other.withTool': 'Includes Skills',
   'filterBy.pricing': 'Model Pricing',
   'filterBy.timePeriod.all': 'All Time',
@@ -270,6 +272,15 @@ export default {
 
   'fork.viewAllForks': 'View all forks',
 
+  'groupAgents.addAndConverse': 'Add & Start Conversation',
+  'groupAgents.addError': 'Failed to add group agent',
+  'groupAgents.addGroup': 'Add Group',
+  'groupAgents.addSuccess': 'Group agent added successfully',
+  'groupAgents.duplicateAdd.content':
+    'This group agent has already been added. Do you want to add it again?',
+  'groupAgents.duplicateAdd.ok': 'Add Anyway',
+  'groupAgents.duplicateAdd.title': 'Group Already Added',
+  'groupAgents.noConfig': 'Group configuration not available',
   'groupAgents.tag': 'Group',
 
   'groupAgents.status.archived.reasons.official':
@@ -1248,6 +1259,8 @@ export default {
   'user.favoritePlugins': 'Saved Skills',
 
   'user.follow': 'Follow',
+  'user.followFailed': 'Failed to follow',
+  'user.followSuccess': 'Followed',
 
   'user.followers': 'Followers',
 
@@ -1299,5 +1312,7 @@ export default {
   'user.unfavoriteFailed': 'Failed to unsave',
   'user.unfavoriteSuccess': 'Unsaved',
   'user.unfollow': 'Unfollow',
+  'user.unfollowFailed': 'Failed to unfollow',
+  'user.unfollowSuccess': 'Unfollowed',
   'user.website': 'Website',
 };

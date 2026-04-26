@@ -8,7 +8,7 @@ import { DEFAULT_AGENT_CONFIG } from '@/const/settings';
 import * as toolEngineeringModule from '@/helpers/toolEngineering';
 import { agentSelectors, chatConfigByIdSelectors } from '@/store/agent/selectors';
 import { aiModelSelectors } from '@/store/aiInfra';
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 
 import { chatService } from './index';
 import { type ResolvedAgentConfig } from './mecha';

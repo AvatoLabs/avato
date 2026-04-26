@@ -8,9 +8,17 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useI18n } from '../../lib/i18n';
 import { useThemeColors } from '../../theme/colors';
 
-function SectionCard({ children, title }: { children: React.ReactNode; title: string }) {
+function SectionCard({
+  children,
+  contentWidth,
+  title,
+}: {
+  children: React.ReactNode;
+  contentWidth?: number;
+  title: string;
+}) {
   return (
-    <View className="mx-5 mb-5">
+    <View className="mb-5 self-center" style={contentWidth ? { width: contentWidth } : undefined}>
       <Text className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
         {title}
       </Text>
@@ -88,6 +96,7 @@ interface GroupSettingsSectionProps {
     openingQuestions: string;
     systemPrompt: string;
   };
+  contentWidth?: number;
   delay?: number;
   loading: boolean;
   onAllowDMChange: (v: boolean) => void;
@@ -101,6 +110,7 @@ interface GroupSettingsSectionProps {
 export function GroupSettingsSection({
   allowDM,
   config,
+  contentWidth,
   delay = 100,
   loading,
   onAllowDMChange,
@@ -116,7 +126,7 @@ export function GroupSettingsSection({
   return (
     <>
       <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
-        <SectionCard title={t.chatSettingsGroup}>
+        <SectionCard contentWidth={contentWidth} title={t.chatSettingsGroup}>
           {loading ? (
             <View className="items-center justify-center py-6">
               <ActivityIndicator color={colors.primary} />
@@ -141,7 +151,7 @@ export function GroupSettingsSection({
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(120).duration(300)}>
-        <SectionCard title={t.chatSettingsSystemPrompt}>
+        <SectionCard contentWidth={contentWidth} title={t.chatSettingsSystemPrompt}>
           {loading ? (
             <View className="items-center justify-center py-6">
               <ActivityIndicator color={colors.primary} />
@@ -159,7 +169,7 @@ export function GroupSettingsSection({
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(140).duration(300)}>
-        <SectionCard title={t.agentConfigOpening}>
+        <SectionCard contentWidth={contentWidth} title={t.agentConfigOpening}>
           {loading ? (
             <View className="items-center justify-center py-6">
               <ActivityIndicator color={colors.primary} />

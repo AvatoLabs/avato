@@ -14,6 +14,10 @@ import HashTags from '@/routes/(main)/memory/features/HashTags';
 import HighlightedContent from '@/routes/(main)/memory/features/HighlightedContent';
 import SourceLink from '@/routes/(main)/memory/features/SourceLink';
 import Time from '@/routes/(main)/memory/features/Time';
+import {
+  useClearDetailSelection,
+  useCloseInvalidDetailSelection,
+} from '@/routes/(main)/memory/features/useResetDetailSelection';
 import { useUserMemoryStore } from '@/store/userMemory';
 import { LayersEnum } from '@/types/userMemory';
 
@@ -32,6 +36,8 @@ const ActivityRightPanel = memo(() => {
   const useFetchMemoryDetail = useUserMemoryStore((s) => s.useFetchMemoryDetail);
 
   const { data: activity, isLoading } = useFetchMemoryDetail(activityId, LayersEnum.Activity);
+  useCloseInvalidDetailSelection('activityId', activityId, isLoading, Boolean(activity));
+  const clearSelection = useClearDetailSelection('activityId');
 
   const schedule = useMemo(() => {
     if (!activity) return null;
@@ -107,6 +113,9 @@ const ActivityRightPanel = memo(() => {
         right: activityId ? (
           <ActivityDropdown id={activityId} size={DESKTOP_HEADER_ICON_SIZE} />
         ) : undefined,
+      }}
+      onExpandChange={(expand) => {
+        if (!expand) clearSelection();
       }}
     >
       {content}

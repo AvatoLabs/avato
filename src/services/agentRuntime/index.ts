@@ -1,12 +1,12 @@
 import { type UIChatMessage } from '@lobechat/types';
 
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { createAgentToolsEngine } from '@/helpers/toolEngineering';
 import { lambdaClient } from '@/libs/trpc/client';
 import { type HumanInterventionRequest } from '@/services/agentRuntime/type';
 import { contextEngineering } from '@/services/chat/mecha';
-import { getAgentStoreState } from '@/store/agent';
 import { agentChatConfigSelectors, agentSelectors } from '@/store/agent/selectors';
+import { getAgentStoreState } from '@/store/agent/store';
 
 export { agentRuntimeClient } from './client';
 export * from './type';
@@ -60,7 +60,7 @@ class AgentRuntimeService {
       toolsEngine.getEnabledPluginManifests(enabledToolIds).entries(),
     );
 
-    const effectiveSpaceId = data.spaceId ?? getActiveWorkspaceSpaceId() ?? undefined;
+    const effectiveSpaceId = resolveWorkspaceSpaceId({ spaceId: data.spaceId });
 
     return await lambdaClient.aiAgent.createOperation.mutate({
       ...data,

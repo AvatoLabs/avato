@@ -31,12 +31,12 @@ const PasswordRow = ({ mobile }: PasswordRowProps) => {
         redirectTo: `/reset-password?email=${encodeURIComponent(userProfile.email)}`,
       });
       notification.success({
-        message: t('profile.resetPasswordSent'),
+        title: t('profile.resetPasswordSent'),
       });
     } catch (error) {
       console.error('Failed to send reset password email:', error);
       notification.error({
-        message: t('profile.resetPasswordError'),
+        title: t('profile.resetPasswordError'),
       });
     } finally {
       setSending(false);

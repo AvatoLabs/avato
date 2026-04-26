@@ -150,12 +150,13 @@ export const AssistantActionsBar = memo<AssistantActionsBarProps>(
         defaultActions.translate,
         defaultActions.divider,
         defaultActions.share,
+        defaultActions.addToSpaceMemory,
         defaultActions.divider,
         defaultActions.regenerate,
         defaultActions.delAndRegenerate,
         defaultActions.del,
       ];
-      return [...base, ...extraMenuItems];
+      return [...base, ...extraMenuItems].filter(Boolean) as MessageActionItemOrDivider[];
     }, [
       actionsConfig?.menu,
       defaultActions.edit,
@@ -165,6 +166,7 @@ export const AssistantActionsBar = memo<AssistantActionsBarProps>(
       defaultActions.tts,
       defaultActions.translate,
       defaultActions.share,
+      defaultActions.addToSpaceMemory,
       defaultActions.regenerate,
       defaultActions.delAndRegenerate,
       defaultActions.del,

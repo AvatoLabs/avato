@@ -54,7 +54,7 @@ describe('MessagesEngine', () => {
         inputTemplate: '{{text}}',
         knowledge: {
           fileContents: [{ content: 'test', fileId: 'f1', filename: 'test.txt' }],
-          knowledgeBases: [{ id: 'kb1', name: 'Knowledge Base 1' }],
+          sourceSets: [{ id: 'kb1', name: 'Knowledge Base 1' }],
         },
         systemRole: 'You are a helpful assistant',
         toolsConfig: {
@@ -268,10 +268,10 @@ describe('MessagesEngine', () => {
       expect(result.metadata.knowledgeInjected).toBe(true);
     });
 
-    it('should inject knowledge bases', async () => {
+    it('should inject source sets', async () => {
       const params = createBasicParams({
         knowledge: {
-          knowledgeBases: [
+          sourceSets: [
             {
               description: 'Test knowledge base',
               id: 'kb-1',
@@ -409,8 +409,8 @@ describe('MessagesEngine', () => {
     });
   });
 
-  describe('Page Editor context', () => {
-    it('should inject page content to the last user message when pageContentContext is provided', async () => {
+  describe('Doc Editor context', () => {
+    it('should inject doc content to the last user message when docContentContext is provided', async () => {
       const messages: UIChatMessage[] = [
         {
           content: 'First question',
@@ -427,7 +427,7 @@ describe('MessagesEngine', () => {
           updatedAt: Date.now(),
         } as UIChatMessage,
         {
-          content: 'Second question about the page',
+          content: 'Second question about the doc',
           createdAt: Date.now(),
           id: 'msg-3',
           role: 'user',
@@ -437,7 +437,7 @@ describe('MessagesEngine', () => {
 
       const params = createBasicParams({
         messages,
-        pageContentContext: {
+        docContentContext: {
           markdown: '# Document Title\n\nDocument content here.',
           metadata: {
             charCount: 40,
@@ -454,7 +454,7 @@ describe('MessagesEngine', () => {
         { content: 'First question', role: 'user' },
         { content: 'Answer', role: 'assistant' },
         {
-          content: `Second question about the page
+          content: `Second question about the doc
 
 <!-- SYSTEM CONTEXT (NOT PART OF USER QUERY) -->
 <context.instruction>following part contains context information injected by the system. Please follow these instructions:
@@ -462,24 +462,24 @@ describe('MessagesEngine', () => {
 1. Always prioritize handling user-visible content.
 2. the context is only required when user's queries rely on it.
 </context.instruction>
-<current_page_context>
-<current_page title="Test Document">
+<current_doc_context>
+<current_doc title="Test Document">
 <markdown chars="40" lines="3">
 # Document Title
 
 Document content here.
 </markdown>
-</current_page>
-</current_page_context>
+</current_doc>
+</current_doc_context>
 <!-- END SYSTEM CONTEXT -->`,
           role: 'user',
         },
       ]);
 
-      expect(result.metadata.pageEditorContextInjected).toBe(true);
+      expect(result.metadata.docEditorContextInjected).toBe(true);
     });
 
-    it('should not inject page content when not enabled', async () => {
+    it('should not inject doc content when not enabled', async () => {
       const messages: UIChatMessage[] = [
         {
           content: 'Question',
@@ -496,23 +496,23 @@ Document content here.
       const result = await engine.process();
 
       expect(result.messages).toEqual([{ content: 'Question', role: 'user' }]);
-      expect(result.metadata.pageEditorContextInjected).toBeUndefined();
+      expect(result.metadata.docEditorContextInjected).toBeUndefined();
     });
   });
 
-  describe('Page Selections', () => {
-    it('should inject page selections to each user message that has them', async () => {
+  describe('Doc Selections', () => {
+    it('should inject doc selections to each user message that has them', async () => {
       const messages: UIChatMessage[] = [
         {
           content: 'First question with selection',
           createdAt: Date.now(),
           id: 'msg-1',
           metadata: {
-            pageSelections: [
+            docSelections: [
               {
                 content: 'Selected paragraph 1',
                 id: 'sel-1',
-                pageId: 'page-1',
+                docId: 'doc-1',
                 xml: '<p>Selected paragraph 1</p>',
               },
             ],
@@ -532,11 +532,11 @@ Document content here.
           createdAt: Date.now(),
           id: 'msg-3',
           metadata: {
-            pageSelections: [
+            docSelections: [
               {
                 content: 'Selected paragraph 2',
                 id: 'sel-2',
-                pageId: 'page-1',
+                docId: 'doc-1',
                 xml: '<p>Selected paragraph 2</p>',
               },
             ],
@@ -548,7 +548,7 @@ Document content here.
 
       const params = createBasicParams({
         messages,
-        pageContentContext: {
+        docContentContext: {
           markdown: '# Doc',
           metadata: { title: 'Doc' },
         },
@@ -567,13 +567,13 @@ Document content here.
 1. Always prioritize handling user-visible content.
 2. the context is only required when user's queries rely on it.
 </context.instruction>
-<user_page_selections>
+<user_doc_selections>
 <user_selections count="1">
 <selection >
 <p>Selected paragraph 1</p>
 </selection>
 </user_selections>
-</user_page_selections>
+</user_doc_selections>
 <!-- END SYSTEM CONTEXT -->`,
           role: 'user',
         },
@@ -587,27 +587,27 @@ Document content here.
 1. Always prioritize handling user-visible content.
 2. the context is only required when user's queries rely on it.
 </context.instruction>
-<user_page_selections>
+<user_doc_selections>
 <user_selections count="1">
 <selection >
 <p>Selected paragraph 2</p>
 </selection>
 </user_selections>
-</user_page_selections>
-<current_page_context>
-<current_page title="Doc">
+</user_doc_selections>
+<current_doc_context>
+<current_doc title="Doc">
 <markdown chars="5" lines="1">
 # Doc
 </markdown>
-</current_page>
-</current_page_context>
+</current_doc>
+</current_doc_context>
 <!-- END SYSTEM CONTEXT -->`,
           role: 'user',
         },
       ]);
     });
 
-    it('should skip user messages without pageSelections', async () => {
+    it('should skip user messages without docSelections', async () => {
       const messages: UIChatMessage[] = [
         {
           content: 'No selection here',
@@ -628,11 +628,11 @@ Document content here.
           createdAt: Date.now(),
           id: 'msg-3',
           metadata: {
-            pageSelections: [
+            docSelections: [
               {
                 content: 'Selected text',
                 id: 'sel-1',
-                pageId: 'page-1',
+                docId: 'doc-1',
                 xml: '<span>Selected text</span>',
               },
             ],
@@ -644,7 +644,7 @@ Document content here.
 
       const params = createBasicParams({
         messages,
-        pageContentContext: {
+        docContentContext: {
           markdown: '# Doc',
           metadata: { title: 'Doc' },
         },
@@ -665,38 +665,38 @@ Document content here.
 1. Always prioritize handling user-visible content.
 2. the context is only required when user's queries rely on it.
 </context.instruction>
-<user_page_selections>
+<user_doc_selections>
 <user_selections count="1">
 <selection >
 <span>Selected text</span>
 </selection>
 </user_selections>
-</user_page_selections>
-<current_page_context>
-<current_page title="Doc">
+</user_doc_selections>
+<current_doc_context>
+<current_doc title="Doc">
 <markdown chars="5" lines="1">
 # Doc
 </markdown>
-</current_page>
-</current_page_context>
+</current_doc>
+</current_doc_context>
 <!-- END SYSTEM CONTEXT -->`,
           role: 'user',
         },
       ]);
     });
 
-    it('should have only one SYSTEM CONTEXT wrapper when both selections and page content are injected', async () => {
+    it('should have only one SYSTEM CONTEXT wrapper when both selections and doc content are injected', async () => {
       const messages: UIChatMessage[] = [
         {
           content: 'Question about selection',
           createdAt: Date.now(),
           id: 'msg-1',
           metadata: {
-            pageSelections: [
+            docSelections: [
               {
                 content: 'Selected text',
                 id: 'sel-1',
-                pageId: 'page-1',
+                docId: 'doc-1',
                 xml: '<p>Selected text</p>',
               },
             ],
@@ -708,7 +708,7 @@ Document content here.
 
       const params = createBasicParams({
         messages,
-        pageContentContext: {
+        docContentContext: {
           markdown: '# Full Document',
           metadata: { title: 'Full Doc' },
         },
@@ -727,35 +727,35 @@ Document content here.
 1. Always prioritize handling user-visible content.
 2. the context is only required when user's queries rely on it.
 </context.instruction>
-<user_page_selections>
+<user_doc_selections>
 <user_selections count="1">
 <selection >
 <p>Selected text</p>
 </selection>
 </user_selections>
-</user_page_selections>
-<current_page_context>
-<current_page title="Full Doc">
+</user_doc_selections>
+<current_doc_context>
+<current_doc title="Full Doc">
 <markdown chars="15" lines="1">
 # Full Document
 </markdown>
-</current_page>
-</current_page_context>
+</current_doc>
+</current_doc_context>
 <!-- END SYSTEM CONTEXT -->`,
           role: 'user',
         },
       ]);
     });
 
-    it('should not inject selections when page editor is not enabled', async () => {
+    it('should not inject selections when doc editor is not enabled', async () => {
       const messages: UIChatMessage[] = [
         {
           content: 'Question',
           createdAt: Date.now(),
           id: 'msg-1',
           metadata: {
-            pageSelections: [
-              { content: 'Selected', id: 'sel-1', pageId: 'page-1', xml: '<p>Selected</p>' },
+            docSelections: [
+              { content: 'Selected', id: 'sel-1', docId: 'doc-1', xml: '<p>Selected</p>' },
             ],
           },
           role: 'user',
@@ -763,7 +763,7 @@ Document content here.
         } as UIChatMessage,
       ];
 
-      // No pageContentContext or initialContext.pageEditor means not enabled
+      // No docContentContext or initialContext.docEditor means not enabled
       const params = createBasicParams({ messages });
       const engine = new MessagesEngine(params);
 

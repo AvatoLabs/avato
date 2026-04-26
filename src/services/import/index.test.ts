@@ -183,9 +183,9 @@ describe('ImportService', () => {
           success: true as const,
           data: {
             date: '2024-01-01',
-            dirname: 'uploads/spc/sess',
+            dirname: 'v2/spaces/spc/blobs/sess',
             filename: 'mock-uuid-123.json',
-            path: 'uploads/spc/sess/mock-uuid-123.json',
+            path: 'v2/spaces/spc/blobs/sess/mock-uuid-123.json',
           },
         };
 
@@ -217,7 +217,7 @@ describe('ImportService', () => {
         );
         expect(callbacks.onStageChange).toHaveBeenCalledWith(ImportStage.Importing);
         expect(lambdaClient.importer.importByFile.mutate).toHaveBeenCalledWith({
-          pathname: 'uploads/spc/sess/mock-uuid-123.json',
+          pathname: 'v2/spaces/spc/blobs/sess/mock-uuid-123.json',
         });
         expect(callbacks.onStageChange).toHaveBeenCalledWith(ImportStage.Success);
         expect(callbacks.onSuccess).toHaveBeenCalled();
@@ -252,9 +252,9 @@ describe('ImportService', () => {
           success: true as const,
           data: {
             date: '2024-01-01',
-            dirname: 'uploads/spc/sess',
+            dirname: 'v2/spaces/spc/blobs/sess',
             filename: 'mock-uuid-123.json',
-            path: 'uploads/spc/sess/mock-uuid-123.json',
+            path: 'v2/spaces/spc/blobs/sess/mock-uuid-123.json',
           },
         };
 
@@ -296,9 +296,9 @@ describe('ImportService', () => {
           success: true as const,
           data: {
             date: '2024-01-01',
-            dirname: 'uploads/spc/sess',
+            dirname: 'v2/spaces/spc/blobs/sess',
             filename: 'mock-uuid-123.json',
-            path: 'uploads/spc/sess/mock-uuid-123.json',
+            path: 'v2/spaces/spc/blobs/sess/mock-uuid-123.json',
           },
         };
 
@@ -370,9 +370,9 @@ describe('ImportService', () => {
           success: true as const,
           data: {
             date: '2024-01-01',
-            dirname: 'uploads/spc/sess',
+            dirname: 'v2/spaces/spc/blobs/sess',
             filename: 'mock-uuid-123.json',
-            path: 'uploads/spc/sess/mock-uuid-123.json',
+            path: 'v2/spaces/spc/blobs/sess/mock-uuid-123.json',
           },
         };
 
@@ -515,9 +515,9 @@ describe('ImportService', () => {
           success: true as const,
           data: {
             date: '2024-01-01',
-            dirname: 'uploads/spc/sess',
+            dirname: 'v2/spaces/spc/blobs/sess',
             filename: 'mock-uuid-123.json',
-            path: 'uploads/spc/sess/mock-uuid-123.json',
+            path: 'v2/spaces/spc/blobs/sess/mock-uuid-123.json',
           },
         };
 
@@ -564,9 +564,9 @@ describe('ImportService', () => {
           success: true as const,
           data: {
             date: '2024-01-01',
-            dirname: 'uploads/spc/sess',
+            dirname: 'v2/spaces/spc/blobs/sess',
             filename: 'mock-uuid-123.json',
-            path: 'uploads/spc/sess/mock-uuid-123.json',
+            path: 'v2/spaces/spc/blobs/sess/mock-uuid-123.json',
           },
         };
 

@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AsyncTaskStatus, AsyncTaskType } from '@/types/asyncTask';
@@ -9,6 +10,7 @@ const {
   mockServerDB,
   mockGetKeyFromFullUrl,
   mockGetFullFileUrl,
+  mockResolveProviderReadableFileReference,
   mockAsyncTaskModelUpdate,
   mockChargeBeforeGenerate,
   mockCreateAsyncCaller,
@@ -18,6 +20,7 @@ const {
   },
   mockGetKeyFromFullUrl: vi.fn(),
   mockGetFullFileUrl: vi.fn(),
+  mockResolveProviderReadableFileReference: vi.fn(),
   mockAsyncTaskModelUpdate: vi.fn(),
   mockChargeBeforeGenerate: vi.fn(),
   mockCreateAsyncCaller: vi.fn(),
@@ -44,6 +47,10 @@ vi.mock('@/server/services/file', () => ({
     getKeyFromFullUrl: mockGetKeyFromFullUrl,
     getFullFileUrl: mockGetFullFileUrl,
   })),
+}));
+
+vi.mock('@/server/services/file/resolveProviderReadableFileReference', () => ({
+  resolveProviderReadableFileReference: mockResolveProviderReadableFileReference,
 }));
 
 // Mock AsyncTaskModel
@@ -111,6 +118,7 @@ describe('imageRouter', () => {
     mockChargeBeforeGenerate.mockResolvedValue(undefined);
     mockGetKeyFromFullUrl.mockResolvedValue(null);
     mockGetFullFileUrl.mockResolvedValue(null);
+    mockResolveProviderReadableFileReference.mockResolvedValue(null);
 
     // Setup default transaction mock
     const mockBatch = {
@@ -184,6 +192,9 @@ describe('imageRouter', () => {
       mockGetKeyFromFullUrl
         .mockResolvedValueOnce('files/image1.jpg')
         .mockResolvedValueOnce('files/image2.jpg');
+      mockGetFullFileUrl
+        .mockResolvedValueOnce('https://blob.example.com/files/image1.jpg')
+        .mockResolvedValueOnce('https://blob.example.com/files/image2.jpg');
 
       const ctx = createMockCtx();
       const input = createDefaultInput({
@@ -210,6 +221,7 @@ describe('imageRouter', () => {
 
     it('should convert single imageUrl to S3 key for database storage', async () => {
       mockGetKeyFromFullUrl.mockResolvedValue('files/single-image.jpg');
+      mockGetFullFileUrl.mockResolvedValue('https://blob.example.com/files/single-image.jpg');
 
       const ctx = createMockCtx();
       const input = createDefaultInput({
@@ -225,6 +237,98 @@ describe('imageRouter', () => {
       expect(mockGetKeyFromFullUrl).toHaveBeenCalledWith(
         'https://s3.amazonaws.com/bucket/files/single-image.jpg',
       );
+    });
+
+    it('should resolve internal file proxy urls to provider-readable urls in production', async () => {
+      mockResolveProviderReadableFileReference.mockResolvedValue({
+        fileId: 'file-1',
+        key: 'files/internal-image.jpg',
+        url: 'https://blob.example.com/files/internal-image.jpg',
+      });
+
+      const ctx = createMockCtx();
+      const input = createDefaultInput({
+        params: {
+          imageUrl: '/f/file-1',
+          prompt: 'test prompt',
+        },
+      });
+
+      const caller = imageRouter.createCaller(ctx);
+      const result = await caller.createImage(input);
+
+      expect(result.success).toBe(true);
+      expect(mockResolveProviderReadableFileReference).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceIp: null,
+          url: '/f/file-1',
+          userAgent: null,
+          userId: mockUserId,
+          via: 'image_generation_input',
+        }),
+      );
+      expect(mockAsyncCallerCreateImage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: expect.objectContaining({
+            imageUrl: 'https://blob.example.com/files/internal-image.jpg',
+          }),
+        }),
+      );
+      expect(mockGetKeyFromFullUrl).not.toHaveBeenCalledWith('/f/file-1');
+    });
+
+    it('should resolve topic share attachment proxy urls to provider-readable urls', async () => {
+      mockResolveProviderReadableFileReference.mockResolvedValue({
+        fileId: 'file-1',
+        key: 'v2/spaces/space-1/blobs/shared-image.jpg',
+        url: 'https://blob.example.com/shared-image.jpg',
+      });
+
+      const ctx = createMockCtx();
+      const input = createDefaultInput({
+        params: {
+          imageUrl: '/share/t/share-1/f/file-1',
+          prompt: 'test prompt',
+        },
+      });
+
+      const caller = imageRouter.createCaller(ctx);
+      const result = await caller.createImage(input);
+
+      expect(result.success).toBe(true);
+      expect(mockResolveProviderReadableFileReference).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: '/share/t/share-1/f/file-1',
+          via: 'image_generation_input',
+        }),
+      );
+      expect(mockAsyncCallerCreateImage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: expect.objectContaining({
+            imageUrl: 'https://blob.example.com/shared-image.jpg',
+          }),
+        }),
+      );
+      expect(mockGetKeyFromFullUrl).not.toHaveBeenCalledWith('/share/t/share-1/f/file-1');
+    });
+
+    it('should fail closed when internal image reference is no longer readable', async () => {
+      mockResolveProviderReadableFileReference.mockRejectedValue(
+        new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' }),
+      );
+
+      const ctx = createMockCtx();
+      const input = createDefaultInput({
+        params: {
+          imageUrl: '/f/file-1',
+          prompt: 'test prompt',
+        },
+      });
+
+      const caller = imageRouter.createCaller(ctx);
+
+      await expect(caller.createImage(input)).rejects.toThrow('RESOURCE_ACCESS_DENIED');
+      expect(mockGetKeyFromFullUrl).not.toHaveBeenCalledWith('/f/file-1');
     });
 
     it('should handle failed URL to key conversion gracefully for imageUrls', async () => {
@@ -400,6 +504,7 @@ describe('imageRouter', () => {
 
     it('should pass with valid key-based imageUrls', async () => {
       mockGetKeyFromFullUrl.mockResolvedValue('files/valid-key.jpg');
+      mockGetFullFileUrl.mockResolvedValue('https://blob.example.com/files/valid-key.jpg');
 
       const ctx = createMockCtx();
       const input = createDefaultInput({
@@ -415,18 +520,36 @@ describe('imageRouter', () => {
       expect(result.success).toBe(true);
     });
 
-    describe('development environment URL conversion', () => {
-      beforeEach(() => {
-        vi.stubEnv('NODE_ENV', 'development');
+    describe('provider-readable URL conversion for extracted keys', () => {
+      it('should convert canonical blob keys to provider-readable URL', async () => {
+        mockGetFullFileUrl.mockResolvedValue('https://blob.example.com/files/image-key.jpg');
+
+        const ctx = createMockCtx();
+        const input = createDefaultInput({
+          params: {
+            prompt: 'test prompt',
+            imageUrl: 'v2/spaces/space-1/blobs/image-key.jpg',
+          },
+        });
+
+        const caller = imageRouter.createCaller(ctx);
+        const result = await caller.createImage(input);
+
+        expect(result.success).toBe(true);
+        expect(mockGetKeyFromFullUrl).not.toHaveBeenCalled();
+        expect(mockGetFullFileUrl).toHaveBeenCalledWith('v2/spaces/space-1/blobs/image-key.jpg');
+        expect(mockAsyncCallerCreateImage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            params: expect.objectContaining({
+              imageUrl: 'https://blob.example.com/files/image-key.jpg',
+            }),
+          }),
+        );
       });
 
-      afterEach(() => {
-        vi.unstubAllEnvs();
-      });
-
-      it('should convert single imageUrl to S3 URL in development mode', async () => {
+      it('should convert single imageUrl to provider-readable URL', async () => {
         mockGetKeyFromFullUrl.mockResolvedValue('files/image-key.jpg');
-        mockGetFullFileUrl.mockResolvedValue('https://s3.amazonaws.com/bucket/files/image-key.jpg');
+        mockGetFullFileUrl.mockResolvedValue('https://blob.example.com/files/image-key.jpg');
 
         const ctx = createMockCtx();
         const input = createDefaultInput({
@@ -441,15 +564,22 @@ describe('imageRouter', () => {
 
         expect(result.success).toBe(true);
         expect(mockGetFullFileUrl).toHaveBeenCalledWith('files/image-key.jpg');
+        expect(mockAsyncCallerCreateImage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            params: expect.objectContaining({
+              imageUrl: 'https://blob.example.com/files/image-key.jpg',
+            }),
+          }),
+        );
       });
 
-      it('should convert multiple imageUrls to S3 URLs in development mode', async () => {
+      it('should convert multiple imageUrls to provider-readable URLs', async () => {
         mockGetKeyFromFullUrl
           .mockResolvedValueOnce('files/image1.jpg')
           .mockResolvedValueOnce('files/image2.jpg');
         mockGetFullFileUrl
-          .mockResolvedValueOnce('https://s3.amazonaws.com/bucket/files/image1.jpg')
-          .mockResolvedValueOnce('https://s3.amazonaws.com/bucket/files/image2.jpg');
+          .mockResolvedValueOnce('https://blob.example.com/files/image1.jpg')
+          .mockResolvedValueOnce('https://blob.example.com/files/image2.jpg');
 
         const ctx = createMockCtx();
         const input = createDefaultInput({
@@ -466,9 +596,19 @@ describe('imageRouter', () => {
         expect(mockGetFullFileUrl).toHaveBeenCalledTimes(2);
         expect(mockGetFullFileUrl).toHaveBeenCalledWith('files/image1.jpg');
         expect(mockGetFullFileUrl).toHaveBeenCalledWith('files/image2.jpg');
+        expect(mockAsyncCallerCreateImage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            params: expect.objectContaining({
+              imageUrls: [
+                'https://blob.example.com/files/image1.jpg',
+                'https://blob.example.com/files/image2.jpg',
+              ],
+            }),
+          }),
+        );
       });
 
-      it('should not convert URLs when getFullFileUrl returns null', async () => {
+      it('fails closed when an extracted internal key cannot be converted to a readable URL', async () => {
         mockGetKeyFromFullUrl.mockResolvedValue('files/image-key.jpg');
         mockGetFullFileUrl.mockResolvedValue(null);
 
@@ -481,10 +621,29 @@ describe('imageRouter', () => {
         });
 
         const caller = imageRouter.createCaller(ctx);
-        const result = await caller.createImage(input);
+        await expect(caller.createImage(input)).rejects.toThrow('RESOURCE_ACCESS_DENIED');
 
-        expect(result.success).toBe(true);
         expect(mockGetFullFileUrl).toHaveBeenCalled();
+        expect(mockAsyncCallerCreateImage).not.toHaveBeenCalled();
+      });
+
+      it('fails closed when a canonical blob key cannot be converted to a readable URL', async () => {
+        mockGetFullFileUrl.mockResolvedValue(null);
+
+        const ctx = createMockCtx();
+        const input = createDefaultInput({
+          params: {
+            prompt: 'test prompt',
+            imageUrl: 'v2/spaces/space-1/blobs/image-key.jpg',
+          },
+        });
+
+        const caller = imageRouter.createCaller(ctx);
+        await expect(caller.createImage(input)).rejects.toThrow('RESOURCE_ACCESS_DENIED');
+
+        expect(mockGetKeyFromFullUrl).not.toHaveBeenCalled();
+        expect(mockGetFullFileUrl).toHaveBeenCalledWith('v2/spaces/space-1/blobs/image-key.jpg');
+        expect(mockAsyncCallerCreateImage).not.toHaveBeenCalled();
       });
     });
   });

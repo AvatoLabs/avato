@@ -6,11 +6,12 @@ import { useTranslation } from 'react-i18next';
 
 import McpSettingsModal from '@/features/MCP/MCPSettings/McpSettingsModal';
 import PluginDetailModal from '@/features/PluginDetailModal';
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useServerConfigStore } from '@/store/serverConfig';
-import { pluginHelpers, useToolStore } from '@/store/tool';
+import { pluginHelpers } from '@/store/tool/helpers';
 import { pluginSelectors, pluginStoreSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 import { type LobeToolType } from '@/types/tool/tool';
 
 import EditCustomPlugin from './EditCustomPlugin';
@@ -41,7 +42,7 @@ const Actions = memo<ActionsProps>(({ identifier, type, isMCP }) => {
     s.togglePlugin,
     agentSelectors.currentAgentPlugins(s).includes(identifier),
   ]);
-  const { modal } = App.useApp();
+  const { modal, message } = App.useApp();
   const hasSettings = pluginHelpers.isSettingSchemaNonEmpty(plugin?.settings);
 
   const [showModal, setModal] = useState(false);
@@ -80,6 +81,7 @@ const Actions = memo<ActionsProps>(({ identifier, type, isMCP }) => {
                 configureButton
               ))}
             <DropdownMenu
+              nativeButton
               placement="bottomRight"
               items={[
                 {
@@ -92,11 +94,15 @@ const Actions = memo<ActionsProps>(({ identifier, type, isMCP }) => {
                       centered: true,
                       okButtonProps: { danger: true },
                       onOk: async () => {
-                        // If plugin is enabled in current agent, disable it first
-                        if (isPluginEnabledInAgent) {
-                          await togglePlugin(identifier, false);
+                        try {
+                          if (isPluginEnabledInAgent) {
+                            await togglePlugin(identifier, false);
+                          }
+                          await unInstallPlugin(identifier);
+                        } catch (error) {
+                          console.error('Failed to uninstall plugin:', error);
+                          message.error(t('store.actions.uninstallFailed'));
                         }
-                        await unInstallPlugin(identifier);
                       },
                       title: t('store.actions.confirmUninstall'),
                       type: 'error',
@@ -113,12 +119,17 @@ const Actions = memo<ActionsProps>(({ identifier, type, isMCP }) => {
             loading={installing}
             size={mobile ? 'small' : undefined}
             onClick={async () => {
-              if (isMCP) {
-                await installMCPPlugin(identifier);
-                await togglePlugin(identifier);
-              } else {
-                await installPlugin(identifier);
-                await togglePlugin(identifier);
+              try {
+                if (isMCP) {
+                  await installMCPPlugin(identifier);
+                  await togglePlugin(identifier);
+                } else {
+                  await installPlugin(identifier);
+                  await togglePlugin(identifier);
+                }
+              } catch (error) {
+                console.error('Failed to install plugin:', error);
+                message.error(t('store.actions.installFailed'));
               }
             }}
           >

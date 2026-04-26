@@ -1,7 +1,7 @@
 'use client';
 
 import { AccordionItem, ContextMenuTrigger, Text } from '@lobehub/ui';
-import React, { memo,Suspense } from 'react';
+import { memo, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
@@ -27,8 +27,14 @@ const Project = memo<ProjectProps>(({ itemKey }) => {
         <ContextMenuTrigger items={dropdownMenu}>{header}</ContextMenuTrigger>
       )}
       title={
-        <Text ellipsis fontSize={12} type={'secondary'} weight={500}>
-          {t('navPanel.library')}
+        <Text
+          ellipsis
+          fontSize={12}
+          style={{ letterSpacing: '0.02em' }}
+          type={'secondary'}
+          weight={600}
+        >
+          {t('navPanel.sourceSet')}
         </Text>
       }
     >

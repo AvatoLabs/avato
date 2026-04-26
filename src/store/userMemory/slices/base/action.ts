@@ -2,8 +2,9 @@ import isEqual from 'fast-deep-equal';
 import { type SWRResponse } from 'swr';
 import useSWR from 'swr';
 
-import { mutate, useClientDataSWR, useClientDataSWRWithSync } from '@/libs/swr';
-import { userMemoryService } from '@/services/userMemory';
+import { mutate, useClientDataSWR } from '@/libs/swr';
+import { useClientDataSWRWithSync } from '@/libs/swr/useClientDataSWRWithSync';
+import { memoryCRUDService, userMemoryService } from '@/services/userMemory';
 import { type StoreSetter } from '@/store/types';
 import { type RetrieveMemoryParams, type RetrieveMemoryResult } from '@/types/userMemory';
 import { LayersEnum } from '@/types/userMemory';
@@ -18,6 +19,7 @@ const SWR_FETCH_USER_MEMORY = 'SWR_FETCH_USER_MEMORY';
 const n = setNamespace('userMemory');
 
 type MemoryContext = Parameters<typeof createMemorySearchParams>[0];
+const getMemoryDetailKey = (id: string, layer: LayersEnum) => `memoryDetail-${layer}-${id}`;
 
 type Setter = StoreSetter<UserMemoryStore>;
 export const createBaseSlice = (set: Setter, get: () => UserMemoryStore, _api?: unknown) =>
@@ -79,7 +81,6 @@ export class BaseActionImpl {
   };
 
   updateMemory = async (id: string, content: string, layer: LayersEnum): Promise<void> => {
-    const { memoryCRUDService } = await import('@/services/userMemory');
     const {
       resetActivitiesList,
       resetContextsList,
@@ -110,7 +111,12 @@ export class BaseActionImpl {
       }
       case LayersEnum.Identity: {
         await memoryCRUDService.updateIdentity(id, { description: content });
-        resetIdentitiesList({ q: this.#get().identitiesQuery, types: this.#get().identitiesTypes });
+        resetIdentitiesList({
+          q: this.#get().identitiesQuery,
+          relationships: this.#get().identitiesRelationships,
+          sort: this.#get().identitiesSort,
+          types: this.#get().identitiesTypes,
+        });
         break;
       }
       case LayersEnum.Preference: {
@@ -123,12 +129,14 @@ export class BaseActionImpl {
       }
     }
 
+    await mutate(getMemoryDetailKey(id, layer));
+
     // Clear editing state
     this.#get().clearEditingMemory();
   };
 
   useFetchMemoryDetail = (id: string | null, layer: LayersEnum): SWRResponse<any> => {
-    const swrKey = id ? `memoryDetail-${layer}-${id}` : null;
+    const swrKey = id ? getMemoryDetailKey(id, layer) : null;
 
     return useSWR(
       swrKey,

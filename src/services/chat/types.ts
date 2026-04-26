@@ -8,10 +8,10 @@ import {
 export interface FetchOptions extends FetchSSEOptions {
   agentId?: string;
   historySummary?: string;
-  /** Initial context for page editor (captured at operation start) */
+  /** Initial context for doc editor (captured at operation start) */
   initialContext?: RuntimeInitialContext;
   signal?: AbortSignal | undefined;
-  /** Step context for page editor (updated each step) */
+  /** Step context for doc editor (updated each step) */
   stepContext?: RuntimeStepContext;
   topicId?: string;
   trace?: TracePayload;

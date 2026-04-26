@@ -3,7 +3,7 @@
 import { memo } from 'react';
 
 import AutoSaveHintBase from '@/components/Editor/AutoSaveHint';
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 
 /**
  * AutoSaveHint - Save status indicator for agent settings

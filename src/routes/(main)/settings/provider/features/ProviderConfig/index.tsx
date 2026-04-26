@@ -15,7 +15,7 @@ import {
   Tooltip,
 } from '@lobehub/ui';
 import { useDebounceFn } from 'ahooks';
-import { Form as AntdForm, Switch } from 'antd';
+import { App, Form as AntdForm, Switch } from 'antd';
 import { createStaticStyles, cssVar, cx, responsive } from 'antd-style';
 import { Loader2Icon, LockIcon } from 'lucide-react';
 import { type ReactNode } from 'react';
@@ -133,6 +133,7 @@ const ProviderConfig = memo<ProviderConfigProps>(
     apiKeyUrl,
     title,
   }) => {
+    const { message } = App.useApp();
     const {
       authType,
       proxyUrl,
@@ -231,14 +232,18 @@ const ProviderConfig = memo<ProviderConfigProps>(
     const isCheckingConnection = useRef(false);
 
     const handleValueChange = useCallback(
-      (...params: Parameters<typeof updateAiProviderConfig>) => {
+      async (...params: Parameters<typeof updateAiProviderConfig>) => {
         // Although debouncedHandleValueChange executes before onBeforeCheck,
         // due to the debounce, debouncedHandleValueChange will actually execute 500ms later
         // so isCheckingConnection.current has already been updated at this point
         // updateAiProviderConfig has already been triggered once during the connection test, so it should not be updated again
         if (isCheckingConnection.current) return;
 
-        updateAiProviderConfig(...params);
+        try {
+          await updateAiProviderConfig(...params);
+        } catch (error) {
+          console.error('Failed to update provider config:', error);
+        }
       },
       [updateAiProviderConfig],
     );
@@ -408,7 +413,13 @@ const ProviderConfig = memo<ProviderConfigProps>(
                   // Set connection test state to prevent duplicate requests from onValuesChange
                   isCheckingConnection.current = true;
                   // Proactively save the latest form values to ensure fetchAiProviderRuntimeState retrieves up-to-date data
-                  await updateAiProviderConfig(id, form.getFieldsValue());
+                  try {
+                    await updateAiProviderConfig(id, form.getFieldsValue());
+                  } catch (error) {
+                    console.error('Failed to prepare provider connection check:', error);
+                    message.error(t('providerModels.config.updateError'));
+                    throw error;
+                  }
                 }}
               />
             ),

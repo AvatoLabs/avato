@@ -21,10 +21,10 @@ import McpDetail from '@/features/MCP/MCPDetail';
 import McpDetailLoading from '@/features/MCP/MCPDetail/Loading';
 import MCPInstallProgress from '@/features/MCP/MCPInstallProgress';
 import { useMarketAuth } from '@/layout/AuthProvider/MarketAuth';
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
-import { useToolStore } from '@/store/tool';
+import { useAgentStore } from '@/store/agent/store';
 import { mcpStoreSelectors, pluginSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 import { type DiscoverMcpItem } from '@/types/discover';
 
 import { itemStyles } from '../style';
@@ -32,7 +32,7 @@ import { itemStyles } from '../style';
 const Item = memo<DiscoverMcpItem>(({ name, description, icon, identifier }) => {
   const styles = itemStyles;
   const { t } = useTranslation('plugin');
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
   const [detailOpen, setDetailOpen] = useState(false);
 
   const [installed, installing, installMCPPlugin, cancelInstallMCPPlugin, unInstallPlugin, plugin] =
@@ -67,10 +67,15 @@ const Item = memo<DiscoverMcpItem>(({ name, description, icon, identifier }) => 
       }
     }
 
-    const isSuccess = await installMCPPlugin(identifier);
+    try {
+      const isSuccess = await installMCPPlugin(identifier);
 
-    if (isSuccess) {
-      await togglePlugin(identifier);
+      if (isSuccess) {
+        await togglePlugin(identifier);
+      }
+    } catch (error) {
+      console.error('Failed to install community plugin:', error);
+      message.error(t('store.actions.installFailed'));
     }
   };
 
@@ -82,7 +87,7 @@ const Item = memo<DiscoverMcpItem>(({ name, description, icon, identifier }) => 
     if (installed) {
       return (
         <DropdownMenu
-          nativeButton={false}
+          nativeButton
           placement="bottomRight"
           items={[
             {
@@ -95,10 +100,15 @@ const Item = memo<DiscoverMcpItem>(({ name, description, icon, identifier }) => 
                   centered: true,
                   okButtonProps: { danger: true },
                   onOk: async () => {
-                    if (isPluginEnabledInAgent) {
-                      await togglePlugin(identifier, false);
+                    try {
+                      if (isPluginEnabledInAgent) {
+                        await togglePlugin(identifier, false);
+                      }
+                      await unInstallPlugin(identifier);
+                    } catch (error) {
+                      console.error('Failed to uninstall community plugin:', error);
+                      message.error(t('store.actions.uninstallFailed'));
                     }
-                    await unInstallPlugin(identifier);
                   },
                   title: t('store.actions.confirmUninstall'),
                   type: 'error',

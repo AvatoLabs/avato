@@ -8,9 +8,9 @@ import { MarketOIDC } from './oidc';
 describe('MarketOIDC.buildAuthUrl', () => {
   it('should join market baseUrl with OIDC auth path correctly (no string concat issues)', async () => {
     const client = new MarketOIDC({
-      baseUrl: 'https://market.lobehub.com/', // trailing slash on purpose
+      baseUrl: 'https://avato.turingmesh.com/', // trailing slash on purpose
       clientId: 'lobehub-desktop',
-      redirectUri: 'https://market.lobehub.com/lobehub-oidc/callback/desktop',
+      redirectUri: 'https://avato.turingmesh.com/lobehub-oidc/callback/desktop',
       scope: 'openid profile email',
     });
 
@@ -22,10 +22,10 @@ describe('MarketOIDC.buildAuthUrl', () => {
 
     const url = await client.buildAuthUrl();
 
-    expect(url).toContain('https://market.lobehub.com/lobehub-oidc/auth?');
+    expect(url).toContain('https://avato.turingmesh.com/lobehub-oidc/auth?');
     expect(url).toContain(`client_id=${encodeURIComponent('lobehub-desktop')}`);
     expect(url).toContain(
-      `redirect_uri=${encodeURIComponent('https://market.lobehub.com/lobehub-oidc/callback/desktop')}`,
+      `redirect_uri=${encodeURIComponent('https://avato.turingmesh.com/lobehub-oidc/callback/desktop')}`,
     );
     expect(url).toContain(`state=${encodeURIComponent('state_value')}`);
     expect(url).toContain(`code_challenge=${encodeURIComponent('code_challenge')}`);
@@ -52,7 +52,7 @@ describe('MarketOIDC.startAuthorization', () => {
 
   it('should reject promptly when popup closes without a handoff result', async () => {
     const client = new MarketOIDC({
-      baseUrl: 'https://market.lobehub.com',
+      baseUrl: 'https://avato.turingmesh.com',
       clientId: 'lobechat-com',
       redirectUri: 'http://localhost:3010/market-auth-callback',
       scope: 'openid profile email',
@@ -60,7 +60,7 @@ describe('MarketOIDC.startAuthorization', () => {
 
     sessionStorage.setItem('market_state', 'state_value');
     vi.spyOn(client, 'buildAuthUrl').mockResolvedValue(
-      'https://market.lobehub.com/lobehub-oidc/auth',
+      'https://avato.turingmesh.com/lobehub-oidc/auth',
     );
 
     let isClosed = false;
@@ -86,7 +86,7 @@ describe('MarketOIDC.startAuthorization', () => {
 
   it('should resolve from storage handoff when popup closes after callback persistence', async () => {
     const client = new MarketOIDC({
-      baseUrl: 'https://market.lobehub.com',
+      baseUrl: 'https://avato.turingmesh.com',
       clientId: 'lobechat-com',
       redirectUri: 'http://localhost:3010/market-auth-callback',
       scope: 'openid profile email',
@@ -96,7 +96,7 @@ describe('MarketOIDC.startAuthorization', () => {
 
     sessionStorage.setItem('market_state', state);
     vi.spyOn(client, 'buildAuthUrl').mockResolvedValue(
-      'https://market.lobehub.com/lobehub-oidc/auth',
+      'https://avato.turingmesh.com/lobehub-oidc/auth',
     );
 
     let isClosed = false;

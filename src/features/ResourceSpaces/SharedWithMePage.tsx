@@ -10,14 +10,17 @@ import useSWR from 'swr';
 import Loading from '@/components/Loading/BrandTextLoading';
 import { lambdaClient } from '@/libs/trpc/client';
 
-import { buildResourceLibraryPath, buildResourcePreviewPath } from './paths';
+import {
+  getCanonicalSharedResourceKind,
+  resolveSharedResourcePath,
+} from './resolveSharedResourcePath';
 
 const SharedWithMePage = memo(() => {
   const { t } = useTranslation('file');
   const navigate = useNavigate();
   const { data, isLoading } = useSWR(
     'resource-shared-with-me',
-    () => lambdaClient.resourceShare.listSharedWithMe.query(),
+    () => lambdaClient.contentShare.listSharedWithMe.query(),
     { revalidateOnFocus: false },
   );
   const items = (data ?? []).filter((item): item is NonNullable<typeof item> => !!item);
@@ -33,7 +36,7 @@ const SharedWithMePage = memo(() => {
   return (
     <Flexbox gap={16} padding={24} width={'100%'}>
       <Flexbox gap={4}>
-        <Text as={'h2'}>{t('shared.title')}</Text>
+        <Text as={'h2'}>{`${t('space.quickAccessTitle')} / ${t('shared.title')}`}</Text>
         <Text type={'secondary'}>{t('shared.subtitle')}</Text>
       </Flexbox>
 
@@ -44,17 +47,14 @@ const SharedWithMePage = memo(() => {
       ) : (
         <Flexbox gap={12}>
           {items.map((item) => {
+            const kind = getCanonicalSharedResourceKind(item);
             const icon =
-              item.kind === 'knowledge_base'
+              kind === 'source_set'
                 ? LibraryIcon
-                : item.kind === 'document'
+                : kind === 'document'
                   ? FolderOpenIcon
                   : FilesIcon;
-
-            const targetPath =
-              item.kind === 'knowledge_base'
-                ? buildResourceLibraryPath(item.spaceId, item.localId)
-                : buildResourcePreviewPath(item.spaceId, item.localId);
+            const targetPath = resolveSharedResourcePath(item);
 
             return (
               <Block
@@ -62,7 +62,7 @@ const SharedWithMePage = memo(() => {
                 horizontal
                 align={'center'}
                 gap={12}
-                key={item.resourceUid}
+                key={item.contentUid}
                 padding={16}
                 variant={'outlined'}
                 onClick={() => navigate(targetPath)}
@@ -73,7 +73,7 @@ const SharedWithMePage = memo(() => {
                     {item.name}
                   </Text>
                   <Text ellipsis fontSize={12} type={'secondary'}>
-                    {t(`shared.kind.${item.kind}`)}
+                    {t(`shared.kind.${kind}`)}
                   </Text>
                 </Flexbox>
               </Block>

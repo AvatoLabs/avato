@@ -56,7 +56,13 @@ const TokenProgress = memo<TokenProgressProps>(({ data, showIcon }) => {
                   }}
                 />
               )}
-              <div style={{ color: cssVar.colorTextSecondary }}>{item.title}</div>
+              <div
+                style={{
+                  color: `color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%)`,
+                }}
+              >
+                {item.title}
+              </div>
             </Flexbox>
             <div style={{ fontWeight: 500 }}>{format(item.value)}</div>
           </Flexbox>

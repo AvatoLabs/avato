@@ -7,8 +7,8 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { marketApiService } from '@/services/marketApi';
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { type AgentForkSourceResponse } from '@/types/discover';
 
 /**

@@ -6,8 +6,8 @@ import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useCreateMenuItems } from '@/routes/(main)/home/_layout/hooks/useCreateMenuItems';
-import { useAgentStore } from '@/store/agent';
 import { builtinAgentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 /**
  * Bridge component for handling File menu actions from Electron main process

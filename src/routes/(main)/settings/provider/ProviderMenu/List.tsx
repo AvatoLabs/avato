@@ -82,7 +82,7 @@ const ProviderList = (props: {
       }
       case SortType.AlphabeticalDesc: {
         return providers.sort((a, b) => {
-          const cmpDisplay = (b.name || a.id).localeCompare(a.name || b.id);
+          const cmpDisplay = (b.name || b.id).localeCompare(a.name || a.id);
           if (cmpDisplay !== 0) return cmpDisplay;
           return b.id.localeCompare(a.id);
         });

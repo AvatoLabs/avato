@@ -3,11 +3,12 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
 
+import { buildPageScopeSearch, createSourceSetPageScope } from '@/features/Pages/usePageScope';
 import GroupSkeleton from '@/routes/(main)/home/features/components/GroupSkeleton';
 import { RECENT_BLOCK_SIZE } from '@/routes/(main)/home/features/const';
-import { useHomeStore } from '@/store/home';
 import { homeRecentSelectors } from '@/store/home/selectors';
-import { standardizeIdentifier } from '@/utils/identifier';
+import { useHomeStore } from '@/store/home/store';
+import { getPageDetailPath, getPageKindFromDocument } from '@/utils/docs';
 
 import RecentPageItem from './Item';
 
@@ -18,12 +19,24 @@ const RecentPageList = memo(() => {
   // Loading state
   if (!isInit) {
     return (
-      <GroupSkeleton height={RECENT_BLOCK_SIZE.PAGE.HEIGHT} width={RECENT_BLOCK_SIZE.PAGE.WIDTH} />
+      <GroupSkeleton
+        height={RECENT_BLOCK_SIZE.PAGE.HEIGHT}
+        variant={'page'}
+        width={RECENT_BLOCK_SIZE.PAGE.WIDTH}
+      />
     );
   }
 
   return documents.map((document) => {
-    const pageUrl = `/page/${standardizeIdentifier(document.id)}`;
+    const pagePath = getPageDetailPath(
+      document.id,
+      getPageKindFromDocument(document),
+      document.spaceId,
+    );
+    const pageSearch = document.sourceSetId
+      ? buildPageScopeSearch(createSourceSetPageScope(document.sourceSetId))
+      : '';
+    const pageUrl = `${pagePath}${pageSearch}`;
 
     return (
       <Link

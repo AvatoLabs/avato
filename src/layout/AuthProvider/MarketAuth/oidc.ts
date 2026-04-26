@@ -1,6 +1,8 @@
 import { isDesktop } from '@/const/version';
 import { MARKET_OIDC_ENDPOINTS } from '@/services/_url';
+import { remoteServerService } from '@/services/electron/remoteServer';
 
+import { getResponseErrorMessage, readJSONResponse } from '../../../utils/client/readJSONResponse';
 import { MarketAuthError } from './errors';
 import {
   clearMarketAuthResult,
@@ -151,23 +153,47 @@ export class MarketOIDC {
       },
       method: 'POST',
     });
+    const { data, responseText } = await readJSONResponse<
+      TokenResponse & { error?: string; error_description?: string }
+    >(response);
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => undefined);
       const errorMessage =
-        `Token exchange failed: ${response.status} ${response.statusText} ${errorData?.error_description || errorData?.error || ''}`.trim();
+        `Token exchange failed: ${response.status} ${response.statusText} ${
+          data?.error_description ||
+          data?.error ||
+          getResponseErrorMessage(responseText, response.statusText)
+        }`.trim();
       console.error('[MarketOIDC]', errorMessage);
       throw new MarketAuthError('authorizationFailed', {
         message: errorMessage,
         meta: {
-          error: errorData,
+          error: data,
+          responseText,
           status: response.status,
           statusText: response.statusText,
         },
       });
     }
 
-    const tokenData = (await response.json()) as TokenResponse;
+    if (!data) {
+      const errorMessage = getResponseErrorMessage(
+        responseText,
+        'Token exchange returned an invalid response payload',
+      );
+
+      console.error('[MarketOIDC]', errorMessage);
+      throw new MarketAuthError('authorizationFailed', {
+        message: errorMessage,
+        meta: {
+          responseText,
+          status: response.status,
+          statusText: response.statusText,
+        },
+      });
+    }
+
+    const tokenData = data;
     console.info('[MarketOIDC] Token exchange successful');
 
     // Clean up temporary data in sessionStorage
@@ -202,7 +228,6 @@ export class MarketOIDC {
     if (isDesktop) {
       // Electron desktop: use IPC to call the main process to open the system browser
       console.info('[MarketOIDC] Desktop app detected, opening system browser via IPC');
-      const { remoteServerService } = await import('@/services/electron/remoteServer');
 
       try {
         const result = await remoteServerService.requestMarketAuthorization({ authUrl });

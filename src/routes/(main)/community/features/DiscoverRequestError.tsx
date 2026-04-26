@@ -13,6 +13,13 @@ const DiscoverRequestError = memo<DiscoverRequestErrorProps>(({ onRetry }) => {
   return (
     <Center height="100%" style={{ minHeight: '50vh' }} width="100%">
       <Empty
+        action={
+          onRetry && (
+            <Button type={'primary'} onClick={onRetry}>
+              {t('retry', { ns: 'common' })}
+            </Button>
+          )
+        }
         description={t('list.error.description', { ns: 'discover' })}
         icon={TriangleAlert}
         title={t('list.error.title', { ns: 'discover' })}
@@ -20,13 +27,6 @@ const DiscoverRequestError = memo<DiscoverRequestErrorProps>(({ onRetry }) => {
         descriptionProps={{
           fontSize: 14,
         }}
-        extra={
-          onRetry && (
-            <Button type={'primary'} onClick={onRetry}>
-              {t('retry', { ns: 'common' })}
-            </Button>
-          )
-        }
         style={{
           maxWidth: 400,
         }}

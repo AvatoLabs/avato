@@ -1,5 +1,7 @@
 import type { ActionIconProps, FormProps } from '@lobehub/ui';
 
+import { WORKSPACE_ICON_STROKE_WIDTH } from './workspaceVisualTokens';
+
 export const HEADER_HEIGHT = 64;
 export const MOBILE_NABBAR_HEIGHT = 44;
 export const MOBILE_TABBAR_HEIGHT = 48;
@@ -23,8 +25,16 @@ export const FORM_STYLE: FormProps = {
   itemMinWidth: 'max(34%, 240px)',
   style: { maxWidth: MAX_WIDTH, width: '100%' },
 };
-export const MOBILE_HEADER_ICON_SIZE: ActionIconProps['size'] = { blockSize: 36, size: 22 };
-export const DESKTOP_HEADER_ICON_SIZE: ActionIconProps['size'] = { blockSize: 32, size: 20 };
+export const MOBILE_HEADER_ICON_SIZE: ActionIconProps['size'] = {
+  blockSize: 36,
+  size: 22,
+  strokeWidth: WORKSPACE_ICON_STROKE_WIDTH,
+};
+export const DESKTOP_HEADER_ICON_SIZE: ActionIconProps['size'] = {
+  blockSize: 32,
+  size: 20,
+  strokeWidth: WORKSPACE_ICON_STROKE_WIDTH,
+};
 export const HEADER_ICON_SIZE = (mobile?: boolean) =>
   mobile ? MOBILE_HEADER_ICON_SIZE : DESKTOP_HEADER_ICON_SIZE;
 export const PWA_INSTALL_ID = 'pwa-install';

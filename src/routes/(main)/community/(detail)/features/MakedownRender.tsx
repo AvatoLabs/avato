@@ -6,6 +6,8 @@ import { type ReactNode } from 'react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { documentMarkdownRemarkPlugins } from '@/libs/markdown/remarkEncodedBreakTag';
+
 import { H1, H2, H3, H4, H5 } from './Toc/Heading';
 
 const MarkdownRender = memo<{ children?: string }>(({ children }) => {
@@ -27,6 +29,7 @@ const MarkdownRender = memo<{ children?: string }>(({ children }) => {
       allowHtml
       enableImageGallery={false}
       enableLatex={false}
+      remarkPluginsAhead={[...documentMarkdownRemarkPlugins]}
       components={{
         a: ({ href, ...rest }: { children?: ReactNode; href?: string }) => {
           if (href && href.startsWith('http'))

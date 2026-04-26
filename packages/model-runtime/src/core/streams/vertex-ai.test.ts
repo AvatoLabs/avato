@@ -772,7 +772,7 @@ describe('GoogleGenerativeAIStream (Vertex AI scenarios)', () => {
                 {
                   image: {
                     imageUri: 'https://example.com/photo.jpg',
-                    sourceUri: 'https://example.com/page',
+                    sourceUri: 'https://example.com/docs',
                     title: 'Example Photo',
                     domain: 'example.com',
                   },
@@ -831,7 +831,7 @@ describe('GoogleGenerativeAIStream (Vertex AI scenarios)', () => {
             {
               domain: 'example.com',
               imageUri: 'https://example.com/photo.jpg',
-              sourceUri: 'https://example.com/page',
+              sourceUri: 'https://example.com/docs',
               title: 'Example Photo',
             },
           ],

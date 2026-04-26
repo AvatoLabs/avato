@@ -8,7 +8,9 @@ import useSWR from 'swr';
 
 import { message } from '@/components/AntdStaticMethods';
 import { LOADING_FLAT } from '@/const/message';
-import { mutate, useClientDataSWRWithSync } from '@/libs/swr';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { mutate } from '@/libs/swr';
+import { useClientDataSWRWithSync } from '@/libs/swr/useClientDataSWRWithSync';
 import { topicService } from '@/services/topic';
 import { type ChatStore } from '@/store/chat';
 import { topicMapKey } from '@/store/chat/utils/topicMapKey';
@@ -32,6 +34,12 @@ type CronTopicsGroupWithJobInfo = {
   cronJobId: string;
   topics: ChatTopic[];
 };
+
+const getTopicContainerKey = (params: {
+  agentId?: string;
+  groupId?: string;
+  spaceId?: string | null;
+}) => topicMapKey({ ...params, spaceId: resolveWorkspaceSpaceId({ spaceId: params.spaceId }) });
 
 /**
  * Options for switchTopic action
@@ -98,6 +106,7 @@ export class ChatTopicActionImpl {
       title: t('defaultTitle', { ns: 'topic' }),
       messages: messages.map((m) => m.id),
       sessionId: sessionId || activeAgentId,
+      spaceId: resolveWorkspaceSpaceId(),
     });
     this.#set({ creatingTopic: false }, false, n('creatingTopic/end'));
 
@@ -116,6 +125,7 @@ export class ChatTopicActionImpl {
       title: t('defaultTitle', { ns: 'topic' }),
       messages: messages.map((m) => m.id),
       sessionId: sessionId || activeAgentId,
+      spaceId: resolveWorkspaceSpaceId(),
     });
 
     this.#get().internal_updateTopicLoading(topicId, true);
@@ -291,8 +301,9 @@ export class ChatTopicActionImpl {
     const pageSize = customPageSize || 20;
     const effectiveExcludeTriggers =
       excludeTriggers && excludeTriggers.length > 0 ? excludeTriggers : undefined;
+    const activeSpaceId = resolveWorkspaceSpaceId();
     // Use topicMapKey to generate the container key for topic data map
-    const containerKey = topicMapKey({ agentId, groupId });
+    const containerKey = getTopicContainerKey({ agentId, groupId, spaceId: activeSpaceId });
     const hasValidContainer = !!(groupId || agentId);
 
     return useClientDataSWRWithSync<{ items: ChatTopic[]; total: number }>(
@@ -303,6 +314,7 @@ export class ChatTopicActionImpl {
             {
               isInbox,
               pageSize,
+              spaceId: activeSpaceId ?? null,
               ...(effectiveExcludeTriggers ? { excludeTriggers: effectiveExcludeTriggers } : {}),
             },
           ]
@@ -330,6 +342,7 @@ export class ChatTopicActionImpl {
           groupId,
           isInbox,
           pageSize,
+          spaceId: activeSpaceId,
         });
 
         // Reset expanding state after fetch completes
@@ -377,7 +390,12 @@ export class ChatTopicActionImpl {
 
   loadMoreTopics = async (): Promise<void> => {
     const { activeAgentId, activeGroupId, topicDataMap } = this.#get();
-    const key = topicMapKey({ agentId: activeAgentId, groupId: activeGroupId });
+    const activeSpaceId = resolveWorkspaceSpaceId();
+    const key = getTopicContainerKey({
+      agentId: activeAgentId,
+      groupId: activeGroupId,
+      spaceId: activeSpaceId,
+    });
     const currentData = topicDataMap[key];
 
     if ((!activeAgentId && !activeGroupId) || currentData?.isLoadingMore) return;
@@ -405,6 +423,7 @@ export class ChatTopicActionImpl {
         excludeTriggers,
         groupId: activeGroupId,
         pageSize,
+        spaceId: activeSpaceId,
       });
 
       const currentTopics = currentData?.items || [];
@@ -452,10 +471,17 @@ export class ChatTopicActionImpl {
       groupId?: string;
     } = {},
   ): SWRResponse<ChatTopic[]> => {
+    const activeSpaceId = resolveWorkspaceSpaceId();
+
     return useSWR<ChatTopic[]>(
-      keywords ? [SWR_USE_SEARCH_TOPIC, keywords, agentId, groupId] : null,
-      ([, keywords, agentId, groupId]: [string, string, string | undefined, string | undefined]) =>
-        topicService.searchTopics(keywords, agentId, groupId),
+      keywords ? [SWR_USE_SEARCH_TOPIC, keywords, agentId, groupId, activeSpaceId ?? null] : null,
+      ([, keywords, agentId, groupId]: [
+        string,
+        string,
+        string | undefined,
+        string | undefined,
+        string | null,
+      ]) => topicService.searchTopics(keywords, agentId, groupId, activeSpaceId),
       {
         onSuccess: (data) => {
           this.#set(
@@ -524,7 +550,7 @@ export class ChatTopicActionImpl {
     const { switchTopic, refreshTopic } = this.#get();
 
     // Get topics for this specific group from the topic map using topicMapKey
-    const key = topicMapKey({ groupId });
+    const key = getTopicContainerKey({ groupId });
     const groupTopics = this.#get().topicDataMap[key]?.items || [];
     const topicIds = groupTopics.map((t) => t.id);
 
@@ -580,7 +606,7 @@ export class ChatTopicActionImpl {
     const { activeAgentId, activeGroupId } = this.#get();
     // Use topicMapKey to generate the same key used in useFetchTopics
     // Key format: [SWR_USE_FETCH_TOPIC, containerKey, { isInbox, pageSize }]
-    const containerKey = topicMapKey({ agentId: activeAgentId, groupId: activeGroupId });
+    const containerKey = getTopicContainerKey({ agentId: activeAgentId, groupId: activeGroupId });
     await mutate(
       (key) => Array.isArray(key) && key[0] === SWR_USE_FETCH_TOPIC && key[1] === containerKey,
     );
@@ -627,7 +653,7 @@ export class ChatTopicActionImpl {
 
   internal_dispatchTopic = (payload: ChatTopicDispatch, action?: any): void => {
     const { activeAgentId, activeGroupId } = this.#get();
-    const key = topicMapKey({ agentId: activeAgentId, groupId: activeGroupId });
+    const key = getTopicContainerKey({ agentId: activeAgentId, groupId: activeGroupId });
     const currentData = this.#get().topicDataMap[key];
     const nextItems = topicReducer(currentData?.items, payload);
 
@@ -664,7 +690,7 @@ export class ChatTopicActionImpl {
     },
   ): void => {
     const { items, total, pageSize, currentPage = 0, append = false, groupId } = params;
-    const key = topicMapKey({ agentId, groupId });
+    const key = getTopicContainerKey({ agentId, groupId });
     const currentData = this.#get().topicDataMap[key];
 
     const nextItems = append ? [...(currentData?.items || []), ...items] : items;

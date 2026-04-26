@@ -4,6 +4,7 @@ import {
   KLAVIS_SERVER_TYPES,
   type KlavisServerType,
   type LobehubSkillProviderType,
+  OFFICIAL_URL,
 } from '@lobechat/const';
 import { type DiscoverPluginDetail, type PluginSource } from '@lobechat/types';
 import { Avatar, Block, Flexbox, Icon, Image, Skeleton, Tag, Text } from '@lobehub/ui';
@@ -17,13 +18,19 @@ import { useDiscoverStore } from '@/store/discover';
 
 /**
  * Icon component for built-in tools (Klavis & LobehubSkill)
- * For string type icon, use Image component to render
+ * For URL string icon, use Image component to render
  * For IconType type icon, use Icon component to render with theme fill color
  */
 const BuiltinToolIcon = memo<Pick<KlavisServerType | LobehubSkillProviderType, 'icon' | 'label'>>(
   ({ icon, label }) => {
     if (typeof icon === 'string') {
-      return <Image alt={label} height={40} src={icon} style={{ flex: 'none' }} width={40} />;
+      if (/^(?:https?:|data:|\/)/.test(icon)) {
+        return <Image alt={label} height={40} src={icon} style={{ flex: 'none' }} width={40} />;
+      }
+
+      return (
+        <Avatar alt={label} avatar={icon} shape={'square'} size={40} style={{ flex: 'none' }} />
+      );
     }
 
     // Use theme color fill, automatically adapts in dark mode
@@ -104,7 +111,7 @@ const PluginItem = memo<PluginItemProps>(({ identifier }) => {
         avatar: '', // Avatar will be rendered by BuiltinToolIcon component
         category: undefined,
         createdAt: '',
-        description: `LobeHub Mcp Server: ${klavisTool.label}`,
+        description: `Avato MCP Server: ${klavisTool.label}`,
         homepage: 'https://klavis.ai',
         identifier: klavisTool.identifier,
         manifest: undefined,
@@ -124,7 +131,7 @@ const PluginItem = memo<PluginItemProps>(({ identifier }) => {
         category: undefined,
         createdAt: '',
         description: lobehubSkill.description,
-        homepage: lobehubSkill.authorUrl || 'https://lobehub.com',
+        homepage: lobehubSkill.authorUrl || OFFICIAL_URL,
         identifier: lobehubSkill.id,
         manifest: undefined,
         related: [],
@@ -138,12 +145,12 @@ const PluginItem = memo<PluginItemProps>(({ identifier }) => {
     // Check builtin tools (like lobe-cloud-sandbox, lobe-memory, etc.)
     if (builtinTool) {
       return {
-        author: 'LobeHub',
+        author: 'Avato',
         avatar: builtinTool.manifest.meta.avatar || '',
         category: undefined,
         createdAt: '',
         description: builtinTool.manifest.meta.description || '',
-        homepage: 'https://lobehub.com',
+        homepage: OFFICIAL_URL,
         identifier: builtinTool.identifier,
         manifest: undefined,
         related: [],

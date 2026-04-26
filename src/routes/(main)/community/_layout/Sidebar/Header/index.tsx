@@ -4,7 +4,7 @@ import { type PropsWithChildren } from 'react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import SideBarHeaderLayout from '@/features/NavPanel/SideBarHeaderLayout';
+import SubSidebarTitleBar from '@/features/NavPanel/components/SubSidebarTitleBar';
 
 import Nav from './Nav';
 
@@ -12,14 +12,7 @@ const Header = memo<PropsWithChildren>(() => {
   const { t } = useTranslation('common');
   return (
     <>
-      <SideBarHeaderLayout
-        breadcrumb={[
-          {
-            href: '/community',
-            title: t('tab.community'),
-          },
-        ]}
-      />
+      <SubSidebarTitleBar title={t('tab.community')} titleTo="/community" />
       <Nav />
     </>
   );

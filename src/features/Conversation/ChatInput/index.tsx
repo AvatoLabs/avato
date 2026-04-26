@@ -18,6 +18,7 @@ import {
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useChatStore } from '@/store/chat';
 import { fileChatSelectors, useFileStore } from '@/store/file';
+import { toDocSelections } from '@/store/file/utils/toDocSelections';
 
 import WideScreenContainer from '../../WideScreenContainer';
 import { messageStateSelectors, useConversationStore } from '../store';
@@ -150,16 +151,12 @@ const ChatInput = memo<ChatInputProps>(
         fileStore.clearChatUploadFileList();
         fileStore.clearChatContextSelections();
 
-        // Convert ChatContextContent to PageSelection for persistence
-        const pageSelections = currentContextList.map((ctx) => ({
-          content: ctx.preview || '',
-          id: ctx.id,
-          pageId: ctx.pageId || '',
-          xml: ctx.content,
-        }));
-
         // Fire and forget - send with captured message
-        await sendMessage({ files: currentFileList, message, pageSelections });
+        await sendMessage({
+          docSelections: toDocSelections(currentContextList),
+          files: currentFileList,
+          message,
+        });
       },
       [isAIGenerating, sendMessage],
     );

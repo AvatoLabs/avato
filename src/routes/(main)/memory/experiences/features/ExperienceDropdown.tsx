@@ -6,6 +6,8 @@ import { type KeyboardEvent, type MouseEvent } from 'react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useQueryState } from '@/hooks/useQueryParam';
+import { useGlobalStore } from '@/store/global';
 import { useUserMemoryStore } from '@/store/userMemory';
 
 interface ExperienceDropdownProps {
@@ -15,7 +17,9 @@ interface ExperienceDropdownProps {
 
 const ExperienceDropdown = memo<ExperienceDropdownProps>(({ id, size = 'small' }) => {
   const { t } = useTranslation(['memory', 'common']);
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
+  const [experienceId, setExperienceId] = useQueryState('experienceId', { clearOnDefault: true });
+  const toggleRightPanel = useGlobalStore((s) => s.toggleRightPanel);
 
   const experiences = useUserMemoryStore((s) => s.experiences);
   const deleteExperience = useUserMemoryStore((s) => s.deleteExperience);
@@ -36,7 +40,16 @@ const ExperienceDropdown = memo<ExperienceDropdownProps>(({ id, size = 'small' }
         okButtonProps: { danger: true },
         okText: t('confirm', { ns: 'common' }),
         onOk: async () => {
-          await deleteExperience(id);
+          try {
+            await deleteExperience(id);
+            if (experienceId === id) {
+              setExperienceId(null);
+              toggleRightPanel(false);
+            }
+          } catch (error) {
+            console.error('Failed to delete experience memory:', error);
+            message.error(t('experience.deleteError'));
+          }
         },
         title: t('experience.deleteTitle'),
         type: 'warning',

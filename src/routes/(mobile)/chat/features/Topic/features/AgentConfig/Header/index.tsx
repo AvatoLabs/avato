@@ -3,8 +3,8 @@
 import { Flexbox, Text } from '@lobehub/ui';
 import { memo } from 'react';
 
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors, builtinAgentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 import Avatar from './Avatar';
 

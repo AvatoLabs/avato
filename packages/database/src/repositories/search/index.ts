@@ -1,12 +1,13 @@
-import { and, desc, eq, ilike, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 
 import {
   agents,
   documents,
   files,
-  knowledgeBaseFiles,
-  knowledgeBases,
   messages,
+  sourceSetFiles,
+  sourceSets,
+  spaceMembers,
   topics,
   userMemories,
 } from '../../schemas';
@@ -24,7 +25,7 @@ export type SearchResultType =
   | 'mcp'
   | 'plugin'
   | 'communityAgent'
-  | 'knowledgeBase';
+  | 'sourceSet';
 
 export interface BaseSearchResult {
   // 1=exact, 2=prefix, 3=contains
@@ -64,16 +65,18 @@ export interface TopicSearchResult extends BaseSearchResult {
 
 export interface FileSearchResult extends BaseSearchResult {
   fileType: string;
-  knowledgeBaseId: string | null;
   name: string;
   size: number;
+  sourceSetId: string | null;
+  spaceId: string | null;
   type: 'file';
   url: string | null;
 }
 
 export interface FolderSearchResult extends BaseSearchResult {
-  knowledgeBaseId: string | null;
   slug: string | null;
+  sourceSetId: string | null;
+  spaceId: string | null;
   type: 'folder';
 }
 
@@ -113,9 +116,10 @@ export interface PluginSearchResult extends BaseSearchResult {
   type: 'plugin';
 }
 
-export interface KnowledgeBaseSearchResult extends BaseSearchResult {
+export interface SourceSetSearchResult extends BaseSearchResult {
   avatar: string | null;
-  type: 'knowledgeBase';
+  spaceId: string | null;
+  type: 'sourceSet';
 }
 
 export interface AssistantSearchResult extends BaseSearchResult {
@@ -139,7 +143,7 @@ export type SearchResult =
   | MCPSearchResult
   | PluginSearchResult
   | AssistantSearchResult
-  | KnowledgeBaseSearchResult;
+  | SourceSetSearchResult;
 
 export interface SearchOptions {
   agentId?: string;
@@ -156,11 +160,24 @@ export interface SearchOptions {
 export class SearchRepo {
   private userId: string;
   private db: LobeChatDatabase;
+  private accessibleSpaceIdsPromise?: Promise<string[]>;
 
   constructor(db: LobeChatDatabase, userId: string) {
     this.userId = userId;
     this.db = db;
   }
+
+  private getAccessibleSpaceIds = async () => {
+    if (!this.accessibleSpaceIdsPromise) {
+      this.accessibleSpaceIdsPromise = this.db
+        .select({ spaceId: spaceMembers.spaceId })
+        .from(spaceMembers)
+        .where(eq(spaceMembers.userId, this.userId))
+        .then((rows) => rows.map((row) => row.spaceId));
+    }
+
+    return this.accessibleSpaceIdsPromise;
+  };
 
   /**
    * Search across agents, topics, files, and pages
@@ -200,8 +217,8 @@ export class SearchRepo {
     if ((!type || type === 'memory') && limits.memory > 0) {
       searchPromises.push(this.searchMemories(trimmedQuery, limits.memory));
     }
-    if ((!type || type === 'knowledgeBase') && limits.knowledgeBase > 0) {
-      searchPromises.push(this.searchKnowledgeBases(trimmedQuery, limits.knowledgeBase));
+    if ((!type || type === 'sourceSet') && limits.sourceSet > 0) {
+      searchPromises.push(this.searchSourceSets(trimmedQuery, limits.sourceSet));
     }
 
     const results = await Promise.all(searchPromises);
@@ -224,7 +241,7 @@ export class SearchRepo {
     agent: number;
     file: number;
     folder: number;
-    knowledgeBase: number;
+    sourceSet: number;
     memory: number;
     message: number;
     page: number;
@@ -237,7 +254,7 @@ export class SearchRepo {
         agent: type === 'agent' ? baseLimit : 0,
         file: type === 'file' ? baseLimit : 0,
         folder: type === 'folder' ? baseLimit : 0,
-        knowledgeBase: type === 'knowledgeBase' ? baseLimit : 0,
+        sourceSet: type === 'sourceSet' ? baseLimit : 0,
         memory: type === 'memory' ? baseLimit : 0,
         message: type === 'message' ? baseLimit : 0,
         page: type === 'page' ? baseLimit : 0,
@@ -252,7 +269,7 @@ export class SearchRepo {
         agent: 3,
         file: 3,
         folder: 3,
-        knowledgeBase: 3,
+        sourceSet: 3,
         memory: 3,
         message: 3,
         page: 6,
@@ -267,7 +284,7 @@ export class SearchRepo {
         agent: 3,
         file: 6,
         folder: 6,
-        knowledgeBase: 6,
+        sourceSet: 6,
         memory: 3,
         message: 3,
         page: 3,
@@ -282,7 +299,7 @@ export class SearchRepo {
         agent: 3,
         file: 3,
         folder: 3,
-        knowledgeBase: 3,
+        sourceSet: 3,
         memory: 3,
         message: 6,
         page: 3,
@@ -296,7 +313,7 @@ export class SearchRepo {
       agent: 3,
       file: 3,
       folder: 3,
-      knowledgeBase: 3,
+      sourceSet: 3,
       memory: 3,
       message: 3,
       page: 3,
@@ -481,6 +498,11 @@ export class SearchRepo {
    */
   private async searchFiles(query: string, limit: number): Promise<FileSearchResult[]> {
     const searchTerm = `%${query}%`;
+    const accessibleSpaceIds = await this.getAccessibleSpaceIds();
+    const ownershipCondition =
+      accessibleSpaceIds.length === 0
+        ? eq(files.userId, this.userId)
+        : or(eq(files.userId, this.userId), inArray(files.spaceId, accessibleSpaceIds));
 
     const rows = await this.db
       .select({
@@ -488,21 +510,19 @@ export class SearchRepo {
         createdAt: files.createdAt,
         fileType: files.fileType,
         id: files.id,
-        knowledgeBaseId: knowledgeBaseFiles.knowledgeBaseId,
+        sourceSetId: sourceSetFiles.sourceSetId,
         name: files.name,
         size: files.size,
+        spaceId: files.spaceId,
         updatedAt: files.updatedAt,
         url: files.url,
       })
       .from(files)
-      .leftJoin(
-        documents,
-        and(eq(files.id, documents.fileId), isNull(documents.deletedAt)),
-      )
-      .leftJoin(knowledgeBaseFiles, eq(files.id, knowledgeBaseFiles.fileId))
+      .leftJoin(documents, and(eq(files.id, documents.fileId), isNull(documents.deletedAt)))
+      .leftJoin(sourceSetFiles, eq(files.id, sourceSetFiles.fileId))
       .where(
         and(
-          eq(files.userId, this.userId),
+          ownershipCondition,
           ne(files.fileType, 'custom/document'),
           ilike(files.name, searchTerm),
         ),
@@ -515,10 +535,11 @@ export class SearchRepo {
       description: this.truncate(row.content),
       fileType: row.fileType,
       id: row.id,
-      knowledgeBaseId: row.knowledgeBaseId,
       name: row.name,
       relevance: this.calculateRelevance(row.name, query),
       size: row.size,
+      spaceId: row.spaceId,
+      sourceSetId: row.sourceSetId,
       title: row.name,
       type: 'file' as const,
       updatedAt: row.updatedAt,
@@ -531,13 +552,18 @@ export class SearchRepo {
    */
   private async searchFolders(query: string, limit: number): Promise<FolderSearchResult[]> {
     const searchTerm = `%${query}%`;
+    const accessibleSpaceIds = await this.getAccessibleSpaceIds();
+    const ownershipCondition =
+      accessibleSpaceIds.length === 0
+        ? eq(documents.userId, this.userId)
+        : or(eq(documents.userId, this.userId), inArray(documents.spaceId, accessibleSpaceIds));
 
     const rows = await this.db
       .select()
       .from(documents)
       .where(
         and(
-          eq(documents.userId, this.userId),
+          ownershipCondition,
           eq(documents.fileType, 'custom/folder'),
           isNull(documents.deletedAt),
           or(
@@ -556,9 +582,10 @@ export class SearchRepo {
         createdAt: row.createdAt,
         description: row.description,
         id: row.id,
-        knowledgeBaseId: row.knowledgeBaseId,
         relevance: this.calculateRelevance(title, query),
         slug: row.slug,
+        spaceId: row.spaceId,
+        sourceSetId: row.sourceSetId,
         title,
         type: 'folder' as const,
         updatedAt: row.updatedAt,
@@ -571,13 +598,18 @@ export class SearchRepo {
    */
   private async searchPages(query: string, limit: number): Promise<PageSearchResult[]> {
     const searchTerm = `%${query}%`;
+    const accessibleSpaceIds = await this.getAccessibleSpaceIds();
+    const ownershipCondition =
+      accessibleSpaceIds.length === 0
+        ? eq(documents.userId, this.userId)
+        : or(eq(documents.userId, this.userId), inArray(documents.spaceId, accessibleSpaceIds));
 
     const rows = await this.db
       .select()
       .from(documents)
       .where(
         and(
-          eq(documents.userId, this.userId),
+          ownershipCondition,
           eq(documents.fileType, 'custom/document'),
           isNull(documents.deletedAt),
           or(
@@ -638,27 +670,29 @@ export class SearchRepo {
   }
 
   /**
-   * Search knowledge bases by name and description
+   * Search source sets by name and description
    */
-  private async searchKnowledgeBases(
-    query: string,
-    limit: number,
-  ): Promise<KnowledgeBaseSearchResult[]> {
+  private async searchSourceSets(query: string, limit: number): Promise<SourceSetSearchResult[]> {
     const searchTerm = `%${query}%`;
+    const accessibleSpaceIds = await this.getAccessibleSpaceIds();
+    const ownershipCondition =
+      accessibleSpaceIds.length === 0
+        ? eq(sourceSets.userId, this.userId)
+        : or(eq(sourceSets.userId, this.userId), inArray(sourceSets.spaceId, accessibleSpaceIds));
 
     const rows = await this.db
       .select()
-      .from(knowledgeBases)
+      .from(sourceSets)
       .where(
         and(
-          eq(knowledgeBases.userId, this.userId),
+          ownershipCondition,
           or(
-            ilike(knowledgeBases.name, searchTerm),
-            ilike(sql`COALESCE(${knowledgeBases.description}, '')`, searchTerm),
+            ilike(sourceSets.name, searchTerm),
+            ilike(sql`COALESCE(${sourceSets.description}, '')`, searchTerm),
           ),
         ),
       )
-      .orderBy(desc(knowledgeBases.updatedAt))
+      .orderBy(desc(sourceSets.updatedAt))
       .limit(limit);
 
     return rows.map((row) => ({
@@ -667,8 +701,9 @@ export class SearchRepo {
       description: row.description,
       id: row.id,
       relevance: this.calculateRelevance(row.name, query),
+      spaceId: row.spaceId,
       title: row.name,
-      type: 'knowledgeBase' as const,
+      type: 'sourceSet' as const,
       updatedAt: row.updatedAt,
     }));
   }

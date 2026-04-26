@@ -101,11 +101,11 @@ export class PreferenceActionImpl {
           this.#set(
             produce((draft) => {
               draft.preferencesSearchLoading = false;
+              draft.preferencesTotal = data.total;
 
               // Set basic information
               if (!draft.preferencesInit) {
                 draft.preferencesInit = true;
-                draft.preferencesTotal = data.total;
               }
 
               // Transform data structure

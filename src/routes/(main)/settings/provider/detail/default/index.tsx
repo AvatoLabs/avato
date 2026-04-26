@@ -1,7 +1,7 @@
 'use client';
 
 import { Flexbox } from '@lobehub/ui';
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 
 import { useAiInfraStore } from '@/store/aiInfra';
 import { useServerConfigStore } from '@/store/serverConfig';
@@ -14,12 +14,20 @@ interface ProviderDetailProps extends ProviderConfigProps {
   showConfig?: boolean;
 }
 const ProviderDetail = memo<ProviderDetailProps>(({ showConfig = true, ...card }) => {
-  const useFetchAiProviderItem = useAiInfraStore((s) => s.useFetchAiProviderItem);
+  const [setActiveAiProvider, useFetchAiProviderItem] = useAiInfraStore((s) => [
+    s.setActiveAiProvider,
+    s.useFetchAiProviderItem,
+  ]);
   const useFetchAiProviderList = useAiInfraStore((s) => s.useFetchAiProviderList);
   const isMobile = useServerConfigStore((s) => s.isMobile);
 
   useFetchAiProviderList({ enabled: isMobile });
   useFetchAiProviderItem(card.id);
+
+  // Sync active provider immediately so model actions target the current route before SWR finishes.
+  useEffect(() => {
+    setActiveAiProvider(card.id);
+  }, [card.id, setActiveAiProvider]);
 
   return (
     <Flexbox gap={24} paddingBlock={8}>

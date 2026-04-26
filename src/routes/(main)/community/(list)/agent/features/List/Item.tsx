@@ -1,4 +1,4 @@
-import { Avatar, Block, Flexbox, Icon, Tag, Text } from '@lobehub/ui';
+import { Avatar, Block, Flexbox, Icon, stopPropagation, Tag, Text } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
 import { ClockIcon } from 'lucide-react';
 import React, { memo, useCallback } from 'react';
@@ -45,7 +45,13 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       font-weight: 500 !important;
 
       &:hover {
+        margin-inline: -4px;
+        padding-inline: 4px;
+        border-radius: 4px;
+
         color: ${cssVar.colorLink};
+
+        background: ${cssVar.colorPrimaryBg};
       }
     `,
   };
@@ -165,7 +171,11 @@ const AssistantItem = memo<DiscoverAssistantItem>(
                   overflow: 'hidden',
                 }}
               >
-                <Link style={{ color: 'inherit', overflow: 'hidden' }} to={link}>
+                <Link
+                  style={{ color: 'inherit', overflow: 'hidden' }}
+                  to={link}
+                  onClick={stopPropagation}
+                >
                   <Text ellipsis as={'h2'} className={styles.title}>
                     {title}
                   </Text>

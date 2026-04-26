@@ -5,8 +5,9 @@ import { type ReactNode } from 'react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
+import { OFFICIAL_URL } from '@/const/url';
 import { builtinToolSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import { type DetailContextValue } from './DetailContext';
 import { DetailContext } from './DetailContext';
@@ -58,7 +59,7 @@ export const BuiltinDetailProvider = ({ children, identifier }: BuiltinDetailPro
 
   const value: DetailContextValue = {
     author: 'Avato',
-    authorUrl: 'https://lobehub.com',
+    authorUrl: OFFICIAL_URL,
     config: null as any, // Builtin tools don't have provider config
     description: meta?.description || '',
     icon: meta?.avatar || '',

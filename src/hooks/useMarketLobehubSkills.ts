@@ -2,10 +2,14 @@
  * Hook to fetch LobeHub skill providers from market API
  *
  * This hook dynamically loads available skill providers from the market,
- * providing better alignment with https://lobehub.com/skills
+ * providing better alignment with the configured market.
  */
 
-import { LOBEHUB_SKILL_PROVIDERS, type LobehubSkillProviderType } from '@lobechat/const';
+import {
+  LOBEHUB_SKILL_PROVIDERS,
+  type LobehubSkillProviderType,
+  OFFICIAL_URL,
+} from '@lobechat/const';
 import { useEffect, useState } from 'react';
 
 import { discoverService } from '@/services/discover';
@@ -14,8 +18,6 @@ import type { ProviderListResponse } from '@/types/discover';
 interface UseMarketLobehubSkillsOptions {
   enabled?: boolean;
 }
-
-interface MarketLobehubSkillProvider extends LobehubSkillProviderType {}
 
 export const useMarketLobehubSkills = (options: UseMarketLobehubSkillsOptions = {}) => {
   const { enabled = true } = options;
@@ -39,8 +41,8 @@ export const useMarketLobehubSkills = (options: UseMarketLobehubSkillsOptions = 
 
         // Transform market response to match LOBEHUB_SKILL_PROVIDERS format
         const providers: LobehubSkillProviderType[] = response.items.map((item) => ({
-          author: 'LobeHub',
-          authorUrl: 'https://lobehub.com',
+          author: 'Avato',
+          authorUrl: OFFICIAL_URL,
           defaultVisible: true,
           description: item.description || '',
           icon: (item as any).icon || (item as any).logo || '',

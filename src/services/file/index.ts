@@ -1,6 +1,14 @@
 import { lambdaClient } from '@/libs/trpc/client';
+import { getCanonicalContentKind } from '@/types/content';
 import {
-  type CheckFileHashResult,
+  type CheckSpaceBlobResult,
+  type FileAssetClassification,
+  type FileAssetGovernanceAuditTrailResult,
+  type FileAssetMetadata,
+  type FileAssetReviewStatus,
+  type FileAssetState,
+  type FileAssetUsagePolicy,
+  type FileGovernanceSummary,
   type FileItem,
   type FileListItem,
   type QueryFileListParams,
@@ -8,19 +16,18 @@ import {
   type UploadFileParams,
 } from '@/types/files';
 
-interface CreateFileParams extends Omit<UploadFileParams, 'url'> {
-  knowledgeBaseId?: string;
+interface CreateFileParams extends UploadFileParams {
   parentId?: string;
+  sourceSetId?: string;
   spaceId?: string;
-  url: string;
 }
 
 export class FileService {
   createFile = async (
     params: UploadFileParams & { parentId?: string; spaceId?: string },
-    knowledgeBaseId?: string,
+    sourceSetId?: string,
   ): Promise<{ id: string; url: string }> => {
-    return lambdaClient.file.createFile.mutate({ ...params, knowledgeBaseId } as CreateFileParams);
+    return lambdaClient.file.createFile.mutate({ ...params, sourceSetId } as CreateFileParams);
   };
 
   getFile = async (id: string): Promise<FileItem> => {
@@ -42,12 +49,20 @@ export class FileService {
     };
   };
 
-  removeFile = async (id: string): Promise<void> => {
-    await lambdaClient.file.removeFile.mutate({ id });
+  removeFile = async (id: string, trash?: boolean): Promise<void> => {
+    await lambdaClient.file.removeFile.mutate({ id, trash });
   };
 
-  removeFiles = async (ids: string[]): Promise<void> => {
-    await lambdaClient.file.removeFiles.mutate({ ids });
+  removeFiles = async (ids: string[], trash?: boolean): Promise<void> => {
+    await lambdaClient.file.removeFiles.mutate({ ids, trash });
+  };
+
+  restoreFile = async (id: string): Promise<void> => {
+    await lambdaClient.file.restoreFile.mutate({ id });
+  };
+
+  restoreFiles = async (ids: string[]): Promise<void> => {
+    await lambdaClient.file.restoreFiles.mutate({ ids });
   };
 
   removeAllFiles = async () => {
@@ -59,11 +74,17 @@ export class FileService {
     return lambdaClient.file.getKnowledgeItems.query(params as QueryFileListSchemaType);
   };
 
+  getKnowledgeGovernanceSummary = async (
+    params: QueryFileListParams,
+  ): Promise<FileGovernanceSummary> => {
+    return lambdaClient.file.getKnowledgeGovernanceSummary.query(params as QueryFileListSchemaType);
+  };
+
   // V2.0 Migrate from getFileItem to getKnowledgeItem
   // This method handles both files (file_ prefix) and documents (docs_ prefix)
   getKnowledgeItem = async (id: string) => {
     // Detect type based on ID prefix
-    if (id.startsWith('docs_')) {
+    if (getCanonicalContentKind({ id, sourceType: 'file' }) === 'document') {
       // Document (including folders) - use document endpoint
       const doc = await lambdaClient.document.getDocumentById.query({ id });
       if (!doc) return null;
@@ -81,9 +102,11 @@ export class FileService {
         fileType: doc.fileType || 'custom/document',
         finishEmbedding: false,
         id: doc.id,
+        sourceSetId: doc.sourceSetId ?? null,
         metadata: doc.metadata,
         name: doc.title || doc.filename || 'Untitled',
         parentId: doc.parentId,
+        spaceId: doc.spaceId ?? null,
         size: doc.totalCharCount || 0,
         slug: doc.slug,
         sourceType: 'document',
@@ -96,12 +119,23 @@ export class FileService {
     }
   };
 
-  getFolderBreadcrumb = async (slug: string) => {
-    return lambdaClient.document.getFolderBreadcrumb.query({ slug });
+  getFileAsset = async (id: string): Promise<FileAssetState> => {
+    return lambdaClient.file.getFileAssetById.query({ id });
   };
 
-  checkFileHash = async (hash: string, spaceId?: string): Promise<CheckFileHashResult> => {
-    return lambdaClient.file.checkFileHash.mutate(spaceId ? { hash, spaceId } : { hash });
+  getFileAssetAuditTrail = async (
+    id: string,
+    limit?: number,
+  ): Promise<FileAssetGovernanceAuditTrailResult> => {
+    return lambdaClient.file.getFileAssetAuditTrail.query(limit ? { id, limit } : { id });
+  };
+
+  getFolderBreadcrumb = async (slug: string, spaceId?: string) => {
+    return lambdaClient.document.getFolderBreadcrumb.query(spaceId ? { slug, spaceId } : { slug });
+  };
+
+  checkSpaceBlob = async (sha256: string, spaceId?: string): Promise<CheckSpaceBlobResult> => {
+    return lambdaClient.file.checkSpaceBlob.mutate(spaceId ? { sha256, spaceId } : { sha256 });
   };
 
   removeFileAsyncTask = async (id: string, type: 'embedding' | 'chunk') => {
@@ -110,6 +144,27 @@ export class FileService {
 
   updateFile = async (id: string, data: { parentId?: string | null }) => {
     return lambdaClient.file.updateFile.mutate({ id, ...data });
+  };
+
+  updateFileAssetGovernance = async (
+    id: string,
+    data: {
+      classification?: FileAssetClassification;
+      metadata?: FileAssetMetadata | null;
+      reviewStatus?: FileAssetReviewStatus;
+      rightsOwner?: string | null;
+      usagePolicy?: FileAssetUsagePolicy;
+    },
+  ): Promise<FileAssetState> => {
+    return lambdaClient.file.updateFileAssetGovernance.mutate({ id, ...data });
+  };
+
+  approveFileAsset = async (id: string): Promise<FileAssetState> => {
+    return lambdaClient.file.approveFileAsset.mutate({ id });
+  };
+
+  archiveFileAsset = async (id: string): Promise<FileAssetState> => {
+    return lambdaClient.file.archiveFileAsset.mutate({ id });
   };
 
   getRecentFiles = async (limit?: number) => {

@@ -79,10 +79,16 @@ const SortModelModal = memo<SortModelModalProps>(({ open, onCancel, defaultItems
             }));
 
             setLoading(true);
-            await updateAiModelsSort(providerId, sortMap);
-            setLoading(false);
-            message.success(t('sortModal.success'));
-            onCancel();
+            try {
+              await updateAiModelsSort(providerId, sortMap);
+              message.success(t('sortModal.success'));
+              onCancel();
+            } catch (error) {
+              console.error('Failed to sort models:', error);
+              message.error(t('sortModal.error'));
+            } finally {
+              setLoading(false);
+            }
           }}
         >
           {t('sortModal.update')}

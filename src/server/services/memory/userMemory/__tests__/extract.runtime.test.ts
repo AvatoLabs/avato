@@ -279,6 +279,7 @@ describe('MemoryExtractionExecutor.resolveRuntimeKeyVaults', () => {
 
     warnSpy.mockRestore();
   });
+
 });
 
 describe('MemoryExtractionExecutor.runDirect', () => {

@@ -115,9 +115,8 @@ const VirtualizedList = memo<VirtualizedListProps>(({ dataSource, itemContent })
 
   // Get the second-to-last message to check if it's a user message
   // (When sending a message, user + assistant messages are created as a pair)
-  const displayMessages = useConversationStore(dataSelectors.displayMessages);
-  const secondLastMessage = displayMessages.at(-2);
-  const isSecondLastMessageFromUser = secondLastMessage?.role === 'user';
+  const secondLastMessageRole = useConversationStore(dataSelectors.secondLastDisplayMessageRole);
+  const isSecondLastMessageFromUser = secondLastMessageRole === 'user';
 
   // Auto scroll to user message when user sends a new message
   // Only scroll when 2 new messages are added and second-to-last is from user

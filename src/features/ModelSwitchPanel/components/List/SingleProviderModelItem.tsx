@@ -13,7 +13,7 @@ export const SingleProviderModelItem = memo<SingleProviderModelItemProps>(({ dat
   return (
     <ModelItemRender
       {...data.model}
-      {...data.model.abilities}
+      abilities={data.model.abilities}
       newBadgeLabel={newLabel}
       showInfoTag={true}
     />

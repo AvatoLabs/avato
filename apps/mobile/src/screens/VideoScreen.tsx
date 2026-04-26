@@ -14,7 +14,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
-  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -48,7 +47,8 @@ import { aiProviderApi, fileApi, getApiUrl, videoApi } from '../lib/api';
 import { useMainTabBottomInsets } from '../lib/bottomChrome';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
-import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
+import { createComposerKeyboardSubscriptions, resolveComposerLift } from '../lib/keyboard';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { GenerationBatch, GenerationItem, GenerationTopic } from '../types';
@@ -477,7 +477,9 @@ export default function VideoScreen({
   const toast = useToast();
   const { t } = useI18n();
   const colors = useThemeColors();
-  const { width: screenWidth } = useWindowDimensions();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const hasPersistentSidebar = responsiveMetrics.isWideTablet;
   const isScreenFocused = useIsFocused();
 
   const [apiBase, setApiBase] = useState('');
@@ -504,13 +506,12 @@ export default function VideoScreen({
   const bottomChrome = useMainTabBottomInsets(keyboardOffset);
   const animatedKeyboard = useAnimatedKeyboard();
   const composerLiftStyle = useAnimatedStyle(() => {
-    const lift =
-      Platform.OS === 'android'
-        ? Math.max(
-            0,
-            animatedKeyboard.height.value - insets.bottom - ANDROID_COMPOSER_LIFT_ADJUSTMENT,
-          )
-        : keyboardOffset;
+    const lift = resolveComposerLift({
+      animatedKeyboardHeight: animatedKeyboard.height.value,
+      bottomInset: insets.bottom,
+      keyboardOffset,
+      platform: Platform.OS,
+    });
 
     return {
       transform: [{ translateY: -lift }],
@@ -551,9 +552,10 @@ export default function VideoScreen({
   }, []);
 
   const openSidebar = useCallback(() => {
+    if (hasPersistentSidebar) return;
     haptics.selection();
     setShowSidebar(true);
-  }, []);
+  }, [hasPersistentSidebar]);
 
   useEffect(() => {
     if (configOpenVersion <= lastConfigOpenVersionRef.current) return;
@@ -561,6 +563,11 @@ export default function VideoScreen({
     lastConfigOpenVersionRef.current = configOpenVersion;
     openSidebar();
   }, [configOpenVersion, openSidebar]);
+
+  useEffect(() => {
+    if (!hasPersistentSidebar || !showSidebar) return;
+    setShowSidebar(false);
+  }, [hasPersistentSidebar, showSidebar]);
 
   const loadModels = useCallback(async () => {
     setLoadingModels(true);
@@ -783,31 +790,11 @@ export default function VideoScreen({
   }, [activeTopicId, isAppActive, isScreenFocused, pendingSignature, stopPolling]);
 
   useEffect(() => {
-    const handleKeyboardShow = (event: any) => {
-      setKeyboardOffset(getKeyboardOffset(event, insets.bottom));
-    };
-
-    const handleKeyboardHide = () => {
-      setKeyboardOffset(0);
-    };
-
-    const subscriptions =
-      Platform.OS === 'ios'
-        ? [
-            Keyboard.addListener('keyboardWillShow', handleKeyboardShow),
-            Keyboard.addListener('keyboardWillHide', handleKeyboardHide),
-            Keyboard.addListener('keyboardWillChangeFrame', (event) => {
-              if (getKeyboardOffset(event, insets.bottom) <= 0) {
-                handleKeyboardHide();
-              } else {
-                handleKeyboardShow(event);
-              }
-            }),
-          ]
-        : [
-            Keyboard.addListener('keyboardDidShow', handleKeyboardShow),
-            Keyboard.addListener('keyboardDidHide', handleKeyboardHide),
-          ];
+    const subscriptions = createComposerKeyboardSubscriptions({
+      bottomInset: insets.bottom,
+      onKeyboardOffsetChange: setKeyboardOffset,
+      platform: Platform.OS,
+    });
 
     return () => {
       for (const subscription of subscriptions) {
@@ -942,8 +929,380 @@ export default function VideoScreen({
     `${duration}s`,
     generateAudio ? t.videoGenerateAudio : undefined,
   ].filter(Boolean);
-  const sidebarWidth = Math.round(screenWidth * 0.85);
-  const sidebarPad = 20;
+  const containerPad = hasPersistentSidebar ? 24 : 20;
+  const layoutGap = hasPersistentSidebar ? 24 : 0;
+  const sidebarWidth = responsiveMetrics.createSidebarWidth;
+  const sidebarPad = hasPersistentSidebar ? 24 : 20;
+  const feedAvailableWidth = hasPersistentSidebar
+    ? Math.max(320, screenWidth - sidebarWidth - layoutGap - containerPad * 2)
+    : Math.max(320, screenWidth - containerPad * 2);
+  const feedContentWidth = Math.min(feedAvailableWidth, responsiveMetrics.createFeedMaxWidth);
+  const composerMaxWidth = feedContentWidth + 32;
+  const sidebarVisible = hasPersistentSidebar || showSidebar;
+  const sidebarPanel = (
+    <View
+      style={
+        hasPersistentSidebar
+          ? {
+              backgroundColor: colors.surface,
+              borderColor: colors.borderSubtle,
+              borderRadius: 24,
+              borderWidth: 1,
+              overflow: 'hidden',
+              width: sidebarWidth,
+            }
+          : {
+              backgroundColor: colors.surface,
+              borderBottomLeftRadius: 20,
+              borderTopLeftRadius: 20,
+              bottom: 0,
+              elevation: 12,
+              position: 'absolute',
+              right: 0,
+              shadowColor: colors.shadow,
+              shadowOffset: { height: 0, width: -4 },
+              shadowOpacity: 0.08,
+              shadowRadius: 16,
+              top: 0,
+              width: sidebarWidth,
+            }
+      }
+    >
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingBottom: Math.max(bottomChrome.overlayListPaddingBottom, 40),
+          paddingHorizontal: sidebarPad,
+          paddingTop: hasPersistentSidebar ? 20 : 60,
+        }}
+      >
+        <View className="mb-2 flex-row items-center justify-between">
+          <Text
+            style={{
+              color: colors.foreground,
+              fontSize: 18,
+              fontWeight: '700',
+              letterSpacing: -0.3,
+            }}
+          >
+            {t.videoTitle}
+          </Text>
+          {!hasPersistentSidebar ? (
+            <TouchableOpacity hitSlop={8} onPress={closeSidebar}>
+              <X color={colors.iconMuted} size={20} strokeWidth={tokens.icon.strokeWidth} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <SidebarLabel text={t.videoSelectModel} />
+        <TouchableOpacity
+          style={{
+            alignItems: 'center',
+            backgroundColor: colors.fillTertiary,
+            borderRadius: 16,
+            flexDirection: 'row',
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+          }}
+          onPress={() => setShowPicker((current) => !current)}
+        >
+          <Sparkles color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+          <Text
+            numberOfLines={1}
+            style={{
+              color: colors.foreground,
+              flex: 1,
+              fontSize: 14,
+              fontWeight: '600',
+              marginLeft: 8,
+            }}
+          >
+            {selectedModelLabel || t.videoSelectModel}
+          </Text>
+          <ChevronDown color={colors.iconMuted} size={16} strokeWidth={tokens.icon.strokeWidth} />
+        </TouchableOpacity>
+
+        {showPicker ? (
+          <Animated.View
+            entering={FadeInDown.duration(350)}
+            style={{
+              backgroundColor: colors.fillTertiary,
+              borderRadius: 12,
+              marginTop: 8,
+              maxHeight: 240,
+              overflow: 'hidden',
+            }}
+          >
+            <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
+              {loadingModels ? (
+                <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+                  <ActivityIndicator color={colors.primary} size="small" />
+                </View>
+              ) : allModels.length === 0 ? (
+                <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+                  <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600' }}>
+                    {t.videoNoModels}
+                  </Text>
+                  <Text
+                    style={{
+                      color: colors.secondaryText,
+                      fontSize: 12,
+                      marginTop: 4,
+                      textAlign: 'center',
+                    }}
+                  >
+                    {t.videoNoModelsDesc}
+                  </Text>
+                </View>
+              ) : (
+                allModels.map((modelItem) => {
+                  const active = provider === modelItem.providerId && model === modelItem.id;
+
+                  return (
+                    <TouchableOpacity
+                      activeOpacity={0.75}
+                      key={`${modelItem.providerId}-${modelItem.id}`}
+                      style={{
+                        alignItems: 'center',
+                        backgroundColor: active ? colors.primarySubtle : 'transparent',
+                        flexDirection: 'row',
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                      }}
+                      onPress={() => {
+                        haptics.light();
+                        setProvider(modelItem.providerId);
+                        setModel(modelItem.id);
+                        setModelName(modelItem.displayName || modelItem.id);
+                        setShowPicker(false);
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={{
+                            color: colors.foreground,
+                            fontSize: 13,
+                            fontWeight: '500',
+                          }}
+                        >
+                          {modelItem.displayName || modelItem.id}
+                        </Text>
+                        <Text style={{ color: colors.muted, fontSize: 10 }}>
+                          {modelItem.providerName}
+                        </Text>
+                      </View>
+                      {active ? (
+                        <Check
+                          color={colors.primary}
+                          size={18}
+                          strokeWidth={tokens.icon.strokeWidth}
+                        />
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+          </Animated.View>
+        ) : null}
+
+        <SidebarLabel
+          text={t.videoTitle}
+          right={
+            <TouchableOpacity
+              className="rounded-full px-3 py-1.5"
+              style={{ backgroundColor: colors.primarySubtle }}
+              onPress={() => {
+                handleResetTopic();
+                if (!hasPersistentSidebar) closeSidebar();
+              }}
+            >
+              <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>
+                {t.videoNewTopic}
+              </Text>
+            </TouchableOpacity>
+          }
+        />
+
+        <View style={{ gap: 8 }}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={{
+              alignItems: 'center',
+              backgroundColor: !activeTopicId ? colors.primarySubtle : colors.fillTertiary,
+              borderRadius: 14,
+              flexDirection: 'row',
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+            }}
+            onPress={() => {
+              handleResetTopic();
+              if (!hasPersistentSidebar) closeSidebar();
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600' }}>
+                {t.videoTopicReset}
+              </Text>
+              <Text style={{ color: colors.secondaryText, fontSize: 11, marginTop: 2 }}>
+                {t.videoNewTopic}
+              </Text>
+            </View>
+            {!activeTopicId ? (
+              <Check color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+            ) : null}
+          </TouchableOpacity>
+
+          {topics.map((topic) => {
+            const active = topic.id === activeTopicId;
+
+            return (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                key={topic.id}
+                style={{
+                  alignItems: 'center',
+                  backgroundColor: active ? colors.primarySubtle : colors.fillTertiary,
+                  borderRadius: 14,
+                  flexDirection: 'row',
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                }}
+                onPress={() => {
+                  haptics.light();
+                  setActiveTopicId(topic.id);
+                  if (!hasPersistentSidebar) closeSidebar();
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      color: colors.foreground,
+                      fontSize: 14,
+                      fontWeight: '600',
+                    }}
+                  >
+                    {topic.title || t.videoTitle}
+                  </Text>
+                  <Text style={{ color: colors.secondaryText, fontSize: 11, marginTop: 2 }}>
+                    {new Date(topic.updatedAt ?? topic.createdAt ?? Date.now())
+                      .toLocaleString()
+                      .replace(',', '')}
+                  </Text>
+                </View>
+                {active ? (
+                  <Check color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <SidebarLabel text={t.videoDuration} />
+        <SidebarOptionGrid
+          columns={2}
+          containerWidth={sidebarWidth - sidebarPad * 2}
+          getKey={(item) => String(item)}
+          items={DURATION_OPTIONS}
+          selectedValue={duration}
+          renderContent={(item, active) => (
+            <Text
+              style={{
+                color: active ? colors.iconOnPrimary : colors.muted,
+                fontSize: 12,
+                fontWeight: '500',
+              }}
+            >
+              {item}s
+            </Text>
+          )}
+          onSelect={(item) => {
+            haptics.selection();
+            setDuration(Number(item));
+          }}
+        />
+
+        <SidebarLabel text={t.videoAspectRatio} />
+        <SidebarOptionGrid
+          columns={2}
+          containerWidth={sidebarWidth - sidebarPad * 2}
+          getKey={(item) => String(item)}
+          items={RATIO_OPTIONS}
+          selectedValue={aspectRatio}
+          renderContent={(item, active) => (
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ marginBottom: 4 }}>
+                <RatioIcon active={active} ratio={String(item)} />
+              </View>
+              <Text
+                style={{
+                  color: active ? colors.iconOnPrimary : colors.muted,
+                  fontSize: 11,
+                  fontWeight: '500',
+                }}
+              >
+                {String(item)}
+              </Text>
+            </View>
+          )}
+          onSelect={(item) => {
+            haptics.selection();
+            setAspectRatio(String(item));
+          }}
+        />
+
+        <SidebarLabel text={t.videoResolution} />
+        <SidebarOptionGrid
+          columns={3}
+          containerWidth={sidebarWidth - sidebarPad * 2}
+          getKey={(item) => String(item)}
+          items={RESOLUTION_OPTIONS}
+          selectedValue={resolution}
+          renderContent={(item, active) => (
+            <Text
+              style={{
+                color: active ? colors.iconOnPrimary : colors.muted,
+                fontSize: 12,
+                fontWeight: '500',
+              }}
+            >
+              {String(item)}
+            </Text>
+          )}
+          onSelect={(item) => {
+            haptics.selection();
+            setResolution(String(item));
+          }}
+        />
+
+        <SidebarLabel text={t.videoGenerateAudio} />
+        <View
+          style={{
+            alignItems: 'center',
+            backgroundColor: colors.fillTertiary,
+            borderRadius: 14,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+          }}
+        >
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600' }}>
+              {t.videoGenerateAudio}
+            </Text>
+          </View>
+          <Switch
+            thumbColor={generateAudio ? colors.iconOnPrimary : colors.controlKnob}
+            trackColor={{ false: colors.switchTrackOff, true: colors.primary }}
+            value={generateAudio}
+            onValueChange={setGenerateAudio}
+          />
+        </View>
+      </ScrollView>
+    </View>
+  );
 
   return (
     <View className="flex-1 bg-background">
@@ -956,7 +1315,7 @@ export default function VideoScreen({
         />
       ) : null}
 
-      {!hideHeader ? (
+      {!hideHeader && !hasPersistentSidebar ? (
         <CreateConfigBar
           label={selectedModelLabel || t.videoSelectModel}
           summary={summaryParts.join(' · ') || t.videoNoModels}
@@ -964,100 +1323,120 @@ export default function VideoScreen({
         />
       ) : null}
 
-      <ScrollView
+      <View
         className="flex-1"
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={
-          loadingHistory
+        style={
+          hasPersistentSidebar
             ? {
-                alignItems: 'center',
-                flexGrow: 1,
-                justifyContent: 'center',
-                paddingBottom: 20,
-                paddingHorizontal: 20,
+                flexDirection: 'row',
+                gap: layoutGap,
+                paddingBottom: 12,
+                paddingHorizontal: containerPad,
               }
-            : batches.length === 0
-              ? {
-                  alignItems: 'center',
-                  flexGrow: 1,
-                  justifyContent: 'center',
-                  paddingBottom: 20,
-                  paddingHorizontal: 20,
-                }
-              : { paddingBottom: 20, paddingHorizontal: 20 }
+            : undefined
         }
       >
-        {loadingHistory ? (
-          <ActivityIndicator color={colors.primary} size="small" />
-        ) : batches.length > 0 ? (
-          batches.flatMap((batch) =>
-            batch.generations.map((generation) => (
-              <VideoPreviewCard
-                baseUrl={apiBase}
-                batch={batch}
-                generation={generation}
-                key={generation.id}
-                onDownload={() => void handleDownload(generation)}
-                onOpen={() => handlePreview(generation)}
-                onShare={() => void handleShare(generation)}
-              />
-            )),
-          )
-        ) : (
-          <View className="flex-1 items-center justify-center px-8">
-            <EmptyState
-              description={t.videoHistoryEmptyDesc}
-              iconVariant="artwork"
-              title={t.videoHistoryEmpty}
-            />
-          </View>
-        )}
-      </ScrollView>
-
-      <Animated.View
-        className="px-4 pt-1"
-        style={[{ paddingBottom: bottomChrome.composerPaddingBottom }, composerLiftStyle]}
-      >
-        <ComposerShell active={composerActive}>
-          <View className="flex-row items-end gap-2 px-3 pb-2 pt-2">
-            <TextInput
-              multiline
-              className="min-h-[36px] flex-1"
-              placeholder={t.videoPromptPlaceholder}
-              placeholderTextColor={colors.secondaryText}
-              underlineColorAndroid="transparent"
-              value={prompt}
+        <View className="flex-1">
+          <ScrollView
+            className="flex-1"
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              flexGrow: 1,
+              paddingBottom: 20,
+              paddingHorizontal: hasPersistentSidebar ? 0 : containerPad,
+            }}
+          >
+            <View
               style={{
-                color: colors.foreground,
-                fontSize: 16,
-                lineHeight: 22,
-                maxHeight: 112,
-                paddingVertical: 0,
-                textAlignVertical: 'top',
+                alignSelf: 'center',
+                flexGrow: 1,
+                justifyContent: loadingHistory || batches.length === 0 ? 'center' : undefined,
+                width: '100%',
+                maxWidth: feedContentWidth,
               }}
-              onChangeText={setPrompt}
-            />
-            <ComposerPrimaryAction
-              active={!!prompt.trim() && !!model}
-              disabled={!prompt.trim() || !model || creating}
-              onPress={() => void handleGenerate()}
             >
-              {creating ? (
-                <ActivityIndicator color={colors.iconOnPrimary} size="small" />
+              {loadingHistory ? (
+                <ActivityIndicator color={colors.primary} size="small" />
+              ) : batches.length > 0 ? (
+                batches.flatMap((batch) =>
+                  batch.generations.map((generation) => (
+                    <VideoPreviewCard
+                      baseUrl={apiBase}
+                      batch={batch}
+                      generation={generation}
+                      key={generation.id}
+                      onDownload={() => void handleDownload(generation)}
+                      onOpen={() => handlePreview(generation)}
+                      onShare={() => void handleShare(generation)}
+                    />
+                  )),
+                )
               ) : (
-                <Sparkles
-                  color={prompt.trim() && model ? colors.iconOnPrimary : colors.muted}
-                  size={18}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
+                <View className="flex-1 items-center justify-center px-8">
+                  <EmptyState
+                    description={t.videoHistoryEmptyDesc}
+                    iconVariant="artwork"
+                    title={t.videoHistoryEmpty}
+                  />
+                </View>
               )}
-            </ComposerPrimaryAction>
-          </View>
-        </ComposerShell>
-      </Animated.View>
+            </View>
+          </ScrollView>
 
-      {showSidebar ? (
+          <Animated.View
+            className="px-4 pt-1"
+            style={[
+              { paddingBottom: bottomChrome.composerPaddingBottom },
+              hasPersistentSidebar
+                ? { alignSelf: 'center', maxWidth: composerMaxWidth, width: '100%' }
+                : null,
+              composerLiftStyle,
+            ]}
+          >
+            <ComposerShell active={composerActive}>
+              <View className="flex-row items-end gap-2 px-3 pb-2 pt-2">
+                <TextInput
+                  multiline
+                  className="min-h-[36px] flex-1"
+                  placeholder={t.videoPromptPlaceholder}
+                  placeholderTextColor={colors.secondaryText}
+                  underlineColorAndroid="transparent"
+                  value={prompt}
+                  style={{
+                    color: colors.foreground,
+                    fontSize: 16,
+                    lineHeight: 22,
+                    maxHeight: 112,
+                    paddingVertical: 0,
+                    textAlignVertical: 'top',
+                  }}
+                  onChangeText={setPrompt}
+                />
+                <ComposerPrimaryAction
+                  active={!!prompt.trim() && !!model}
+                  disabled={!prompt.trim() || !model || creating}
+                  onPress={() => void handleGenerate()}
+                >
+                  {creating ? (
+                    <ActivityIndicator color={colors.iconOnPrimary} size="small" />
+                  ) : (
+                    <Sparkles
+                      color={prompt.trim() && model ? colors.iconOnPrimary : colors.muted}
+                      size={18}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                  )}
+                </ComposerPrimaryAction>
+              </View>
+            </ComposerShell>
+          </Animated.View>
+        </View>
+
+        {hasPersistentSidebar ? sidebarPanel : null}
+      </View>
+
+      {!hasPersistentSidebar && sidebarVisible ? (
         <>
           <Animated.View
             entering={FadeIn.duration(250)}
@@ -1074,361 +1453,8 @@ export default function VideoScreen({
           <Animated.View
             entering={SlideInRight.duration(300)}
             exiting={SlideOutRight.duration(300)}
-            style={{
-              backgroundColor: colors.surface,
-              borderBottomLeftRadius: 20,
-              borderTopLeftRadius: 20,
-              bottom: 0,
-              elevation: 12,
-              position: 'absolute',
-              right: 0,
-              shadowColor: colors.shadow,
-              shadowOffset: { height: 0, width: -4 },
-              shadowOpacity: 0.08,
-              shadowRadius: 16,
-              top: 0,
-              width: sidebarWidth,
-            }}
           >
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingBottom: Math.max(bottomChrome.overlayListPaddingBottom, 40),
-                paddingHorizontal: sidebarPad,
-                paddingTop: 60,
-              }}
-            >
-              <View className="mb-2 flex-row items-center justify-between">
-                <Text
-                  style={{
-                    color: colors.foreground,
-                    fontSize: 18,
-                    fontWeight: '700',
-                    letterSpacing: -0.3,
-                  }}
-                >
-                  {t.videoTitle}
-                </Text>
-                <TouchableOpacity hitSlop={8} onPress={closeSidebar}>
-                  <X color={colors.iconMuted} size={20} strokeWidth={tokens.icon.strokeWidth} />
-                </TouchableOpacity>
-              </View>
-
-              <SidebarLabel text={t.videoSelectModel} />
-              <TouchableOpacity
-                style={{
-                  alignItems: 'center',
-                  backgroundColor: colors.fillTertiary,
-                  borderRadius: 16,
-                  flexDirection: 'row',
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                }}
-                onPress={() => setShowPicker((current) => !current)}
-              >
-                <Sparkles color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    color: colors.foreground,
-                    flex: 1,
-                    fontSize: 14,
-                    fontWeight: '600',
-                    marginLeft: 8,
-                  }}
-                >
-                  {selectedModelLabel || t.videoSelectModel}
-                </Text>
-                <ChevronDown
-                  color={colors.iconMuted}
-                  size={16}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-              </TouchableOpacity>
-
-              {showPicker ? (
-                <Animated.View
-                  entering={FadeInDown.duration(350)}
-                  style={{
-                    backgroundColor: colors.fillTertiary,
-                    borderRadius: 12,
-                    marginTop: 8,
-                    maxHeight: 240,
-                    overflow: 'hidden',
-                  }}
-                >
-                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
-                    {loadingModels ? (
-                      <View style={{ alignItems: 'center', paddingVertical: 24 }}>
-                        <ActivityIndicator color={colors.primary} size="small" />
-                      </View>
-                    ) : allModels.length === 0 ? (
-                      <View style={{ alignItems: 'center', paddingVertical: 24 }}>
-                        <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600' }}>
-                          {t.videoNoModels}
-                        </Text>
-                        <Text
-                          style={{
-                            color: colors.secondaryText,
-                            fontSize: 12,
-                            marginTop: 4,
-                            textAlign: 'center',
-                          }}
-                        >
-                          {t.videoNoModelsDesc}
-                        </Text>
-                      </View>
-                    ) : (
-                      allModels.map((modelItem) => {
-                        const active = provider === modelItem.providerId && model === modelItem.id;
-
-                        return (
-                          <TouchableOpacity
-                            activeOpacity={0.75}
-                            key={`${modelItem.providerId}-${modelItem.id}`}
-                            style={{
-                              alignItems: 'center',
-                              backgroundColor: active ? colors.primarySubtle : 'transparent',
-                              flexDirection: 'row',
-                              paddingHorizontal: 16,
-                              paddingVertical: 12,
-                            }}
-                            onPress={() => {
-                              haptics.light();
-                              setProvider(modelItem.providerId);
-                              setModel(modelItem.id);
-                              setModelName(modelItem.displayName || modelItem.id);
-                              setShowPicker(false);
-                            }}
-                          >
-                            <View style={{ flex: 1 }}>
-                              <Text
-                                style={{
-                                  color: colors.foreground,
-                                  fontSize: 13,
-                                  fontWeight: '500',
-                                }}
-                              >
-                                {modelItem.displayName || modelItem.id}
-                              </Text>
-                              <Text style={{ color: colors.muted, fontSize: 10 }}>
-                                {modelItem.providerName}
-                              </Text>
-                            </View>
-                            {active ? (
-                              <Check
-                                color={colors.primary}
-                                size={18}
-                                strokeWidth={tokens.icon.strokeWidth}
-                              />
-                            ) : null}
-                          </TouchableOpacity>
-                        );
-                      })
-                    )}
-                  </ScrollView>
-                </Animated.View>
-              ) : null}
-
-              <SidebarLabel
-                text={t.videoTitle}
-                right={
-                  <TouchableOpacity
-                    className="rounded-full px-3 py-1.5"
-                    style={{ backgroundColor: colors.primarySubtle }}
-                    onPress={() => {
-                      handleResetTopic();
-                      closeSidebar();
-                    }}
-                  >
-                    <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>
-                      {t.videoNewTopic}
-                    </Text>
-                  </TouchableOpacity>
-                }
-              />
-
-              <View style={{ gap: 8 }}>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  style={{
-                    alignItems: 'center',
-                    backgroundColor: !activeTopicId ? colors.primarySubtle : colors.fillTertiary,
-                    borderRadius: 14,
-                    flexDirection: 'row',
-                    paddingHorizontal: 14,
-                    paddingVertical: 12,
-                  }}
-                  onPress={() => {
-                    handleResetTopic();
-                    closeSidebar();
-                  }}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600' }}>
-                      {t.videoTopicReset}
-                    </Text>
-                    <Text style={{ color: colors.secondaryText, fontSize: 11, marginTop: 2 }}>
-                      {t.videoNewTopic}
-                    </Text>
-                  </View>
-                  {!activeTopicId ? (
-                    <Check color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                  ) : null}
-                </TouchableOpacity>
-
-                {topics.map((topic) => {
-                  const active = topic.id === activeTopicId;
-
-                  return (
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      key={topic.id}
-                      style={{
-                        alignItems: 'center',
-                        backgroundColor: active ? colors.primarySubtle : colors.fillTertiary,
-                        borderRadius: 14,
-                        flexDirection: 'row',
-                        paddingHorizontal: 14,
-                        paddingVertical: 12,
-                      }}
-                      onPress={() => {
-                        haptics.light();
-                        setActiveTopicId(topic.id);
-                        closeSidebar();
-                      }}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          numberOfLines={1}
-                          style={{
-                            color: colors.foreground,
-                            fontSize: 14,
-                            fontWeight: '600',
-                          }}
-                        >
-                          {topic.title || t.videoTitle}
-                        </Text>
-                        <Text style={{ color: colors.secondaryText, fontSize: 11, marginTop: 2 }}>
-                          {new Date(topic.updatedAt ?? topic.createdAt ?? Date.now())
-                            .toLocaleString()
-                            .replace(',', '')}
-                        </Text>
-                      </View>
-                      {active ? (
-                        <Check
-                          color={colors.primary}
-                          size={18}
-                          strokeWidth={tokens.icon.strokeWidth}
-                        />
-                      ) : null}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <SidebarLabel text={t.videoDuration} />
-              <SidebarOptionGrid
-                columns={2}
-                containerWidth={sidebarWidth - sidebarPad * 2}
-                getKey={(item) => String(item)}
-                items={DURATION_OPTIONS}
-                selectedValue={duration}
-                renderContent={(item, active) => (
-                  <Text
-                    style={{
-                      color: active ? colors.iconOnPrimary : colors.muted,
-                      fontSize: 12,
-                      fontWeight: '500',
-                    }}
-                  >
-                    {item}s
-                  </Text>
-                )}
-                onSelect={(item) => {
-                  haptics.selection();
-                  setDuration(Number(item));
-                }}
-              />
-
-              <SidebarLabel text={t.videoAspectRatio} />
-              <SidebarOptionGrid
-                columns={2}
-                containerWidth={sidebarWidth - sidebarPad * 2}
-                getKey={(item) => String(item)}
-                items={RATIO_OPTIONS}
-                selectedValue={aspectRatio}
-                renderContent={(item, active) => (
-                  <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-                    <View style={{ marginBottom: 4 }}>
-                      <RatioIcon active={active} ratio={String(item)} />
-                    </View>
-                    <Text
-                      style={{
-                        color: active ? colors.iconOnPrimary : colors.muted,
-                        fontSize: 11,
-                        fontWeight: '500',
-                      }}
-                    >
-                      {String(item)}
-                    </Text>
-                  </View>
-                )}
-                onSelect={(item) => {
-                  haptics.selection();
-                  setAspectRatio(String(item));
-                }}
-              />
-
-              <SidebarLabel text={t.videoResolution} />
-              <SidebarOptionGrid
-                columns={3}
-                containerWidth={sidebarWidth - sidebarPad * 2}
-                getKey={(item) => String(item)}
-                items={RESOLUTION_OPTIONS}
-                selectedValue={resolution}
-                renderContent={(item, active) => (
-                  <Text
-                    style={{
-                      color: active ? colors.iconOnPrimary : colors.muted,
-                      fontSize: 12,
-                      fontWeight: '500',
-                    }}
-                  >
-                    {String(item)}
-                  </Text>
-                )}
-                onSelect={(item) => {
-                  haptics.selection();
-                  setResolution(String(item));
-                }}
-              />
-
-              <SidebarLabel text={t.videoGenerateAudio} />
-              <View
-                style={{
-                  alignItems: 'center',
-                  backgroundColor: colors.fillTertiary,
-                  borderRadius: 14,
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  paddingHorizontal: 14,
-                  paddingVertical: 12,
-                }}
-              >
-                <View style={{ flex: 1, paddingRight: 12 }}>
-                  <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600' }}>
-                    {t.videoGenerateAudio}
-                  </Text>
-                </View>
-                <Switch
-                  thumbColor={generateAudio ? colors.iconOnPrimary : colors.controlKnob}
-                  trackColor={{ false: colors.switchTrackOff, true: colors.primary }}
-                  value={generateAudio}
-                  onValueChange={setGenerateAudio}
-                />
-              </View>
-            </ScrollView>
+            {sidebarPanel}
           </Animated.View>
         </>
       ) : null}

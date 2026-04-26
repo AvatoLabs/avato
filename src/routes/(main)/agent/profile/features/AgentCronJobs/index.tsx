@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import urlJoin from 'url-join';
 
 import { useQueryRoute } from '@/hooks/useQueryRoute';
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
 
 import CronJobCards from './CronJobCards';
@@ -36,7 +36,9 @@ const AgentCronJobs = memo(() => {
   // Delete: Keep the existing delete logic
   const handleDelete = useCallback(
     async (jobId: string) => {
-      await deleteCronJob(jobId);
+      try {
+        await deleteCronJob(jobId);
+      } catch {}
     },
     [deleteCronJob],
   );

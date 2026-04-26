@@ -1,10 +1,19 @@
 import { BUILTIN_AGENT_SLUGS, getAgentRuntimeConfig } from '@lobechat/builtin-agents';
 import { builtinSkills } from '@lobechat/builtin-skills';
+import { LocalSystemManifest } from '@lobechat/builtin-tool-local-system';
+import {
+  type DeviceAttachment,
+  type DeviceSystemInfo,
+  generateSystemPrompt,
+  RemoteDeviceManifest,
+} from '@lobechat/builtin-tool-remote-device';
 import { SkillsIdentifier, SkillsManifest } from '@lobechat/builtin-tool-skills';
 import { WebBrowsingExecutionRuntime } from '@lobechat/builtin-tool-web-browsing/executionRuntime';
 import { builtinTools } from '@lobechat/builtin-tools';
 import { type TracePayload } from '@lobechat/const';
 import {
+  type FileContent,
+  generateToolsFromManifest,
   type LobeToolManifest,
   type SkillMeta,
   ToolArgumentsRepairer,
@@ -17,13 +26,20 @@ import {
   type ModelRuntime,
 } from '@lobechat/model-runtime';
 import { skillsPrompts } from '@lobechat/prompts';
-import { type ChatToolPayload, type MessageToolCall } from '@lobechat/types';
+import {
+  type ChatToolPayload,
+  type MessageToolCall,
+  type UserInterventionConfig,
+} from '@lobechat/types';
+import { nanoid } from '@lobechat/utils';
 import { LOBE_DEFAULT_MODEL_LIST } from 'model-bank';
 
 import { AgentModel } from '@/database/models/agent';
 import { AgentSkillModel } from '@/database/models/agentSkill';
+import { FileModel } from '@/database/models/file';
 import { PluginModel } from '@/database/models/plugin';
 import { SessionModel } from '@/database/models/session';
+import { SpaceModel } from '@/database/models/space';
 import { UserModel } from '@/database/models/user';
 import { type LobeChatDatabase } from '@/database/type';
 import { filterBuiltinSkills } from '@/helpers/skillFilters';
@@ -37,6 +53,8 @@ import { PluginGatewayService } from '@/server/services/pluginGateway';
 import { SearchService } from '@/server/services/search';
 import { ToolExecutionService } from '@/server/services/toolExecution';
 import { BuiltinToolsExecutor } from '@/server/services/toolExecution/builtin';
+import { deviceProxy } from '@/server/services/toolExecution/deviceProxy';
+import { type ToolExecutionContext } from '@/server/services/toolExecution/types';
 import { type ChatStreamPayload } from '@/types/openai/chat';
 
 import { partitionToolsByIntervention } from './partitionToolsByIntervention';
@@ -82,7 +100,9 @@ export interface MobileMemoryPayload {
 }
 
 export interface MobileChatPayload extends ChatStreamPayload {
+  activeDeviceId?: string;
   memory?: MobileMemoryPayload;
+  operationId?: string;
   plugins?: string[];
   sessionId?: string;
   /** Optional Space for server builtin tools (sandbox export → `createFileRecord` / `space_blobs`). */
@@ -100,11 +120,11 @@ interface ConversationConfig {
   };
   files?: Array<{ content?: string | null; enabled?: boolean | null; id?: string; name?: string }>;
   id?: string;
-  knowledgeBases?: Array<{ enabled?: boolean | null; id?: string; name?: string }>;
   model?: string | null;
   plugins?: string[];
   provider?: string | null;
   slug?: string | null;
+  sourceSets?: Array<{ enabled?: boolean | null; id?: string; name?: string }>;
   systemRole?: string | null;
 }
 
@@ -120,6 +140,13 @@ interface MobileToolSet {
   manifestMap: Record<string, LobeToolManifest>;
   sourceMap: Record<string, ToolSource>;
   tools?: NonNullable<ChatStreamPayload['tools']>;
+}
+
+interface MobileDeviceContext {
+  activeDeviceId?: string;
+  deviceSystemInfo?: Record<string, string>;
+  gatewayConfigured: boolean;
+  onlineDevices: DeviceAttachment[];
 }
 
 interface MobileToolExecutionEvent {
@@ -252,6 +279,21 @@ const readSessionConversationConfig = async (
   }
 };
 
+const readConversationFileContents = async (
+  serverDB: LobeChatDatabase,
+  userId: string,
+  sessionId?: string,
+): Promise<FileContent[] | undefined> => {
+  if (!sessionId) return undefined;
+
+  try {
+    return await new FileModel(serverDB, userId).getSessionAssignedFileContents(sessionId);
+  } catch (error) {
+    console.error('[webapi/chat] failed to read conversation-scoped files:', error);
+    return undefined;
+  }
+};
+
 const readMemoryContext = async (params: {
   conversationConfig?: ConversationConfig;
   explicitMemory?: MobileMemoryPayload;
@@ -310,6 +352,76 @@ const dedupeTools = (tools: NonNullable<ChatStreamPayload['tools']>) => {
     return true;
   });
 };
+
+const createMobileOperationId = (payload: Pick<MobileChatPayload, 'sessionId' | 'topicId'>) =>
+  `mob_${Date.now()}_${payload.sessionId || 'direct'}_${payload.topicId || 'none'}_${nanoid(8)}`;
+
+const isEligibleDevice = (device: DeviceAttachment) =>
+  device.online && device.allowRemoteTools === true;
+
+const toDeviceSystemInfoVariables = (
+  systemInfo: DeviceSystemInfo,
+  device?: DeviceAttachment,
+): Record<string, string> => ({
+  arch: systemInfo.arch,
+  desktopPath: systemInfo.desktopPath,
+  documentsPath: systemInfo.documentsPath,
+  downloadsPath: systemInfo.downloadsPath,
+  homePath: systemInfo.homePath,
+  musicPath: systemInfo.musicPath,
+  picturesPath: systemInfo.picturesPath,
+  platform: device?.platform ?? 'unknown',
+  userDataPath: systemInfo.userDataPath,
+  videosPath: systemInfo.videosPath,
+  workingDirectory: systemInfo.workingDirectory,
+});
+
+const hasRemoteDeviceActivation = (toolCall: ChatToolPayload, executionState?: unknown) => {
+  if (toolCall.identifier !== RemoteDeviceManifest.identifier) return undefined;
+  if (!isExecutionStateRecord(executionState)) return undefined;
+
+  const metadata = executionState.metadata;
+  if (!isExecutionStateRecord(metadata)) return undefined;
+
+  const activeDeviceId = metadata.activeDeviceId;
+  return typeof activeDeviceId === 'string' && activeDeviceId.trim()
+    ? activeDeviceId.trim()
+    : undefined;
+};
+
+const toModelChatPayload = (payload: MobileChatPayload): MobileChatPayload => {
+  const data = { ...payload };
+  delete (data as any).memory;
+  delete (data as any).plugins;
+  delete (data as any).sessionId;
+  delete (data as any).activeDeviceId;
+  delete (data as any).operationId;
+  return data;
+};
+
+export const buildMobileToolExecutionContext = (params: {
+  activeDeviceId?: string;
+  operationId?: string;
+  processContentBlocks?: ToolExecutionContext['processContentBlocks'];
+  serverDB: LobeChatDatabase;
+  sourceSetIds?: string[];
+  spaceId?: string;
+  toolCall: ChatToolPayload;
+  toolManifestMap: Record<string, LobeToolManifest>;
+  topicId?: string;
+  userId: string;
+}): ToolExecutionContext => ({
+  activeDeviceId: params.activeDeviceId,
+  messageId: params.toolCall.id,
+  operationId: params.operationId,
+  processContentBlocks: params.processContentBlocks,
+  serverDB: params.serverDB,
+  sourceSetIds: params.sourceSetIds,
+  spaceId: params.spaceId,
+  toolManifestMap: params.toolManifestMap,
+  topicId: params.topicId,
+  userId: params.userId,
+});
 
 const isExecutionStateRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -507,6 +619,7 @@ export class MobileChatService {
   private readonly provider: string;
   private readonly requestSignal: AbortSignal;
   private readonly serverDB: LobeChatDatabase;
+  private readonly spaceModel: SpaceModel;
   private readonly userId: string;
 
   constructor(params: {
@@ -520,28 +633,179 @@ export class MobileChatService {
     this.provider = params.provider;
     this.requestSignal = params.requestSignal;
     this.serverDB = params.serverDB;
+    this.spaceModel = new SpaceModel(params.serverDB, params.userId);
     this.userId = params.userId;
   }
 
+  private assertAccessibleSpace = async (spaceId?: string | null) => {
+    if (!spaceId) return;
+
+    const space = await this.spaceModel.findAccessibleSpaceById(spaceId);
+    if (!space?.id) {
+      throw new Error('SPACE_ACCESS_DENIED');
+    }
+  };
+
+  private resolveDeviceContext = async (
+    requestedDeviceId?: string,
+  ): Promise<MobileDeviceContext> => {
+    if (!deviceProxy.isConfigured) {
+      return { gatewayConfigured: false, onlineDevices: [] };
+    }
+
+    let onlineDevices: DeviceAttachment[] = [];
+    try {
+      onlineDevices = await deviceProxy.queryDeviceList(this.userId);
+    } catch (error) {
+      console.warn('[webapi/chat] failed to query remote desktop devices:', error);
+    }
+
+    const eligibleDevices = onlineDevices.filter(isEligibleDevice);
+    const normalizedRequestedDeviceId = requestedDeviceId?.trim();
+    const activeDevice = normalizedRequestedDeviceId
+      ? eligibleDevices.find((device) => device.deviceId === normalizedRequestedDeviceId)
+      : eligibleDevices.length === 1
+        ? eligibleDevices[0]
+        : undefined;
+
+    if (!activeDevice) {
+      return { gatewayConfigured: true, onlineDevices };
+    }
+
+    let deviceSystemInfo: Record<string, string> | undefined;
+    try {
+      const systemInfo = await deviceProxy.queryDeviceSystemInfo(
+        this.userId,
+        activeDevice.deviceId,
+      );
+      if (systemInfo) {
+        deviceSystemInfo = toDeviceSystemInfoVariables(systemInfo, activeDevice);
+      }
+    } catch (error) {
+      console.warn(
+        `[webapi/chat] failed to query system info for remote device ${activeDevice.deviceId}:`,
+        error,
+      );
+    }
+
+    return {
+      activeDeviceId: activeDevice.deviceId,
+      deviceSystemInfo,
+      gatewayConfigured: true,
+      onlineDevices,
+    };
+  };
+
+  private ensureActiveDeviceToolSet = (toolSet: MobileToolSet): MobileToolSet => {
+    if (toolSet.manifestMap[LocalSystemManifest.identifier]) return toolSet;
+
+    const localSystemManifest = LocalSystemManifest as unknown as LobeToolManifest;
+
+    return {
+      ...toolSet,
+      enabledToolIds: [...new Set([...toolSet.enabledToolIds, LocalSystemManifest.identifier])],
+      manifestMap: {
+        ...toolSet.manifestMap,
+        [LocalSystemManifest.identifier]: localSystemManifest,
+      },
+      sourceMap: {
+        ...toolSet.sourceMap,
+        [LocalSystemManifest.identifier]: 'builtin',
+      },
+      tools: dedupeTools([
+        ...(toolSet.tools ?? []),
+        ...generateToolsFromManifest(localSystemManifest),
+      ] as NonNullable<ChatStreamPayload['tools']>),
+    };
+  };
+
+  private applyDeviceActivation = (params: {
+    activeDeviceId?: string;
+    executionState?: unknown;
+    toolCall: ChatToolPayload;
+    toolSet: MobileToolSet;
+  }) => {
+    const activatedDeviceId = hasRemoteDeviceActivation(params.toolCall, params.executionState);
+    if (!activatedDeviceId) {
+      return { activeDeviceId: params.activeDeviceId, toolSet: params.toolSet };
+    }
+
+    return {
+      activeDeviceId: activatedDeviceId,
+      toolSet: this.ensureActiveDeviceToolSet(params.toolSet),
+    };
+  };
+
+  private executeMobileTool = async (params: {
+    activeDeviceId?: string;
+    boundProcessContentBlocks: NonNullable<ToolExecutionContext['processContentBlocks']>;
+    operationId: string;
+    sourceSetIds?: string[];
+    toolCall: ChatToolPayload;
+    toolExecutionService: ToolExecutionService;
+    toolSet: MobileToolSet;
+    payload: MobileChatPayload;
+  }) => {
+    const execution = await params.toolExecutionService.executeTool(
+      params.toolCall,
+      buildMobileToolExecutionContext({
+        activeDeviceId: params.activeDeviceId,
+        operationId: params.operationId,
+        processContentBlocks:
+          params.toolCall.source === 'mcp' ? params.boundProcessContentBlocks : undefined,
+        serverDB: this.serverDB,
+        sourceSetIds: params.sourceSetIds,
+        spaceId: params.payload.spaceId,
+        toolCall: params.toolCall,
+        toolManifestMap: params.toolSet.manifestMap,
+        topicId: params.payload.topicId,
+        userId: this.userId,
+      }),
+    );
+
+    const activation = this.applyDeviceActivation({
+      activeDeviceId: params.activeDeviceId,
+      executionState: execution.state,
+      toolCall: params.toolCall,
+      toolSet: params.toolSet,
+    });
+
+    return { execution, ...activation };
+  };
+
   private resolveToolSet = async (params: {
     conversationConfig?: ConversationConfig;
+    deviceContext: MobileDeviceContext;
     pluginIds: string[];
     skillMetas: SkillMeta[];
     payload: MobileChatPayload;
   }): Promise<MobileToolSet | undefined> => {
-    const { conversationConfig, pluginIds, skillMetas, payload } = params;
-    if (pluginIds.length === 0) return undefined;
+    const { conversationConfig, deviceContext, pluginIds, skillMetas, payload } = params;
     if (!isModelSupportToolUse(payload.model, this.provider)) return undefined;
 
     const toolNameResolver = new ToolNameResolver();
+
+    const deviceToolIds = deviceContext.gatewayConfigured
+      ? [
+          RemoteDeviceManifest.identifier,
+          ...(deviceContext.activeDeviceId ? [LocalSystemManifest.identifier] : []),
+        ]
+      : [];
+    const toolIds = [
+      ...new Set([
+        ...pluginIds,
+        ...(skillMetas.length > 0 ? [SkillsIdentifier] : []),
+        ...deviceToolIds,
+      ]),
+    ];
+
+    if (toolIds.length === 0) return undefined;
+
     const pluginModel = new PluginModel(this.serverDB, this.userId);
-    const installedPlugins = await pluginModel.query();
+    const installedPlugins = (await pluginModel.query()) ?? [];
     const installedPluginMap = new Map(
       installedPlugins.map((plugin) => [plugin.identifier, plugin]),
     );
-
-    const toolIds =
-      skillMetas.length > 0 ? [...new Set([...pluginIds, SkillsIdentifier])] : pluginIds;
 
     console.info(
       `[webapi/chat] resolving tools for plugins: ${JSON.stringify(toolIds)}, installed: ${installedPlugins.map((plugin) => plugin.identifier).join(',')}`,
@@ -557,6 +821,13 @@ export class MobileChatService {
           chatConfig: conversationConfig?.chatConfig,
           plugins: toolIds,
         },
+        deviceContext: deviceContext.gatewayConfigured
+          ? {
+              activeDeviceReady: !!deviceContext.activeDeviceId,
+              deviceOnline: deviceContext.onlineDevices.some(isEligibleDevice),
+              gatewayConfigured: true,
+            }
+          : undefined,
         model: payload.model,
         provider: this.provider,
       },
@@ -581,7 +852,13 @@ export class MobileChatService {
         continue;
       }
 
-      manifestMap[manifest.identifier] = manifest;
+      manifestMap[manifest.identifier] =
+        manifest.identifier === RemoteDeviceManifest.identifier
+          ? ({
+              ...manifest,
+              systemRole: generateSystemPrompt(deviceContext.onlineDevices),
+            } as LobeToolManifest)
+          : manifest;
 
       if (builtinToolIdentifiers.has(manifest.identifier)) {
         sourceMap[manifest.identifier] = 'builtin';
@@ -726,12 +1003,22 @@ export class MobileChatService {
 
   private buildMessages = async (params: {
     conversationConfig?: ConversationConfig;
+    conversationFileContents?: FileContent[];
+    deviceSystemInfo?: Record<string, string>;
     memoryContext?: string;
     payload: MobileChatPayload;
     skillMetas: SkillMeta[];
     toolSet?: MobileToolSet;
   }) => {
-    const { conversationConfig, memoryContext, payload, skillMetas, toolSet } = params;
+    const {
+      conversationConfig,
+      conversationFileContents,
+      deviceSystemInfo,
+      memoryContext,
+      payload,
+      skillMetas,
+      toolSet,
+    } = params;
 
     const skillContext =
       skillMetas.length > 0
@@ -749,6 +1036,7 @@ export class MobileChatService {
     }
 
     const shouldUseServerMessagesEngine =
+      (conversationFileContents?.length ?? 0) > 0 ||
       !!conversationConfig ||
       !!memoryContext ||
       !!skillContext ||
@@ -760,23 +1048,25 @@ export class MobileChatService {
           enableHistoryCount: conversationConfig?.chatConfig?.enableHistoryCount,
           historyCount: conversationConfig?.chatConfig?.historyCount,
           inputTemplate: conversationConfig?.chatConfig?.inputTemplate,
-          knowledge: conversationConfig
-            ? {
-                fileContents: conversationConfig.files
-                  ?.filter((file) => file.enabled === true)
-                  .map((file) => ({
-                    content: file.content ?? '',
-                    fileId: file.id ?? '',
-                    filename: file.name ?? '',
-                  })),
-                knowledgeBases: conversationConfig.knowledgeBases
-                  ?.filter((kb) => kb.enabled === true)
-                  .map((kb) => ({
-                    id: kb.id ?? '',
-                    name: kb.name ?? '',
-                  })),
-              }
-            : undefined,
+          knowledge:
+            conversationConfig || conversationFileContents
+              ? {
+                  conversationFileContents,
+                  fileContents: conversationConfig?.files
+                    ?.filter((file) => file.enabled === true)
+                    .map((file) => ({
+                      content: file.content ?? '',
+                      fileId: file.id ?? '',
+                      filename: file.name ?? '',
+                    })),
+                  sourceSets: conversationConfig?.sourceSets
+                    ?.filter((kb) => kb.enabled === true)
+                    .map((kb) => ({
+                      id: kb.id ?? '',
+                      name: kb.name ?? '',
+                    })),
+                }
+              : undefined,
           messages: payload.messages as any,
           model: payload.model,
           provider: this.provider,
@@ -787,6 +1077,7 @@ export class MobileChatService {
                 tools: toolSet.enabledToolIds,
               }
             : undefined,
+          additionalVariables: deviceSystemInfo,
         });
 
     return sanitizeToolCallHistory(messages) || [];
@@ -801,24 +1092,28 @@ export class MobileChatService {
       pluginGatewayService: new PluginGatewayService(),
     });
 
-    const boundProcessContentBlocks = async (blocks: any[]) =>
-      processContentBlocks(blocks, fileService);
+    const boundProcessContentBlocks: NonNullable<
+      ToolExecutionContext['processContentBlocks']
+    > = async (blocks) => processContentBlocks(blocks, fileService);
 
     return { boundProcessContentBlocks, toolExecutionService };
   };
 
   private streamToolLoopFallback = async (params: {
+    activeDeviceId?: string;
     conversationConfig?: ConversationConfig;
+    operationId: string;
     payload: MobileChatPayload;
     runtimeOptions: Record<string, any>;
     toolSet: MobileToolSet;
   }) => {
-    const { conversationConfig, payload, runtimeOptions, toolSet } = params;
+    const { activeDeviceId, conversationConfig, operationId, payload, runtimeOptions, toolSet } =
+      params;
     const encoder = new TextEncoder();
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
     const { boundProcessContentBlocks, toolExecutionService } = this.createToolExecutionService();
-    const knowledgeBaseIds = conversationConfig?.knowledgeBases
+    const sourceSetIds = conversationConfig?.sourceSets
       ?.filter((kb) => kb.enabled === true)
       .map((kb) => kb.id)
       .filter(Boolean) as string[] | undefined;
@@ -834,7 +1129,9 @@ export class MobileChatService {
 
     void (async () => {
       try {
+        let currentActiveDeviceId = activeDeviceId;
         let loopMessages = sanitizeToolCallHistory(payload.messages) || [];
+        let loopToolSet = toolSet;
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
           loopMessages = sanitizeToolCallHistory(loopMessages) || [];
@@ -852,10 +1149,11 @@ export class MobileChatService {
 
           const response = await this.modelRuntime.chat(
             {
-              ...payload,
+              ...toModelChatPayload(payload),
               apiMode: 'chatCompletion',
               messages: loopMessages,
               stream: true,
+              tools: loopToolSet.tools,
             } as any,
             {
               ...runtimeOptions,
@@ -881,8 +1179,8 @@ export class MobileChatService {
                       rawToolCalls = toolsCalling;
                       normalizedToolCalls = normalizeToolCalls(
                         toolsCalling,
-                        toolSet.manifestMap,
-                        toolSet.sourceMap,
+                        loopToolSet.manifestMap,
+                        loopToolSet.sourceMap,
                       );
                     },
                     onUsage: async (usage: StreamUsageData) => {
@@ -905,7 +1203,7 @@ export class MobileChatService {
             break;
           }
 
-          let userInterventionConfig: { allowList?: string[]; approvalMode: string } | undefined;
+          let userInterventionConfig: UserInterventionConfig | undefined;
           try {
             const userModel = new UserModel(this.serverDB, this.userId);
             const settings = await userModel.getUserSettings();
@@ -917,7 +1215,7 @@ export class MobileChatService {
           const [toolsNeedingIntervention, toolsToExecute] = partitionToolsByIntervention(
             normalizedToolCalls,
             userInterventionConfig,
-            toolSet.manifestMap,
+            loopToolSet.manifestMap,
           );
 
           if (toolsNeedingIntervention.length > 0) {
@@ -933,16 +1231,19 @@ export class MobileChatService {
             ];
 
             for (const toolCall of toolsToExecute) {
-              const execution = await toolExecutionService.executeTool(toolCall, {
-                knowledgeBaseIds,
-                processContentBlocks:
-                  toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
-                serverDB: this.serverDB,
-                spaceId: payload.spaceId,
-                toolManifestMap: toolSet.manifestMap,
-                topicId: payload.topicId,
-                userId: this.userId,
+              const result = await this.executeMobileTool({
+                activeDeviceId: currentActiveDeviceId,
+                boundProcessContentBlocks,
+                operationId,
+                payload,
+                sourceSetIds,
+                toolCall,
+                toolExecutionService,
+                toolSet: loopToolSet,
               });
+              const { execution } = result;
+              currentActiveDeviceId = result.activeDeviceId;
+              loopToolSet = result.toolSet;
               const content =
                 typeof execution.content === 'string'
                   ? execution.content
@@ -985,10 +1286,15 @@ export class MobileChatService {
               resumeStore.key(this.userId, payload.sessionId ?? '', payload.topicId),
               {
                 loopMessages,
-                payload: { ...payload, messages: loopMessages },
+                payload: {
+                  ...payload,
+                  activeDeviceId: currentActiveDeviceId,
+                  messages: loopMessages,
+                  operationId,
+                },
                 pendingToolCalls: pendingWithStatus,
                 round,
-                toolSet,
+                toolSet: loopToolSet,
                 userId: this.userId,
               },
             );
@@ -1014,16 +1320,19 @@ export class MobileChatService {
           const toolExecutions: MobileToolExecutionEvent[] = [];
 
           for (const toolCall of normalizedToolCalls) {
-            const execution = await toolExecutionService.executeTool(toolCall, {
-              knowledgeBaseIds,
-              processContentBlocks:
-                toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
-              serverDB: this.serverDB,
-              spaceId: payload.spaceId,
-              toolManifestMap: toolSet.manifestMap,
-              topicId: payload.topicId,
-              userId: this.userId,
+            const result = await this.executeMobileTool({
+              activeDeviceId: currentActiveDeviceId,
+              boundProcessContentBlocks,
+              operationId,
+              payload,
+              sourceSetIds,
+              toolCall,
+              toolExecutionService,
+              toolSet: loopToolSet,
             });
+            const { execution } = result;
+            currentActiveDeviceId = result.activeDeviceId;
+            loopToolSet = result.toolSet;
 
             const executionContent = serializeToolExecutionContent(execution.content);
             toolExecutions.push(createToolExecutionEvent(toolCall, execution));
@@ -1065,6 +1374,9 @@ export class MobileChatService {
   };
 
   handleChat = async (payload: MobileChatPayload, tracePayload?: TracePayload) => {
+    await this.assertAccessibleSpace(payload.spaceId);
+    const operationId = payload.operationId || createMobileOperationId(payload);
+
     const conversationConfig = await readSessionConversationConfig(
       this.serverDB,
       this.userId,
@@ -1085,7 +1397,8 @@ export class MobileChatService {
       );
     }
 
-    const [memoryContext, skillMetas] = await Promise.all([
+    const [conversationFileContents, memoryContext, skillMetas, deviceContext] = await Promise.all([
+      readConversationFileContents(this.serverDB, this.userId, payload.sessionId),
       readMemoryContext({
         conversationConfig,
         explicitMemory: payload.memory,
@@ -1094,10 +1407,12 @@ export class MobileChatService {
         userId: this.userId,
       }),
       resolveEnabledSkillMetas(pluginIds, this.serverDB, this.userId),
+      this.resolveDeviceContext(payload.activeDeviceId),
     ]);
 
     const toolSet = await this.resolveToolSet({
       conversationConfig,
+      deviceContext,
       payload,
       pluginIds,
       skillMetas,
@@ -1105,25 +1420,25 @@ export class MobileChatService {
 
     const messages = await this.buildMessages({
       conversationConfig,
+      conversationFileContents,
+      deviceSystemInfo: deviceContext.deviceSystemInfo,
       memoryContext,
       payload,
       skillMetas,
       toolSet,
     });
 
-    const data: MobileChatPayload = {
+    const data = toModelChatPayload({
       ...payload,
+      activeDeviceId: deviceContext.activeDeviceId,
       messages,
+      operationId,
       ...(toolSet?.tools ? { tools: toolSet.tools } : {}),
-    };
-    const knowledgeBaseIds = conversationConfig?.knowledgeBases
+    });
+    const sourceSetIds = conversationConfig?.sourceSets
       ?.filter((kb) => kb.enabled === true)
       .map((kb) => kb.id)
       .filter(Boolean) as string[] | undefined;
-
-    delete (data as any).memory;
-    delete (data as any).plugins;
-    delete (data as any).sessionId;
 
     const traceOptions = tracePayload?.enabled
       ? createTraceOptions(data, { provider: this.provider, trace: tracePayload })
@@ -1147,6 +1462,8 @@ export class MobileChatService {
     let toolLoopSucceeded = false;
     let toolExecutionsForResponse: MobileToolExecutionEvent[] = [];
     let finalAssistantForResponse: ToolLoopFinalAssistantResponse | undefined;
+    let activeDeviceIdForTools = deviceContext.activeDeviceId;
+    let effectiveToolSet = toolSet;
 
     if (toolSet?.tools?.length) {
       try {
@@ -1154,13 +1471,14 @@ export class MobileChatService {
           this.createToolExecutionService();
 
         let loopMessages = [...originalMessages];
+        let loopToolSet = toolSet;
         let toolsWereCalled = false;
         const loopToolExecutions: MobileToolExecutionEvent[] = [];
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
           loopMessages = sanitizeToolCallHistory(loopMessages) || [];
           console.info(
-            `[webapi/chat] tool-loop round ${round + 1}: ${loopMessages.length} messages, ${data.tools?.length ?? 0} tools`,
+            `[webapi/chat] tool-loop round ${round + 1}: ${loopMessages.length} messages, ${loopToolSet.tools?.length ?? 0} tools`,
           );
 
           const response = await this.modelRuntime.chat(
@@ -1170,6 +1488,7 @@ export class MobileChatService {
               messages: loopMessages,
               responseMode: 'json',
               stream: false,
+              tools: loopToolSet.tools,
             } as any,
             runtimeOptions,
           );
@@ -1222,15 +1541,15 @@ export class MobileChatService {
           toolsWereCalled = true;
           const normalizedToolCalls = normalizeToolCalls(
             assistantMessage.tool_calls,
-            toolSet.manifestMap,
-            toolSet.sourceMap,
+            loopToolSet.manifestMap,
+            loopToolSet.sourceMap,
           );
 
           console.info(
             `[webapi/chat] round ${round + 1}: model called ${normalizedToolCalls.length} tools: ${normalizedToolCalls.map((toolCall) => toolCall.apiName).join(', ')}`,
           );
 
-          let userInterventionConfig: { allowList?: string[]; approvalMode: string } | undefined;
+          let userInterventionConfig: UserInterventionConfig | undefined;
           try {
             const userModel = new UserModel(this.serverDB, this.userId);
             const settings = await userModel.getUserSettings();
@@ -1242,7 +1561,7 @@ export class MobileChatService {
           const [toolsNeedingIntervention, toolsToExecute] = partitionToolsByIntervention(
             normalizedToolCalls,
             userInterventionConfig,
-            toolSet.manifestMap,
+            loopToolSet.manifestMap,
           );
 
           if (toolsNeedingIntervention.length > 0) {
@@ -1260,16 +1579,20 @@ export class MobileChatService {
               console.info(
                 `[webapi/chat] executing tool (auto): ${toolCall.identifier}:${toolCall.apiName}`,
               );
-              const execution = await toolExecutionService.executeTool(toolCall, {
-                knowledgeBaseIds,
-                processContentBlocks:
-                  toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
-                serverDB: this.serverDB,
-                spaceId: payload.spaceId,
-                toolManifestMap: toolSet.manifestMap,
-                topicId: payload.topicId,
-                userId: this.userId,
+              const result = await this.executeMobileTool({
+                activeDeviceId: activeDeviceIdForTools,
+                boundProcessContentBlocks,
+                operationId,
+                payload,
+                sourceSetIds,
+                toolCall,
+                toolExecutionService,
+                toolSet: loopToolSet,
               });
+              const { execution } = result;
+              activeDeviceIdForTools = result.activeDeviceId;
+              loopToolSet = result.toolSet;
+              effectiveToolSet = loopToolSet;
               const content =
                 typeof execution.content === 'string'
                   ? execution.content
@@ -1302,10 +1625,15 @@ export class MobileChatService {
             const rk = resumeStore.key(this.userId, payload.sessionId ?? '', payload.topicId);
             resumeStore.set(rk, {
               loopMessages: [...loopMessages],
-              payload: { ...data, messages: loopMessages },
+              payload: {
+                ...payload,
+                activeDeviceId: activeDeviceIdForTools,
+                messages: loopMessages,
+                operationId,
+              },
               pendingToolCalls: pendingWithStatus,
               round,
-              toolSet,
+              toolSet: loopToolSet,
               userId: this.userId,
             });
 
@@ -1337,16 +1665,20 @@ export class MobileChatService {
               `[webapi/chat] executing tool: ${toolCall.identifier}:${toolCall.apiName}`,
             );
 
-            const execution = await toolExecutionService.executeTool(toolCall, {
-              knowledgeBaseIds,
-              processContentBlocks:
-                toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
-              serverDB: this.serverDB,
-              spaceId: payload.spaceId,
-              toolManifestMap: toolSet.manifestMap,
-              topicId: payload.topicId,
-              userId: this.userId,
+            const result = await this.executeMobileTool({
+              activeDeviceId: activeDeviceIdForTools,
+              boundProcessContentBlocks,
+              operationId,
+              payload,
+              sourceSetIds,
+              toolCall,
+              toolExecutionService,
+              toolSet: loopToolSet,
             });
+            const { execution } = result;
+            activeDeviceIdForTools = result.activeDeviceId;
+            loopToolSet = result.toolSet;
+            effectiveToolSet = loopToolSet;
 
             const content =
               typeof execution.content === 'string'
@@ -1369,6 +1701,7 @@ export class MobileChatService {
 
         if (toolsWereCalled) {
           data.messages = sanitizeToolCallHistory(loopMessages) || [];
+          data.tools = loopToolSet.tools;
           toolExecutionsForResponse = loopToolExecutions;
           toolLoopSucceeded = true;
         }
@@ -1391,7 +1724,7 @@ export class MobileChatService {
       });
     }
 
-    if (toolSet?.tools?.length && toolLoopSucceeded) {
+    if (effectiveToolSet?.tools?.length && toolLoopSucceeded) {
       delete data.tools;
     }
 
@@ -1423,12 +1756,19 @@ export class MobileChatService {
       `[webapi/chat] final streaming call: tools=${data.tools?.length ?? 0}, messages=${data.messages?.length ?? 0}`,
     );
 
-    if (!toolLoopSucceeded && toolSet?.tools?.length) {
+    if (!toolLoopSucceeded && effectiveToolSet?.tools?.length) {
       return this.streamToolLoopFallback({
+        activeDeviceId: activeDeviceIdForTools,
         conversationConfig,
-        payload: data,
+        operationId,
+        payload: {
+          ...data,
+          activeDeviceId: activeDeviceIdForTools,
+          operationId,
+          sessionId: payload.sessionId,
+        },
         runtimeOptions,
-        toolSet,
+        toolSet: effectiveToolSet,
       });
     }
 
@@ -1475,20 +1815,25 @@ export class MobileChatService {
     resumeState: MobileInterventionResumeState;
   }) => {
     const { approvedToolCall, rejectedToolCall, payload, resumeState } = params;
+    await this.assertAccessibleSpace(payload.spaceId);
+
     const hasApprove = Boolean(approvedToolCall);
     const hasReject = Boolean(rejectedToolCall);
     if (hasApprove === hasReject) {
       throw new Error('Provide exactly one of approvedToolCall or rejectedToolCall');
     }
 
-    const { loopMessages, pendingToolCalls, round, toolSet } = resumeState;
+    const { loopMessages, pendingToolCalls, round } = resumeState;
+    const operationId = payload.operationId || createMobileOperationId(payload);
+    let activeDeviceIdForTools = payload.activeDeviceId;
+    let loopToolSet = resumeState.toolSet as MobileToolSet;
     const { boundProcessContentBlocks, toolExecutionService } = this.createToolExecutionService();
     const conversationConfig = await readSessionConversationConfig(
       this.serverDB,
       this.userId,
       payload.sessionId,
     );
-    const knowledgeBaseIds = conversationConfig?.knowledgeBases
+    const sourceSetIds = conversationConfig?.sourceSets
       ?.filter((kb) => kb.enabled === true)
       .map((kb) => kb.id)
       .filter(Boolean) as string[] | undefined;
@@ -1498,16 +1843,19 @@ export class MobileChatService {
     let settledTool: ChatToolPayload;
 
     if (approvedToolCall) {
-      const execution = await toolExecutionService.executeTool(approvedToolCall, {
-        knowledgeBaseIds,
-        processContentBlocks:
-          approvedToolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
-        serverDB: this.serverDB,
-        spaceId: payload.spaceId,
-        toolManifestMap: toolSet.manifestMap,
-        topicId: payload.topicId,
-        userId: this.userId,
+      const result = await this.executeMobileTool({
+        activeDeviceId: activeDeviceIdForTools,
+        boundProcessContentBlocks,
+        operationId,
+        payload,
+        sourceSetIds,
+        toolCall: approvedToolCall,
+        toolExecutionService,
+        toolSet: loopToolSet,
       });
+      const { execution } = result;
+      activeDeviceIdForTools = result.activeDeviceId;
+      loopToolSet = result.toolSet;
 
       const content =
         typeof execution.content === 'string'
@@ -1564,10 +1912,15 @@ export class MobileChatService {
     if (remainingPending.length > 0) {
       resumeStore.set(resumeStore.key(this.userId, payload.sessionId ?? '', payload.topicId), {
         loopMessages: newLoopMessages,
-        payload: { ...payload, messages: newLoopMessages },
+        payload: {
+          ...payload,
+          activeDeviceId: activeDeviceIdForTools,
+          messages: newLoopMessages,
+          operationId,
+        },
         pendingToolCalls: remainingPending,
         round,
-        toolSet,
+        toolSet: loopToolSet,
         userId: this.userId,
       });
 
@@ -1594,14 +1947,13 @@ export class MobileChatService {
 
     resumeStore.delete(resumeStore.key(this.userId, payload.sessionId ?? '', payload.topicId));
 
-    const data: MobileChatPayload = {
+    const data = toModelChatPayload({
       ...payload,
+      activeDeviceId: activeDeviceIdForTools,
       messages: sanitizeToolCallHistory(newLoopMessages) || [],
-      ...(toolSet?.tools ? { tools: toolSet.tools } : {}),
-    };
-    delete (data as any).memory;
-    delete (data as any).plugins;
-    delete (data as any).sessionId;
+      operationId,
+      ...(loopToolSet?.tools ? { tools: loopToolSet.tools } : {}),
+    });
 
     const runtimeOptions = {
       signal: this.requestSignal,
@@ -1615,6 +1967,7 @@ export class MobileChatService {
         messages: data.messages,
         responseMode: 'json',
         stream: false,
+        tools: loopToolSet.tools,
       } as any,
       runtimeOptions,
     );
@@ -1641,10 +1994,10 @@ export class MobileChatService {
     if (assistantMessage?.tool_calls?.length) {
       const normalized = normalizeToolCalls(
         assistantMessage.tool_calls,
-        toolSet.manifestMap,
-        toolSet.sourceMap,
+        loopToolSet.manifestMap,
+        loopToolSet.sourceMap,
       );
-      let userInterventionConfig: { allowList?: string[]; approvalMode: string } | undefined;
+      let userInterventionConfig: UserInterventionConfig | undefined;
       try {
         const userModel = new UserModel(this.serverDB, this.userId);
         const settings = await userModel.getUserSettings();
@@ -1655,7 +2008,7 @@ export class MobileChatService {
       const [needing, toExecute] = partitionToolsByIntervention(
         normalized,
         userInterventionConfig,
-        toolSet.manifestMap,
+        loopToolSet.manifestMap,
       );
       if (needing.length > 0) {
         const fullLoop = [
@@ -1669,15 +2022,19 @@ export class MobileChatService {
         ];
         const execEvents: MobileToolExecutionEvent[] = [];
         for (const tc of toExecute) {
-          const ex = await toolExecutionService.executeTool(tc, {
-            knowledgeBaseIds,
-            processContentBlocks: tc.source === 'mcp' ? boundProcessContentBlocks : undefined,
-            serverDB: this.serverDB,
-            spaceId: payload.spaceId,
-            toolManifestMap: toolSet.manifestMap,
-            topicId: payload.topicId,
-            userId: this.userId,
+          const result = await this.executeMobileTool({
+            activeDeviceId: activeDeviceIdForTools,
+            boundProcessContentBlocks,
+            operationId,
+            payload,
+            sourceSetIds,
+            toolCall: tc,
+            toolExecutionService,
+            toolSet: loopToolSet,
           });
+          const { execution: ex } = result;
+          activeDeviceIdForTools = result.activeDeviceId;
+          loopToolSet = result.toolSet;
           const c = typeof ex.content === 'string' ? ex.content : JSON.stringify(ex.content);
           fullLoop.push({ content: c, role: 'tool', tool_call_id: tc.id } as any);
           execEvents.push(createToolExecutionEvent(tc, ex));
@@ -1697,10 +2054,15 @@ export class MobileChatService {
         const store = getMobileInterventionResumeStore();
         store.set(store.key(this.userId, payload.sessionId ?? '', payload.topicId), {
           loopMessages: fullLoop,
-          payload: { ...payload, messages: fullLoop },
+          payload: {
+            ...payload,
+            activeDeviceId: activeDeviceIdForTools,
+            messages: fullLoop,
+            operationId,
+          },
           pendingToolCalls: pendingWithStatus,
           round: round + 1,
-          toolSet,
+          toolSet: loopToolSet,
           userId: this.userId,
         });
         return createStaticSSETextResponse({

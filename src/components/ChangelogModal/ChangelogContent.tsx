@@ -8,7 +8,7 @@ import urlJoin from 'url-join';
 
 import { CustomMDX } from '@/components/mdx';
 import { OFFICIAL_SITE } from '@/const/url';
-import { type Locales } from '@/locales/resources';
+import { type Locales } from '@/locales/contents';
 import { ChangelogService } from '@/server/services/changelog';
 import { type ChangelogIndexItem } from '@/types/changelog';
 
@@ -46,11 +46,7 @@ const PostItem = ({ id, versionRange, locale, showDivider = true }: PostItemProp
         {data.image && (
           <Image
             alt={data.title}
-            src={
-              data.image.startsWith('/blog')
-                ? urlJoin('https://hub-apac-1.lobeobjects.space/', data.image)
-                : data.image
-            }
+            src={data.image.startsWith('/blog') ? urlJoin(OFFICIAL_SITE, data.image) : data.image}
           />
         )}
         <Suspense fallback={<div>Loading...</div>}>

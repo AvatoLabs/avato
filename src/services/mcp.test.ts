@@ -5,6 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { mcpService } from './mcp';
 
+const { isDesktopMock } = vi.hoisted(() => ({
+  isDesktopMock: { value: false },
+}));
+
 const mockElectronIpc = {
   mcp: {
     callTool: vi.fn(),
@@ -17,7 +21,9 @@ const mockElectronIpc = {
 // Mock dependencies
 vi.mock('@lobechat/const', () => ({
   CURRENT_VERSION: '1.0.0',
-  isDesktop: false,
+  get isDesktop() {
+    return isDesktopMock.value;
+  },
 }));
 
 vi.mock('@lobechat/utils', () => ({
@@ -81,6 +87,7 @@ describe('MCPService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    isDesktopMock.value = false;
     mockGetToolStoreState.mockReturnValue({});
   });
 
@@ -226,6 +233,59 @@ describe('MCPService', () => {
 
       expect(result).toEqual(mockResult);
       expect(toolsClient.mcp.callTool.mutate).toHaveBeenCalled();
+    });
+
+    it('should use desktop IPC for local HTTP MCP tool calls on desktop', async () => {
+      isDesktopMock.value = true;
+      const { toolsClient } = await import('@/libs/trpc/client');
+
+      const mockLocalHttpPlugin = {
+        customParams: {
+          mcp: {
+            type: 'http',
+            url: 'http://localhost:8787/mcp',
+          },
+        },
+        manifest: {
+          meta: { title: 'Local HTTP MCP' },
+          version: '1.0.0',
+        },
+      };
+
+      mockPluginSelectors.getInstalledPluginById.mockReturnValue(() => mockLocalHttpPlugin);
+      mockPluginSelectors.getCustomPluginById.mockReturnValue(() => null);
+
+      const mockResult = {
+        content: 'local http result',
+        state: { content: [{ text: 'local http result', type: 'text' }] },
+        success: true,
+      };
+      mockElectronIpc.mcp.callTool.mockResolvedValue(superjson.serialize(mockResult) as any);
+
+      const payload: ChatToolPayload = {
+        apiName: 'readLocal',
+        arguments: '{"path":"/tmp/a.txt"}',
+        id: 'tool-call-local-http',
+        identifier: 'local-http-plugin',
+        type: 'standalone',
+      };
+
+      const result = await mcpService.invokeMcpToolCall(payload, {});
+
+      expect(result).toEqual(mockResult);
+      expect(toolsClient.mcp.callTool.mutate).not.toHaveBeenCalled();
+      expect(mockElectronIpc.mcp.callTool).toHaveBeenCalledTimes(1);
+
+      const callArg = mockElectronIpc.mcp.callTool.mock.calls[0][0];
+      expect(superjson.deserialize(callArg as any)).toMatchObject({
+        args: { path: '/tmp/a.txt' },
+        params: {
+          name: 'local-http-plugin',
+          type: 'http',
+          url: 'http://localhost:8787/mcp',
+        },
+        toolName: 'readLocal',
+      });
     });
 
     it('should return undefined when plugin is not found', async () => {

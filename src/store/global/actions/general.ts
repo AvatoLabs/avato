@@ -11,6 +11,7 @@ import { type SystemStatus } from '@/store/global/initialState';
 import { type StoreSetter } from '@/store/types';
 import { type LocaleMode } from '@/types/locale';
 import { switchLang } from '@/utils/client/switchLang';
+import { ensureElectronIpc } from '@/utils/electron/ipc';
 import { merge } from '@/utils/merge';
 import { setNamespace } from '@/utils/storeDebug';
 
@@ -37,7 +38,6 @@ export class GlobalGeneralActionImpl {
 
     if (isDesktop) {
       try {
-        const { ensureElectronIpc } = await import('@/utils/electron/ipc');
         const path = `/agent/${agentId}?mode=single`;
 
         const result = await ensureElectronIpc().windows.createMultiInstanceWindow({
@@ -68,7 +68,6 @@ export class GlobalGeneralActionImpl {
 
     if (isDesktop) {
       try {
-        const { ensureElectronIpc } = await import('@/utils/electron/ipc');
         const path = `/agent/${agentId}?topic=${topicId}&mode=single`;
 
         const result = await ensureElectronIpc().windows.createMultiInstanceWindow({
@@ -105,8 +104,6 @@ export class GlobalGeneralActionImpl {
     if (isDesktop && !skipBroadcast) {
       (async () => {
         try {
-          const { ensureElectronIpc } = await import('@/utils/electron/ipc');
-
           await ensureElectronIpc().system.updateLocale(locale);
         } catch (error) {
           console.error('Failed to update locale in main process:', error);
@@ -115,15 +112,15 @@ export class GlobalGeneralActionImpl {
     }
   };
 
-  updateResourceManagerColumnWidth = (column: 'name' | 'date' | 'size', width: number): void => {
-    const currentWidths = this.#get().status.resourceManagerColumnWidths || {
+  updateContentManagerColumnWidth = (column: 'name' | 'date' | 'size', width: number): void => {
+    const currentWidths = this.#get().status.contentManagerColumnWidths || {
       date: 160,
       name: 574,
       size: 140,
     };
 
     this.#get().updateSystemStatus({
-      resourceManagerColumnWidths: {
+      contentManagerColumnWidths: {
         ...currentWidths,
         [column]: width,
       },

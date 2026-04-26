@@ -2,6 +2,7 @@ import { exec } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { promisify } from 'node:util';
+
 import superjson from 'superjson';
 
 import FileService from '@/services/fileSrv';
@@ -92,8 +93,8 @@ interface GetStreamableMcpServerManifestInput {
 
 interface CallToolInput {
   args: any;
-  env: any;
-  params: GetStdioMcpServerManifestInput;
+  env?: Record<string, string>;
+  params: MCPClientParams;
   toolName: string;
 }
 
@@ -159,7 +160,7 @@ const toMarkdown = async (
           return `<resource type="${item.type}" url="${url}" />`;
         }
         case 'resource': {
-          return `<resource type="${item.type}">${JSON.stringify(item.resource)}</resource>}`;
+          return `<resource type="${item.type}">${JSON.stringify(item.resource)}</content>}`;
         }
         default: {
           return '';
@@ -200,14 +201,14 @@ export default class McpCtr extends ControllerModule {
 
         const base64 = block.data;
         const buffer = Buffer.from(base64, 'base64');
-        const hash = createHash('sha256').update(buffer).digest('hex');
+        const sha256 = createHash('sha256').update(buffer).digest('hex');
         const id = randomUUID();
         const filePath = path.posix.join('mcp', `${block.type}s`, todayShard(), `${id}.${ext}`);
 
         const { metadata } = await this.fileService.uploadFile({
           content: base64,
           filename: `${id}.${ext}`,
-          hash,
+          sha256,
           path: filePath,
           type: block.mimeType,
         });
@@ -323,13 +324,7 @@ export default class McpCtr extends ControllerModule {
   @IpcMethod()
   async callTool(payload: SuperJSONSerialized<CallToolInput>) {
     const input = deserializePayload<CallToolInput>(payload);
-    const params: MCPClientParams = {
-      args: input.params.args || [],
-      command: input.params.command,
-      env: input.env,
-      name: input.params.name,
-      type: 'stdio',
-    };
+    const params = this.normalizeCallToolParams(input);
 
     let client: MCPClient | undefined;
     try {
@@ -367,6 +362,26 @@ export default class McpCtr extends ControllerModule {
         await client.disconnect();
       }
     }
+  }
+
+  private normalizeCallToolParams(input: CallToolInput): MCPClientParams {
+    if (input.params.type === 'http') {
+      return {
+        auth: input.params.auth,
+        headers: input.params.headers,
+        name: input.params.name,
+        type: 'http',
+        url: input.params.url,
+      };
+    }
+
+    return {
+      args: input.params.args || [],
+      command: input.params.command,
+      env: input.env ?? input.params.env,
+      name: input.params.name,
+      type: 'stdio',
+    };
   }
 
   // ---------- MCP Install Check (local system) ----------
@@ -415,14 +430,14 @@ export default class McpCtr extends ControllerModule {
       let version = output;
 
       if (dependency.versionParsingRequired) {
-        const versionMatch = output.match(/[Vv]?(\d+(\.\d+)*)/);
+        const versionMatch = output.match(/V?(\d+(\.\d+)*)/i);
         if (versionMatch) version = versionMatch[0];
       }
 
       let meetRequirement = true;
 
       if (dependency.requiredVersion) {
-        const currentVersion = String(version).replace(/^[Vv]/, '');
+        const currentVersion = String(version).replace(/^V/i, '');
         const currentNum = Number.parseFloat(currentVersion);
 
         const requirementMatch = String(dependency.requiredVersion).match(/([<=>]+)?(\d+(\.\d+)*)/);

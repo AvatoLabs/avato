@@ -5,20 +5,20 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { checkFileStorageUsage } from '@/business/server/trpc-middlewares/lambda';
-import { ResourceModel } from '@/database/models/resource';
+import { ContentModel } from '@/database/models/content';
 import { SpaceModel } from '@/database/models/space';
 import { uploadSessions } from '@/database/schemas';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
-import { getPrivateBlobS3 } from '@/server/modules/PrivateBlobS3';
-import { AuthorizedResourceResolver } from '@/server/services/resource';
+import { getBlobProvider } from '@/server/modules/BlobProvider';
+import { AuthorizedResourceResolver } from '@/server/services/content';
 import { HOUR } from '@/utils/units';
 
 /** Default upload session expiry time: 1 hour */
 const DEFAULT_UPLOAD_SESSION_EXPIRY_MS = HOUR;
 
 /** Storage key prefix for upload blobs */
-const UPLOAD_STORAGE_PREFIX = 'uploads/';
+const UPLOAD_STORAGE_PREFIX = 'v2/spaces/';
 
 /** Max file size: 500MB */
 const MAX_UPLOAD_SIZE = 500 * 1024 * 1024;
@@ -33,7 +33,7 @@ const uploadProcedure = authedProcedure.use(serverDatabase).use(async (opts) => 
 
   return opts.next({
     ctx: {
-      resourceModel: new ResourceModel(ctx.serverDB, ctx.userId),
+      contentModel: new ContentModel(ctx.serverDB, ctx.userId),
       resolver: new AuthorizedResourceResolver(ctx.serverDB, ctx.userId),
       spaceModel: new SpaceModel(ctx.serverDB, ctx.userId),
     },
@@ -46,7 +46,7 @@ const uploadProcedure = authedProcedure.use(serverDatabase).use(async (opts) => 
  * session metadata and `files.name` after createFile.
  */
 const generateStorageKey = (spaceId: string, sessionId: string): string =>
-  `${UPLOAD_STORAGE_PREFIX}${spaceId}/${sessionId}/${nanoid()}`;
+  `${UPLOAD_STORAGE_PREFIX}${spaceId}/blobs/${sessionId}/${nanoid()}`;
 
 export const uploadRouter = router({
   /**
@@ -63,7 +63,7 @@ export const uploadRouter = router({
       z.object({
         filename: z.string().min(1).max(255),
         fileType: z.string().min(1).max(255),
-        knowledgeBaseId: z.string().optional(),
+        sourceSetId: z.string().optional(),
         parentId: z.string().optional(),
         sha256: z.string().optional(),
         size: z.number().int().positive(),
@@ -71,7 +71,7 @@ export const uploadRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { filename, fileType, size, sha256, spaceId, parentId, knowledgeBaseId } = input;
+      const { filename, fileType, size, sha256, spaceId, parentId, sourceSetId } = input;
 
       // Validate file size
       if (size > MAX_UPLOAD_SIZE) {
@@ -83,13 +83,9 @@ export const uploadRouter = router({
 
       // Resolve the target space
       let targetSpaceId = spaceId;
-      if (knowledgeBaseId) {
-        // Get space from knowledge base
-        const knowledgeBase = await ctx.resolver.requireKnowledgeBase(
-          knowledgeBaseId,
-          'create_child',
-        );
-        targetSpaceId = knowledgeBase.spaceId || targetSpaceId;
+      if (sourceSetId) {
+        const sourceSet = await ctx.resolver.requireSourceSet(sourceSetId, 'create_child');
+        targetSpaceId = sourceSet.spaceId || targetSpaceId;
       } else if (parentId) {
         // Get space from parent document
         const parent = await ctx.resolver.requireDocument(parentId, 'create_child');
@@ -103,8 +99,8 @@ export const uploadRouter = router({
       }
 
       // Check space membership role (must be editor or owner to upload)
-      if (spaceId || knowledgeBaseId || parentId) {
-        const role = await ctx.resourceModel.getSpaceMemberRole(targetSpaceId);
+      if (spaceId || sourceSetId || parentId) {
+        const role = await ctx.contentModel.getSpaceMemberRole(targetSpaceId);
         if (role === 'viewer' || !role) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -118,7 +114,7 @@ export const uploadRouter = router({
       const expiresAt = new Date(Date.now() + DEFAULT_UPLOAD_SESSION_EXPIRY_MS);
       const sessionId = idGenerator('uploadSessions');
       const storageKey = generateStorageKey(targetSpaceId, sessionId);
-      const session = await ctx.resourceModel.createUploadSession({
+      const session = await ctx.contentModel.createUploadSession({
         expectedSha256: sha256 || null,
         expectedSize: size,
         expiresAt,
@@ -126,7 +122,7 @@ export const uploadRouter = router({
         metadata: {
           filename,
           fileType,
-          knowledgeBaseId,
+          sourceSetId,
           parentId,
         },
         spaceId: targetSpaceId,
@@ -136,14 +132,14 @@ export const uploadRouter = router({
       // Generate presigned upload URL
       let presignedUrl: string;
       try {
-        const privateS3 = getPrivateBlobS3();
-        presignedUrl = await privateS3.createPreSignedUploadUrl(storageKey, {
+        const blobProvider = getBlobProvider();
+        presignedUrl = await blobProvider.createUploadUrl(storageKey, {
           contentType: fileType,
           expiresIn: Math.floor(DEFAULT_UPLOAD_SESSION_EXPIRY_MS / 1000),
         });
-      } catch (error) {
+      } catch {
         // Clean up the session if presigned URL generation fails
-        await ctx.resourceModel.expireUploadSession(session.id);
+        await ctx.contentModel.expireUploadSession(session.id);
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
           message: 'File storage is not configured',
@@ -177,7 +173,7 @@ export const uploadRouter = router({
       const { uploadSessionId, etag } = input;
 
       // Find and validate the upload session
-      const session = await ctx.resourceModel.findPendingUploadSessionById(uploadSessionId);
+      const session = await ctx.contentModel.findPendingUploadSessionById(uploadSessionId);
       if (!session) {
         throw new TRPCError({
           code: 'NOT_FOUND',
@@ -197,14 +193,14 @@ export const uploadRouter = router({
       let actualSize: number;
       let actualEtag: string | undefined;
       try {
-        const privateS3 = getPrivateBlobS3();
-        const metadata = await privateS3.getObjectMetadata(session.storageKey);
+        const blobProvider = getBlobProvider();
+        const metadata = await blobProvider.getObjectMetadata(session.storageKey);
         actualSize = metadata.contentLength;
         actualEtag = metadata.etag;
       } catch (error) {
         const meta = (session.metadata as Record<string, unknown> | null) ?? {};
         if (isS3HeadObjectMissingError(error) && session.expectedSha256 && session.spaceId) {
-          await ctx.resourceModel.quarantineSpaceBlobAfterFailedVerify({
+          await ctx.contentModel.quarantineSpaceBlobAfterFailedVerify({
             createdBy: ctx.userId,
             extraMetadata: { ...meta, uploadSessionId: session.id },
             fileType: (meta.fileType as string) || 'application/octet-stream',
@@ -215,7 +211,7 @@ export const uploadRouter = router({
             storageKey: session.storageKey,
           });
         }
-        await ctx.resourceModel.expireUploadSession(uploadSessionId);
+        await ctx.contentModel.expireUploadSession(uploadSessionId);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to verify uploaded file',
@@ -226,7 +222,7 @@ export const uploadRouter = router({
       if (actualSize !== session.expectedSize) {
         const meta = (session.metadata as Record<string, unknown> | null) ?? {};
         if (session.expectedSha256 && session.spaceId) {
-          await ctx.resourceModel.quarantineSpaceBlobAfterFailedVerify({
+          await ctx.contentModel.quarantineSpaceBlobAfterFailedVerify({
             actualSize,
             createdBy: ctx.userId,
             extraMetadata: { ...meta, uploadSessionId: session.id },
@@ -238,7 +234,7 @@ export const uploadRouter = router({
             storageKey: session.storageKey,
           });
         }
-        await ctx.resourceModel.expireUploadSession(uploadSessionId);
+        await ctx.contentModel.expireUploadSession(uploadSessionId);
         throw new TRPCError({
           code: 'CONFLICT',
           message: `File size mismatch: expected ${session.expectedSize}, got ${actualSize}`,
@@ -255,11 +251,11 @@ export const uploadRouter = router({
       }
 
       // Mark session as completed
-      await ctx.resourceModel.completeUploadSession(uploadSessionId, actualEtag || etag);
+      await ctx.contentModel.completeUploadSession(uploadSessionId, actualEtag || etag);
 
       // Upsert space blob
       const metadata = session.metadata as Record<string, any> | null;
-      const blob = await ctx.resourceModel.upsertSpaceBlob({
+      const blob = await ctx.contentModel.upsertSpaceBlob({
         createdBy: session.createdBy!,
         etag: actualEtag || etag,
         fileType: metadata?.fileType || 'application/octet-stream',
@@ -288,7 +284,7 @@ export const uploadRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { uploadSessionId } = input;
 
-      const session = await ctx.resourceModel.findUploadSessionById(uploadSessionId);
+      const session = await ctx.contentModel.findUploadSessionById(uploadSessionId);
       if (!session) {
         throw new TRPCError({
           code: 'NOT_FOUND',

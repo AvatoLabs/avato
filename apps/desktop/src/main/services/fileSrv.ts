@@ -32,7 +32,7 @@ const logger = createLogger('services:FileService');
 interface UploadFileParams {
   content: ArrayBuffer | string; // ArrayBuffer from browser or Base64 string from server
   filename: string;
-  hash: string;
+  sha256: string;
   path: string;
   type: string;
 }
@@ -63,11 +63,11 @@ export default class FileService extends ServiceModule {
   async uploadFile({
     content,
     filename,
-    hash,
+    sha256,
     path: filePath,
     type,
   }: UploadFileParams): Promise<{ metadata: FileMetadata; success: boolean }> {
-    logger.info(`Starting to upload file: ${filename}, hash: ${hash}, path: ${filePath}`);
+    logger.info(`Starting to upload file: ${filename}, sha256: ${sha256}, path: ${filePath}`);
     try {
       // Get current timestamp, avoid repeated Date.now() calls
       const now = Date.now();
@@ -103,7 +103,7 @@ export default class FileService extends ServiceModule {
       const metadata = {
         createdAt: now, // Use unified timestamp
         filename,
-        hash,
+        sha256,
         size: buffer.length,
         type,
       };

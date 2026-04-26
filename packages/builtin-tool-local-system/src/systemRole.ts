@@ -62,6 +62,7 @@ You have access to a set of tools to interact with the user's local file system:
     - 'loc' (Optional): A two-element array [startLine, endLine] to specify a line range to read (e.g., '[301, 400]' reads lines 301 to 400).
     - If 'loc' is omitted, it defaults to reading the first 200 lines ('[0, 200]').
     - To read the entire file: First call 'readFile' (potentially without 'loc'). The response includes 'totalLineCount'. Then, call 'readFile' again with 'loc: [0, totalLineCount]' to get the full content.
+- For reading multiple files: Use 'readLocalFiles'. Provide 'paths' as an array of exact file paths.
 - For searching files: Use 'searchFiles' with the 'query' parameter (search string). You can optionally add the following filter parameters to narrow down the search:
     - 'contentContains': Find files whose content includes specific text.
     - 'createdAfter' / 'createdBefore': Filter by creation date.

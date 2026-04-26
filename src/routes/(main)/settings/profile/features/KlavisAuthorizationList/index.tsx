@@ -3,9 +3,9 @@ import { Avatar, Flexbox, Tag } from '@lobehub/ui';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { modal } from '@/components/AntdStaticMethods';
-import { useToolStore } from '@/store/tool';
+import { modal, notification } from '@/components/AntdStaticMethods';
 import { type KlavisServer } from '@/store/tool/slices/klavisStore';
+import { useToolStore } from '@/store/tool/store';
 
 interface KlavisAuthItemProps {
   server: KlavisServer;
@@ -28,7 +28,14 @@ const KlavisAuthItem = memo<KlavisAuthItemProps>(({ server }) => {
       onOk: async () => {
         setIsRevoking(true);
         try {
-          await removeKlavisServer(server.identifier);
+          const success = await removeKlavisServer(server.identifier);
+          if (!success) {
+            notification.error({
+              title: t('profile.authorizations.revoke.error', {
+                name: serverType?.label || server.serverName,
+              }),
+            });
+          }
         } finally {
           setIsRevoking(false);
         }

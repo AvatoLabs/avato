@@ -22,8 +22,9 @@ import { useHotkeysContext } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
 import { usePasteFile, useUploadFiles } from '@/components/DragUploadZone';
-import { useAgentStore } from '@/store/agent';
+import { electronSystemService } from '@/services/electron/system';
 import { agentByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useUserStore } from '@/store/user';
 import { labPreferSelectors, preferenceSelectors, settingsSelectors } from '@/store/user/selectors';
 
@@ -32,8 +33,14 @@ import { useChatInputStore, useStoreApi } from '../store';
 import Placeholder from './Placeholder';
 
 const className = cx(css`
+  display: block !important;
+
   p {
     margin-block-end: 0;
+  }
+
+  > [contenteditable='true'] {
+    min-height: 100%;
   }
 `);
 
@@ -113,7 +120,7 @@ const InputEditor = memo<{ defaultRows?: number }>(({ defaultRows = 2 }) => {
               }),
             ],
           },
-    [enableRichRender],
+    [enableRichRender, expand, slashMenuRef],
   );
 
   return (
@@ -191,8 +198,6 @@ const InputEditor = memo<{ defaultRows?: number }>(({ defaultRows = 2 }) => {
       onContextMenu={async ({ event: e, editor }) => {
         if (isDesktop) {
           e.preventDefault();
-          const { electronSystemService } = await import('@/services/electron/system');
-
           const selectionText = editor.getSelectionDocument('markdown') as unknown as string;
 
           await electronSystemService.showContextMenu('editor', {

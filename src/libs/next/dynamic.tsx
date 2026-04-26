@@ -7,6 +7,8 @@
 
 import { type ComponentType, lazy, type ReactNode, Suspense } from 'react';
 
+import { tryHardReloadForChunkError } from '../../utils/chunkError';
+
 export interface DynamicOptions<P = NonNullable<unknown>> {
   loading?: ((...args: any[]) => ReactNode) | undefined;
   ssr?: boolean;
@@ -24,12 +26,24 @@ function dynamic<P = NonNullable<unknown>>(
 ): ComponentType<P> {
   const LazyComponent = lazy(async () => {
     const mod = await loader();
+    if (!mod) {
+      tryHardReloadForChunkError();
+      throw new Error('Dynamic import returned no module');
+    }
+
     if (typeof mod === 'function') {
       return { default: mod as ComponentType<P> };
     }
-    if ('default' in mod) {
+
+    if (typeof mod === 'object' && 'default' in mod) {
+      if (!mod.default) {
+        tryHardReloadForChunkError();
+        throw new Error('Dynamic import returned an empty default export');
+      }
+
       return mod as { default: ComponentType<P> };
     }
+
     return { default: mod as unknown as ComponentType<P> };
   });
 

@@ -129,7 +129,7 @@ export const ListItemRenderer = memo<ListItemRendererProps>(
               >
                 <ModelItemRender
                   {...item.model}
-                  {...item.model.abilities}
+                  abilities={item.model.abilities}
                   showInfoTag
                   newBadgeLabel={newLabel}
                 />

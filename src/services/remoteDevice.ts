@@ -1,0 +1,99 @@
+import type { DeviceAttachment } from '@lobechat/builtin-tool-remote-device';
+import type { DeviceSystemInfo } from '@lobechat/device-gateway-client/types';
+
+import { lambdaClient } from '@/libs/trpc/client';
+
+interface ExecuteToolCallParams {
+  apiName: string;
+  arguments: string;
+  deviceId?: string;
+  identifier: 'lobe-local-system' | 'lobe-skills';
+  timeout?: number;
+}
+
+const MIN_REMOTE_DEVICE_TIMEOUT = 1000;
+const MAX_REMOTE_DEVICE_TIMEOUT = 600_000;
+
+const normalizeRemoteDeviceTimeout = (timeout?: number) => {
+  if (typeof timeout !== 'number' || !Number.isFinite(timeout)) return undefined;
+
+  return Math.min(
+    Math.max(Math.trunc(timeout), MIN_REMOTE_DEVICE_TIMEOUT),
+    MAX_REMOTE_DEVICE_TIMEOUT,
+  );
+};
+
+class RemoteDeviceService {
+  private readonly activeDeviceStorageKey = 'lobehub.remoteDevice.activeDeviceId';
+
+  async executeToolCall(params: ExecuteToolCallParams) {
+    const timeout = normalizeRemoteDeviceTimeout(params.timeout);
+    const normalizedParams: ExecuteToolCallParams = { ...params };
+
+    if (timeout === undefined) {
+      delete normalizedParams.timeout;
+    } else {
+      normalizedParams.timeout = timeout;
+    }
+
+    return lambdaClient.remoteDevice.executeToolCall.mutate(normalizedParams);
+  }
+
+  async getActiveDeviceId(): Promise<string | undefined> {
+    const stored = this.readActiveDeviceId();
+    const devices = await this.list();
+    if (
+      stored &&
+      devices.some(
+        (device) => device.deviceId === stored && device.online && device.allowRemoteTools,
+      )
+    ) {
+      return stored;
+    }
+
+    const onlineDevices = devices.filter((device) => device.online && device.allowRemoteTools);
+    const activeDeviceId = onlineDevices.length === 1 ? onlineDevices[0].deviceId : undefined;
+    if (activeDeviceId) {
+      this.setActiveDeviceId(activeDeviceId);
+    } else if (stored) {
+      this.clearActiveDeviceId();
+    }
+
+    return activeDeviceId;
+  }
+
+  async getSystemInfo(deviceId: string): Promise<DeviceSystemInfo | undefined> {
+    return lambdaClient.remoteDevice.getSystemInfo.query({ deviceId });
+  }
+
+  async list(): Promise<DeviceAttachment[]> {
+    return lambdaClient.remoteDevice.list.query();
+  }
+
+  setActiveDeviceId(deviceId: string) {
+    if (typeof localStorage === 'undefined') return;
+    const normalizedDeviceId = deviceId.trim();
+    if (!normalizedDeviceId) {
+      this.clearActiveDeviceId();
+      return;
+    }
+
+    localStorage.setItem(this.activeDeviceStorageKey, normalizedDeviceId);
+  }
+
+  async status() {
+    return lambdaClient.remoteDevice.status.query();
+  }
+
+  private readActiveDeviceId() {
+    if (typeof localStorage === 'undefined') return undefined;
+    return localStorage.getItem(this.activeDeviceStorageKey) || undefined;
+  }
+
+  private clearActiveDeviceId() {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(this.activeDeviceStorageKey);
+  }
+}
+
+export const remoteDeviceService = new RemoteDeviceService();

@@ -10,7 +10,7 @@ export const BUILTIN_AGENT_SLUGS = {
   groupAgentBuilder: 'group-agent-builder',
   groupSupervisor: 'group-supervisor',
   inbox: 'inbox',
-  pageAgent: 'page-agent',
+  docsAgent: 'docs-agent',
 } as const;
 
 export type BuiltinAgentSlug = (typeof BUILTIN_AGENT_SLUGS)[keyof typeof BUILTIN_AGENT_SLUGS];
@@ -45,7 +45,7 @@ export interface BuiltinAgentRuntimeResult {
  * Runtime Context - context passed to runtime function
  */
 export interface RuntimeContext {
-  /** Document content for PageAgent */
+  /** Document content for DocsAgent */
   documentContent?: string;
 
   /** Context for GroupSupervisor */

@@ -3,10 +3,14 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
 
+import { isCanonicalDocumentEntry } from '@/features/ContentManager/utils/isCanonicalDocumentEntry';
+import { buildPageScopeSearch, createSourceSetPageScope } from '@/features/Pages/usePageScope';
+import { buildFilesPreviewPath } from '@/features/ResourceSpaces';
 import GroupSkeleton from '@/routes/(main)/home/features/components/GroupSkeleton';
 import { RECENT_BLOCK_SIZE } from '@/routes/(main)/home/features/const';
-import { useHomeStore } from '@/store/home';
 import { homeRecentSelectors } from '@/store/home/selectors';
+import { useHomeStore } from '@/store/home/store';
+import { getPageDetailPath } from '@/utils/docs';
 
 import RecentResourceItem from './Item';
 
@@ -19,14 +23,24 @@ const RecentResourceList = memo(() => {
     return (
       <GroupSkeleton
         height={RECENT_BLOCK_SIZE.RESOURCE.HEIGHT}
+        variant={'resource'}
         width={RECENT_BLOCK_SIZE.RESOURCE.WIDTH}
       />
     );
   }
 
   return files.map((file) => {
-    const isPage = file.fileType === 'text/plain';
-    const fileUrl = isPage ? `/resource/${file.id}` : `/resource?file=${file.id}`;
+    const hasCanonicalDocumentIdentity = isCanonicalDocumentEntry({
+      id: file.id,
+      sourceType: file.sourceType,
+    });
+    const canonicalDocPath = getPageDetailPath(file.id, 'doc', file.spaceId);
+    const canonicalDocSearch = file.sourceSetId
+      ? buildPageScopeSearch(createSourceSetPageScope(file.sourceSetId))
+      : '';
+    const fileUrl = hasCanonicalDocumentIdentity
+      ? `${canonicalDocPath}${canonicalDocSearch}`
+      : buildFilesPreviewPath(file.spaceId, file.fileId || file.id);
 
     return (
       <Link

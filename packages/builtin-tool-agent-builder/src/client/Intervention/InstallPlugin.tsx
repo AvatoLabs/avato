@@ -7,7 +7,6 @@ import { CheckCircle } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
 import {
   klavisStoreSelectors,
   lobehubSkillStoreSelectors,
@@ -16,6 +15,7 @@ import {
 } from '@/store/tool/selectors';
 import { KlavisServerStatus } from '@/store/tool/slices/klavisStore/types';
 import { LobehubSkillStatus } from '@/store/tool/slices/lobehubSkillStore/types';
+import { useToolStore } from '@/store/tool/store';
 
 import type { InstallPluginParams } from '../../types';
 
@@ -158,7 +158,7 @@ const InstallPluginIntervention = memo<BuiltinInterventionProps<InstallPluginPar
                   {lobehubSkillProviderInfo?.label || identifier}
                 </span>
                 <span style={{ color: 'var(--lobe-text-tertiary)', fontSize: 12 }}>
-                  LobeHub Skill
+                  Avato Skill
                 </span>
               </Flexbox>
               <span style={{ color: 'var(--lobe-text-secondary)', fontSize: 12 }}>

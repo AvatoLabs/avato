@@ -2,10 +2,13 @@ import { ENABLE_BUSINESS_FEATURES } from '@lobechat/business-const';
 import { type LobeChatDatabase } from '@lobechat/database';
 
 import { initNewUserForBusiness } from '@/business/server/user';
+import { SpaceModel } from '@/database/models/space';
 import { UserModel } from '@/database/models/user';
 import { initializeServerAnalytics } from '@/libs/analytics';
+import { getBlobProvider } from '@/server/modules/BlobProvider';
 import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
-import { FileS3 } from '@/server/modules/S3';
+
+import { buildLegacyUserAvatarStorageKey, buildUserAvatarStorageKey } from './avatar';
 
 type CreatedUser = {
   createdAt?: Date | null;
@@ -56,17 +59,23 @@ export class UserService {
   };
 
   getUserAvatar = async (id: string, image: string) => {
-    const s3 = new FileS3();
-    const s3FileUrl = `user/avatar/${id}/${image}`;
+    const personalSpace = await SpaceModel.findPersonalSpaceByOwnerId(this.db, id);
+    const candidateKeys = [
+      personalSpace?.id ? buildUserAvatarStorageKey(personalSpace.id, image) : undefined,
+      buildLegacyUserAvatarStorageKey(id, image),
+    ].filter(Boolean) as string[];
 
-    try {
-      const file = await s3.getFileByteArray(s3FileUrl);
-      if (!file) {
-        return null;
+    for (const key of candidateKeys) {
+      try {
+        const file = await getBlobProvider().getObjectByteArray(key);
+        if (file) {
+          return Buffer.from(file);
+        }
+      } catch (error) {
+        console.error('Failed to get user avatar', error);
       }
-      return Buffer.from(file);
-    } catch (error) {
-      console.error('Failed to get user avatar', error);
     }
+
+    return null;
   };
 }

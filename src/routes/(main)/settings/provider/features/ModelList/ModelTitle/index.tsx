@@ -1,5 +1,5 @@
-import { ActionIcon, Button, DropdownMenu, Flexbox, Skeleton, Text } from '@lobehub/ui';
-import { App, Space } from 'antd';
+import { ActionIcon, DropdownMenu, Flexbox, Skeleton, Text } from '@lobehub/ui';
+import { App } from 'antd';
 import { cssVar } from 'antd-style';
 import { CircleX, EllipsisVertical, LucideRefreshCcwDot, PlusIcon } from 'lucide-react';
 import { memo, useState } from 'react';
@@ -13,21 +13,29 @@ import CreateNewModelModal from '../CreateNewModelModal';
 import Search from './Search';
 
 interface ModelFetcherProps {
+  fetchRemoteModelsLoading?: boolean;
+  onFetchRemoteModels?: () => Promise<void>;
   provider: string;
   showAddNewModel?: boolean;
   showModelFetcher?: boolean;
 }
 
 const ModelTitle = memo<ModelFetcherProps>(
-  ({ provider, showAddNewModel = true, showModelFetcher = true }) => {
+  ({
+    fetchRemoteModelsLoading = false,
+    onFetchRemoteModels,
+    provider,
+    showAddNewModel = true,
+    showModelFetcher = true,
+  }) => {
     const { t } = useTranslation('modelProvider');
+    const { t: commonT } = useTranslation('common');
     const { modal, message } = App.useApp();
     const [
       searchKeyword,
       totalModels,
       isEmpty,
       hasRemoteModels,
-      fetchRemoteModelList,
       clearObtainedModels,
       clearModelsByProvider,
       useFetchAiProviderModels,
@@ -36,7 +44,6 @@ const ModelTitle = memo<ModelFetcherProps>(
       aiModelSelectors.totalAiProviderModelList(s),
       aiModelSelectors.isEmptyAiProviderModelList(s),
       aiModelSelectors.hasRemoteModels(s),
-      s.fetchRemoteModelList,
       s.clearRemoteModels,
       s.clearModelsByProvider,
       s.useFetchAiProviderModels,
@@ -44,7 +51,6 @@ const ModelTitle = memo<ModelFetcherProps>(
 
     const { isLoading } = useFetchAiProviderModels(provider);
 
-    const [fetchRemoteModelsLoading, setFetchRemoteModelsLoading] = useState(false);
     const [clearRemoteModelsLoading, setClearRemoteModelsLoading] = useState(false);
     const [showModal, setShowModal] = useState(false);
 
@@ -72,30 +78,36 @@ const ModelTitle = memo<ModelFetcherProps>(
             {isLoading ? (
               <Skeleton.Button active style={{ height: 22 }} />
             ) : (
-              <Text style={{ fontSize: 12 }} type={'secondary'}>
-                <div style={{ display: 'flex', lineHeight: '24px' }}>
+              <Flexbox horizontal align={'center'} gap={4}>
+                <Text style={{ fontSize: 12, lineHeight: '24px' }} type={'secondary'}>
                   {t('providerModels.list.total', { count: totalModels })}
-                  {hasRemoteModels && (
-                    <ActionIcon
-                      icon={CircleX}
-                      loading={clearRemoteModelsLoading}
-                      size={'small'}
-                      title={t('providerModels.list.fetcher.clear')}
-                      onClick={async () => {
-                        setClearRemoteModelsLoading(true);
+                </Text>
+                {hasRemoteModels && (
+                  <ActionIcon
+                    icon={CircleX}
+                    loading={clearRemoteModelsLoading}
+                    size={'small'}
+                    title={t('providerModels.list.fetcher.clear')}
+                    onClick={async () => {
+                      setClearRemoteModelsLoading(true);
+                      try {
                         await clearObtainedModels(provider);
+                      } catch (error) {
+                        console.error('Failed to clear fetched models:', error);
+                        message.error(t('providerModels.list.fetcher.clearError'));
+                      } finally {
                         setClearRemoteModelsLoading(false);
-                      }}
-                    />
-                  )}
-                </div>
-              </Text>
+                      }
+                    }}
+                  />
+                )}
+              </Flexbox>
             )}
           </Flexbox>
           {isLoading ? (
             <Skeleton.Button active size={'small'} style={{ width: 120 }} />
           ) : isEmpty ? null : (
-            <Flexbox horizontal gap={8}>
+            <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
               {!mobile && (
                 <Search
                   value={searchKeyword}
@@ -104,32 +116,28 @@ const ModelTitle = memo<ModelFetcherProps>(
                   }}
                 />
               )}
-              <Space.Compact>
+              <Flexbox horizontal gap={4}>
                 {showModelFetcher && (
-                  <Button
+                  <ActionIcon
                     icon={LucideRefreshCcwDot}
                     loading={fetchRemoteModelsLoading}
                     size={'small'}
+                    title={
+                      fetchRemoteModelsLoading
+                        ? t('providerModels.list.fetcher.fetching')
+                        : t('providerModels.list.fetcher.fetch')
+                    }
                     onClick={async () => {
-                      setFetchRemoteModelsLoading(true);
-                      try {
-                        await fetchRemoteModelList(provider);
-                      } catch (e) {
-                        console.error(e);
-                      }
-                      setFetchRemoteModelsLoading(false);
+                      await onFetchRemoteModels?.();
                     }}
-                  >
-                    {fetchRemoteModelsLoading
-                      ? t('providerModels.list.fetcher.fetching')
-                      : t('providerModels.list.fetcher.fetch')}
-                  </Button>
+                  />
                 )}
                 {showAddNewModel && (
                   <>
-                    <Button
+                    <ActionIcon
                       icon={PlusIcon}
                       size={'small'}
+                      title={t('providerModels.list.addNew')}
                       onClick={() => {
                         setShowModal(true);
                       }}
@@ -146,8 +154,13 @@ const ModelTitle = memo<ModelFetcherProps>(
                         modal.confirm({
                           content: t('providerModels.list.resetAll.conform'),
                           onOk: async () => {
-                            await clearModelsByProvider(provider);
-                            message.success(t('providerModels.list.resetAll.success'));
+                            try {
+                              await clearModelsByProvider(provider);
+                              message.success(t('providerModels.list.resetAll.success'));
+                            } catch (error) {
+                              console.error('Failed to reset provider models:', error);
+                              message.error(t('providerModels.list.resetAll.error'));
+                            }
                           },
                           title: t('providerModels.list.resetAll.title'),
                         });
@@ -155,9 +168,9 @@ const ModelTitle = memo<ModelFetcherProps>(
                     },
                   ]}
                 >
-                  <Button icon={EllipsisVertical} size={'small'} />
+                  <ActionIcon icon={EllipsisVertical} size={'small'} title={commonT('more')} />
                 </DropdownMenu>
-              </Space.Compact>
+              </Flexbox>
             </Flexbox>
           )}
         </Flexbox>

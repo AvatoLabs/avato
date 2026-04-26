@@ -10,10 +10,9 @@ const hideSyncAlert = (s: UserStore) => s.preference.hideSyncAlert;
 
 const hideSettingsMoveGuide = (s: UserStore) => s.preference.guide?.moveSettingsToAvatar;
 
-const showUploadFileInKnowledgeBaseTip = (s: UserStore) =>
-  s.preference.guide?.uploadFileInKnowledgeBase;
+const showUploadFileInSourceSetTip = (s: UserStore) => s.preference.guide?.uploadFileInSourceSet;
 
-const shouldTriggerFileInKnowledgeBaseTip = (s: UserStore) =>
+const shouldTriggerFileInSourceSetTip = (s: UserStore) =>
   !(typeof s.preference.guide?.moveSettingsToAvatar === 'boolean');
 
 const isPreferenceInit = (s: UserStore) => s.isUserStateInit;
@@ -22,8 +21,8 @@ export const preferenceSelectors = {
   hideSettingsMoveGuide,
   hideSyncAlert,
   isPreferenceInit,
-  shouldTriggerFileInKnowledgeBaseTip,
-  showUploadFileInKnowledgeBaseTip,
+  shouldTriggerFileInSourceSetTip,
+  showUploadFileInSourceSetTip,
   topicDisplayMode,
   useCmdEnterToSend,
 };

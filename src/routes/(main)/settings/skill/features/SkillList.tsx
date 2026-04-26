@@ -22,7 +22,6 @@ import { useTranslation } from 'react-i18next';
 import AddSkillButton from '@/features/SkillStore/SkillList/AddSkillButton';
 import { useFetchInstalledPlugins } from '@/hooks/useFetchInstalledPlugins';
 import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
-import { useToolStore } from '@/store/tool';
 import {
   agentSkillsSelectors,
   builtinToolSelectors,
@@ -32,6 +31,7 @@ import {
 } from '@/store/tool/selectors';
 import { KlavisServerStatus } from '@/store/tool/slices/klavisStore';
 import { LobehubSkillStatus } from '@/store/tool/slices/lobehubSkillStore/types';
+import { useToolStore } from '@/store/tool/store';
 import { type LobeToolType } from '@/types/tool/tool';
 
 import AgentSkillItem from './AgentSkillItem';

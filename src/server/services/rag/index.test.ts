@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockEmbeddings,
   mockFilterReadableFileIds,
-  mockFilterReadableKnowledgeBaseIds,
+  mockFilterReadableSourceSetIds,
   mockFindByFileId,
   mockParseFile,
   mockRequireFile,
@@ -13,7 +13,7 @@ const {
 } = vi.hoisted(() => ({
   mockEmbeddings: vi.fn(),
   mockFilterReadableFileIds: vi.fn(),
-  mockFilterReadableKnowledgeBaseIds: vi.fn(),
+  mockFilterReadableSourceSetIds: vi.fn(),
   mockFindByFileId: vi.fn(),
   mockParseFile: vi.fn(),
   mockRequireFile: vi.fn(),
@@ -40,13 +40,13 @@ vi.mock('@/server/services/document', () => ({
   })),
 }));
 
-vi.mock('@/server/services/resource', () => ({
+vi.mock('@/server/services/content', () => ({
   AuthorizedResourceResolver: vi.fn().mockImplementation(() => ({
     requireFile: mockRequireFile,
   })),
-  ResourceAuthorizer: vi.fn().mockImplementation(() => ({
+  ContentAuthorizer: vi.fn().mockImplementation(() => ({
     filterReadableFileIds: mockFilterReadableFileIds,
-    filterReadableKnowledgeBaseIds: mockFilterReadableKnowledgeBaseIds,
+    filterReadableSourceSetIds: mockFilterReadableSourceSetIds,
   })),
 }));
 
@@ -70,7 +70,7 @@ describe('ServerRagService', () => {
     vi.clearAllMocks();
     mockEmbeddings.mockResolvedValue([embeddingVector]);
     mockFilterReadableFileIds.mockResolvedValue([]);
-    mockFilterReadableKnowledgeBaseIds.mockResolvedValue([]);
+    mockFilterReadableSourceSetIds.mockResolvedValue([]);
     mockFindByFileId.mockResolvedValue(undefined);
     mockParseFile.mockResolvedValue(undefined);
     mockRequireFile.mockResolvedValue({ name: 'doc.md' });
@@ -78,11 +78,62 @@ describe('ServerRagService', () => {
     mockSemanticSearchForChat.mockResolvedValue([]);
   });
 
+  describe('getFileContents', () => {
+    it('should ignore docs_* canonical document ids', async () => {
+      const serverDB = {
+        query: {
+          sourceSetFiles: {
+            findMany: vi.fn().mockResolvedValue([]),
+          },
+        },
+      } as any;
+      mockFilterReadableFileIds.mockResolvedValue(['file-1']);
+      mockFindByFileId.mockResolvedValue({ content: 'alpha', metadata: { pageKind: 'doc' } });
+      const service = new ServerRagService(serverDB, userId);
+
+      const result = await service.getFileContents(['docs_derived_1', 'file-1']);
+
+      expect(mockFilterReadableFileIds).toHaveBeenCalledWith(['file-1']);
+      expect(mockRequireFile).toHaveBeenCalledWith('file-1', 'preview_content');
+      expect(mockRequireFile).not.toHaveBeenCalledWith('docs_derived_1', 'preview_content');
+      expect(result).toEqual([
+        expect.objectContaining({
+          content: 'alpha',
+          fileId: 'file-1',
+          filename: 'doc.md',
+        }),
+      ]);
+    });
+  });
+
   describe('semanticSearchForChat', () => {
+    it('should strip docs_* ids before readable-file filtering', async () => {
+      const serverDB = {
+        query: {
+          sourceSetFiles: {
+            findMany: vi.fn().mockResolvedValue([]),
+          },
+        },
+      } as any;
+      mockFilterReadableFileIds.mockResolvedValue(['file-1']);
+      mockSemanticSearchForChat.mockResolvedValue([
+        { fileId: 'file-1', fileName: 'A', id: 'chunk-1', similarity: 0.95, text: 'alpha' },
+      ]);
+
+      const service = new ServerRagService(serverDB, userId);
+
+      await service.semanticSearchForChat({
+        fileIds: ['docs_derived_1', 'file-1'],
+        query: 'rag audit',
+      });
+
+      expect(mockFilterReadableFileIds).toHaveBeenCalledWith(['file-1']);
+    });
+
     it('should short-circuit before embedding when no readable files remain', async () => {
       const serverDB = {
         query: {
-          knowledgeBaseFiles: {
+          sourceSetFiles: {
             findMany: vi.fn().mockResolvedValue([]),
           },
         },
@@ -91,8 +142,8 @@ describe('ServerRagService', () => {
 
       const result = await service.semanticSearchForChat({
         fileIds: ['file-1'],
-        knowledgeIds: ['kb-1'],
         query: 'rag audit',
+        sourceSetIds: ['kb-1'],
       });
 
       expect(result).toEqual({ chunks: [], fileResults: [] });
@@ -104,14 +155,14 @@ describe('ServerRagService', () => {
       const findMany = vi.fn().mockResolvedValue([{ fileId: 'file-2' }, { fileId: 'file-3' }]);
       const serverDB = {
         query: {
-          knowledgeBaseFiles: {
+          sourceSetFiles: {
             findMany,
           },
         },
       } as any;
 
       mockFilterReadableFileIds.mockResolvedValue(['file-1', 'file-2']);
-      mockFilterReadableKnowledgeBaseIds.mockResolvedValue(['kb-1']);
+      mockFilterReadableSourceSetIds.mockResolvedValue(['kb-1']);
       mockSemanticSearchForChat.mockResolvedValue([
         { fileId: 'file-2', fileName: 'A', id: 'chunk-1', similarity: 0.95, text: 'alpha' },
         { fileId: 'file-2', fileName: 'A', id: 'chunk-2', similarity: 0.9, text: 'beta' },
@@ -124,8 +175,8 @@ describe('ServerRagService', () => {
         chunkTopK: 4,
         fileIds: ['file-1', 'file-2'],
         fileTopK: 1,
-        knowledgeIds: ['kb-1'],
         query: 'rag audit',
+        sourceSetIds: ['kb-1'],
       });
 
       expect(findMany).toHaveBeenCalled();
@@ -144,7 +195,7 @@ describe('ServerRagService', () => {
     it('should diversify chunks across files before trimming', async () => {
       const serverDB = {
         query: {
-          knowledgeBaseFiles: {
+          sourceSetFiles: {
             findMany: vi.fn().mockResolvedValue([]),
           },
         },

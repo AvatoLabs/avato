@@ -8,7 +8,7 @@ import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useChatStore } from '@/store/chat';
-import { useNotebookStore } from '@/store/notebook';
+import { useNotebookStore } from '@/store/notebook/store';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   container: css`

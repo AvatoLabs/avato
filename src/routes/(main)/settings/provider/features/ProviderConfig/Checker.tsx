@@ -1,5 +1,6 @@
 'use client';
 
+import { App } from 'antd';
 import { CheckCircleFilled } from '@ant-design/icons';
 import { type ChatMessageError } from '@lobechat/types';
 import { TraceNameMap } from '@lobechat/types';
@@ -64,6 +65,7 @@ interface ConnectionCheckerProps {
 
 const Checker = memo<ConnectionCheckerProps>(
   ({ model, provider, checkErrorRender: CheckErrorRender, onBeforeCheck, onAfterCheck }) => {
+    const { message } = App.useApp();
     const { t } = useTranslation('setting');
 
     const [isProviderConfigUpdating, updateAiProviderConfig] = useAiInfraStore((s) => [
@@ -191,6 +193,7 @@ const Checker = memo<ConnectionCheckerProps>(
               overflow: 'hidden',
             }}
             onSelect={async (value) => {
+              const previousCheckModel = checkModel;
               // Update local state
               setCheckModel(value);
               setPass(false);
@@ -198,7 +201,15 @@ const Checker = memo<ConnectionCheckerProps>(
 
               // Persist the selected model to provider config
               // This allows the model to be retained after page refresh
-              await updateAiProviderConfig(provider, { checkModel: value });
+              try {
+                await updateAiProviderConfig(provider, { checkModel: value });
+              } catch (error) {
+                console.error('Failed to update connection checker model:', error);
+                setCheckModel(previousCheckModel);
+                message.error(
+                  t('providerModels.config.checker.updateError', { ns: 'modelProvider' }),
+                );
+              }
             }}
           />
           <Button
@@ -222,9 +233,11 @@ const Checker = memo<ConnectionCheckerProps>(
                 : undefined
             }
             onClick={async () => {
-              await onBeforeCheck();
               try {
+                await onBeforeCheck();
                 await checkConnection();
+              } catch (error) {
+                console.error('Failed to run provider connection check:', error);
               } finally {
                 await onAfterCheck();
               }

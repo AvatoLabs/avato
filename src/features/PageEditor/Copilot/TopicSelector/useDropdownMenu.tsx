@@ -18,7 +18,7 @@ export const useDropdownMenu = ({
   topicId,
 }: UseDropdownMenuProps): (() => MenuProps['items']) => {
   const { t } = useTranslation(['common', 'topic']);
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
   const removeTopic = useChatStore((s) => s.removeTopic);
 
   const handleDelete = () => {
@@ -29,8 +29,13 @@ export const useDropdownMenu = ({
       okButtonProps: { danger: true },
       okText: t('delete'),
       onOk: async () => {
-        await removeTopic(topicId);
-        onClose();
+        try {
+          await removeTopic(topicId);
+          onClose();
+        } catch (error) {
+          console.error('Failed to delete copilot topic:', error);
+          message.error(t('actions.removeError', { ns: 'topic' }));
+        }
       },
       title: t('delete'),
     });

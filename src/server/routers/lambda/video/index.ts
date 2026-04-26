@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
+import { TRPCError } from '@trpc/server';
 import debug from 'debug';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -20,6 +21,7 @@ import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { keyVaults, serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 import { FileService } from '@/server/services/file';
+import { resolveRuntimeFileInput } from '@/server/services/file/resolveRuntimeFileInput';
 import {
   AsyncTaskError,
   AsyncTaskErrorType,
@@ -72,16 +74,30 @@ export const videoRouter = router({
 
     // Normalize image URLs to S3 keys for database storage
     let configForDatabase = { ...params };
+    let generationParams = { ...params };
 
     // Process first-frame imageUrl
     if (typeof params.imageUrl === 'string' && params.imageUrl) {
       try {
-        const key = await fileService.getKeyFromFullUrl(params.imageUrl);
-        if (key) {
-          log('Converted imageUrl to key: %s -> %s', params.imageUrl, key);
-          configForDatabase = { ...configForDatabase, imageUrl: key };
+        const resolvedInput = await resolveRuntimeFileInput({
+          db: serverDB,
+          fileService,
+          sourceIp: ctx.clientIp ?? null,
+          url: params.imageUrl,
+          userAgent: ctx.userAgent ?? null,
+          userId,
+          via: 'video_generation_input',
+        });
+
+        if (resolvedInput) {
+          log('Resolved internal imageUrl to provider-readable URL: %s', params.imageUrl);
+          configForDatabase = { ...configForDatabase, imageUrl: resolvedInput.key };
+          generationParams = { ...generationParams, imageUrl: resolvedInput.url };
+        } else {
+          log('Failed to extract key from imageUrl: %s', params.imageUrl);
         }
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error('Error converting imageUrl to key: %O', error);
       }
     }
@@ -89,43 +105,26 @@ export const videoRouter = router({
     // Process last-frame endImageUrl
     if (typeof params.endImageUrl === 'string' && params.endImageUrl) {
       try {
-        const key = await fileService.getKeyFromFullUrl(params.endImageUrl);
-        if (key) {
-          log('Converted endImageUrl to key: %s -> %s', params.endImageUrl, key);
-          configForDatabase = { ...configForDatabase, endImageUrl: key };
+        const resolvedInput = await resolveRuntimeFileInput({
+          db: serverDB,
+          fileService,
+          sourceIp: ctx.clientIp ?? null,
+          url: params.endImageUrl,
+          userAgent: ctx.userAgent ?? null,
+          userId,
+          via: 'video_generation_input',
+        });
+
+        if (resolvedInput) {
+          log('Resolved internal endImageUrl to provider-readable URL: %s', params.endImageUrl);
+          configForDatabase = { ...configForDatabase, endImageUrl: resolvedInput.key };
+          generationParams = { ...generationParams, endImageUrl: resolvedInput.url };
+        } else {
+          log('Failed to extract key from endImageUrl: %s', params.endImageUrl);
         }
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error('Error converting endImageUrl to key: %O', error);
-      }
-    }
-
-    // In development, convert localhost proxy URLs to S3 URLs for API access
-    let generationParams = params;
-    if (process.env.NODE_ENV === 'development') {
-      const updates: Record<string, unknown> = {};
-
-      if (typeof params.imageUrl === 'string' && params.imageUrl) {
-        const s3Url = await fileService.getFullFileUrl(configForDatabase.imageUrl as string);
-        if (s3Url) {
-          log('Dev: converted imageUrl proxy URL to S3 URL: %s -> %s', params.imageUrl, s3Url);
-          updates.imageUrl = s3Url;
-        }
-      }
-
-      if (typeof params.endImageUrl === 'string' && params.endImageUrl) {
-        const s3Url = await fileService.getFullFileUrl(configForDatabase.endImageUrl as string);
-        if (s3Url) {
-          log(
-            'Dev: converted endImageUrl proxy URL to S3 URL: %s -> %s',
-            params.endImageUrl,
-            s3Url,
-          );
-          updates.endImageUrl = s3Url;
-        }
-      }
-
-      if (Object.keys(updates).length > 0) {
-        generationParams = { ...params, ...updates };
       }
     }
 

@@ -1,6 +1,7 @@
-import { Flexbox, Icon } from '@lobehub/ui';
-import { Loader2 } from 'lucide-react';
+import { Flexbox } from '@lobehub/ui';
 import { memo } from 'react';
+
+import BubblesLoading from '@/components/BubblesLoading';
 
 import { styles } from '../style';
 import { type ChatItemProps } from '../type';
@@ -15,7 +16,7 @@ const Loading = memo<LoadingProps>(({ loading }) => {
 
   return (
     <Flexbox align={'center'} className={styles.loading} justify={'center'}>
-      <Icon spin icon={Loader2} size={{ size: 12, strokeWidth: 3 }} />
+      <BubblesLoading size={4} />
     </Flexbox>
   );
 });

@@ -5,7 +5,7 @@ import { createStaticStyles } from 'antd-style';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 
 import { type ChannelProvider } from '../const';
 import Body from './Body';
@@ -229,6 +229,7 @@ const PlatformDetail = memo<PlatformDetailProps>(({ provider, agentId, currentCo
         testResult={testResult}
         testing={testing}
         onCopied={() => msg.success(t('channel.copied'))}
+        onCopyFailed={() => msg.error(t('channel.copyFailed'))}
         onDelete={handleDelete}
         onSave={handleSave}
         onTestConnection={handleTestConnection}

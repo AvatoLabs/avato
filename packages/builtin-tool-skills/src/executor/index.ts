@@ -30,7 +30,7 @@ class SkillsExecutor extends BaseExecutor<typeof SkillsApiName> {
         return { stop: true, success: false };
       }
 
-      const result = await this.runtime.execScript(params);
+      const result = await this.runtime.execScript(params, ctx);
 
       if (result.success) {
         return { content: result.content, state: result.state, success: true };
@@ -117,7 +117,7 @@ class SkillsExecutor extends BaseExecutor<typeof SkillsApiName> {
         return { stop: true, success: false };
       }
 
-      const result = await this.runtime.exportFile(params);
+      const result = await this.runtime.exportFile(params, ctx);
 
       if (result.success) {
         return { content: result.content, state: result.state, success: true };

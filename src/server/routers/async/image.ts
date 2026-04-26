@@ -320,7 +320,6 @@ export const imageRouter = router({
               width: width ?? image.width,
             },
             {
-              fileHash: image.hash,
               fileType: image.mime,
               metadata: {
                 generationId,
@@ -329,8 +328,9 @@ export const imageRouter = router({
                 width: image.width,
               },
               name: `${sanitizeFileName(params.prompt, generationId)}.${image.extension}`,
+              sha256: image.sha256,
               size: image.size,
-              url: uploadedImageUrl,
+              storageKey: uploadedImageUrl,
             },
           );
 

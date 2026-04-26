@@ -4,7 +4,16 @@
  */
 import { ArrowLeft, Check, MessageCircle, Plus } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import {
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import EmptyState from '../components/ui/EmptyState';
@@ -21,6 +30,7 @@ import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { navigateToLogin } from '../lib/navigation';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import { generateBestTitle } from '../lib/titleGeneration';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useChatStore } from '../store/chat';
@@ -105,6 +115,9 @@ export default function TopicListScreen({ route, navigation }: RootStackScreenPr
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const contentWidth = Math.min(Math.max(screenWidth - 40, 0), responsiveMetrics.settingsMaxWidth);
 
   const session = useSessionStore((s) => s.sessions.find((x) => x.id === sessionId));
   const isGroupSession = session?.type === 'group';
@@ -221,37 +234,43 @@ export default function TopicListScreen({ route, navigation }: RootStackScreenPr
     [fetchMessages, navigation, sessionId, switchTopic, t.errorUnknown, toast],
   );
 
-  const filteredTopics = searchQuery
-    ? topics.filter((tp) => (tp.title || '').toLowerCase().includes(searchQuery.toLowerCase()))
-    : topics;
+  const sortedTopics = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const filteredTopics = normalizedQuery
+      ? topics.filter((topic) => (topic.title || '').toLowerCase().includes(normalizedQuery))
+      : topics;
 
-  const sortedTopics = [...filteredTopics].sort((a, b) => {
-    if (a.favorite && !b.favorite) return -1;
-    if (!a.favorite && b.favorite) return 1;
-    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-  });
+    return [...filteredTopics].sort((a, b) => {
+      if (a.favorite && !b.favorite) return -1;
+      if (!a.favorite && b.favorite) return 1;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  }, [searchQuery, topics]);
 
   const renderTopicItem = useCallback(
     ({ item }: { item: Topic }) => {
       if (!sessionId) return null;
 
       return (
-        <TopicListRow
-          activeTopicId={activeTopic}
-          favoriteTopic={favoriteTopic}
-          handleSmartRename={handleSmartRename}
-          handleSwitchTopic={handleSwitchTopic}
-          isGroupSession={isGroupSession}
-          removeTopic={removeTopic}
-          sessionId={sessionId}
-          setTopicTagTarget={setTopicTagTarget}
-          topic={item}
-          updateTopic={updateTopic}
-        />
+        <View style={{ width: contentWidth }}>
+          <TopicListRow
+            activeTopicId={activeTopic}
+            favoriteTopic={favoriteTopic}
+            handleSmartRename={handleSmartRename}
+            handleSwitchTopic={handleSwitchTopic}
+            isGroupSession={isGroupSession}
+            removeTopic={removeTopic}
+            sessionId={sessionId}
+            setTopicTagTarget={setTopicTagTarget}
+            topic={item}
+            updateTopic={updateTopic}
+          />
+        </View>
       );
     },
     [
       activeTopic,
+      contentWidth,
       favoriteTopic,
       handleSmartRename,
       handleSwitchTopic,
@@ -280,7 +299,7 @@ export default function TopicListScreen({ route, navigation }: RootStackScreenPr
         }}
       />
 
-      <View className="px-5 pb-3 pt-1">
+      <View className="pb-3 pt-1" style={{ alignSelf: 'center', width: contentWidth }}>
         <SearchField
           placeholder={t.topicSearch}
           value={searchQuery}
@@ -289,19 +308,21 @@ export default function TopicListScreen({ route, navigation }: RootStackScreenPr
       </View>
 
       <Animated.View entering={enteringSection(40)}>
-        <SelectionListItem
-          className="mx-5 mb-2"
-          selected={activeTopic === null}
-          title={t.topicAllMessages}
-          leading={
-            <MessageCircle
-              color={activeTopic === null ? colors.primary : colors.secondaryText}
-              size={18}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
-          }
-          onPress={() => handleSwitchTopic(null)}
-        />
+        <View style={{ alignSelf: 'center', width: contentWidth }}>
+          <SelectionListItem
+            className="mb-2"
+            selected={activeTopic === null}
+            title={t.topicAllMessages}
+            leading={
+              <MessageCircle
+                color={activeTopic === null ? colors.primary : colors.secondaryText}
+                size={18}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            }
+            onPress={() => handleSwitchTopic(null)}
+          />
+        </View>
       </Animated.View>
 
       <FlatList
@@ -310,15 +331,19 @@ export default function TopicListScreen({ route, navigation }: RootStackScreenPr
         renderItem={renderTopicItem}
         ListEmptyComponent={
           loading ? (
-            <ListSkeleton />
+            <View style={{ width: contentWidth }}>
+              <ListSkeleton />
+            </View>
           ) : (
-            <EmptyState description={t.topicEmptyDesc} iconVariant="topic" title={t.topicEmpty} />
+            <View style={{ width: contentWidth }}>
+              <EmptyState description={t.topicEmptyDesc} iconVariant="topic" title={t.topicEmpty} />
+            </View>
           )
         }
         contentContainerStyle={
           sortedTopics.length === 0
-            ? { flexGrow: 1, justifyContent: 'center', paddingBottom: 30 }
-            : { paddingBottom: 30 }
+            ? { alignItems: 'center', flexGrow: 1, justifyContent: 'center', paddingBottom: 30 }
+            : { alignItems: 'center', paddingBottom: 30 }
         }
         refreshControl={
           <RefreshControl

@@ -2,9 +2,10 @@
 
 import { ActionIcon, Flexbox, Text } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
-import { RefreshCw } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { SUGGEST_QUESTIONS_ICONS } from '@/config/entryIcons';
 
 import Item from './Item';
 import { type SuggestMode } from './useRandomQuestions';
@@ -40,7 +41,7 @@ const List = memo<ListProps>(({ mode, count = 3 }) => {
         })}
       </Flexbox>
       <Flexbox horizontal align={'center'} gap={4} style={{ cursor: 'pointer' }} onClick={refresh}>
-        <ActionIcon icon={RefreshCw} size={'small'} />
+        <ActionIcon icon={SUGGEST_QUESTIONS_ICONS.refresh} size={'small'} />
         <Text color={cssVar.colorTextSecondary} fontSize={12}>
           {tCommon('switch')}
         </Text>

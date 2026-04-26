@@ -1,11 +1,13 @@
 import { type SendMessageServerResponse } from '@lobechat/types';
 import { AiSendMessageServerSchema, StructureOutputSchema } from '@lobechat/types';
+import { TRPCError } from '@trpc/server';
 import debug from 'debug';
 import { z } from 'zod';
 
 import { LOADING_FLAT } from '@/const/message';
 import { AgentModel } from '@/database/models/agent';
 import { MessageModel } from '@/database/models/message';
+import { SpaceModel } from '@/database/models/space';
 import { ThreadModel } from '@/database/models/thread';
 import { TopicModel } from '@/database/models/topic';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
@@ -26,11 +28,26 @@ const aiChatProcedure = authedProcedure.use(serverDatabase).use(async (opts) => 
       aiChatService: new AiChatService(ctx.serverDB, ctx.userId),
       fileService: new FileService(ctx.serverDB, ctx.userId),
       messageModel: new MessageModel(ctx.serverDB, ctx.userId),
+      spaceModel: new SpaceModel(ctx.serverDB, ctx.userId),
       threadModel: new ThreadModel(ctx.serverDB, ctx.userId),
       topicModel: new TopicModel(ctx.serverDB, ctx.userId),
     },
   });
 });
+
+const assertAccessibleSpace = async (
+  ctx: {
+    spaceModel: SpaceModel;
+  },
+  spaceId?: string | null,
+) => {
+  if (!spaceId) return;
+
+  const space = await ctx.spaceModel.findAccessibleSpaceById(spaceId);
+  if (!space?.id) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_ACCESS_DENIED' });
+  }
+};
 
 export const aiChatRouter = router({
   /**
@@ -79,6 +96,8 @@ export const aiChatRouter = router({
   sendMessageInServer: aiChatProcedure
     .input(AiSendMessageServerSchema)
     .mutation(async ({ input, ctx }) => {
+      await assertAccessibleSpace(ctx, input.spaceId);
+
       log('sendMessageInServer called for agentId: %s', input.agentId);
       log(
         'topicId: %s, newTopic: %O, newThread: %O',
@@ -106,6 +125,7 @@ export const aiChatRouter = router({
           groupId: input.groupId,
           messages: input.newTopic.topicMessageIds,
           sessionId,
+          spaceId: input.spaceId,
           title: input.newTopic.title,
         });
         topicId = topicItem.id;
@@ -143,9 +163,9 @@ export const aiChatRouter = router({
       // create user message
       log('creating user message with content length: %d', input.newUserMessage.content.length);
 
-      // Build user message metadata with pageSelections if present
-      const userMessageMetadata = input.newUserMessage.pageSelections?.length
-        ? { pageSelections: input.newUserMessage.pageSelections }
+      // Build user message metadata with docSelections if present
+      const userMessageMetadata = input.newUserMessage.docSelections?.length
+        ? { docSelections: input.newUserMessage.docSelections }
         : undefined;
 
       const userMessageItem = await ctx.messageModel.create({

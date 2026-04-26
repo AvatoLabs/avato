@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   formatDate,
+  formatDateTime,
   formatIntergerNumber,
   formatNumber,
   formatPrice,
@@ -255,6 +256,17 @@ describe('format', () => {
       const date = new Date('2023-05-15T12:00:00Z');
       const expectedFormat = dayjs(date).format('YYYY-MM-DD');
       expect(formatDate(date)).toBe(expectedFormat);
+    });
+  });
+
+  describe('formatDateTime', () => {
+    it('should format date time correctly', () => {
+      const date = new Date('2023-05-15T12:34:00Z');
+      expect(formatDateTime(date)).toBe(dayjs(date).format('YYYY-MM-DD HH:mm'));
+    });
+
+    it('should handle undefined input', () => {
+      expect(formatDateTime(undefined)).toBe('--');
     });
   });
 });

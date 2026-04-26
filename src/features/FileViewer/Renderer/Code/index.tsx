@@ -5,18 +5,27 @@ import { createStaticStyles } from 'antd-style';
 import { memo } from 'react';
 
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
+import { useUserStore } from '@/store/user';
+import { userGeneralSettingsSelectors } from '@/store/user/selectors';
 
+import { useDocsAgentContextFallback } from '../../hooks/useDocsAgentContextFallback';
 import { useTextFileLoader } from '../../hooks/useTextFileLoader';
+import { MermaidDiagramPanel } from '../Markdown/components';
+import { resolveCodeBlockLanguage } from '../Markdown/utils';
 
 const styles = createStaticStyles(({ css }) => ({
   page: css`
+    overflow-x: hidden;
+
+    box-sizing: border-box;
     width: 100%;
+    min-width: 0;
     height: 100%;
     padding-inline: 24px 4px;
   `,
 }));
 
-const getLanguage = (fileName?: string): string => {
+export const getLanguage = (fileName?: string): string => {
   if (!fileName) return 'txt';
 
   const ext = fileName.toLowerCase().split('.').pop();
@@ -146,6 +155,10 @@ const getLanguage = (fileName?: string): string => {
     case 'mdx': {
       return 'markdown';
     }
+    case 'mmd':
+    case 'mermaid': {
+      return 'mermaid';
+    }
 
     // SQL
     case 'sql': {
@@ -194,6 +207,8 @@ const getLanguage = (fileName?: string): string => {
 };
 
 interface CodeViewerProps {
+  docsAgentContextKey?: string;
+  enableDocsAgentContext?: boolean;
   fileId: string;
   fileName?: string;
   url: string | null;
@@ -202,23 +217,38 @@ interface CodeViewerProps {
 /**
  * Render any code file.
  */
-const CodeViewer = memo<CodeViewerProps>(({ url, fileName }) => {
-  const { fileData, loading } = useTextFileLoader(url);
-  const language = getLanguage(fileName);
+const CodeViewer = memo<CodeViewerProps>(
+  ({ enableDocsAgentContext, fileId, url, fileName, docsAgentContextKey }) => {
+    const { fileData, loading } = useTextFileLoader(url);
+    const { mermaidTheme } = useUserStore(userGeneralSettingsSelectors.config);
+    const language = resolveCodeBlockLanguage(getLanguage(fileName), fileData || '');
 
-  return (
-    <Flexbox className={styles.page}>
-      {!loading && fileData ? (
-        <Highlighter language={language} showLanguage={false} variant={'borderless'}>
-          {fileData}
-        </Highlighter>
-      ) : (
-        <Center height={'100%'}>
-          <NeuralNetworkLoading size={36} />
-        </Center>
-      )}
-    </Flexbox>
-  );
-});
+    useDocsAgentContextFallback({
+      contextKey: docsAgentContextKey,
+      enabled: enableDocsAgentContext,
+      fileId,
+      fileName,
+      text: fileData,
+    });
+
+    return (
+      <Flexbox className={styles.page}>
+        {!loading && fileData !== null ? (
+          language === 'mermaid' ? (
+            <MermaidDiagramPanel content={fileData} mermaidTheme={mermaidTheme} />
+          ) : (
+            <Highlighter language={language} showLanguage={false} variant={'borderless'}>
+              {fileData}
+            </Highlighter>
+          )
+        ) : (
+          <Center height={'100%'}>
+            <NeuralNetworkLoading size={36} />
+          </Center>
+        )}
+      </Flexbox>
+    );
+  },
+);
 
 export default CodeViewer;

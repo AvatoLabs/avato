@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-import type { PageSelection } from './pageSelection';
-import { PageSelectionSchema } from './pageSelection';
+import type { DocSelection } from './docSelection';
+import { DocSelectionSchema } from './docSelection';
 
 export interface ModelTokensUsage {
   // Prediction tokens
@@ -98,10 +98,10 @@ export const EmojiReactionSchema = z.object({
 
 export const MessageMetadataSchema = ModelUsageSchema.merge(ModelPerformanceSchema).extend({
   collapsed: z.boolean().optional(),
+  docSelections: z.array(DocSelectionSchema).optional(),
   inspectExpanded: z.boolean().optional(),
   isMultimodal: z.boolean().optional(),
   isSupervisor: z.boolean().optional(),
-  pageSelections: z.array(PageSelectionSchema).optional(),
   reactions: z.array(EmojiReactionSchema).optional(),
   scope: z.string().optional(),
   subAgentId: z.string().optional(),
@@ -142,6 +142,11 @@ export interface MessageMetadata extends ModelUsage, ModelPerformance {
    */
   collapsed?: boolean;
   compare?: boolean;
+  /**
+   * Doc selections attached to user message
+   * Used for Ask AI functionality to persist selection context
+   */
+  docSelections?: DocSelection[];
   finishType?: string;
   /**
    * Tool inspect expanded state
@@ -163,11 +168,6 @@ export interface MessageMetadata extends ModelUsage, ModelPerformance {
    * Used by conversation-flow to transform role to 'supervisor' for UI rendering
    */
   isSupervisor?: boolean;
-  /**
-   * Page selections attached to user message
-   * Used for Ask AI functionality to persist selection context
-   */
-  pageSelections?: PageSelection[];
   performance?: ModelPerformance;
   /**
    * Flag indicating if message is pinned (excluded from compression)

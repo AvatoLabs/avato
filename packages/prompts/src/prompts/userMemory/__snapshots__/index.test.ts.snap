@@ -99,6 +99,7 @@ exports[`promptUserMemory > experiences only > should format single experience 1
   <experience id="exp-1">
     <situation>User asked about React hooks implementation</situation>
     <key_learning>User prefers concise explanations with code examples</key_learning>
+    <action>Share a concise example alongside the explanation</action>
   </experience>
 </experiences>
 </user_memory>"
@@ -347,7 +348,10 @@ exports[`promptUserMemory > preferences only > should format single preference 1
 "<user_memory>
 <instruction>The following are memories about this user retrieved from previous conversations. Use this information to personalize your responses and maintain continuity.</instruction>
 <preferences count="1">
-  <preference id="pref-1">Always use TypeScript strict mode</preference>
+  <preference id="pref-1">
+    <conclusion_directives>Always use TypeScript strict mode</conclusion_directives>
+    <suggestions>Consider adding eslint rules for strictness drift</suggestions>
+  </preference>
 </preferences>
 </user_memory>"
 `;

@@ -1,18 +1,28 @@
-import { type IconSize } from '@lobehub/ui';
-import { Icon } from '@lobehub/ui';
-import { Loader2 } from 'lucide-react';
 import { type CSSProperties } from 'react';
 import { memo } from 'react';
 
+import BubblesLoading from '@/components/BubblesLoading';
+
 interface UpdateLoadingProps {
-  size?: IconSize;
+  size?: number | { size?: number } | string;
   style?: CSSProperties;
 }
+
+const resolveSize = (size?: UpdateLoadingProps['size']) => {
+  if (typeof size === 'number') return Math.max(4, Math.round(size / 2.4));
+  if (typeof size === 'object' && typeof size?.size === 'number') {
+    return Math.max(4, Math.round(size.size / 2.4));
+  }
+  if (size === 'small') return 5;
+  if (size === 'large') return 8;
+
+  return 6;
+};
 
 const UpdateLoading = memo<UpdateLoadingProps>(({ size, style }) => {
   return (
     <div style={style}>
-      <Icon spin icon={Loader2} size={size} />
+      <BubblesLoading size={resolveSize(size)} />
     </div>
   );
 });

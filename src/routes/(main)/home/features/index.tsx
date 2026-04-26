@@ -1,325 +1,476 @@
 'use client';
 
-import { GROUP_CHAT_URL, SESSION_CHAT_URL } from '@lobechat/const';
-import { type RecentTopic, type SidebarAgentItem } from '@lobechat/types';
-import { Avatar, Block, Button, Flexbox, Tabs, Tag, Text } from '@lobehub/ui';
-import { createStaticStyles, cssVar } from 'antd-style';
-import { BotMessageSquareIcon, ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
-import { memo, useEffect, useMemo, useState } from 'react';
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  TouchSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { Block, Flexbox, Text } from '@lobehub/ui';
+import { createStaticStyles, cx } from 'antd-style';
+import { GripVertical, LayoutGrid } from 'lucide-react';
+import { memo, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 
-import AgentGroupAvatar from '@/features/AgentGroupAvatar';
-import GroupAvatar from '@/features/GroupAvatar';
-import { useInitRecentPage } from '@/hooks/useInitRecentPage';
-import { useInitRecentResource } from '@/hooks/useInitRecentResource';
-import { useInitRecentTopic } from '@/hooks/useInitRecentTopic';
-import { useIsMobile } from '@/hooks/useIsMobile';
-import { useHomeStore } from '@/store/home';
-import { homeAgentListSelectors, homeRecentSelectors } from '@/store/home/selectors';
-import { useUserStore } from '@/store/user';
-import { authSelectors } from '@/store/user/slices/auth/selectors';
+import {
+  WORKSPACE_HOME_COLUMN_MAX_WIDTH_PX,
+  WORKSPACE_HOME_SECTION_GAP_PX,
+} from '@/const/workspaceVisualTokens';
+import { homeRecentSelectors } from '@/store/home/selectors';
+import { useHomeStore } from '@/store/home/store';
 
-import CommunityAgents from './CommunityAgents';
-import GroupSkeleton from './components/GroupSkeleton';
-import Time from './components/Time';
-import { RECENT_BLOCK_SIZE } from './const';
+import CommunityRecommend from './CommunityRecommend';
+import FeaturedPlugins from './FeaturedPlugins';
 import InputArea from './InputArea';
 import RecentPage from './RecentPage';
 import RecentResource from './RecentResource';
+import SuggestQuestions from './SuggestQuestions';
+
+const HOME_PANEL_ORDER_STORAGE_KEY = 'lobehub.home.panel-order.v1';
+
+type HomePanelId = 'community' | 'examples' | 'recentDocs' | 'recentFiles' | 'skills';
+type HomePanelSpan = 'full' | 'wide';
+
+interface HomePanelDefinition {
+  id: HomePanelId;
+  node: ReactNode;
+  span: HomePanelSpan;
+}
+
+const DEFAULT_PANEL_ORDER: HomePanelId[] = [
+  'recentDocs',
+  'examples',
+  'recentFiles',
+  'skills',
+  'community',
+];
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
-  listItem: css`
-    border: 1px solid ${cssVar.colorBorderSecondary};
-    border-radius: 12px;
-    transition: all ${cssVar.motionDurationMid} ${cssVar.motionEaseInOut};
+  contentGrid: css`
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+    gap: 16px;
+    width: 100%;
+  `,
+  dragHandle: css`
+    cursor: grab;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 24px;
+    height: 24px;
+    border: 1px solid color-mix(in srgb, ${cssVar.colorBorderSecondary} 64%, transparent);
+    border-radius: 999px;
+
+    color: color-mix(in srgb, ${cssVar.colorTextDescription} 86%, ${cssVar.colorText} 14%);
+
+    opacity: 0.68;
+    background: color-mix(in srgb, ${cssVar.colorBgElevated} 90%, ${cssVar.colorBgContainer} 10%);
+    box-shadow: 0 16px 32px -24px color-mix(in srgb, ${cssVar.colorText} 68%, transparent);
+
+    transition:
+      transform ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      border-color ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      color ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      opacity ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      box-shadow ${cssVar.motionDurationMid} ${cssVar.motionEaseOut};
+
+    &:active {
+      cursor: grabbing;
+      transform: scale(0.96);
+    }
 
     &:hover {
-      border-color: ${cssVar.colorPrimaryBorder};
-      background: ${cssVar.colorFillQuaternary};
+      border-color: color-mix(
+        in srgb,
+        ${cssVar.colorPrimaryBorder} 24%,
+        ${cssVar.colorBorderSecondary} 76%
+      );
+      color: ${cssVar.colorText};
+      opacity: 1;
     }
+  `,
+  heroCard: css`
+    isolation: isolate;
+    position: relative;
+
+    overflow: hidden;
+
+    padding: clamp(20px, 2vw, 28px);
+    border: 1px solid
+      color-mix(in srgb, ${cssVar.colorBorderSecondary} 72%, ${cssVar.colorBorder} 28%);
+    border-radius: 30px;
+
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, ${cssVar.colorBgContainer} 98%, ${cssVar.colorFillTertiary} 2%) 0%,
+      color-mix(in srgb, ${cssVar.colorBgElevated} 95%, ${cssVar.colorFillQuaternary} 5%) 100%
+    );
+    box-shadow: 0 28px 56px -42px color-mix(in srgb, ${cssVar.colorText} 22%, transparent);
+
+    &::before {
+      pointer-events: none;
+      content: '';
+
+      position: absolute;
+      inset-block-start: -120px;
+      inset-inline-end: -120px;
+
+      width: 320px;
+      height: 320px;
+      border-radius: 999px;
+
+      opacity: 0.42;
+      background: radial-gradient(
+        circle,
+        color-mix(in srgb, ${cssVar.colorPrimaryBg} 22%, transparent) 0%,
+        transparent 72%
+      );
+    }
+  `,
+  heroDescription: css`
+    max-width: 70ch;
+    font-size: 14px;
+    line-height: 1.62;
+    color: color-mix(in srgb, ${cssVar.colorTextSecondary} 82%, ${cssVar.colorText} 18%);
+  `,
+  heroLead: css`
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: min(100%, 860px);
+  `,
+  heroSection: css`
+    position: relative;
+    z-index: 1;
+
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  `,
+  heroTitle: css`
+    max-width: 12ch;
+
+    font-size: clamp(34px, 4.4vw, 46px);
+    font-weight: 700;
+    line-height: 0.98;
+    color: ${cssVar.colorText};
+    letter-spacing: -0.04em;
+
+    @media (width <= 768px) {
+      max-width: 100%;
+      font-size: 30px;
+    }
+  `,
+  panelDragging: css`
+    z-index: 2;
+    box-shadow: 0 26px 48px -34px color-mix(in srgb, ${cssVar.colorText} 28%, transparent);
+  `,
+  panelFrame: css`
+    position: relative;
+
+    min-width: 0;
+    padding: clamp(14px, 1.4vw, 18px);
+    border: 1px solid color-mix(in srgb, ${cssVar.colorBorderSecondary} 58%, transparent);
+    border-radius: 22px;
+
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, ${cssVar.colorBgContainer} 98%, ${cssVar.colorFillTertiary} 2%) 0%,
+      color-mix(in srgb, ${cssVar.colorBgElevated} 96%, ${cssVar.colorFillQuaternary} 4%) 100%
+    );
+    box-shadow: 0 20px 40px -34px color-mix(in srgb, ${cssVar.colorText} 16%, transparent);
+
+    transition:
+      transform ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      box-shadow ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      border-color ${cssVar.motionDurationMid} ${cssVar.motionEaseOut};
+
+    &:hover {
+      transform: translateY(-1px);
+      border-color: color-mix(
+        in srgb,
+        ${cssVar.colorPrimaryBorder} 18%,
+        ${cssVar.colorBorderSecondary} 82%
+      );
+      box-shadow: 0 24px 44px -34px color-mix(in srgb, ${cssVar.colorText} 20%, transparent);
+    }
+  `,
+  panelFull: css`
+    grid-column: 1 / -1;
+  `,
+  panelOver: css`
+    border-color: color-mix(
+      in srgb,
+      ${cssVar.colorPrimaryBorder} 36%,
+      ${cssVar.colorBorderSecondary} 64%
+    );
+  `,
+  panelToolbar: css`
+    position: absolute;
+    z-index: 2;
+    inset-block-start: -10px;
+    inset-inline-end: 16px;
+  `,
+  panelWide: css`
+    grid-column: auto;
+  `,
+  sectionHeader: css`
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+  `,
+  sectionLabel: css`
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+
+    font-size: 12px;
+    font-weight: 600;
+    color: color-mix(in srgb, ${cssVar.colorTextDescription} 92%, ${cssVar.colorTextSecondary} 8%);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  `,
+  sectionRule: css`
+    flex: 1;
+    min-width: 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, ${cssVar.colorBorderSecondary} 58%, transparent) 0%,
+      transparent 100%
+    );
+  `,
+  workspaceRoot: css`
+    width: 100%;
+    max-width: ${WORKSPACE_HOME_COLUMN_MAX_WIDTH_PX}px;
+    margin-inline: auto;
   `,
 }));
 
-const getRecentTopicUrl = (topic: RecentTopic) =>
-  topic.type === 'group' && topic.group
-    ? `/group/${topic.group.id}?topic=${topic.id}`
-    : `/agent/${topic?.agent?.id}?topic=${topic.id}`;
+const normalizePanelOrder = (panelIds: HomePanelId[], candidate?: unknown): HomePanelId[] => {
+  if (!Array.isArray(candidate)) return panelIds;
 
-const renderTopicAvatar = (topic: RecentTopic) => {
-  if (topic.type === 'group' && topic.group?.members?.length) {
-    return (
-      <GroupAvatar
-        size={30}
-        avatars={topic.group.members.map((member) => ({
-          avatar: member.avatar || '🤖',
-          backgroundColor: member.backgroundColor || undefined,
-        }))}
-      />
-    );
-  }
-
-  return (
-    <Avatar
-      avatar={topic.agent?.avatar || '🤖'}
-      background={topic.agent?.backgroundColor || undefined}
-      shape={'square'}
-      size={30}
-    />
+  const validIds = candidate.filter((id): id is HomePanelId =>
+    panelIds.includes(id as HomePanelId),
   );
+  const missingIds = panelIds.filter((id) => !validIds.includes(id));
+
+  return [...validIds, ...missingIds];
 };
 
-const ResumeWorkPanel = memo<{ isRevalidating: boolean }>(({ isRevalidating }) => {
-  const { t } = useTranslation(['home', 'chat']);
-  const recentTopics = useHomeStore(homeRecentSelectors.recentTopics);
-  const isRecentTopicsInit = useHomeStore(homeRecentSelectors.isRecentTopicsInit);
+interface DraggableHomePanelProps {
+  children: ReactNode;
+  id: HomePanelId;
+  span: HomePanelSpan;
+}
 
-  const list = useMemo(() => recentTopics.slice(0, 6), [recentTopics]);
+const DraggableHomePanel = memo<DraggableHomePanelProps>(({ id, span, children }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDraggableNodeRef,
+    transform,
+    isDragging,
+  } = useDraggable({ id });
+  const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
+
+  const setNodeRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      setDraggableNodeRef(node);
+      setDroppableNodeRef(node);
+    },
+    [setDraggableNodeRef, setDroppableNodeRef],
+  );
 
   return (
-    <Block
-      flex={1}
-      padding={16}
-      variant={'outlined'}
-      style={{
-        borderRadius: 16,
-        minWidth: 0,
-      }}
+    <div
+      ref={setNodeRef}
+      className={cx(
+        styles.panelFrame,
+        span === 'full' ? styles.panelFull : styles.panelWide,
+        isDragging && styles.panelDragging,
+        isOver && styles.panelOver,
+      )}
+      style={
+        transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined
+      }
     >
-      <Flexbox gap={12}>
-        <Flexbox horizontal align={'center'} justify={'space-between'}>
-          <Flexbox horizontal align={'center'} gap={8}>
-            <BotMessageSquareIcon color={cssVar.colorTextSecondary} size={16} />
-            <Text color={cssVar.colorTextSecondary} fontSize={14}>
-              {t('workspace.resume.title')}
-            </Text>
-          </Flexbox>
-          {isRevalidating && <Tag>{t('workspace.status.syncing')}</Tag>}
-        </Flexbox>
-
-        {!isRecentTopicsInit && (
-          <GroupSkeleton
-            height={RECENT_BLOCK_SIZE.TOPIC.HEIGHT}
-            width={RECENT_BLOCK_SIZE.TOPIC.WIDTH}
-          />
-        )}
-
-        {isRecentTopicsInit && list.length === 0 && (
-          <Text fontSize={13} type={'secondary'}>
-            {t('workspace.resume.empty')}
-          </Text>
-        )}
-
-        {isRecentTopicsInit && list.length > 0 && (
-          <Flexbox gap={8}>
-            {list.map((topic) => {
-              const agentOrGroup = topic.type === 'group' ? topic.group?.title : topic.agent?.title;
-              const topicTitle = topic.title || t('workspace.resume.untitled');
-
-              return (
-                <Link
-                  key={topic.id}
-                  style={{ color: 'inherit', textDecoration: 'none' }}
-                  to={getRecentTopicUrl(topic)}
-                >
-                  <Block clickable className={styles.listItem} padding={'10px 12px'}>
-                    <Flexbox horizontal align={'center'} gap={8} justify={'space-between'}>
-                      <Flexbox horizontal align={'center'} gap={10} style={{ minWidth: 0 }}>
-                        {renderTopicAvatar(topic)}
-                        <Flexbox gap={4} style={{ minWidth: 0 }}>
-                          <Text ellipsis={{ rows: 1 }} style={{ lineHeight: 1.3 }} weight={500}>
-                            {topicTitle}
-                          </Text>
-                          <Flexbox horizontal align={'center'} gap={8} style={{ minWidth: 0 }}>
-                            <Text ellipsis fontSize={12} type={'secondary'}>
-                              {agentOrGroup || t('inbox.title', { ns: 'chat' })}
-                            </Text>
-                            <Time date={topic.updatedAt} />
-                          </Flexbox>
-                        </Flexbox>
-                      </Flexbox>
-                      <ChevronRightIcon color={cssVar.colorTextQuaternary} size={16} />
-                    </Flexbox>
-                  </Block>
-                </Link>
-              );
-            })}
-          </Flexbox>
-        )}
-      </Flexbox>
-    </Block>
-  );
-});
-
-const MyAssistantsPanel = memo(() => {
-  const { t } = useTranslation(['home', 'chat']);
-  const isLogin = useUserStore(authSelectors.isLogin);
-  const useFetchAgentList = useHomeStore((s) => s.useFetchAgentList);
-  const { isLoading } = useFetchAgentList(isLogin);
-  const agents = useHomeStore(homeAgentListSelectors.allAgents);
-
-  const list = useMemo(() => agents.slice(0, 10), [agents]);
-
-  if (isLoading) {
-    return (
-      <GroupSkeleton
-        height={RECENT_BLOCK_SIZE.AGENT.HEIGHT}
-        width={RECENT_BLOCK_SIZE.AGENT.WIDTH}
-      />
-    );
-  }
-
-  if (list.length === 0) {
-    return (
-      <Text fontSize={13} type={'secondary'}>
-        {t('workspace.assistants.empty')}
-      </Text>
-    );
-  }
-
-  const getAgentUrl = (item: SidebarAgentItem) =>
-    item.type === 'group' ? GROUP_CHAT_URL(item.id) : SESSION_CHAT_URL(item.id, false);
-
-  return (
-    <Flexbox gap={8}>
-      {list.map((item) => (
-        <Link
-          key={item.id}
-          style={{ color: 'inherit', textDecoration: 'none' }}
-          to={getAgentUrl(item)}
+      <div className={styles.panelToolbar}>
+        <button
+          aria-label="Drag to reorder"
+          className={styles.dragHandle}
+          type="button"
+          {...attributes}
+          {...listeners}
         >
-          <Block clickable className={styles.listItem} padding={'10px 12px'}>
-            <Flexbox horizontal align={'center'} gap={8} justify={'space-between'}>
-              <Flexbox horizontal align={'center'} gap={10} style={{ minWidth: 0 }}>
-                {item.type === 'group' ? (
-                  <AgentGroupAvatar
-                    avatar={typeof item.avatar === 'string' ? item.avatar : undefined}
-                    backgroundColor={item.backgroundColor || undefined}
-                    memberAvatars={Array.isArray(item.avatar) ? item.avatar : []}
-                    size={30}
-                  />
-                ) : (
-                  <Avatar
-                    avatar={typeof item.avatar === 'string' ? item.avatar : '🤖'}
-                    background={item.backgroundColor || undefined}
-                    shape={'square'}
-                    size={30}
-                  />
-                )}
-                <Flexbox gap={4} style={{ minWidth: 0 }}>
-                  <Text ellipsis={{ rows: 1 }} style={{ lineHeight: 1.3 }} weight={500}>
-                    {item.title ||
-                      t(item.type === 'group' ? 'untitledGroup' : 'untitledAgent', { ns: 'chat' })}
-                  </Text>
-                  <Time date={item.updatedAt} />
-                </Flexbox>
-              </Flexbox>
-              <ChevronRightIcon color={cssVar.colorTextQuaternary} size={16} />
-            </Flexbox>
-          </Block>
-        </Link>
-      ))}
-    </Flexbox>
+          <GripVertical size={14} strokeWidth={2} />
+        </button>
+      </div>
+      {children}
+    </div>
   );
 });
+
+DraggableHomePanel.displayName = 'DraggableHomePanel';
 
 const Home = memo(() => {
-  const { t } = useTranslation(['home', 'file']);
-  const isLogin = useUserStore(authSelectors.isLogin);
-  const isMobile = useIsMobile();
-  const inputActiveMode = useHomeStore((s) => s.inputActiveMode);
+  const { t } = useTranslation(['home']);
+  const [recentPages, recentResources, isRecentPagesInit, isRecentResourcesInit] = useHomeStore(
+    (s) => [
+      homeRecentSelectors.recentPages(s),
+      homeRecentSelectors.recentResources(s),
+      homeRecentSelectors.isRecentPagesInit(s),
+      homeRecentSelectors.isRecentResourcesInit(s),
+    ],
+  );
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 120, tolerance: 6 },
+    }),
+  );
 
-  useInitRecentPage();
-  useInitRecentResource();
-  const { isRevalidating: isTopicRevalidating } = useInitRecentTopic();
+  const contentMode = 'agent';
+  const showRecentDocs = !isRecentPagesInit || (recentPages?.length ?? 0) > 0;
+  const showRecentFiles = !isRecentResourcesInit || (recentResources?.length ?? 0) > 0;
 
-  const [activeTab, setActiveTab] = useState<'assistants' | 'community' | 'documents'>('documents');
-  const [secondaryExpanded, setSecondaryExpanded] = useState(false);
+  const panels = useMemo<HomePanelDefinition[]>(
+    () =>
+      [
+        showRecentDocs
+          ? {
+              id: 'recentDocs',
+              node: <RecentPage />,
+              span: 'wide',
+            }
+          : null,
+        showRecentFiles
+          ? {
+              id: 'recentFiles',
+              node: <RecentResource />,
+              span: 'wide',
+            }
+          : null,
+        {
+          id: 'examples',
+          node: <SuggestQuestions mode={contentMode} />,
+          span: 'wide',
+        },
+        {
+          id: 'skills',
+          node: <FeaturedPlugins />,
+          span: 'wide',
+        },
+        {
+          id: 'community',
+          node: <CommunityRecommend mode={contentMode} />,
+          span: 'full',
+        },
+      ].filter(Boolean) as HomePanelDefinition[],
+    [contentMode, showRecentDocs, showRecentFiles],
+  );
 
-  // De-emphasize heavy modules when a starter mode is active (user can still expand)
-  const hideOtherModules = inputActiveMode && ['agent', 'group', 'write'].includes(inputActiveMode);
+  const availablePanelIds = useMemo(() => panels.map((panel) => panel.id), [panels]);
+  const panelMap = useMemo(
+    () => new Map<HomePanelId, HomePanelDefinition>(panels.map((panel) => [panel.id, panel])),
+    [panels],
+  );
+  const [panelOrder, setPanelOrder] = useState<HomePanelId[]>(() =>
+    normalizePanelOrder(DEFAULT_PANEL_ORDER),
+  );
 
   useEffect(() => {
-    if (!hideOtherModules) setSecondaryExpanded(false);
-  }, [hideOtherModules]);
+    if (typeof window === 'undefined') return;
 
-  const showSecondarySections = !hideOtherModules || secondaryExpanded;
+    let parsed: unknown;
+    const saved = window.localStorage.getItem(HOME_PANEL_ORDER_STORAGE_KEY);
+
+    if (saved) {
+      try {
+        parsed = JSON.parse(saved);
+      } catch {
+        parsed = undefined;
+      }
+    }
+
+    setPanelOrder(normalizePanelOrder(availablePanelIds, parsed));
+  }, [availablePanelIds]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || panelOrder.length === 0) return;
+
+    window.localStorage.setItem(HOME_PANEL_ORDER_STORAGE_KEY, JSON.stringify(panelOrder));
+  }, [panelOrder]);
+
+  const orderedPanels = useMemo(
+    () => panelOrder.map((id) => panelMap.get(id)).filter(Boolean) as HomePanelDefinition[],
+    [panelMap, panelOrder],
+  );
+
+  const onDragEnd = useCallback(({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+
+    setPanelOrder((current) => {
+      const next = [...current];
+      const from = next.indexOf(active.id as HomePanelId);
+      const to = next.indexOf(over.id as HomePanelId);
+
+      if (from === -1 || to === -1) return current;
+
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+
+      return next;
+    });
+  }, []);
 
   return (
-    <Flexbox gap={24}>
-      <Flexbox gap={6} style={{ marginTop: 8 }}>
-        <Text style={{ fontSize: isMobile ? 28 : 34, lineHeight: 1.2 }} weight={700}>
-          {t('workspace.hero.title')}
-        </Text>
-        <Text color={cssVar.colorTextSecondary} style={{ fontSize: isMobile ? 15 : 16 }}>
-          {t('workspace.hero.subtitle')}
-        </Text>
-      </Flexbox>
+    <Flexbox className={styles.workspaceRoot} gap={WORKSPACE_HOME_SECTION_GAP_PX} width={'100%'}>
+      <Block className={styles.heroCard}>
+        <div className={styles.heroSection}>
+          <div className={styles.heroLead}>
+            <Text as={'div'} className={styles.heroTitle}>
+              {t('workspace.hero.title')}
+            </Text>
+            <Text as={'div'} className={styles.heroDescription}>
+              {t('workspace.hero.subtitle')}
+            </Text>
+          </div>
+          <InputArea />
+        </div>
+      </Block>
 
-      <InputArea />
+      <div className={styles.sectionHeader}>
+        <div className={styles.sectionLabel}>
+          <LayoutGrid size={13} strokeWidth={2} />
+          <Text as={'span'}>
+            {t('workspace.arrange.title', { defaultValue: 'Arrange sections' })}
+          </Text>
+        </div>
+        <div className={styles.sectionRule} />
+      </div>
 
-      {hideOtherModules && !secondaryExpanded && (
-        <Button
-          block
-          icon={<ChevronDownIcon size={16} />}
-          style={{ borderColor: cssVar.colorBorderSecondary }}
-          type={'default'}
-          onClick={() => setSecondaryExpanded(true)}
-        >
-          {t('workspace.secondary.expand')}
-        </Button>
-      )}
-
-      {showSecondarySections && (
-        <Flexbox gap={16} width={'100%'}>
-          {hideOtherModules && secondaryExpanded && (
-            <Flexbox horizontal align={'center'} justify={'flex-end'} width={'100%'}>
-              <Button type={'text'} onClick={() => setSecondaryExpanded(false)}>
-                {t('workspace.secondary.collapse')}
-              </Button>
-            </Flexbox>
-          )}
-
-          <Flexbox gap={16} horizontal={!isMobile} width={'100%'}>
-            {isLogin && <ResumeWorkPanel isRevalidating={isTopicRevalidating} />}
-          </Flexbox>
-
-          <Block
-            padding={16}
-            variant={'outlined'}
-            style={{
-              borderRadius: 16,
-            }}
-          >
-            <Tabs
-              activeKey={activeTab}
-              items={[
-                {
-                  children: (
-                    <Flexbox gap={24}>
-                      {isLogin && <RecentPage />}
-                      {isLogin && <RecentResource />}
-                    </Flexbox>
-                  ),
-                  key: 'documents',
-                  label: t('workspace.tabs.documents'),
-                },
-                {
-                  children: <MyAssistantsPanel />,
-                  key: 'assistants',
-                  label: t('workspace.tabs.assistants'),
-                },
-                {
-                  children: <CommunityAgents />,
-                  key: 'community',
-                  label: t('workspace.tabs.community'),
-                },
-              ]}
-              onChange={(value) => setActiveTab(value as 'assistants' | 'community' | 'documents')}
-            />
-          </Block>
-        </Flexbox>
-      )}
+      <DndContext collisionDetection={closestCenter} sensors={sensors} onDragEnd={onDragEnd}>
+        <div className={styles.contentGrid}>
+          {orderedPanels.map((panel) => (
+            <DraggableHomePanel id={panel.id} key={panel.id} span={panel.span}>
+              {panel.node}
+            </DraggableHomePanel>
+          ))}
+        </div>
+      </DndContext>
     </Flexbox>
   );
 });

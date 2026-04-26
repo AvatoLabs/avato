@@ -36,7 +36,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   count: css`
     font-family: ${cssVar.fontFamilyCode};
     font-size: 12px;
-    color: ${cssVar.colorTextSecondary};
+    color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
   `,
   expanded: css`
     max-height: 300px;
@@ -98,7 +98,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     color: ${cssVar.colorText};
   `,
   textTodo: css`
-    color: ${cssVar.colorTextSecondary};
+    color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
   `,
 }));
 

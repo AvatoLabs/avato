@@ -1,7 +1,10 @@
 // Context Provider exports
 export { AgentBuilderContextInjector } from './AgentBuilderContextInjector';
 export { AgentManagementContextInjector } from './AgentManagementContextInjector';
+export { ConversationFilesInjector } from './ConversationFilesInjector';
 export { DiscordContextProvider } from './DiscordContextProvider';
+export { DocEditorContextInjector } from './DocEditorContextInjector';
+export { DocSelectionsInjector } from './DocSelectionsInjector';
 export { EvalContextSystemInjector } from './EvalContextSystemInjector';
 export { ForceFinishSummaryInjector } from './ForceFinishSummaryInjector';
 export { GroupAgentBuilderContextInjector } from './GroupAgentBuilderContextInjector';
@@ -10,8 +13,6 @@ export { GTDPlanInjector } from './GTDPlanInjector';
 export { GTDTodoInjector } from './GTDTodoInjector';
 export { HistorySummaryProvider } from './HistorySummary';
 export { KnowledgeInjector } from './KnowledgeInjector';
-export { PageEditorContextInjector } from './PageEditorContextInjector';
-export { PageSelectionsInjector } from './PageSelectionsInjector';
 export { SkillContextProvider } from './SkillContextProvider';
 export { SystemDateProvider } from './SystemDateProvider';
 export { SystemRoleInjector } from './SystemRoleInjector';
@@ -32,7 +33,10 @@ export type {
   AvailablePluginInfo,
   AvailableProviderInfo,
 } from './AgentManagementContextInjector';
+export type { ConversationFilesInjectorConfig } from './ConversationFilesInjector';
 export type { DiscordContext, DiscordContextProviderConfig } from './DiscordContextProvider';
+export type { DocEditorContextInjectorConfig } from './DocEditorContextInjector';
+export type { DocSelectionsInjectorConfig } from './DocSelectionsInjector';
 export type { EvalContext, EvalContextSystemInjectorConfig } from './EvalContextSystemInjector';
 export type { ForceFinishSummaryInjectorConfig } from './ForceFinishSummaryInjector';
 export type {
@@ -49,8 +53,6 @@ export type { GTDPlan, GTDPlanInjectorConfig } from './GTDPlanInjector';
 export type { GTDTodoInjectorConfig, GTDTodoItem, GTDTodoList } from './GTDTodoInjector';
 export type { HistorySummaryConfig } from './HistorySummary';
 export type { KnowledgeInjectorConfig } from './KnowledgeInjector';
-export type { PageEditorContextInjectorConfig } from './PageEditorContextInjector';
-export type { PageSelectionsInjectorConfig } from './PageSelectionsInjector';
 export type { SkillContextProviderConfig, SkillMeta } from './SkillContextProvider';
 export type { SystemDateProviderConfig } from './SystemDateProvider';
 export type { SystemRoleInjectorConfig } from './SystemRoleInjector';

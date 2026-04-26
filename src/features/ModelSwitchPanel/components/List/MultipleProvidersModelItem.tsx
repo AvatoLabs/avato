@@ -52,7 +52,7 @@ export const MultipleProvidersModelItem = memo<MultipleProvidersModelItemProps>(
         >
           <ModelItemRender
             {...data.model}
-            {...data.model.abilities}
+            abilities={data.model.abilities}
             newBadgeLabel={newLabel}
             showInfoTag={true}
           />

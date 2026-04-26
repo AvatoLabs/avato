@@ -1,7 +1,7 @@
 import { Then } from '@cucumber/cucumber';
 import { expect } from '@playwright/test';
 
-import { CustomWorld } from '../../support/world';
+import type { CustomWorld } from '../../support/world';
 
 // ============================================
 // Then Steps (Assertions)
@@ -10,9 +10,9 @@ import { CustomWorld } from '../../support/world';
 // Home Page Steps
 Then('I should see the featured assistants section', async function (this: CustomWorld) {
   // Look for "Featured Agents" heading text (i18n key: home.featuredAssistants)
-  // Supports: en-US "Featured Agents", zh-CN "推荐助理"
+  // Supports: en-US "Featured Agents", zh-CN "推荐智能体"
   const featuredSection = this.page
-    .getByRole('heading', { name: /featured agents|推荐助理/i })
+    .getByRole('heading', { name: /featured agents|推荐智能体/i })
     .first();
   await expect(featuredSection).toBeVisible({ timeout: 30_000 });
 });

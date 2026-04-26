@@ -6,6 +6,8 @@ import { Info } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { OFFICIAL_URL } from '@/const/url';
+
 import type { ChannelProvider } from './const';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
@@ -110,7 +112,7 @@ const PlatformList = memo<PlatformListProps>(
         </div>
         <div style={{ borderTop: `1px solid ${theme.colorBorder}`, padding: 12 }}>
           <a
-            href="https://lobehub.com/docs/usage/channels/overview"
+            href={`${OFFICIAL_URL}/docs/usage/channels/overview`}
             rel="noopener noreferrer"
             target="_blank"
             style={{

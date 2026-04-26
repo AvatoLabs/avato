@@ -35,11 +35,12 @@ const CreateNewProvider = memo<CreateNewProviderProps>(({ onClose, open, initial
 
     try {
       await updateAiProvider(id, values);
-      setLoading(false);
       message.success(t('updateAiProvider.updateSuccess'));
       onClose?.();
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error('Failed to update AI provider:', error);
+      message.error(t('updateAiProvider.updateError'));
+    } finally {
       setLoading(false);
     }
   };
@@ -125,11 +126,16 @@ const CreateNewProvider = memo<CreateNewProviderProps>(({ onClose, open, initial
                 },
                 okText: t('delete', { ns: 'common' }),
                 onOk: async () => {
-                  await deleteAiProvider(id);
-                  navigate('/settings/provider/all');
+                  try {
+                    await deleteAiProvider(id);
+                    navigate('/settings/provider/all');
 
-                  onClose?.();
-                  message.success(t('updateAiProvider.deleteSuccess'));
+                    onClose?.();
+                    message.success(t('updateAiProvider.deleteSuccess'));
+                  } catch (error) {
+                    console.error('Failed to delete AI provider:', error);
+                    message.error(t('updateAiProvider.deleteError'));
+                  }
                 },
                 title: t('updateAiProvider.confirmDelete'),
               });

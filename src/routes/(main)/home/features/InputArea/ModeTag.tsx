@@ -1,11 +1,11 @@
 import { ActionIcon, Block, Text } from '@lobehub/ui';
 import { createStaticStyles, cssVar } from 'antd-style';
-import { FilePenIcon, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ACTION_ENTRY_ICONS, APP_ENTRY_ICONS } from '@/config/entryIcons';
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   container: css`
@@ -23,7 +23,7 @@ const modeConfig = {
   agent: { icon: ACTION_ENTRY_ICONS.createAgent, titleKey: 'starter.createAgent' },
   group: { icon: ACTION_ENTRY_ICONS.createGroup, titleKey: 'starter.createGroup' },
   image: { icon: APP_ENTRY_ICONS.image, titleKey: 'starter.image' },
-  research: { icon: FilePenIcon, titleKey: 'starter.deepResearch' },
+  research: { icon: APP_ENTRY_ICONS.search, titleKey: 'starter.deepResearch' },
   video: { icon: APP_ENTRY_ICONS.video, titleKey: 'starter.seedance' },
   write: { icon: ACTION_ENTRY_ICONS.write, titleKey: 'starter.write' },
 } as const;

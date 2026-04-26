@@ -28,7 +28,6 @@ type OnStatusUpdate = (
 interface UploadWithProgressParams {
   abortController?: AbortController;
   file: File;
-  knowledgeBaseId?: string;
   onStatusUpdate?: OnStatusUpdate;
   parentId?: string;
   /**
@@ -41,7 +40,9 @@ interface UploadWithProgressParams {
    * Optional source identifier for the file (e.g., 'page-editor', 'image_generation')
    */
   source?: string;
+  sourceSetId?: string;
   spaceId?: string;
+  uploadId?: string;
 }
 
 interface UploadWithProgressResult {
@@ -71,15 +72,15 @@ export class FileUploadActionImpl {
     // Extract image dimensions from base64 data
     const dimensions = await getImageDimensions(base64);
 
-    const { metadata, fileType, size, hash } = await uploadService.uploadBase64ToS3(base64);
+    const { metadata, fileType, size, sha256 } = await uploadService.uploadBase64ToS3(base64);
 
     const res = await fileService.createFile({
       fileType,
-      hash,
+      sha256,
       metadata,
       name: metadata.filename,
       size,
-      url: metadata.path,
+      storageKey: metadata.path,
     });
     return { ...res, dimensions, filename: metadata.filename };
   };
@@ -87,30 +88,33 @@ export class FileUploadActionImpl {
   uploadWithProgress = async ({
     file,
     onStatusUpdate,
-    knowledgeBaseId,
+    sourceSetId,
     skipCheckFileType,
     parentId,
     spaceId,
     source,
     abortController,
+    uploadId,
   }: UploadWithProgressParams): Promise<UploadWithProgressResult | undefined> => {
+    const statusUpdateId = uploadId ?? file.name;
+
     try {
       const fileArrayBuffer = await file.arrayBuffer();
 
       // 1. extract image dimensions if applicable
       const dimensions = await getImageDimensions(file);
 
-      // 2. check file hash
-      const hash = sha256(fileArrayBuffer);
+      // 2. check whether the same space-scoped blob already exists
+      const sha256Hex = sha256(fileArrayBuffer);
 
-      const checkStatus = await fileService.checkFileHash(hash, spaceId);
+      const checkStatus = await fileService.checkSpaceBlob(sha256Hex, spaceId);
       let metadata: FileMetadata;
 
       // 3. if file exist, just skip upload
       if (checkStatus.isExist) {
         metadata = checkStatus.metadata as FileMetadata;
         onStatusUpdate?.({
-          id: file.name,
+          id: statusUpdateId,
           type: 'updateFile',
           value: { status: 'processing', uploadState: { progress: 100, restTime: 0, speed: 0 } },
         });
@@ -119,9 +123,9 @@ export class FileUploadActionImpl {
       else {
         const { data, success } = await uploadService.uploadFileToS3(file, {
           abortController,
-          knowledgeBaseId,
+          sourceSetId,
           onNotSupported: () => {
-            onStatusUpdate?.({ id: file.name, type: 'removeFile' });
+            onStatusUpdate?.({ id: statusUpdateId, type: 'removeFile' });
             message.info({
               content: t('upload.fileOnlySupportInServerMode', {
                 cloud: LOBE_CHAT_CLOUD,
@@ -133,13 +137,13 @@ export class FileUploadActionImpl {
           },
           onProgress: (status, upload) => {
             onStatusUpdate?.({
-              id: file.name,
+              id: statusUpdateId,
               type: 'updateFile',
               value: { status: status === 'success' ? 'processing' : status, uploadState: upload },
             });
           },
           parentId,
-          sha256: hash,
+          sha256: sha256Hex,
           skipCheckFileType,
           spaceId,
         });
@@ -159,27 +163,32 @@ export class FileUploadActionImpl {
       }
 
       // 5. create file to db
+      const storageKey = metadata.path ?? checkStatus.storageKey;
+      if (!storageKey) {
+        throw new Error('Missing storage key for uploaded file');
+      }
+
       const data = await fileService.createFile(
         {
           fileType,
-          hash,
+          sha256: sha256Hex,
           metadata,
           name: file.name,
           parentId,
           spaceId,
           size: file.size,
           source,
-          url: metadata.path || checkStatus.url,
+          storageKey,
         },
-        knowledgeBaseId,
+        sourceSetId,
       );
 
       onStatusUpdate?.({
-        id: file.name,
+        id: statusUpdateId,
         type: 'updateFile',
         value: {
+          fileId: data.id,
           fileUrl: data.url,
-          id: data.id,
           status: 'success',
           uploadState: { progress: 100, restTime: 0, speed: 0 },
         },
@@ -189,13 +198,20 @@ export class FileUploadActionImpl {
     } catch (error) {
       // Handle file storage plan limit error
       if ((error as any)?.message?.includes('beyond the plan limit')) {
-        onStatusUpdate?.({ id: file.name, type: 'removeFile' });
+        onStatusUpdate?.({ id: statusUpdateId, type: 'removeFile' });
         uploadErrorNotification.error(error, {
           description: t('upload.storageLimitExceeded', { ns: 'error' }),
           message: t('upload.title', { ns: 'error' }),
         });
         return;
       }
+
+      onStatusUpdate?.({
+        id: statusUpdateId,
+        type: 'updateFile',
+        value: { status: abortController?.signal.aborted ? 'cancelled' : 'error' },
+      });
+
       throw error;
     }
   };

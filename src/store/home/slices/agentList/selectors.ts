@@ -1,10 +1,24 @@
 import { type SidebarAgentItem, type SidebarGroup } from '@/database/repositories/home';
 import { type HomeStore } from '@/store/home/store';
 
+const isGroupChatSession = (item: SidebarAgentItem): boolean => item.type === 'group';
+
 /**
  * Get all pinned agents
  */
 const pinnedAgents = (s: HomeStore): SidebarAgentItem[] => s.pinnedAgents;
+
+/**
+ * Pinned single-agent sessions only (群组会话 are listed under 群组 section).
+ */
+const pinnedAgentsOnly = (s: HomeStore): SidebarAgentItem[] =>
+  s.pinnedAgents.filter((i) => !isGroupChatSession(i));
+
+/**
+ * Pinned 群组会话 — shown in 群组 sidebar block.
+ */
+const pinnedGroupSessions = (s: HomeStore): SidebarAgentItem[] =>
+  s.pinnedAgents.filter(isGroupChatSession);
 
 /**
  * Get all agent groups (folders)
@@ -17,6 +31,18 @@ const agentGroups = (s: HomeStore): SidebarGroup[] => s.agentGroups;
 const ungroupedAgents = (s: HomeStore): SidebarAgentItem[] => s.ungroupedAgents;
 
 /**
+ * Ungrouped single-agent sessions only (excludes 群组会话).
+ */
+const ungroupedAgentsOnly = (s: HomeStore): SidebarAgentItem[] =>
+  s.ungroupedAgents.filter((i) => !isGroupChatSession(i));
+
+/**
+ * Ungrouped 群组会话 — shown in 群组 sidebar block.
+ */
+const ungroupedGroupSessions = (s: HomeStore): SidebarAgentItem[] =>
+  s.ungroupedAgents.filter(isGroupChatSession);
+
+/**
  * Limit ungrouped agents for sidebar display based on page size
  */
 const ungroupedAgentsLimited =
@@ -25,9 +51,20 @@ const ungroupedAgentsLimited =
     s.ungroupedAgents.slice(0, pageSize);
 
 /**
+ * Limit ungrouped **agent** sessions (excludes group chats) for 智能体 section.
+ */
+const ungroupedAgentsOnlyLimited =
+  (pageSize: number) =>
+  (s: HomeStore): SidebarAgentItem[] =>
+    ungroupedAgentsOnly(s).slice(0, pageSize);
+
+/**
  * Get ungrouped agents count
  */
 const ungroupedAgentsCount = (s: HomeStore): number => s.ungroupedAgents.length;
+
+/** Count of ungrouped single-agent sessions (for 「更多」 pagination in 智能体 section). */
+const ungroupedAgentsOnlyCount = (s: HomeStore): number => ungroupedAgentsOnly(s).length;
 
 /**
  * Check if agent list is initialized
@@ -73,7 +110,13 @@ export const homeAgentListSelectors = {
   hasCustomAgents,
   isAgentListInit,
   pinnedAgents,
+  pinnedAgentsOnly,
+  pinnedGroupSessions,
   ungroupedAgents,
+  ungroupedAgentsOnly,
+  ungroupedAgentsOnlyCount,
+  ungroupedAgentsOnlyLimited,
   ungroupedAgentsCount,
   ungroupedAgentsLimited,
+  ungroupedGroupSessions,
 };

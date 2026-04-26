@@ -35,7 +35,7 @@
   "messages.handoffTimeout": "授权等待超时。请回到浏览器完成操作后再重试",
   "messages.loading": "正在启动授权流程…",
   "messages.success.cloudMcpInstall": "授权成功！现在可以安装 Cloud MCP 了。",
-  "messages.success.submit": "授权成功！现在可以发布助理了。",
+  "messages.success.submit": "授权成功！现在可以发布智能体了。",
   "messages.success.upload": "授权成功！现在可以发布新版本了。",
   "profileSetup.cancel": "取消",
   "profileSetup.confirmChangeUserId.cancel": "取消",

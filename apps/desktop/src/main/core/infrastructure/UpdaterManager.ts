@@ -401,9 +401,9 @@ export class UpdaterManager {
       );
 
       autoUpdater.setFeedURL({
-        owner: 'lobehub',
+        owner: 'AvatoLabs',
         provider: 'github',
-        repo: 'lobehub',
+        repo: 'avatohub',
       });
 
       autoUpdater.allowPrerelease = this.currentChannel !== 'stable';

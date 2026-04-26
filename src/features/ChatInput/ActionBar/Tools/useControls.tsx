@@ -14,10 +14,9 @@ import { useTranslation } from 'react-i18next';
 import PluginAvatar from '@/components/Plugins/PluginAvatar';
 import { useCheckPluginsIsInstalled } from '@/hooks/useCheckPluginsIsInstalled';
 import { useFetchInstalledPlugins } from '@/hooks/useFetchInstalledPlugins';
-import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
-import { useToolStore } from '@/store/tool';
 import {
   agentSkillsSelectors,
   builtinToolSelectors,
@@ -25,6 +24,7 @@ import {
   lobehubSkillStoreSelectors,
   pluginSelectors,
 } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import { useAgentId } from '../../hooks/useAgentId';
 import KlavisServerItem from './KlavisServerItem';

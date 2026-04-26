@@ -3,13 +3,8 @@ import { EvalEvaluationStatus } from '@lobechat/types';
 import type { SQL } from 'drizzle-orm';
 import { and, count, desc, eq, inArray } from 'drizzle-orm';
 
-import type {
-  NewEvalEvaluationItem} from '../../schemas';
-import {
-  evalDatasets,
-  evalEvaluation,
-  evaluationRecords
-} from '../../schemas';
+import type { NewEvalEvaluationItem } from '../../schemas';
+import { evalDatasets, evalEvaluation, evaluationRecords } from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
 
 export class EvalEvaluationModel {
@@ -35,7 +30,7 @@ export class EvalEvaluationModel {
       .where(and(eq(evalEvaluation.id, id), eq(evalEvaluation.userId, this.userId)));
   };
 
-  queryByKnowledgeBaseId = async (knowledgeBaseId: string) => {
+  queryBySourceSetId = async (sourceSetId: string) => {
     const evaluations = await this.db
       .select({
         createdAt: evalEvaluation.createdAt,
@@ -53,10 +48,7 @@ export class EvalEvaluationModel {
       .leftJoin(evalDatasets, eq(evalDatasets.id, evalEvaluation.datasetId))
       .orderBy(desc(evalEvaluation.createdAt))
       .where(
-        and(
-          eq(evalEvaluation.userId, this.userId),
-          eq(evalEvaluation.knowledgeBaseId, knowledgeBaseId),
-        ),
+        and(eq(evalEvaluation.userId, this.userId), eq(evalEvaluation.sourceSetId, sourceSetId)),
       );
 
     // Then query record statistics for each evaluation

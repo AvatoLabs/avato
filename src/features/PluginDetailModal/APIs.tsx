@@ -5,8 +5,8 @@ import { Wrench } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
 import { pluginSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 const APIs = memo<{
   id: string;

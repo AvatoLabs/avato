@@ -13,8 +13,8 @@ import { nanoid } from 'nanoid';
 import sharp from 'sharp';
 
 import { FileService } from '@/server/services/file';
+import { resolveRuntimeFileInput } from '@/server/services/file/resolveRuntimeFileInput';
 import { calculateThumbnailDimensions } from '@/utils/number';
-import { getYYYYmmddHHMMss } from '@/utils/time';
 
 const log = debug('lobe-video:generation-service');
 const execFileAsync = promisify(execFile);
@@ -36,20 +36,50 @@ interface VideoMetadata {
 export interface VideoProcessResult {
   coverKey: string;
   duration: number;
-  fileHash: string;
   fileSize: number;
   height: number;
   mimeType: string;
+  sha256: string;
   thumbnailKey: string;
   videoKey: string;
   width: number;
 }
 
 export class VideoGenerationService {
+  private db: LobeChatDatabase;
+
   private fileService: FileService;
 
+  private userId: string;
+
   constructor(db: LobeChatDatabase, userId: string) {
+    this.db = db;
     this.fileService = new FileService(db, userId);
+    this.userId = userId;
+  }
+
+  private createGenerationBlobPath(extension: string) {
+    return this.fileService.createOpaqueUserBlobPath('generations/videos', extension);
+  }
+
+  private async resolveFetchableVideoUrl(url: string) {
+    const resolvedInput = await resolveRuntimeFileInput({
+      db: this.db,
+      fileService: this.fileService,
+      url,
+      userId: this.userId,
+      via: 'video_generation_input',
+    });
+
+    if (resolvedInput) {
+      return resolvedInput.url;
+    }
+
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+
+    return this.fileService.getFullFileUrl(url);
   }
 
   /**
@@ -58,11 +88,13 @@ export class VideoGenerationService {
   async processVideoForGeneration(videoUrl: string): Promise<VideoProcessResult> {
     log('Processing video from URL: %s', videoUrl);
 
+    const fetchableUrl = await this.resolveFetchableVideoUrl(videoUrl);
+
     let tempVideoPath: string | null = null;
     let tempCoverPath: string | null = null;
 
     try {
-      tempVideoPath = await this.downloadVideo(videoUrl);
+      tempVideoPath = await this.downloadVideo(fetchableUrl);
 
       const [metadata, videoBuffer] = await Promise.all([
         this.getVideoMetadata(tempVideoPath),
@@ -71,21 +103,17 @@ export class VideoGenerationService {
 
       log('Video metadata: %O', metadata);
 
-      const fileHash = createHash('sha256').update(videoBuffer).digest('hex');
+      const sha256 = createHash('sha256').update(videoBuffer).digest('hex');
       const fileSize = videoBuffer.length;
 
       // Determine MIME type from URL or default to mp4
-      const ext = path.extname(new URL(videoUrl).pathname).toLowerCase();
+      const ext = path.extname(new URL(fetchableUrl).pathname).toLowerCase();
       const mimeType = ext === '.webm' ? 'video/webm' : 'video/mp4';
       const videoExt = ext || '.mp4';
 
       // Generate S3 keys
-      const uuid = nanoid();
-      const dateTime = getYYYYmmddHHMMss(new Date());
-      const generationsFolder = 'generations/videos';
-
       // Upload video
-      const videoKey = `${generationsFolder}/${uuid}_${metadata.width}x${metadata.height}_${dateTime}_raw${videoExt}`;
+      const { key: videoKey } = await this.createGenerationBlobPath(videoExt.replace(/^\./, ''));
       log('Uploading video to: %s', videoKey);
       await this.fileService.uploadMedia(videoKey, videoBuffer);
 
@@ -95,7 +123,7 @@ export class VideoGenerationService {
 
       // Convert cover to webp
       const coverWebpBuffer = await sharp(coverBuffer).webp({ quality: 100 }).toBuffer();
-      const coverKey = `${generationsFolder}/${uuid}_${metadata.width}x${metadata.height}_${dateTime}_cover.webp`;
+      const { key: coverKey } = await this.createGenerationBlobPath('webp');
       log('Uploading cover to: %s', coverKey);
 
       // Calculate thumbnail dimensions
@@ -115,7 +143,7 @@ export class VideoGenerationService {
           .webp({ quality: 100 })
           .toBuffer();
 
-        thumbnailKey = `${generationsFolder}/${uuid}_${thumbnailWidth}x${thumbnailHeight}_${dateTime}_thumb.webp`;
+        ({ key: thumbnailKey } = await this.createGenerationBlobPath('webp'));
         log('Uploading thumbnail to: %s', thumbnailKey);
 
         // Upload cover and thumbnail in parallel
@@ -134,10 +162,10 @@ export class VideoGenerationService {
       return {
         coverKey,
         duration: metadata.duration,
-        fileHash,
         fileSize,
         height: metadata.height,
         mimeType,
+        sha256,
         thumbnailKey,
         videoKey,
         width: metadata.width,

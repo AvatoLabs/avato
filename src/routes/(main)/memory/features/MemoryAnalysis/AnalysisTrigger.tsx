@@ -2,6 +2,7 @@
 
 import { ActionIcon, Button, Icon, Tooltip } from '@lobehub/ui';
 import { App } from 'antd';
+import { createStyles, useTheme } from 'antd-style';
 import { CalendarClockIcon } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +15,31 @@ import {
 
 import DateRangeModal from './DateRangeModal';
 
+const useStyles = createStyles(({ css, token }) => ({
+  solidPrimaryForeground: css`
+    &,
+    &:hover,
+    &:active,
+    &:focus {
+      color: ${token.colorTextLightSolid} !important;
+    }
+
+    &.ant-btn-primary:not(.ant-btn-disabled),
+    &.ant-btn-color-primary:not(.ant-btn-disabled) {
+      color: ${token.colorTextLightSolid} !important;
+    }
+
+    & .anticon,
+    & svg,
+    &.ant-btn-primary:not(.ant-btn-disabled) .anticon,
+    &.ant-btn-primary:not(.ant-btn-disabled) svg,
+    &.ant-btn-color-primary:not(.ant-btn-disabled) .anticon,
+    &.ant-btn-color-primary:not(.ant-btn-disabled) svg {
+      color: ${token.colorTextLightSolid} !important;
+    }
+  `,
+}));
+
 interface Props {
   footerNote: string;
   iconOnly?: boolean;
@@ -22,6 +48,8 @@ interface Props {
 }
 
 const AnalysisTrigger = memo<Props>(({ footerNote, range, onRangeChange, iconOnly }) => {
+  const { styles } = useStyles();
+  const theme = useTheme();
   const { t } = useTranslation('memory');
   const { message } = App.useApp();
   const { isValidating, refresh } = useMemoryAnalysisAsyncTask();
@@ -70,11 +98,19 @@ const AnalysisTrigger = memo<Props>(({ footerNote, range, onRangeChange, iconOnl
     <>
       {iconOnly ? (
         <Tooltip title={t('analysis.action.button')}>
-          <ActionIcon icon={CalendarClockIcon} loading={loading} onClick={() => setOpen(true)} />
+          <ActionIcon
+            className={styles.solidPrimaryForeground}
+            color={theme.colorTextLightSolid}
+            icon={CalendarClockIcon}
+            loading={loading}
+            onClick={() => setOpen(true)}
+          />
         </Tooltip>
       ) : (
         <Button
+          className={styles.solidPrimaryForeground}
           icon={<Icon icon={CalendarClockIcon} />}
+          iconProps={{ color: theme.colorTextLightSolid }}
           loading={loading}
           size={'large'}
           style={{ maxWidth: 300 }}

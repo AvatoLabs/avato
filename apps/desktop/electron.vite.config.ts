@@ -58,7 +58,7 @@ export default defineConfig({
             }
 
             // Split i18n json resources by namespace (ns), not by locale.
-            // Example: ".../resources/locales/zh-CN/common.json?import" -> "locales-common"
+            // Example: ".../contents/locales/zh-CN/common.json?import" -> "locales-common"
             const normalizedId = id.replaceAll('\\', '/').split('?')[0];
             const match = normalizedId.match(/\/locales\/[^/]+\/([^/]+)\.json$/);
 
@@ -69,8 +69,22 @@ export default defineConfig({
       sourcemap: isDev ? 'inline' : false,
     },
     define: {
+      'process.env.APP_URL': JSON.stringify(process.env.APP_URL),
+      'process.env.DESKTOP_CLOUD_SSO_PROVIDER': JSON.stringify(
+        process.env.DESKTOP_CLOUD_SSO_PROVIDER,
+      ),
+      'process.env.DEVICE_GATEWAY_URL': JSON.stringify(process.env.DEVICE_GATEWAY_URL),
+      'process.env.NEXT_PUBLIC_DESKTOP_CLOUD_SSO_PROVIDER': JSON.stringify(
+        process.env.NEXT_PUBLIC_DESKTOP_CLOUD_SSO_PROVIDER,
+      ),
+      'process.env.NEXT_PUBLIC_OFFICIAL_URL': JSON.stringify(process.env.NEXT_PUBLIC_OFFICIAL_URL),
+      'process.env.OFFICIAL_CLOUD_SERVER': JSON.stringify(process.env.OFFICIAL_CLOUD_SERVER),
       'process.env.UPDATE_CHANNEL': JSON.stringify(process.env.UPDATE_CHANNEL),
       'process.env.UPDATE_SERVER_URL': JSON.stringify(process.env.UPDATE_SERVER_URL),
+      // Avoid bundling ws optional native accelerators into Electron main.
+      // Missing optional requires can otherwise become empty modules in Rollup.
+      'process.env.WS_NO_BUFFER_UTIL': JSON.stringify('true'),
+      'process.env.WS_NO_UTF_8_VALIDATE': JSON.stringify('true'),
     },
     resolve: {
       alias: {
@@ -96,6 +110,7 @@ export default defineConfig({
   renderer: {
     root: ROOT_DIR,
     build: {
+      chunkSizeWarningLimit: 2500,
       outDir: resolve(__dirname, 'dist/renderer'),
       rollupOptions: {
         input: resolve(__dirname, 'index.html'),

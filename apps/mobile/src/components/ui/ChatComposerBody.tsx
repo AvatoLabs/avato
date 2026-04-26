@@ -67,7 +67,12 @@ export interface ChatComposerBodyProps {
   variant: ChatComposerVariant;
 }
 
-const INPUT_CLASS = 'text-foreground text-[16px] leading-[22px] min-h-[36px] max-h-28';
+const INPUT_STYLE = {
+  fontSize: 16,
+  lineHeight: 22,
+  maxHeight: 112,
+  minHeight: 36,
+} as const;
 
 export function ChatComposerBody({
   topSlot,
@@ -196,34 +201,46 @@ export function ChatComposerBody({
   return (
     <ComposerShell active={active}>
       {topSlot}
-      <View className="px-3 pt-2">
+      <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
         {groupMembers && groupMembers.length > 0 ? (
           <GroupMentionInput
             accessibilityLabel={placeholder}
-            className={INPUT_CLASS}
             editable={textEditable}
             members={groupMembers}
             placeholder={placeholder}
-            style={{ paddingVertical: 0, textAlignVertical: 'top' }}
             value={value}
+            style={[
+              INPUT_STYLE,
+              { color: colors.foreground, paddingVertical: 0, textAlignVertical: 'top' },
+            ]}
             onChangeText={onChangeText}
           />
         ) : (
           <TextInput
             multiline
             accessibilityLabel={placeholder}
-            className={INPUT_CLASS}
             editable={textEditable}
             placeholder={placeholder}
             placeholderTextColor={colors.secondaryText}
-            style={{ paddingVertical: 0, textAlignVertical: 'top' }}
             underlineColorAndroid="transparent"
             value={value}
+            style={[
+              INPUT_STYLE,
+              { color: colors.foreground, paddingVertical: 0, textAlignVertical: 'top' },
+            ]}
             onChangeText={onChangeText}
           />
         )}
       </View>
-      <View className="px-2 pb-1.5 pt-1" style={{ alignItems: 'center', flexDirection: 'row' }}>
+      <View
+        style={{
+          alignItems: 'center',
+          flexDirection: 'row',
+          paddingBottom: 6,
+          paddingHorizontal: 8,
+          paddingTop: 4,
+        }}
+      >
         {variant === 'detailGroup' ? (
           <View style={{ alignItems: 'center', flexDirection: 'row', flexShrink: 1 }}>
             {renderAttach(0)}
@@ -254,16 +271,18 @@ export function ChatComposerBody({
           </>
         )}
 
-        <View className="flex-1" />
+        <View style={{ flex: 1 }} />
 
         {generating && onStop ? (
           <Animated.View style={sendAnimStyle}>
             <TouchableOpacity
               activeOpacity={0.7}
-              className="rounded-full items-center justify-center"
               style={{
+                alignItems: 'center',
                 backgroundColor: colors.muted,
                 height: actionSize,
+                borderRadius: actionSize / 2,
+                justifyContent: 'center',
                 width: actionSize,
               }}
               onPress={onStop}

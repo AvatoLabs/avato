@@ -50,6 +50,42 @@ describe('normalizeMessageFileUrlsForClient', () => {
     expect(result[0].imageList?.[0].url).toBe('https://cdn.example.com/img.png');
   });
 
+  it('should rewrite same-origin absolute urls to file proxy urls', () => {
+    const messages = [
+      {
+        fileList: [{ id: 'file-1', url: 'https://avato.turingmesh.com/files/doc.pdf' }],
+        id: 'msg-1',
+        imageList: [
+          { alt: 'image', id: 'img-1', url: 'https://avato.turingmesh.com/files/img.png' },
+        ],
+        role: 'user',
+      },
+    ] as UIChatMessage[];
+
+    const result = normalizeMessageFileUrlsForClient(messages);
+
+    expect(result[0].imageList?.[0].url).toBe('/f/img-1');
+    expect(result[0].fileList?.[0].url).toBe('/f/file-1');
+  });
+
+  it('should preserve stable topic share proxy urls', () => {
+    const messages = [
+      {
+        fileList: [{ id: 'file-1', url: 'https://avato.turingmesh.com/share/t/share-1/f/file-1' }],
+        id: 'msg-1',
+        imageList: [{ alt: 'image', id: 'img-1', url: '/share/t/share-1/f/img-1' }],
+        role: 'user',
+      },
+    ] as UIChatMessage[];
+
+    const result = normalizeMessageFileUrlsForClient(messages);
+
+    expect(result[0].fileList?.[0].url).toBe(
+      'https://avato.turingmesh.com/share/t/share-1/f/file-1',
+    );
+    expect(result[0].imageList?.[0].url).toBe('/share/t/share-1/f/img-1');
+  });
+
   it('should keep insecure urls unchanged on http app', () => {
     mockAppEnv.APP_URL = 'http://localhost:3210';
 

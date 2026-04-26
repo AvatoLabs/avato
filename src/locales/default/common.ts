@@ -55,11 +55,11 @@ export default {
   'clientDB.initing.migrating': 'Performing database migration...',
   'clientDB.initing.ready': 'Database is ready',
   'clientDB.modal.desc':
-    'Enable the next-generation client database. Persist chat data in your browser and unlock advanced features like the Library.',
+    'Enable the next-generation client database. Persist chat data in your browser and unlock advanced features like Files and Reference Sets.',
   'clientDB.modal.enable': 'Enable Now',
-  'clientDB.modal.features.knowledgeBase.desc':
-    'Build your personal Library and chat with Agents using it (coming soon).',
-  'clientDB.modal.features.knowledgeBase.title': 'Library chat support — your second brain',
+  'clientDB.modal.features.sourceSet.desc':
+    'Build reusable reference sets and let Agents read them with clear scope.',
+  'clientDB.modal.features.sourceSet.title': 'Reference set chat support — your second brain',
   'clientDB.modal.features.localFirst.desc':
     'Chat data is stored entirely in the browser, keeping your data always under your control.',
   'clientDB.modal.features.localFirst.title': 'Local first, privacy first',
@@ -121,17 +121,17 @@ export default {
   'cmdk.askAgentPlaceholder': 'Ask {{agent}} something...',
   'cmdk.askLobeAI': 'Ask Avato',
   'cmdk.avatoStudio': 'Studio',
-  'cmdk.community': 'Community',
+  'cmdk.community': 'Discover',
   'cmdk.communitySupport': 'Community Support',
   'cmdk.contactUs': 'Contact Us',
   'cmdk.context.agent': 'Agent',
-  'cmdk.context.community': 'Community',
+  'cmdk.context.community': 'Discover',
   'cmdk.context.general': 'General',
   'cmdk.context.group': 'Group',
   'cmdk.context.memory': 'Memory',
-  'cmdk.context.page': 'Page',
+  'cmdk.context.page': 'Docs',
   'cmdk.context.painting': 'Painting',
-  'cmdk.context.resource': 'Resource',
+  'cmdk.context.resource': 'Files',
   'cmdk.context.settings': 'Settings',
   'cmdk.discover': 'Discover',
   'cmdk.keyboard.ESC': 'ESC',
@@ -176,7 +176,7 @@ export default {
 
   'cmdk.keywords.referral': 'referral rewards invite bonus',
 
-  'cmdk.keywords.resources': 'knowledge files library documents',
+  'cmdk.keywords.resources': 'files folders source sets drive library',
 
   'cmdk.keywords.settings': 'settings preferences configuration options',
 
@@ -200,9 +200,9 @@ export default {
 
   'cmdk.newAgentTeam': 'Create New Group',
 
-  'cmdk.newLibrary': 'Create New Library',
+  'cmdk.newSourceSet': 'Create New Reference Set',
 
-  'cmdk.newPage': 'Create New Page',
+  'cmdk.newPage': 'Create New Doc',
 
   'newSession': 'New conversation',
 
@@ -212,11 +212,11 @@ export default {
 
   'cmdk.openSettings': 'Open Settings',
 
-  'cmdk.pages': 'Pages',
+  'cmdk.pages': 'Documents',
 
-  'cmdk.painting': 'Painting',
+  'cmdk.painting': 'Artwork',
 
-  'cmdk.resource': 'Resources',
+  'cmdk.content': 'Files',
 
   'cmdk.search.agent': 'Agent',
 
@@ -236,9 +236,9 @@ export default {
 
   'cmdk.search.folders': 'Folders',
 
-  'cmdk.search.knowledgeBase': 'Library',
+  'cmdk.search.sourceSet': 'Reference Set',
 
-  'cmdk.search.knowledgeBases': 'Libraries',
+  'cmdk.search.sourceSets': 'Reference Sets',
 
   'cmdk.search.loading': 'Searching...',
 
@@ -251,8 +251,8 @@ export default {
   'cmdk.search.memory': 'Memory',
   'cmdk.search.message': 'Message',
   'cmdk.search.messages': 'Messages',
-  'cmdk.search.page': 'Page',
-  'cmdk.search.pages': 'Pages',
+  'cmdk.search.page': 'Document',
+  'cmdk.search.pages': 'Documents',
   'cmdk.search.plugin': 'Skill',
   'cmdk.search.plugins': 'Skills',
   'cmdk.search.searchMore': 'Search more {{type}}',
@@ -419,7 +419,7 @@ export default {
   'more': 'More',
   'navPanel.agent': 'Agent',
   'navPanel.displayItems': 'Display Items',
-  'navPanel.library': 'Library',
+  'navPanel.sourceSet': 'Reference Sets',
   'navPanel.searchAgent': 'Search Agent...',
   'navPanel.searchResultEmpty': 'No search results found',
   'new': 'New',
@@ -478,16 +478,17 @@ export default {
   'tab.avatoStudio': 'Studio',
   'tab.audio': 'Audio',
   'tab.chat': 'Chat',
-  'tab.community': 'Community',
+  'tab.community': 'Discover',
   'tab.discover': 'Discover',
   'tab.eval': 'Eval Lab',
   'tab.files': 'Files',
   'tab.home': 'Home',
-  'tab.knowledgeBase': 'Library',
+  'tab.sourceSet': 'Reference Sets',
   'tab.me': 'Me',
   'tab.memory': 'Memory',
-  'tab.pages': 'Pages',
-  'tab.resource': 'Resources',
+  'tab.pages': 'Documents',
+  'tab.table': 'Tables',
+  'tab.resource': 'Files',
   'tab.search': 'Search',
   'tab.setting': 'Settings',
   'tab.video': 'Video',
@@ -507,6 +508,7 @@ export default {
   'upgradeVersion.newVersion': 'Update available: {{version}}',
   'upgradeVersion.serverVersion': 'Server: {{version}}',
   'userPanel.anonymousNickName': 'Anonymous User',
+  'userPanel.localUser': 'Local User',
   'userPanel.billing': 'Billing Management',
   'userPanel.cloud': 'Launch {{name}}',
   'userPanel.community': 'Community',

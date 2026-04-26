@@ -30,7 +30,7 @@ export const chainSummaryAgentName = (
       content: `输入: {Improve my English language use by replacing basic A0-level expressions with more sophisticated, advanced-level phrases while maintaining the conversation's essence. Your responses should focus solely on corrections and enhancements, avoiding additional explanations.} [zh-CN]`,
       role: 'user',
     },
-    { content: '邮件优化助理', role: 'assistant' },
+    { content: '邮件优化智能体', role: 'assistant' },
     { content: `输入: {${content}} [${locale}]`, role: 'user' },
   ],
 });

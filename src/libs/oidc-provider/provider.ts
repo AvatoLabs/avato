@@ -1,3 +1,4 @@
+import { BRANDING_NAME } from '@lobechat/business-const';
 import { type LobeChatDatabase } from '@lobechat/database';
 import debug from 'debug';
 import { type Configuration, type KoaContextWithOIDC } from 'oidc-provider';
@@ -8,7 +9,7 @@ import { serverDBEnv } from '@/config/db';
 import { UserModel } from '@/database/models/user';
 import { appEnv } from '@/envs/app';
 import { getJWKS } from '@/libs/oidc-provider/jwt';
-import { normalizeLocale } from '@/locales/resources';
+import { normalizeLocale } from '@/locales/contents';
 
 import { DrizzleAdapter } from './adapter';
 import { defaultClaims, defaultClients, defaultScopes } from './config';
@@ -272,10 +273,10 @@ export const createOIDCProvider = async (db: LobeChatDatabase): Promise<Provider
       ctx.body = `
         <html>
           <head>
-            <title>LobeHub OIDC Error</title>
+            <title>${BRANDING_NAME} OIDC Error</title>
           </head>
           <body>
-            <h1>LobeHub OIDC Error</h1>
+            <h1>${BRANDING_NAME} OIDC Error</h1>
             <p>${JSON.stringify(error, null, 2)}</p>
             <p>${JSON.stringify(out, null, 2)}</p>
           </body>

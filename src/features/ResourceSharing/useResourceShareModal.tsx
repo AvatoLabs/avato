@@ -1,16 +1,16 @@
 'use client';
 
-import { createModal } from '@lobehub/ui';
+import { createModal } from '@lobehub/ui/base-ui';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { type ResourceKind } from '@/types/resource';
+import { type ContentKind } from '@/types/content';
 
 import ResourceShareModal from './ResourceShareModal';
 
 interface OpenShareModalParams {
   id: string;
-  kind: ResourceKind;
+  kind: ContentKind;
   name: string;
 }
 
@@ -21,10 +21,9 @@ export const useResourceShareModal = () => {
     (params: OpenShareModalParams) => {
       createModal({
         children: <ResourceShareModal {...params} />,
-        focusTriggerAfterClose: true,
         footer: null,
         title: t('share.title'),
-        width: 820,
+        width: 760,
       });
     },
     [t],

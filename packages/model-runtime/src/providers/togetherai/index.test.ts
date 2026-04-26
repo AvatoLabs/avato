@@ -35,8 +35,8 @@ describe('LobeTogetherAI - custom features', () => {
 
     it('should have custom defaultHeaders', () => {
       expect(params.constructorOptions?.defaultHeaders).toEqual({
-        'HTTP-Referer': 'https://chat-preview.lobehub.com',
-        'X-Title': 'Lobe Chat',
+        'HTTP-Referer': process.env.APP_URL || 'https://avato.turingmesh.com',
+        'X-Title': 'Avato',
       });
     });
 

@@ -1,8 +1,8 @@
 import type { LLMParams } from 'model-bank';
 
 import type { FileItem } from '../files';
-import type { KnowledgeBaseItem } from '../knowledgeBase';
 import type { FewShots } from '../llm';
+import type { SourceSetItem } from '../sourceSet';
 import type { LobeAgentAgencyConfig } from './agencyConfig';
 import type { LobeAgentChatConfig } from './chatConfig';
 import type { LobeAgentTTSConfig } from './tts';
@@ -28,37 +28,34 @@ export interface LobeAgentConfig {
   id?: string;
 
   /**
-   * knowledge bases
-   */
-  knowledgeBases?: KnowledgeBaseItem[];
-  /**
    * Language model used by the agent
    * @default gpt-4o-mini
    */
   model: string;
-
   /**
    * Opening message
    */
   openingMessage?: string;
+
   /**
    * Opening questions
    */
   openingQuestions?: string[];
-
   /**
    * Language model parameters
    */
   params: LLMParams;
+
   /**
    * Enabled plugins
    */
   plugins?: string[];
-
   /**
    *  Model provider
    */
   provider?: string;
+
+  sourceSets?: SourceSetItem[];
 
   /**
    * System role

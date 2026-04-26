@@ -54,7 +54,7 @@ tags:
 <Steps>
   ### 导入所需权限
 
-  在您的应用设置中，进入 **权限与范围**，点击 **批量导入**，然后粘贴以下 JSON 以授予机器人所需的所有权限。
+  在您的设置中，进入 **权限与范围**，点击 **批量导入**，然后粘贴以下 JSON 以授予机器人所需的所有权限。
 
   ```json
   {
@@ -79,17 +79,14 @@ tags:
         "im:message:send_as_bot",
         "im:resource"
       ],
-      "user": [
-        "aily:file:read",
-        "aily:file:write",
-        "im:chat.access_event.bot_p2p_chat:read"
-      ]
+      "user": ["aily:file:read", "aily:file:write", "im:chat.access_event.bot_p2p_chat:read"]
     }
   }
   ```
 
   <Callout type={'warning'}>
-    以上 JSON 适用于**飞书**。如果您使用的是 **Lark（国际版）**，部分权限码可能不可用（如 `aily:*`、`corehr:*`、`im:chat.access_event.bot_p2p_chat:read`）。请移除批量导入时提示无效的权限码。
+    以上 JSON 适用于**飞书**。如果您使用的是 **Lark（国际版）**，部分权限码可能不可用（如
+    `aily:*`、`corehr:*`、`im:chat.access_event.bot_p2p_chat:read`）。请移除批量导入时提示无效的权限码。
   </Callout>
 
   ### 启用机器人功能
@@ -148,7 +145,7 @@ tags:
 <Steps>
   ### 创建版本
 
-  在您的应用设置中，进入 **版本管理与发布**。创建一个新版本并填写发布说明。
+  在您的设置中，进入 **版本管理与发布**。创建一个新版本并填写发布说明。
 
   ### 提交审核
 

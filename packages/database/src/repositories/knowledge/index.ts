@@ -1,26 +1,34 @@
 import type { QueryFileListParams } from '@lobechat/types';
-import { FilesTabs, SortType } from '@lobechat/types';
+import {
+  FileAssetClassification,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+  FilesTabs,
+  SortType,
+} from '@lobechat/types';
 import { sql } from 'drizzle-orm';
 
 import { DocumentModel } from '../../models/document';
 import { FileModel } from '../../models/file';
-import { documents, files, knowledgeBaseFiles } from '../../schemas';
+import { documents, fileAssets, files, sourceSetFiles } from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
 
-export interface KnowledgeItem {
+export interface AgentSourceItem {
+  attachable?: boolean;
   chunkTaskId?: string | null;
   content?: string | null;
   createdAt: Date;
   editorData?: Record<string, any> | null;
   embeddingTaskId?: string | null;
+  fileId?: string | null;
   fileType: string;
   id: string;
-  knowledgeBaseId?: string | null;
   metadata?: Record<string, any> | null;
   name: string;
   parentId?: string | null;
   size: number;
   slug?: string | null;
+  sourceSetId?: string | null;
   /**
    * Source type to distinguish between files and documents
    * - 'file': from files table
@@ -51,53 +59,119 @@ export class KnowledgeRepo {
     this.documentModel = new DocumentModel(db, userId);
   }
 
+  private resolveParentId = async (parentId?: string | null, spaceId?: string) => {
+    if (!parentId) return parentId;
+
+    if (spaceId) {
+      const scoped = await this.documentModel.findBySlugInSpace(parentId, spaceId);
+      if (scoped) return scoped.id;
+
+      return parentId;
+    }
+
+    const docBySlug = await this.documentModel.findBySlug(parentId);
+    return docBySlug?.id || parentId;
+  };
+
+  private buildFileAssetWhereConditions = ({
+    alias,
+    assetClassification,
+    assetRightsOwner,
+    assetReviewStatus,
+    assetUsagePolicy,
+  }: {
+    alias: string;
+    assetClassification?: QueryFileListParams['assetClassification'];
+    assetRightsOwner?: QueryFileListParams['assetRightsOwner'];
+    assetReviewStatus?: QueryFileListParams['assetReviewStatus'];
+    assetUsagePolicy?: QueryFileListParams['assetUsagePolicy'];
+  }) => {
+    const assetConditions: ReturnType<typeof sql>[] = [];
+
+    if (assetClassification) {
+      assetConditions.push(
+        assetClassification === FileAssetClassification.General
+          ? sql`(${sql.raw(`${alias}.classification`)} = ${assetClassification} OR ${sql.raw(`${alias}.file_id`)} IS NULL)`
+          : sql`${sql.raw(`${alias}.classification`)} = ${assetClassification}`,
+      );
+    }
+
+    if (assetReviewStatus) {
+      assetConditions.push(
+        assetReviewStatus === FileAssetReviewStatus.Draft
+          ? sql`(${sql.raw(`${alias}.review_status`)} = ${assetReviewStatus} OR ${sql.raw(`${alias}.file_id`)} IS NULL)`
+          : sql`${sql.raw(`${alias}.review_status`)} = ${assetReviewStatus}`,
+      );
+    }
+
+    if (assetUsagePolicy) {
+      assetConditions.push(
+        assetUsagePolicy === FileAssetUsagePolicy.Internal
+          ? sql`(${sql.raw(`${alias}.usage_policy`)} = ${assetUsagePolicy} OR ${sql.raw(`${alias}.file_id`)} IS NULL)`
+          : sql`${sql.raw(`${alias}.usage_policy`)} = ${assetUsagePolicy}`,
+      );
+    }
+
+    if (assetRightsOwner) {
+      assetConditions.push(sql`${sql.raw(`${alias}.rights_owner`)} ILIKE ${`%${assetRightsOwner}%`}`);
+    }
+
+    return assetConditions;
+  };
+
   /**
    * Query combined results from files and documents tables
    */
   async query({
+    assetClassification,
+    assetRightsOwner,
+    assetReviewStatus,
+    assetUsagePolicy,
     category,
     q,
     sortType,
     sorter,
-    knowledgeBaseId,
-    showFilesInKnowledgeBase,
+    sourceSetId,
+    showFilesInSourceSet,
     parentId,
     spaceId,
+    trash,
     limit = 50,
     offset = 0,
-  }: QueryFileListParams = {}): Promise<KnowledgeItem[]> {
-    // If parentId is provided, check if it's a slug and resolve it to an ID
-    let resolvedParentId = parentId;
-    if (parentId) {
-      // Try to find a document with this slug
-      const docBySlug = await this.documentModel.findBySlug(parentId);
-      if (docBySlug) {
-        resolvedParentId = docBySlug.id;
-      }
-      // Otherwise assume it's already an ID
-    }
+  }: QueryFileListParams = {}): Promise<AgentSourceItem[]> {
+    const resolvedParentId = await this.resolveParentId(parentId, spaceId);
 
     // Build file query
     const fileQuery = this.buildFileQuery({
+      assetClassification,
+      assetRightsOwner,
+      assetReviewStatus,
+      assetUsagePolicy,
       category,
-      knowledgeBaseId,
+      sourceSetId,
       parentId: resolvedParentId,
       q,
-      showFilesInKnowledgeBase,
+      showFilesInSourceSet,
       spaceId,
       sortType,
       sorter,
+      trash,
     });
 
     // Build document query (notes)
     const documentQuery = this.buildDocumentQuery({
+      assetClassification,
+      assetRightsOwner,
+      assetReviewStatus,
+      assetUsagePolicy,
       category,
-      knowledgeBaseId,
+      sourceSetId,
       parentId: resolvedParentId,
       q,
       spaceId,
       sortType,
       sorter,
+      trash,
     });
 
     // Combine both queries with UNION ALL
@@ -142,14 +216,16 @@ export class KnowledgeRepo {
       }
 
       return {
+        attachable: undefined,
         chunkTaskId: row.chunk_task_id,
         content: row.content,
         createdAt: new Date(row.created_at),
         editorData,
         embeddingTaskId: row.embedding_task_id,
+        fileId: row.file_id ?? null,
         fileType: row.file_type,
         id: row.id,
-        knowledgeBaseId: row.knowledge_base_id ?? null,
+        sourceSetId: row.source_set_id ?? null,
         metadata,
         name: row.name,
         parentId: row.parent_id ?? null,
@@ -168,10 +244,11 @@ export class KnowledgeRepo {
    * Query recent items (files and documents)
    * Returns the most recently updated items
    */
-  async queryRecent(limit: number = 12): Promise<KnowledgeItem[]> {
+  async queryRecent(limit: number = 12): Promise<AgentSourceItem[]> {
     const fileQuery = sql`
       SELECT
         COALESCE(d.id, f.id) as id,
+        f.id as file_id,
         f.name,
         f.file_type,
         f.size,
@@ -189,15 +266,17 @@ export class KnowledgeRepo {
       LEFT JOIN ${documents} d
         ON f.id = d.file_id
       WHERE f.user_id = ${this.userId}
+        AND f.deleted_at IS NULL
         AND NOT EXISTS (
-          SELECT 1 FROM ${knowledgeBaseFiles}
-          WHERE ${knowledgeBaseFiles.fileId} = f.id
+          SELECT 1 FROM ${sourceSetFiles}
+          WHERE ${sourceSetFiles.fileId} = f.id
         )
     `;
 
     const documentQuery = sql`
       SELECT
         id,
+        NULL::text as file_id,
         COALESCE(title, filename, 'Untitled') as name,
         file_type,
         total_char_count as size,
@@ -214,7 +293,8 @@ export class KnowledgeRepo {
       FROM ${documents}
       WHERE user_id = ${this.userId}
         AND source_type != ${'file'}
-        AND knowledge_base_id IS NULL
+        AND source_set_id IS NULL
+        AND deleted_at IS NULL
     `;
 
     const combinedQuery = sql`
@@ -256,6 +336,7 @@ export class KnowledgeRepo {
         createdAt: new Date(row.created_at),
         editorData,
         embeddingTaskId: row.embedding_task_id,
+        fileId: row.file_id ?? null,
         fileType: row.file_type,
         id: row.id,
         metadata,
@@ -311,16 +392,29 @@ export class KnowledgeRepo {
   }
 
   private buildFileQuery({
+    assetClassification,
+    assetRightsOwner,
+    assetReviewStatus,
+    assetUsagePolicy,
     category,
     q,
-    knowledgeBaseId,
-    showFilesInKnowledgeBase,
+    sourceSetId,
+    showFilesInSourceSet,
     parentId,
     spaceId,
+    trash,
   }: QueryFileListParams = {}): ReturnType<typeof sql> {
     const whereConditions: any[] = [
       spaceId ? sql`f.space_id = ${spaceId}` : sql`f.user_id = ${this.userId}`,
+      trash ? sql`f.deleted_at IS NOT NULL` : sql`f.deleted_at IS NULL`,
     ];
+    const assetWhereConditions = this.buildFileAssetWhereConditions({
+      alias: 'fa',
+      assetClassification,
+      assetRightsOwner,
+      assetReviewStatus,
+      assetUsagePolicy,
+    });
 
     // Parent ID filter
     if (parentId !== undefined) {
@@ -350,10 +444,11 @@ export class KnowledgeRepo {
     }
 
     // Knowledge base filter
-    if (knowledgeBaseId) {
+    if (sourceSetId) {
       // Build where conditions using proper table references (f.column instead of files.column)
       const kbWhereConditions: any[] = [
         spaceId ? sql`f.space_id = ${spaceId}` : sql`f.user_id = ${this.userId}`,
+        trash ? sql`f.deleted_at IS NOT NULL` : sql`f.deleted_at IS NULL`,
       ];
 
       // Parent ID filter
@@ -384,9 +479,12 @@ export class KnowledgeRepo {
         }
       }
 
+      kbWhereConditions.push(...assetWhereConditions);
+
       return sql`
         SELECT
           COALESCE(d.id, f.id) as id,
+          f.id as file_id,
           f.name,
           f.file_type,
           f.size,
@@ -401,11 +499,17 @@ export class KnowledgeRepo {
           COALESCE(d.metadata, f.metadata) as metadata,
           'file' as source_type,
           f.parent_id,
-          ${knowledgeBaseId}::text as knowledge_base_id
+          ${sourceSetId}::text as source_set_id
         FROM ${files} f
-        INNER JOIN ${knowledgeBaseFiles} kbf
+        INNER JOIN ${sourceSetFiles} kbf
           ON f.id = kbf.file_id
-          AND kbf.knowledge_base_id = ${knowledgeBaseId}
+          AND kbf.source_set_id = ${sourceSetId}
+        ${
+          assetWhereConditions.length > 0
+            ? sql`LEFT JOIN ${fileAssets} fa
+              ON f.id = fa.file_id`
+            : sql``
+        }
         LEFT JOIN ${documents} d
           ON f.id = d.file_id
         WHERE ${sql.join(kbWhereConditions, sql` AND `)}
@@ -413,20 +517,23 @@ export class KnowledgeRepo {
     }
 
     // Exclude files in knowledge base if needed
-    if (!showFilesInKnowledgeBase) {
+    if (!showFilesInSourceSet) {
       whereConditions.push(
         sql`
           NOT EXISTS (
-                    SELECT 1 FROM ${knowledgeBaseFiles}
-                    WHERE ${knowledgeBaseFiles.fileId} = f.id
+                    SELECT 1 FROM ${sourceSetFiles}
+                    WHERE ${sourceSetFiles.fileId} = f.id
                   )
         `,
       );
     }
 
+    whereConditions.push(...assetWhereConditions);
+
     return sql`
       SELECT
         COALESCE(d.id, f.id) as id,
+        f.id as file_id,
         f.name,
         f.file_type,
         f.size,
@@ -441,8 +548,14 @@ export class KnowledgeRepo {
         COALESCE(d.metadata, f.metadata) as metadata,
         'file' as source_type,
         f.parent_id,
-        NULL::text as knowledge_base_id
+        NULL::text as source_set_id
       FROM ${files} f
+      ${
+        assetWhereConditions.length > 0
+          ? sql`LEFT JOIN ${fileAssets} fa
+            ON f.id = fa.file_id`
+          : sql``
+      }
       LEFT JOIN ${documents} d
         ON f.id = d.file_id
       WHERE ${sql.join(whereConditions, sql` AND `)}
@@ -450,15 +563,45 @@ export class KnowledgeRepo {
   }
 
   private buildDocumentQuery({
+    assetClassification,
+    assetRightsOwner,
+    assetReviewStatus,
+    assetUsagePolicy,
     category,
     q,
-    knowledgeBaseId,
+    sourceSetId,
     parentId,
     spaceId,
+    trash,
   }: QueryFileListParams = {}): ReturnType<typeof sql> {
+    if (assetClassification || assetRightsOwner || assetReviewStatus || assetUsagePolicy) {
+      return sql`
+        SELECT
+          NULL::varchar(30) as id,
+          NULL::varchar(30) as file_id,
+          NULL::text as name,
+          NULL::varchar(255) as file_type,
+          NULL::integer as size,
+          NULL::text as url,
+          NULL::timestamp with time zone as created_at,
+          NULL::timestamp with time zone as updated_at,
+          NULL::uuid as chunk_task_id,
+          NULL::uuid as embedding_task_id,
+          NULL::jsonb as editor_data,
+          NULL::text as content,
+          NULL::varchar(255) as slug,
+          NULL::jsonb as metadata,
+          NULL::text as source_type,
+          NULL::varchar(255) as parent_id,
+          NULL::text as source_set_id
+        WHERE false
+      `;
+    }
+
     const whereConditions: any[] = [
       spaceId ? sql`${documents.spaceId} = ${spaceId}` : sql`${documents.userId} = ${this.userId}`,
       sql`${documents.sourceType} != ${'file'}`,
+      trash ? sql`${documents.deletedAt} IS NOT NULL` : sql`${documents.deletedAt} IS NULL`,
     ];
 
     // Parent ID filter
@@ -499,6 +642,7 @@ export class KnowledgeRepo {
         return sql`
           SELECT
             NULL::varchar(30) as id,
+            NULL::varchar(30) as file_id,
             NULL::text as name,
             NULL::varchar(255) as file_type,
             NULL::integer as size,
@@ -513,7 +657,7 @@ export class KnowledgeRepo {
             NULL::jsonb as metadata,
             NULL::text as source_type,
             NULL::varchar(255) as parent_id,
-            NULL::text as knowledge_base_id
+            NULL::text as source_set_id
           WHERE false
         `;
       }
@@ -521,10 +665,11 @@ export class KnowledgeRepo {
 
     // Knowledge base filter for documents
     // Documents are linked to knowledge bases through files table via fileId
-    if (knowledgeBaseId) {
+    if (sourceSetId) {
       // Build where conditions using proper table references (d.column instead of documents.column)
       const kbWhereConditions: any[] = [
         spaceId ? sql`d.space_id = ${spaceId}` : sql`d.user_id = ${this.userId}`,
+        trash ? sql`d.deleted_at IS NOT NULL` : sql`d.deleted_at IS NULL`,
       ];
 
       // Parent ID filter
@@ -567,6 +712,7 @@ export class KnowledgeRepo {
           return sql`
             SELECT
               NULL::varchar(30) as id,
+              NULL::varchar(30) as file_id,
               NULL::text as name,
               NULL::varchar(255) as file_type,
               NULL::integer as size,
@@ -579,20 +725,23 @@ export class KnowledgeRepo {
               NULL::text as content,
               NULL::varchar(255) as slug,
               NULL::jsonb as metadata,
-              NULL::text as source_type
+              NULL::text as source_type,
+              NULL::varchar(255) as parent_id,
+              NULL::text as source_set_id
             WHERE false
           `;
         }
       }
 
       // When in a knowledge base, return standalone documents (folders and notes without fileId)
-      // that have the knowledgeBaseId column set. Documents with fileId are already
+      // that have the sourceSetId column set. Documents with fileId are already
       // returned by the file query via their linked file records.
-      kbWhereConditions.push(sql`d.file_id IS NULL`, sql`d.knowledge_base_id = ${knowledgeBaseId}`);
+      kbWhereConditions.push(sql`d.file_id IS NULL`, sql`d.source_set_id = ${sourceSetId}`);
 
       return sql`
         SELECT
           d.id,
+          NULL::varchar(30) as file_id,
           COALESCE(d.title, d.filename, 'Untitled') as name,
           d.file_type,
           d.total_char_count as size,
@@ -607,7 +756,7 @@ export class KnowledgeRepo {
           d.metadata,
           'document' as source_type,
           d.parent_id,
-          d.knowledge_base_id
+          d.source_set_id
         FROM ${documents} d
         WHERE ${sql.join(kbWhereConditions, sql` AND `)}
       `;
@@ -616,6 +765,7 @@ export class KnowledgeRepo {
     return sql`
       SELECT
         id,
+        NULL::varchar(30) as file_id,
         COALESCE(title, filename, 'Untitled') as name,
         file_type,
         total_char_count as size,
@@ -630,7 +780,7 @@ export class KnowledgeRepo {
         metadata,
         'document' as source_type,
         parent_id,
-        knowledge_base_id
+        source_set_id
       FROM ${documents}
       WHERE ${sql.join(whereConditions, sql` AND `)}
     `;

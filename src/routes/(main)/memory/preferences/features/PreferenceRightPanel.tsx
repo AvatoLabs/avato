@@ -16,6 +16,10 @@ import HighlightedContent from '@/routes/(main)/memory/features/HighlightedConte
 import ProgressIcon from '@/routes/(main)/memory/features/ProgressIcon';
 import SourceLink from '@/routes/(main)/memory/features/SourceLink';
 import Time from '@/routes/(main)/memory/features/Time';
+import {
+  useClearDetailSelection,
+  useCloseInvalidDetailSelection,
+} from '@/routes/(main)/memory/features/useResetDetailSelection';
 import { useUserMemoryStore } from '@/store/userMemory';
 import { LayersEnum } from '@/types/userMemory';
 
@@ -35,6 +39,8 @@ const PreferenceRightPanel = memo(() => {
   const useFetchMemoryDetail = useUserMemoryStore((s) => s.useFetchMemoryDetail);
 
   const { data: preference, isLoading } = useFetchMemoryDetail(preferenceId, LayersEnum.Preference);
+  useCloseInvalidDetailSelection('preferenceId', preferenceId, isLoading, Boolean(preference));
+  const clearSelection = useClearDetailSelection('preferenceId');
 
   if (!preferenceId) return null;
 
@@ -94,6 +100,9 @@ const PreferenceRightPanel = memo(() => {
         right: preferenceId ? (
           <PreferenceDropdown id={preferenceId} size={DESKTOP_HEADER_ICON_SIZE} />
         ) : undefined,
+      }}
+      onExpandChange={(expand) => {
+        if (!expand) clearSelection();
       }}
     >
       {content}

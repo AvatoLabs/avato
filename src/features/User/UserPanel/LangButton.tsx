@@ -4,7 +4,7 @@ import { Languages } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { localeOptions } from '@/locales/resources';
+import { localeOptions } from '@/locales/contents';
 import { useGlobalStore } from '@/store/global';
 import { globalGeneralSelectors } from '@/store/global/selectors';
 

@@ -2,17 +2,15 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 import { ChatSettingsTabs } from '@/store/global/initialState';
 
 import { useOpenChatSettings } from './useInterceptingRoutes';
 
 const mockNavigate = vi.fn();
 const mockUseNavigate = vi.fn(() => mockNavigate);
-const mockUseLocation = vi.fn(() => ({ pathname: '/' }));
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mockUseNavigate(),
-  useLocation: () => mockUseLocation(),
 }));
 vi.mock('@/hooks/useIsMobile', () => ({
   useIsMobile: vi.fn(),
@@ -25,7 +23,11 @@ vi.mock('@/store/global', () => ({
 describe('useOpenChatSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAgentStore.setState({ showAgentSetting: false, activeAgentId: undefined });
+    useAgentStore.setState({
+      activeAgentId: undefined,
+      activeAgentSettingTab: undefined,
+      showAgentSetting: false,
+    });
   });
 
   it('navigates to mobile chat settings with session info', () => {
@@ -53,6 +55,21 @@ describe('useOpenChatSettings', () => {
     });
 
     expect(useAgentStore.getState().showAgentSetting).toBeTruthy();
+    expect(useAgentStore.getState().activeAgentSettingTab).toBe(ChatSettingsTabs.Meta);
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('stores the requested desktop settings tab', () => {
+    useAgentStore.setState({ activeAgentId: '456' });
+    vi.mocked(useIsMobile).mockReturnValue(false);
+
+    const { result } = renderHook(() => useOpenChatSettings(ChatSettingsTabs.Sources));
+
+    act(() => {
+      result.current();
+    });
+
+    expect(useAgentStore.getState().showAgentSetting).toBeTruthy();
+    expect(useAgentStore.getState().activeAgentSettingTab).toBe(ChatSettingsTabs.Sources);
   });
 });

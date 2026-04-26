@@ -1,10 +1,11 @@
 import { Flexbox, TooltipGroup } from '@lobehub/ui';
-import React, { memo,Suspense } from 'react';
+import React, { memo, Suspense } from 'react';
 
 import DragUploadZone, { useUploadFiles } from '@/components/DragUploadZone';
 import Loading from '@/components/Loading/BrandTextLoading';
-import { useAgentStore } from '@/store/agent';
+import { conversationMutedTextStyles } from '@/features/Conversation/styles/mutedText';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
 
@@ -29,6 +30,7 @@ const ChatConversation = memo(() => {
     <Suspense fallback={<Loading debugId="Agent > ChatConversation" />}>
       <DragUploadZone style={wrapperStyle} onUploadFiles={handleUploadFiles}>
         <Flexbox
+          className={conversationMutedTextStyles.root}
           height={'100%'}
           style={{ overflow: 'hidden', position: 'relative' }}
           width={'100%'}

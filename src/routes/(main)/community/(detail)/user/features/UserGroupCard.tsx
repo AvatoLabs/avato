@@ -13,6 +13,7 @@ import {
   Tooltip,
   TooltipGroup,
 } from '@lobehub/ui';
+import { App } from 'antd';
 import { createStaticStyles, cx } from 'antd-style';
 import {
   AlertTriangle,
@@ -32,6 +33,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import urlJoin from 'url-join';
 
 import PublishedTime from '@/components/PublishedTime';
+import { chatGroupService } from '@/services/chatGroup';
 import { type DiscoverGroupAgentItem, type GroupAgentStatus } from '@/types/discover';
 import { formatIntergerNumber } from '@/utils/format';
 
@@ -127,6 +129,7 @@ const UserGroupCard = memo<UserGroupCardProps>(
   }) => {
     const { t } = useTranslation(['discover', 'setting']);
     const navigate = useNavigate();
+    const { message } = App.useApp();
     const { isOwner, onStatusChange } = useUserDetailContext();
 
     const link = qs.stringifyUrl(
@@ -143,9 +146,24 @@ const UserGroupCard = memo<UserGroupCardProps>(
       navigate(link);
     }, [link, navigate]);
 
-    const handleEdit = useCallback(() => {
-      navigate(urlJoin('/group', identifier, 'profile'));
-    }, [identifier, navigate]);
+    const handleEdit = useCallback(async () => {
+      try {
+        const groups = await chatGroupService.getGroups();
+        const localGroup = groups.find(
+          (group) => group.marketIdentifier === identifier || group.id === identifier,
+        );
+
+        if (!localGroup?.id) {
+          message.error(t('setting:myAgents.errors.fetchFailed'));
+          return;
+        }
+
+        navigate(urlJoin('/group', localGroup.id, 'profile'));
+      } catch (error) {
+        console.error('[UserGroupCard] handleEdit error:', error);
+        message.error(t('setting:myAgents.errors.editFailed'));
+      }
+    }, [identifier, message, navigate, t]);
 
     const handleStatusAction = useCallback(
       (action: 'publish' | 'unpublish' | 'deprecate') => {

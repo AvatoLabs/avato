@@ -6,8 +6,8 @@ import { Plus } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useHomeStore } from '@/store/home';
 import { homeAgentListSelectors } from '@/store/home/selectors';
+import { useHomeStore } from '@/store/home/store';
 import type { SessionGroupItemBase } from '@/types/session';
 
 import GroupItem from './GroupItem';

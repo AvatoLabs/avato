@@ -11,12 +11,14 @@ import { useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 
 interface DangerZoneSectionProps {
+  contentWidth?: number;
   delay?: number;
   onClearHistory: () => void;
   onDeleteChat: () => void;
 }
 
 export function DangerZoneSection({
+  contentWidth,
   delay = 150,
   onClearHistory,
   onDeleteChat,
@@ -26,7 +28,7 @@ export function DangerZoneSection({
 
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
-      <View className="mx-5 mt-4">
+      <View className="mt-4 self-center" style={contentWidth ? { width: contentWidth } : undefined}>
         <Text className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
           {t.chatSettingsDangerZone}
         </Text>

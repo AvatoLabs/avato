@@ -7,7 +7,7 @@ import { useParams } from 'react-router-dom';
 
 import Loading from '@/components/Loading/BrandTextLoading';
 import NavHeader from '@/features/NavHeader';
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 
 import { CHANNEL_PROVIDERS } from './const';
 import PlatformDetail from './detail';

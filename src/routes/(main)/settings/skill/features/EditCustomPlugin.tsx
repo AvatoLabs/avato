@@ -3,8 +3,8 @@ import { type ReactNode } from 'react';
 import { memo } from 'react';
 
 import DevModal from '@/features/PluginDevModal';
-import { useToolStore } from '@/store/tool';
 import { pluginSelectors } from '@/store/tool/slices/plugin/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 interface EditCustomPluginProps {
   children: ReactNode;

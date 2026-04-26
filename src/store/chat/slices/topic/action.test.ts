@@ -4,6 +4,7 @@ import { type Mock } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LOADING_FLAT } from '@/const/message';
+import { setActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { mutate } from '@/libs/swr';
 import { topicService } from '@/services/topic';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
@@ -66,6 +67,7 @@ vi.mock('i18next', () => ({
 beforeEach(() => {
   // Setup initial state and mocks before each test
   vi.clearAllMocks();
+  setActiveWorkspaceSpaceId(undefined);
   useChatStore.setState(
     {
       activeAgentId: undefined,
@@ -88,6 +90,7 @@ beforeEach(() => {
 
 afterEach(() => {
   // Cleanup mocks after each test
+  setActiveWorkspaceSpaceId(undefined);
   vi.restoreAllMocks();
 });
 
@@ -473,6 +476,35 @@ describe('topic action', () => {
       // Verify topics are stored in topicDataMap with correct key
       expect(
         useChatStore.getState().topicDataMap[topicMapKey({ agentId: sessionId })]?.items,
+      ).toEqual(topics);
+    });
+
+    it('should scope fetched topics by active workspace', async () => {
+      const sessionId = 'space-session-id';
+      const topics = [{ id: 'topic-id', title: 'Space Topic' }];
+
+      setActiveWorkspaceSpaceId('spc_test');
+      (topicService.getTopics as Mock).mockResolvedValue({ items: topics, total: topics.length });
+
+      const { result } = renderHook(() =>
+        useChatStore().useFetchTopics(true, { agentId: sessionId }),
+      );
+
+      await waitFor(() => {
+        expect(result.current.data).toEqual({ items: topics, total: topics.length });
+      });
+
+      expect(topicService.getTopics).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agentId: sessionId,
+          spaceId: 'spc_test',
+        }),
+      );
+
+      expect(
+        useChatStore.getState().topicDataMap[
+          topicMapKey({ agentId: sessionId, spaceId: 'spc_test' })
+        ]?.items,
       ).toEqual(topics);
     });
   });

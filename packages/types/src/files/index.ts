@@ -1,4 +1,4 @@
-import type { BlobStatus, ResourceRole } from '../resource';
+import type { BlobStatus, ContentRole } from '../content';
 
 export enum FilesTabs {
   All = 'all',
@@ -12,8 +12,8 @@ export enum FilesTabs {
 }
 
 export enum FileSource {
+  DocEditor = 'doc-editor',
   ImageGeneration = 'image_generation',
-  PageEditor = 'page-editor',
   VideoGeneration = 'video_generation',
 }
 
@@ -21,12 +21,12 @@ export interface FileItem {
   blobId?: string | null;
   blobStatus?: BlobStatus | null;
   content?: string;
+  contentRole?: ContentRole | null;
+  contentUid?: string | null;
   createdAt: Date;
   enabled?: boolean;
   id: string;
   name: string;
-  resourceRole?: ResourceRole | null;
-  resourceUid?: string | null;
   size: number;
   source?: FileSource | null;
   spaceId?: string | null;
@@ -35,5 +35,6 @@ export interface FileItem {
   url: string;
 }
 
+export * from './asset';
 export * from './list';
 export * from './upload';

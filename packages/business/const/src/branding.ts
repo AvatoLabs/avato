@@ -1,7 +1,7 @@
 export const LOBE_CHAT_CLOUD = 'Avato Cloud';
 
 export const BRANDING_NAME = 'Avato';
-export const BRANDING_LOGO_URL = '/icons/icon-192x192.png';
+export const BRANDING_LOGO_URL = '/icons/icon-192x192-transparent.png';
 
 export const ORG_NAME = 'Avato';
 
@@ -21,9 +21,7 @@ export const SOCIAL_URL = {
   youtube: undefined,
 };
 
-export const FILE_URL = {
-  importFromNotionGuide: 'https://hub-apac-1.lobeobjects.space/assets/notion.mp4',
-};
+export const FILE_URL = {};
 
 export const BRANDING_EMAIL = {
   business: undefined,

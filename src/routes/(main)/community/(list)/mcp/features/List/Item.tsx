@@ -148,7 +148,11 @@ const McpItem = memo<DiscoverMcpItem>(
                   overflow: 'hidden',
                 }}
               >
-                <Link style={{ color: 'inherit', overflow: 'hidden' }} to={link}>
+                <Link
+                  style={{ color: 'inherit', overflow: 'hidden' }}
+                  to={link}
+                  onClick={stopPropagation}
+                >
                   <Text ellipsis as={'h2'} className={styles.title}>
                     {name}
                   </Text>

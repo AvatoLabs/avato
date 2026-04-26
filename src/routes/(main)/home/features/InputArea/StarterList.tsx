@@ -1,156 +1,161 @@
-import { BUILTIN_AGENT_SLUGS } from '@lobechat/builtin-agents';
 import { type ButtonProps } from '@lobehub/ui';
-import { Button, Center, Tooltip } from '@lobehub/ui';
-import { createStaticStyles, cssVar, cx } from 'antd-style';
-import { memo, useCallback, useMemo } from 'react';
+import { Button, Tooltip } from '@lobehub/ui';
+import { createStaticStyles, cssVar } from 'antd-style';
+import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 import { ACTION_ENTRY_ICONS, APP_ENTRY_ICONS } from '@/config/entryIcons';
-import { useInitBuiltinAgent } from '@/hooks/useInitBuiltinAgent';
-import { type StarterMode } from '@/store/home';
-import { useHomeStore } from '@/store/home';
+import { useCreateMenuItems } from '@/routes/(main)/home/_layout/hooks/useCreateMenuItems';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
-  active: css`
-    border-color: ${cssVar.colorFillSecondary} !important;
-    background: ${cssVar.colorBgElevated} !important;
-  `,
   button: css`
-    height: 40px;
-    border-color: ${cssVar.colorFillSecondary};
-    background: transparent;
-    box-shadow: none !important;
+    height: 36px;
+    padding-inline: 13px;
+    border-color: color-mix(
+      in srgb,
+      ${cssVar.colorBorderSecondary} 66%,
+      ${cssVar.colorBorder} 34%
+    ) !important;
+    border-radius: 999px;
+
+    font-size: 13px;
+    font-weight: 600;
+    color: color-mix(in srgb, ${cssVar.colorTextSecondary} 88%, ${cssVar.colorText} 12%);
+    letter-spacing: 0.01em;
+
+    background: color-mix(
+      in srgb,
+      ${cssVar.colorBgContainer} 96%,
+      ${cssVar.colorFillTertiary} 4%
+    ) !important;
+    box-shadow: 0 12px 24px -22px color-mix(in srgb, ${cssVar.colorText} 55%, transparent) !important;
+
+    transition:
+      transform ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      border-color ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      background ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      color ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      box-shadow ${cssVar.motionDurationMid} ${cssVar.motionEaseOut};
 
     &:hover {
-      border-color: ${cssVar.colorFillSecondary} !important;
-      background: ${cssVar.colorBgElevated} !important;
+      transform: translateY(-1px);
+
+      border-color: color-mix(
+        in srgb,
+        ${cssVar.colorPrimaryBorder} 28%,
+        ${cssVar.colorBorderSecondary} 72%
+      ) !important;
+
+      color: ${cssVar.colorText} !important;
+
+      background: color-mix(
+        in srgb,
+        ${cssVar.colorPrimaryBg} 8%,
+        ${cssVar.colorBgContainer} 92%
+      ) !important;
+      box-shadow: 0 18px 30px -24px color-mix(in srgb, ${cssVar.colorText} 62%, transparent) !important;
     }
+
+    &:active {
+      transform: translateY(0) scale(0.985);
+    }
+  `,
+  root: css`
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
   `,
 }));
 
-type StarterTitleKey =
-  | 'starter.createAgent'
-  | 'starter.createGroup'
-  | 'starter.write'
-  | 'starter.seedance'
-  | 'starter.deepResearch'
-  | 'starter.nanoBanana2';
+type StarterKey = 'agent' | 'group' | 'image' | 'write';
 
 interface StarterItem {
+  action: () => Promise<void> | void;
   disabled?: boolean;
-  hot?: boolean;
   icon?: ButtonProps['icon'];
-  key: StarterMode;
-  titleKey: StarterTitleKey;
+  key: StarterKey;
+  titleKey: 'starter.createAgent' | 'starter.createGroup' | 'starter.image' | 'starter.write';
 }
 
 const StarterList = memo(() => {
   const { t } = useTranslation('home');
-
-  useInitBuiltinAgent(BUILTIN_AGENT_SLUGS.agentBuilder);
-  useInitBuiltinAgent(BUILTIN_AGENT_SLUGS.groupAgentBuilder);
-  useInitBuiltinAgent(BUILTIN_AGENT_SLUGS.pageAgent);
-
-  const [inputActiveMode, setInputActiveMode, navigate] = useHomeStore((s) => [
-    s.inputActiveMode,
-    s.setInputActiveMode,
-    s.navigate,
-  ]);
+  const navigate = useNavigate();
+  const { createAgent, createEmptyGroup, createPage } = useCreateMenuItems();
+  const [pendingKey, setPendingKey] = useState<StarterKey | null>(null);
 
   const items: StarterItem[] = useMemo(
     () => [
       {
+        action: createAgent,
         icon: ACTION_ENTRY_ICONS.createAgent,
         key: 'agent',
         titleKey: 'starter.createAgent',
       },
       {
+        action: createEmptyGroup,
         icon: ACTION_ENTRY_ICONS.createGroup,
         key: 'group',
         titleKey: 'starter.createGroup',
       },
       {
+        action: createPage,
         icon: ACTION_ENTRY_ICONS.write,
         key: 'write',
         titleKey: 'starter.write',
       },
       {
+        action: () => navigate('/image?model=gemini-3.1-flash-image-preview:image'),
         icon: APP_ENTRY_ICONS.image,
         key: 'image',
-        titleKey: 'starter.nanoBanana2',
+        titleKey: 'starter.image',
       },
-      // {
-      //   hot: true,
-      //   icon: VideoIcon,
-      //   key: 'video',
-      //   titleKey: 'starter.seedance',
-      // },
-      // {
-      //   disabled: true,
-      //   icon: MicroscopeIcon,
-      //   key: 'research',
-      //   titleKey: 'starter.deepResearch',
-      // },
     ],
-    [],
-  );
-
-  const handleClick = useCallback(
-    (key: StarterMode) => {
-      if (key === 'video') {
-        navigate?.('/video');
-        return;
-      }
-
-      if (key === 'image') {
-        navigate?.('/image?model=gemini-3.1-flash-image-preview:image');
-        return;
-      }
-
-      // Toggle mode: if clicking the active mode, clear it; otherwise set it
-      if (inputActiveMode === key) {
-        setInputActiveMode(null);
-      } else {
-        setInputActiveMode(key);
-      }
-    },
-    [inputActiveMode, setInputActiveMode, navigate],
+    [createAgent, createEmptyGroup, createPage, navigate],
   );
 
   return (
-    <Center horizontal gap={8}>
+    <div className={styles.root}>
       {items.map((item) => {
         const button = (
           <Button
-            className={cx(styles.button, inputActiveMode === item.key && styles.active)}
-            disabled={item.disabled}
+            className={styles.button}
+            disabled={item.disabled || pendingKey !== null}
             icon={item.icon}
             key={item.key}
+            loading={pendingKey === item.key}
             shape={'round'}
             variant={'outlined'}
             iconProps={{
-              color: inputActiveMode === item.key ? cssVar.colorText : cssVar.colorTextSecondary,
-              size: { size: 18, strokeWidth: 2.2 },
+              color: cssVar.colorTextDescription,
+              size: { size: 16, strokeWidth: 2 },
             }}
-            onClick={() => handleClick(item.key)}
+            onClick={async () => {
+              try {
+                setPendingKey(item.key);
+                await item.action();
+              } finally {
+                setPendingKey(null);
+              }
+            }}
           >
             {t(item.titleKey)}
-            {item.hot && ' 🔥'}
           </Button>
         );
 
-        if (item.disabled) {
-          return (
-            <Tooltip key={item.key} title={t('starter.developing')}>
-              {button}
-            </Tooltip>
-          );
-        }
+        if (!item.disabled) return button;
 
-        return button;
+        return (
+          <Tooltip key={item.key} title={t('starter.developing')}>
+            {button}
+          </Tooltip>
+        );
       })}
-    </Center>
+    </div>
   );
 });
+
+StarterList.displayName = 'StarterList';
 
 export default StarterList;

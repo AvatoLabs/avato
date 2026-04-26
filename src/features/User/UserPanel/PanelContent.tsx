@@ -10,6 +10,7 @@ import { isDesktop } from '@/const/version';
 import { navigateToDesktopOnboarding } from '@/routes/(desktop)/desktop-onboarding/navigation';
 import { clearDesktopOnboardingCompleted } from '@/routes/(desktop)/desktop-onboarding/storage';
 import { DesktopOnboardingScreen } from '@/routes/(desktop)/desktop-onboarding/types';
+import { remoteServerService } from '@/services/electron/remoteServer';
 import { useUserStore } from '@/store/user';
 import { authSelectors } from '@/store/user/selectors';
 
@@ -34,7 +35,6 @@ const PanelContent: FC<{ closePopover: () => void }> = ({ closePopover }) => {
       closePopover();
 
       try {
-        const { remoteServerService } = await import('@/services/electron/remoteServer');
         await remoteServerService.clearRemoteServerConfig();
       } catch (error) {
         console.error(error);

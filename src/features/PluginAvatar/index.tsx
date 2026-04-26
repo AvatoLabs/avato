@@ -5,8 +5,9 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Avatar from '@/components/Plugins/PluginAvatar';
-import { pluginHelpers, useToolStore } from '@/store/tool';
+import { pluginHelpers } from '@/store/tool/helpers';
 import { toolSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 interface PluginAvatarProps {
   identifier: string;

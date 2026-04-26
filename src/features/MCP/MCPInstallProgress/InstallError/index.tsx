@@ -2,7 +2,7 @@ import { Alert, Button, Flexbox } from '@lobehub/ui';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 import { type MCPErrorInfo } from '@/types/plugins';
 
 import ErrorDetails from './ErrorDetails';

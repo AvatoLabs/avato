@@ -1,23 +1,17 @@
 import { type ChatCompletionErrorPayload, type ModelRuntime } from '@lobechat/model-runtime';
 import { AGENT_RUNTIME_ERROR_SET } from '@lobechat/model-runtime';
-import { ChatErrorType } from '@lobechat/types';
+import { ChatErrorType, type ChatToolPayload } from '@lobechat/types';
 
 import { checkAuth } from '@/app/(backend)/middleware/auth';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
-import { MobileChatService } from '@/server/services/mobileChat';
+import { MobileChatService, type MobileChatPayload } from '@/server/services/mobileChat';
 import { getMobileInterventionResumeStore } from '@/server/services/mobileChat/resumeStore';
 import { createErrorResponse } from '@/utils/errorResponse';
 
 export const maxDuration = 300;
 
 interface MobileContinuePayload {
-  approvedToolCall?: {
-    apiName: string;
-    arguments: string;
-    id: string;
-    identifier: string;
-    [key: string]: any;
-  };
+  approvedToolCall?: ChatToolPayload;
   assistantMessageId?: string;
   rejectedToolCall?: { id: string; reason?: string };
   sessionId: string;
@@ -35,7 +29,7 @@ export const POST = checkAuth(
       const hasApprove = Boolean(approvedToolCall?.id);
       const hasReject = Boolean(rejectedToolCall?.id);
       if (!sessionId || hasApprove === hasReject) {
-        return createErrorResponse(ChatErrorType.InvalidRequest, {
+        return createErrorResponse(ChatErrorType.BadRequest, {
           error:
             'sessionId is required, and exactly one of approvedToolCall.id or rejectedToolCall.id',
           provider,
@@ -47,7 +41,7 @@ export const POST = checkAuth(
       const state = resumeStore.get(rk);
 
       if (!state) {
-        return createErrorResponse(ChatErrorType.InvalidRequest, {
+        return createErrorResponse(ChatErrorType.BadRequest, {
           error: 'No pending intervention found or session expired',
           provider,
         });
@@ -71,7 +65,7 @@ export const POST = checkAuth(
       return await service.continueIntervention({
         ...(hasApprove ? { approvedToolCall: approvedToolCall! } : {}),
         ...(hasReject ? { rejectedToolCall: rejectedToolCall! } : {}),
-        payload: state.payload,
+        payload: state.payload as MobileChatPayload,
         resumeState: state,
       });
     } catch (error) {

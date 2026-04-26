@@ -1,11 +1,22 @@
 import type { ChatFileItem, ChatImageItem, ChatVideoItem, UIChatMessage } from '@lobechat/types';
 
 import { appEnv } from '@/envs/app';
+import {
+  isSameOriginAppUrl,
+  isStableAppFileProxyUrl,
+} from '@/server/services/file/stableAppFileProxy';
 
 const shouldUseProxyUrl = (url?: string) => {
   if (!url) return false;
+  if (isStableAppFileProxyUrl(url)) return false;
 
-  return appEnv.APP_URL.startsWith('https://') && url.startsWith('http://');
+  if (appEnv.APP_URL.startsWith('https://') && url.startsWith('http://')) return true;
+
+  try {
+    return new URL(url).origin === new URL(appEnv.APP_URL).origin;
+  } catch {
+    return false;
+  }
 };
 
 const withProxyUrl = <T extends { id: string; url: string }>(items?: T[]): T[] | undefined => {

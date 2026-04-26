@@ -55,9 +55,9 @@ table agents_files {
   }
 }
 
-table agents_knowledge_bases {
+table agents_source_sets {
   agent_id text [not null]
-  knowledge_base_id text [not null]
+  source_set_id text [not null]
   user_id text [not null]
   enabled boolean [default: true]
   accessed_at "timestamp with time zone" [not null, default: `now()`]
@@ -65,10 +65,10 @@ table agents_knowledge_bases {
   updated_at "timestamp with time zone" [not null, default: `now()`]
 
   indexes {
-    (agent_id, knowledge_base_id) [pk]
-    agent_id [name: 'agents_knowledge_bases_agent_id_idx']
-    knowledge_base_id [name: 'agents_knowledge_bases_knowledge_base_id_idx']
-    user_id [name: 'agents_knowledge_bases_user_id_idx']
+    (agent_id, source_set_id) [pk]
+    agent_id [name: 'agents_source_sets_agent_id_idx']
+    source_set_id [name: 'agents_source_sets_source_set_id_idx']
+    user_id [name: 'agents_source_sets_user_id_idx']
   }
 }
 
@@ -248,6 +248,30 @@ table agent_skills {
     user_id [name: 'agent_skills_user_id_idx']
     source [name: 'agent_skills_source_idx']
     zip_file_hash [name: 'agent_skills_zip_hash_idx']
+  }
+}
+
+table file_assets {
+  file_id text [pk, not null]
+  space_id text [not null]
+  created_by text
+  classification text [not null, default: 'general']
+  review_status text [not null, default: 'draft']
+  usage_policy text [not null, default: 'internal']
+  rights_owner text
+  reviewed_by text
+  reviewed_at "timestamp with time zone"
+  metadata jsonb
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    space_id [name: 'file_assets_space_id_idx']
+    created_by [name: 'file_assets_created_by_idx']
+    classification [name: 'file_assets_classification_idx']
+    review_status [name: 'file_assets_review_status_idx']
+    usage_policy [name: 'file_assets_usage_policy_idx']
   }
 }
 
@@ -466,6 +490,195 @@ table chat_groups_agents {
   }
 }
 
+table content_access_events {
+  id text [pk, not null]
+  space_id text
+  content_uid text
+  share_link_id text
+  actor_id text
+  access_type text [not null]
+  source_ip text
+  user_agent text
+  metadata jsonb
+  created_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    space_id [name: 'content_access_events_space_id_idx']
+    content_uid [name: 'content_access_events_content_uid_idx']
+    actor_id [name: 'content_access_events_actor_id_idx']
+    share_link_id [name: 'content_access_events_share_link_id_idx']
+  }
+}
+
+table content_audit_logs {
+  id text [pk, not null]
+  space_id text
+  content_uid text
+  actor_id text
+  action text [not null]
+  metadata jsonb
+  before jsonb
+  after jsonb
+  source_ip text
+  user_agent text
+  created_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    space_id [name: 'content_audit_logs_space_id_idx']
+    content_uid [name: 'content_audit_logs_content_uid_idx']
+    actor_id [name: 'content_audit_logs_actor_id_idx']
+    action [name: 'content_audit_logs_action_idx']
+  }
+}
+
+table content_permissions {
+  id text [pk, not null]
+  space_id text [not null]
+  content_uid text [not null]
+  subject_type text [not null]
+  subject_id text [not null]
+  role text [not null]
+  inherits_to_children boolean [not null, default: true]
+  can_reshare boolean [not null, default: false]
+  expires_at "timestamp with time zone"
+  created_by text [not null]
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    (content_uid, subject_type, subject_id) [name: 'content_permissions_subject_unique', unique]
+    space_id [name: 'content_permissions_space_id_idx']
+    (subject_type, subject_id) [name: 'content_permissions_subject_lookup_idx']
+  }
+}
+
+table content_registry {
+  content_uid text [pk, not null]
+  kind text [not null]
+  local_id text [not null]
+  space_id text [not null]
+  authz_epoch integer [not null, default: 1]
+  deleted_at "timestamp with time zone"
+  created_by text
+  metadata jsonb
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    (kind, local_id) [name: 'content_registry_kind_local_id_unique', unique]
+    space_id [name: 'content_registry_space_id_idx']
+    created_by [name: 'content_registry_created_by_idx']
+  }
+}
+
+table content_share_links {
+  id text [pk, not null]
+  space_id text [not null]
+  content_uid text [not null]
+  token_hash varchar(128) [not null]
+  role text [not null, default: 'viewer']
+  expires_at "timestamp with time zone" [not null]
+  password_hash text
+  disabled_at "timestamp with time zone"
+  created_by text [not null]
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    token_hash [name: 'content_share_links_token_hash_unique', unique]
+    content_uid [name: 'content_share_links_content_uid_idx']
+    space_id [name: 'content_share_links_space_id_idx']
+  }
+}
+
+table space_blobs {
+  id text [pk, not null]
+  space_id text [not null]
+  sha256 varchar(64) [not null]
+  storage_key text [not null]
+  status text [not null]
+  size integer [not null]
+  file_type varchar(255) [not null]
+  etag text
+  verified_at "timestamp with time zone"
+  created_by text [not null]
+  metadata jsonb
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    (space_id, sha256) [name: 'space_blobs_space_sha_unique', unique]
+    status [name: 'space_blobs_status_idx']
+    created_by [name: 'space_blobs_created_by_idx']
+  }
+}
+
+table space_members {
+  space_id text [not null]
+  user_id text [not null]
+  role text [not null]
+  created_by text [not null]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    (space_id, user_id) [pk]
+    user_id [name: 'space_members_user_id_idx']
+    role [name: 'space_members_role_idx']
+    space_id [name: 'space_members_owner_unique', unique]
+  }
+}
+
+table spaces {
+  id text [pk, not null]
+  name text [not null]
+  description text
+  kind text [not null]
+  personal_owner_id text
+  created_by text [not null]
+  authz_epoch integer [not null, default: 1]
+  deleted_at "timestamp with time zone"
+  metadata jsonb
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    created_by [name: 'spaces_created_by_idx']
+    kind [name: 'spaces_kind_idx']
+    personal_owner_id [name: 'spaces_personal_owner_unique', unique]
+  }
+}
+
+table upload_sessions {
+  id text [pk, not null]
+  space_id text
+  blob_id text
+  storage_key text [not null]
+  expected_size integer [not null]
+  expected_sha256 varchar(64)
+  status text [not null, default: 'pending']
+  expires_at "timestamp with time zone" [not null]
+  completed_at "timestamp with time zone"
+  etag text
+  created_by text
+  metadata jsonb
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    space_id [name: 'upload_sessions_space_id_idx']
+    blob_id [name: 'upload_sessions_blob_id_idx']
+    expires_at [name: 'upload_sessions_expires_at_idx']
+    status [name: 'upload_sessions_status_idx']
+  }
+}
+
 table documents {
   id varchar(255) [pk, not null]
   title text
@@ -480,9 +693,9 @@ table documents {
   source_type text [not null]
   source text [not null]
   file_id text
-  knowledge_base_id text
+  source_set_id text
   space_id text
-  resource_uid text
+  content_uid text
   parent_id varchar(255)
   inherit_mode text [default: 'inherit']
   deleted_at "timestamp with time zone"
@@ -501,9 +714,9 @@ table documents {
     user_id [name: 'documents_user_id_idx']
     file_id [name: 'documents_file_id_idx']
     parent_id [name: 'documents_parent_id_idx']
-    knowledge_base_id [name: 'documents_knowledge_base_id_idx']
+    source_set_id [name: 'documents_source_set_id_idx']
     space_id [name: 'documents_space_id_idx']
-    resource_uid [name: 'documents_resource_uid_idx']
+    content_uid [name: 'documents_content_uid_idx']
     (client_id, space_id) [name: 'documents_client_id_space_id_unique', unique]
     (slug, space_id) [name: 'documents_slug_space_id_unique', unique]
   }
@@ -519,7 +732,7 @@ table files {
   url text [not null]
   source text
   space_id text
-  resource_uid text
+  content_uid text
   blob_id text
   parent_id varchar(255)
   deleted_at "timestamp with time zone"
@@ -535,7 +748,7 @@ table files {
     file_hash [name: 'file_hash_idx']
     user_id [name: 'files_user_id_idx']
     space_id [name: 'files_space_id_idx']
-    resource_uid [name: 'files_resource_uid_idx']
+    content_uid [name: 'files_content_uid_idx']
     blob_id [name: 'files_blob_id_idx']
     parent_id [name: 'files_parent_id_idx']
     chunk_task_id [name: 'files_chunk_task_id_idx']
@@ -559,31 +772,32 @@ table global_files {
   }
 }
 
-table knowledge_base_files {
-  knowledge_base_id text [not null]
+table source_set_files {
+  source_set_id text [not null]
   file_id text [not null]
   user_id text [not null]
+  space_id text
   created_at "timestamp with time zone" [not null, default: `now()`]
 
   indexes {
-    (knowledge_base_id, file_id) [pk]
-    knowledge_base_id [name: 'knowledge_base_files_kb_id_idx']
-    user_id [name: 'knowledge_base_files_user_id_idx']
-    file_id [name: 'knowledge_base_files_file_id_idx']
+    (source_set_id, file_id) [pk]
+    source_set_id [name: 'source_set_files_source_set_id_idx']
+    user_id [name: 'source_set_files_user_id_idx']
+    file_id [name: 'source_set_files_file_id_idx']
+    space_id [name: 'source_set_files_space_id_idx']
   }
 }
 
-table knowledge_bases {
+table source_sets {
   id text [pk, not null]
   name text [not null]
   description text
   avatar text
   type text
   space_id text
-  resource_uid text
+  content_uid text
   user_id text [not null]
   client_id text
-  is_public boolean [default: false]
   settings jsonb
   deleted_at "timestamp with time zone"
   accessed_at "timestamp with time zone" [not null, default: `now()`]
@@ -591,10 +805,10 @@ table knowledge_bases {
   updated_at "timestamp with time zone" [not null, default: `now()`]
 
   indexes {
-    (client_id, space_id) [name: 'knowledge_bases_client_id_space_id_unique', unique]
-    user_id [name: 'knowledge_bases_user_id_idx']
-    space_id [name: 'knowledge_bases_space_id_idx']
-    resource_uid [name: 'knowledge_bases_resource_uid_idx']
+    (client_id, space_id) [name: 'source_sets_client_id_space_id_unique', unique]
+    user_id [name: 'source_sets_user_id_idx']
+    space_id [name: 'source_sets_space_id_idx']
+    content_uid [name: 'source_sets_content_uid_idx']
   }
 }
 
@@ -1129,7 +1343,7 @@ table rag_eval_datasets {
   id text [pk, not null]
   description text
   name text [not null]
-  knowledge_base_id text
+  source_set_id text
   user_id text
   accessed_at "timestamp with time zone" [not null, default: `now()`]
   created_at "timestamp with time zone" [not null, default: `now()`]
@@ -1148,7 +1362,7 @@ table rag_eval_evaluations {
   status text
   error jsonb
   dataset_id text [not null]
-  knowledge_base_id text
+  source_set_id text
   language_model text
   embedding_model text
   user_id text
@@ -1235,170 +1449,6 @@ table rbac_user_roles {
   }
 }
 
-table resource_access_events {
-  id text [pk, not null]
-  space_id text
-  resource_uid text
-  share_link_id text
-  actor_id text
-  access_type text [not null]
-  source_ip text
-  user_agent text
-  metadata jsonb
-  created_at "timestamp with time zone" [not null, default: `now()`]
-
-  indexes {
-    space_id [name: 'resource_access_events_space_id_idx']
-    resource_uid [name: 'resource_access_events_resource_uid_idx']
-    actor_id [name: 'resource_access_events_actor_id_idx']
-    share_link_id [name: 'resource_access_events_share_link_id_idx']
-  }
-}
-
-table resource_audit_logs {
-  id text [pk, not null]
-  space_id text
-  resource_uid text
-  actor_id text
-  action text [not null]
-  metadata jsonb
-  before jsonb
-  after jsonb
-  source_ip text
-  user_agent text
-  created_at "timestamp with time zone" [not null, default: `now()`]
-
-  indexes {
-    space_id [name: 'resource_audit_logs_space_id_idx']
-    resource_uid [name: 'resource_audit_logs_resource_uid_idx']
-    actor_id [name: 'resource_audit_logs_actor_id_idx']
-    action [name: 'resource_audit_logs_action_idx']
-  }
-}
-
-table resource_permissions {
-  id text [pk, not null]
-  space_id text [not null]
-  resource_uid text [not null]
-  subject_type text [not null]
-  subject_id text [not null]
-  role text [not null]
-  inherits_to_children boolean [not null, default: true]
-  can_reshare boolean [not null, default: false]
-  expires_at "timestamp with time zone"
-  created_by text [not null]
-  accessed_at "timestamp with time zone" [not null, default: `now()`]
-  created_at "timestamp with time zone" [not null, default: `now()`]
-  updated_at "timestamp with time zone" [not null, default: `now()`]
-
-  indexes {
-    (resource_uid, subject_type, subject_id) [name: 'resource_permissions_subject_unique', unique]
-    space_id [name: 'resource_permissions_space_id_idx']
-    (subject_type, subject_id) [name: 'resource_permissions_subject_lookup_idx']
-  }
-}
-
-table resource_registry {
-  resource_uid text [pk, not null]
-  kind text [not null]
-  local_id text [not null]
-  space_id text [not null]
-  authz_epoch integer [not null, default: 1]
-  deleted_at "timestamp with time zone"
-  created_by text
-  metadata jsonb
-  accessed_at "timestamp with time zone" [not null, default: `now()`]
-  created_at "timestamp with time zone" [not null, default: `now()`]
-  updated_at "timestamp with time zone" [not null, default: `now()`]
-
-  indexes {
-    (kind, local_id) [name: 'resource_registry_kind_local_id_unique', unique]
-    space_id [name: 'resource_registry_space_id_idx']
-    created_by [name: 'resource_registry_created_by_idx']
-  }
-}
-
-table resource_share_links {
-  id text [pk, not null]
-  space_id text [not null]
-  resource_uid text [not null]
-  token_hash varchar(128) [not null]
-  role text [not null, default: 'viewer']
-  expires_at "timestamp with time zone" [not null]
-  password_hash text
-  disabled_at "timestamp with time zone"
-  created_by text [not null]
-  accessed_at "timestamp with time zone" [not null, default: `now()`]
-  created_at "timestamp with time zone" [not null, default: `now()`]
-  updated_at "timestamp with time zone" [not null, default: `now()`]
-
-  indexes {
-    token_hash [name: 'resource_share_links_token_hash_unique', unique]
-    resource_uid [name: 'resource_share_links_resource_uid_idx']
-    space_id [name: 'resource_share_links_space_id_idx']
-  }
-}
-
-table space_blobs {
-  id text [pk, not null]
-  space_id text [not null]
-  sha256 varchar(64) [not null]
-  storage_key text [not null]
-  status text [not null]
-  size integer [not null]
-  file_type varchar(255) [not null]
-  etag text
-  verified_at "timestamp with time zone"
-  created_by text [not null]
-  metadata jsonb
-  accessed_at "timestamp with time zone" [not null, default: `now()`]
-  created_at "timestamp with time zone" [not null, default: `now()`]
-  updated_at "timestamp with time zone" [not null, default: `now()`]
-
-  indexes {
-    (space_id, sha256) [name: 'space_blobs_space_sha_unique', unique]
-    status [name: 'space_blobs_status_idx']
-    created_by [name: 'space_blobs_created_by_idx']
-  }
-}
-
-table space_members {
-  space_id text [not null]
-  user_id text [not null]
-  role text [not null]
-  created_by text [not null]
-  created_at "timestamp with time zone" [not null, default: `now()`]
-  updated_at "timestamp with time zone" [not null, default: `now()`]
-
-  indexes {
-    (space_id, user_id) [pk]
-    user_id [name: 'space_members_user_id_idx']
-    role [name: 'space_members_role_idx']
-    space_id [name: 'space_members_owner_unique', unique]
-  }
-}
-
-table spaces {
-  id text [pk, not null]
-  name text [not null]
-  description text
-  kind text [not null]
-  personal_owner_id text
-  created_by text [not null]
-  authz_epoch integer [not null, default: 1]
-  deleted_at "timestamp with time zone"
-  metadata jsonb
-  accessed_at "timestamp with time zone" [not null, default: `now()`]
-  created_at "timestamp with time zone" [not null, default: `now()`]
-  updated_at "timestamp with time zone" [not null, default: `now()`]
-
-  indexes {
-    created_by [name: 'spaces_created_by_idx']
-    kind [name: 'spaces_kind_idx']
-    personal_owner_id [name: 'spaces_personal_owner_unique', unique]
-  }
-}
-
 table agents_to_sessions {
   agent_id text [not null]
   session_id text [not null]
@@ -1479,6 +1529,39 @@ table sessions {
     (id, user_id) [name: 'sessions_id_user_id_idx']
     (user_id, updated_at) [name: 'sessions_user_id_updated_at_idx']
     group_id [name: 'sessions_group_id_idx']
+  }
+}
+
+table space_memory_entries {
+  id varchar(255) [pk, not null]
+  space_id text [not null]
+  created_by text [not null]
+  updated_by text
+  reviewed_by text
+  status varchar(32) [not null, default: 'candidate']
+  category varchar(32) [not null, default: 'general']
+  title varchar(255) [not null]
+  summary text
+  content text
+  source_refs jsonb
+  metadata jsonb
+  recall_enabled boolean [not null, default: true]
+  expires_at "timestamp with time zone"
+  stale_at "timestamp with time zone"
+  last_verified_at "timestamp with time zone"
+  published_at "timestamp with time zone"
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    space_id [name: 'space_memory_entries_space_id_idx']
+    (space_id, status) [name: 'space_memory_entries_space_status_idx']
+    (space_id, category) [name: 'space_memory_entries_space_category_idx']
+    (space_id, status, recall_enabled) [name: 'space_memory_entries_space_recall_idx']
+    expires_at [name: 'space_memory_entries_expires_at_idx']
+    stale_at [name: 'space_memory_entries_stale_at_idx']
+    reviewed_by [name: 'space_memory_entries_reviewed_by_idx']
   }
 }
 
@@ -1570,6 +1653,7 @@ table topics {
   editor_data jsonb
   agent_id text
   group_id text
+  space_id text
   user_id text [not null]
   client_id text
   history_summary text
@@ -1587,6 +1671,7 @@ table topics {
     session_id [name: 'topics_session_id_idx']
     tag_id [name: 'topics_tag_id_idx']
     group_id [name: 'topics_group_id_idx']
+    space_id [name: 'topics_space_id_idx']
     agent_id [name: 'topics_agent_id_idx']
     trigger [name: 'topics_trigger_idx']
     () [name: 'topics_extract_status_gin_idx']
@@ -1914,9 +1999,9 @@ ref: agents_files.file_id > files.id
 
 ref: agents_files.agent_id > agents.id
 
-ref: agents_knowledge_bases.knowledge_base_id - knowledge_bases.id
+ref: agents_source_sets.source_set_id - source_sets.id
 
-ref: agents_knowledge_bases.agent_id > agents.id
+ref: agents_source_sets.agent_id > agents.id
 
 ref: agents_to_sessions.session_id > sessions.id
 

@@ -12,7 +12,7 @@ import SearchResultCount from '@/routes/(main)/community/components/SearchResult
 import Statistic from '@/routes/(main)/community/components/Statistic';
 import Title from '@/routes/(main)/community/components/Title';
 import { aggregatorClientService } from '@/services/aggregator';
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 import { DiscoverTab } from '@/types/discover';
 import {
   SKILL_AGGREGATOR_ALL_SOURCE,

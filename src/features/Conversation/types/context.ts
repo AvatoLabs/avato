@@ -16,7 +16,7 @@ export interface ConversationContext extends BaseConversationContext {
    * Metadata (optional, for extension)
    *
    * Can be used to store additional context-specific data:
-   * - knowledgeBaseId: For knowledge base chat
+   * - sourceSetId: For source-set chat
    * - agentId: For agent preview chat
    * - preview: Boolean flag for preview mode
    * - etc.
@@ -32,8 +32,8 @@ export type ConversationMetadata<T = Record<string, any>> = T;
 /**
  * Common metadata types
  */
-export interface KnowledgeBaseMetadata {
-  knowledgeBaseId: string;
+export interface SourceSetMetadata {
+  sourceSetId: string;
 }
 
 export interface AgentPreviewMetadata {

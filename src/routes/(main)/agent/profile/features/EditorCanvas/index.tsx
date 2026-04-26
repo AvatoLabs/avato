@@ -16,8 +16,8 @@ import isEqual from 'fast-deep-equal';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 import { EMPTY_EDITOR_STATE } from '../constants';
 import { useMentionOptions } from '../ProfileEditor/MentionList';

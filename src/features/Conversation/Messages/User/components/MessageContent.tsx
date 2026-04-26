@@ -6,22 +6,20 @@ import { cleanSpeakerTag } from '@/store/chat/utils/cleanSpeakerTag';
 import { type UIChatMessage } from '@/types/index';
 
 import { useMarkdown } from '../useMarkdown';
+import DocSelections from './DocSelections';
 import FileListViewer from './FileListViewer';
 import ImageFileListViewer from './ImageFileListViewer';
-import PageSelections from './PageSelections';
 import VideoFileListViewer from './VideoFileListViewer';
 
 const UserMessageContent = memo<UIChatMessage>(
   ({ id, content, imageList, videoList, fileList, metadata }) => {
     const markdownProps = useMarkdown(id);
-    const pageSelections = metadata?.pageSelections;
+    const docSelections = metadata?.docSelections;
     const displayContent = useMemo(() => (content ? cleanSpeakerTag(content) : content), [content]);
 
     return (
       <Flexbox gap={8} id={id}>
-        {pageSelections && pageSelections.length > 0 && (
-          <PageSelections selections={pageSelections} />
-        )}
+        {docSelections && docSelections.length > 0 && <DocSelections selections={docSelections} />}
         {displayContent && <MarkdownMessage {...markdownProps}>{displayContent}</MarkdownMessage>}
         {imageList && imageList?.length > 0 && <ImageFileListViewer items={imageList} />}
         {videoList && videoList?.length > 0 && <VideoFileListViewer items={videoList} />}

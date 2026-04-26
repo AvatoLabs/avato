@@ -8,6 +8,7 @@ import { threadService } from '@/services/thread';
 import { type ThreadItem } from '@/types/topic';
 import { ThreadStatus, ThreadType } from '@/types/topic';
 
+import { PortalViewType } from '../portal/initialState';
 import { useChatStore } from '../../store';
 
 // Mock @/libs/swr mutate
@@ -122,7 +123,7 @@ describe('thread action', () => {
       expect(result.current.threadStartMessageId).toBe('message-id');
       expect(result.current.startToForkThread).toBe(true);
       expect(pushPortalViewSpy).toHaveBeenCalledWith({
-        type: 'thread',
+        type: PortalViewType.Thread,
         startMessageId: 'message-id',
       });
     });
@@ -140,7 +141,7 @@ describe('thread action', () => {
       expect(result.current.threadStartMessageId).toBe('source-message-id');
       expect(result.current.startToForkThread).toBe(false);
       expect(pushPortalViewSpy).toHaveBeenCalledWith({
-        type: 'thread',
+        type: PortalViewType.Thread,
         threadId: 'thread-id',
         startMessageId: 'source-message-id',
       });
@@ -403,7 +404,7 @@ describe('thread action', () => {
 
       act(() => {
         useChatStore.setState({
-          portalStack: [{ threadId: 'thread-id', type: 'thread' }],
+          portalStack: [{ threadId: 'thread-id', type: PortalViewType.Thread }],
           threadMaps: {
             'test-topic-id': [mockThread],
           },
@@ -455,7 +456,7 @@ describe('thread action', () => {
 
       act(() => {
         useChatStore.setState({
-          portalStack: [{ threadId: 'thread-id', type: 'thread' }],
+          portalStack: [{ threadId: 'thread-id', type: PortalViewType.Thread }],
           threadMaps: {
             'test-topic-id': [mockThread],
           },
@@ -491,7 +492,7 @@ describe('thread action', () => {
 
       act(() => {
         useChatStore.setState({
-          portalStack: [{ threadId: 'thread-id', type: 'thread' }],
+          portalStack: [{ threadId: 'thread-id', type: PortalViewType.Thread }],
           threadMaps: {
             'test-topic-id': [mockThread],
           },

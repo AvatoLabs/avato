@@ -3,9 +3,21 @@
 import { Flexbox, Text } from '@lobehub/ui';
 import { DatePicker, Modal } from 'antd';
 import { type RangePickerProps } from 'antd/es/date-picker';
+import { createStyles } from 'antd-style';
 import dayjs from 'dayjs';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const useStyles = createStyles(({ css, token }) => ({
+  solidPrimaryForeground: css`
+    color: ${token.colorTextLightSolid} !important;
+
+    .anticon,
+    svg {
+      color: ${token.colorTextLightSolid} !important;
+    }
+  `,
+}));
 
 interface Props {
   footerNote: string;
@@ -19,6 +31,7 @@ interface Props {
 
 const DateRangeModal = memo<Props>(
   ({ footerNote, onCancel, onChange, onSubmit, open, range, submitting }) => {
+    const { styles } = useStyles();
     const { t } = useTranslation('memory');
 
     const disabledDate = useCallback<NonNullable<RangePickerProps['disabledDate']>>(
@@ -29,7 +42,7 @@ const DateRangeModal = memo<Props>(
     return (
       <Modal
         cancelText={t('analysis.modal.cancel')}
-        okButtonProps={{ loading: submitting }}
+        okButtonProps={{ className: styles.solidPrimaryForeground, loading: submitting }}
         okText={t('analysis.modal.submit')}
         open={open}
         title={t('analysis.modal.title')}

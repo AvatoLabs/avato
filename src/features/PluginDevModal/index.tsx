@@ -30,13 +30,16 @@ const DevModal = memo<DevModalProps>(
 
     const { mobile } = useResponsive();
     const [form] = Form.useForm();
-    useEffect(() => {
-      form.setFieldsValue(value);
-    }, []);
 
     useEffect(() => {
-      if (mode === 'create' && !open) form.resetFields();
-    }, [open]);
+      if (!open) return;
+
+      if (mode === 'create') {
+        form.resetFields();
+      }
+
+      form.setFieldsValue(value);
+    }, [form, mode, open, value]);
 
     const buttonStyle = mobile ? { flex: 1 } : { margin: 0 };
 

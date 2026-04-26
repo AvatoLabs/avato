@@ -1,4 +1,4 @@
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
 import { useUserStore } from '@/store/user';
 import { authSelectors } from '@/store/user/slices/auth/selectors';
 

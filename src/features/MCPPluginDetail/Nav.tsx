@@ -18,8 +18,8 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import urlJoin from 'url-join';
 
-import { useToolStore } from '@/store/tool';
 import { pluginSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 import { McpNavKey } from '@/types/discover';
 
 import { useDetailContext } from './DetailProvider';

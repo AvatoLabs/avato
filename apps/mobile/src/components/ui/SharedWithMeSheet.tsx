@@ -1,11 +1,10 @@
 /**
- * Resources shared with the current user (resourceShare.listSharedWithMe).
+ * Content shared with the current user (resourceShare.listSharedWithMe).
  */
 import { ChevronRight, Link2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   FlatList,
   type ListRenderItemInfo,
   Modal,
@@ -13,22 +12,26 @@ import {
   RefreshControl,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { resourceShareApi } from '../../lib/api';
+import { contentShareApi } from '../../lib/api';
+import { formatMobileDateTime } from '../../lib/dateTime';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
+import { getCanonicalSharedResourceKind } from '../../lib/resourceShare';
+import { getResponsiveLayoutMetrics } from '../../lib/responsiveLayout';
 import { useThemeColors } from '../../theme/colors';
 import { enteringModalContent } from '../../theme/motion';
 
 export interface SharedWithMeRow {
-  kind: 'document' | 'file' | 'knowledge_base';
+  contentUid?: string;
+  kind: 'document' | 'file' | 'source_set';
   localId: string;
   name: string;
-  resourceUid?: string;
   sharedExpiresAt?: string | Date | null;
   sharedRole?: 'editor' | 'owner' | 'viewer';
   spaceId?: string | null;
@@ -37,10 +40,11 @@ export interface SharedWithMeRow {
 function normalizeRow(raw: unknown, untitled: string): SharedWithMeRow | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as Record<string, unknown>;
-  const kind = o.kind;
+  const rawKind = o.kind;
   const localId = o.localId;
-  if (kind !== 'file' && kind !== 'document' && kind !== 'knowledge_base') return null;
+  if (rawKind !== 'file' && rawKind !== 'document' && rawKind !== 'source_set') return null;
   if (typeof localId !== 'string') return null;
+  const kind = getCanonicalSharedResourceKind({ kind: rawKind, localId });
   const sr = o.sharedRole;
   const sharedRole = sr === 'editor' || sr === 'owner' || sr === 'viewer' ? sr : undefined;
   const se = o.sharedExpiresAt;
@@ -50,7 +54,7 @@ function normalizeRow(raw: unknown, untitled: string): SharedWithMeRow | null {
     kind,
     localId,
     name: typeof o.name === 'string' ? o.name : untitled,
-    resourceUid: typeof o.resourceUid === 'string' ? o.resourceUid : undefined,
+    contentUid: typeof o.contentUid === 'string' ? o.contentUid : undefined,
     sharedExpiresAt,
     sharedRole,
     spaceId: typeof o.spaceId === 'string' ? o.spaceId : null,
@@ -58,14 +62,7 @@ function normalizeRow(raw: unknown, untitled: string): SharedWithMeRow | null {
 }
 
 function formatSharedWhen(value: string | Date | null | undefined): string {
-  if (value == null) return '—';
-  try {
-    const d = typeof value === 'string' ? new Date(value) : value;
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString();
-  } catch {
-    return '—';
-  }
+  return formatMobileDateTime(value);
 }
 
 function kindLabel(
@@ -73,11 +70,11 @@ function kindLabel(
   t: {
     resourceSharedKindDocument: string;
     resourceSharedKindFile: string;
-    resourceSharedKindLibrary: string;
+    resourceSharedKindSourceSet: string;
   },
 ) {
   if (kind === 'file') return t.resourceSharedKindFile;
-  if (kind === 'knowledge_base') return t.resourceSharedKindLibrary;
+  if (kind === 'source_set') return t.resourceSharedKindSourceSet;
   return t.resourceSharedKindDocument;
 }
 
@@ -100,21 +97,33 @@ function roleLabelUi(
   return t.resourceShareRoleViewer;
 }
 
-const SHARED_LIST_MAX_H = Math.min(420, Math.round(Dimensions.get('window').height * 0.52));
-
 export default function SharedWithMeSheet({ visible, onClose, onPick }: SharedWithMeSheetProps) {
   const colors = useThemeColors();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
   const [rows, setRows] = useState<SharedWithMeRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [failed, setFailed] = useState(false);
+  const isFloatingPanel = responsiveMetrics.isTablet;
+  const sheetWidth = Math.min(
+    Math.max(screenWidth - 32, 0),
+    responsiveMetrics.isWideTablet ? 720 : 640,
+  );
+  const sheetMaxHeight = isFloatingPanel
+    ? Math.min(Math.round(screenHeight * 0.78), 760)
+    : Math.round(screenHeight * 0.85);
+  const sharedListMaxHeight = Math.min(
+    isFloatingPanel ? 520 : 420,
+    Math.round(screenHeight * (isFloatingPanel ? 0.58 : 0.52)),
+  );
 
   const load = useCallback(async () => {
     setFailed(false);
     try {
-      const raw = await resourceShareApi.listSharedWithMe();
+      const raw = await contentShareApi.listSharedWithMe();
       const list = (Array.isArray(raw) ? raw : [])
         .map((item) => normalizeRow(item, t.resourceUntitled))
         .filter((r): r is SharedWithMeRow => r !== null);
@@ -142,7 +151,8 @@ export default function SharedWithMeSheet({ visible, onClose, onPick }: SharedWi
       <TouchableOpacity
         accessibilityRole="button"
         activeOpacity={0.7}
-        className="flex-row items-center py-3.5 border-b border-foreground/8 gap-2"
+        className="mb-3 flex-row items-center gap-2 rounded-2xl border px-4 py-3.5"
+        style={{ backgroundColor: colors.card, borderColor: colors.borderSubtle }}
         onPress={() => {
           haptics.selection();
           onPick(item);
@@ -166,7 +176,7 @@ export default function SharedWithMeSheet({ visible, onClose, onPick }: SharedWi
         <ChevronRight color={colors.muted} size={18} strokeWidth={2} />
       </TouchableOpacity>
     ),
-    [colors.muted, colors.secondaryText, onPick, t],
+    [colors.borderSubtle, colors.card, colors.muted, colors.secondaryText, onPick, t],
   );
 
   return (
@@ -177,13 +187,32 @@ export default function SharedWithMeSheet({ visible, onClose, onPick }: SharedWi
       visible={visible}
       onRequestClose={onClose}
     >
-      <Pressable className="flex-1 justify-end bg-black/45" onPress={onClose}>
+      <Pressable
+        className="flex-1 bg-black/45"
+        style={{
+          justifyContent: isFloatingPanel ? 'center' : 'flex-end',
+          paddingHorizontal: isFloatingPanel ? 16 : 0,
+          paddingVertical: isFloatingPanel ? 24 : 0,
+        }}
+        onPress={onClose}
+      >
         <Animated.View
           entering={enteringModalContent()}
-          style={{ maxHeight: '85%', paddingBottom: Math.max(insets.bottom, 12) }}
+          style={{
+            alignSelf: 'center',
+            maxHeight: sheetMaxHeight,
+            paddingBottom: isFloatingPanel
+              ? Math.max(insets.bottom, 16)
+              : Math.max(insets.bottom, 12),
+            width: isFloatingPanel ? sheetWidth : undefined,
+          }}
         >
           <Pressable
-            className="bg-card rounded-t-2xl overflow-hidden"
+            className={
+              isFloatingPanel
+                ? 'bg-card rounded-3xl overflow-hidden'
+                : 'bg-card rounded-t-2xl overflow-hidden'
+            }
             onPress={(e) => e.stopPropagation()}
           >
             <View className="items-center pt-3 pb-2">
@@ -229,7 +258,35 @@ export default function SharedWithMeSheet({ visible, onClose, onPick }: SharedWi
                 keyExtractor={(item) => `${item.kind}:${item.localId}`}
                 renderItem={renderSharedRow}
                 showsVerticalScrollIndicator={false}
-                style={{ maxHeight: SHARED_LIST_MAX_H }}
+                style={{ maxHeight: sharedListMaxHeight }}
+                ListHeaderComponent={
+                  <View
+                    className="mb-4 rounded-2xl border px-4 py-4"
+                    style={{
+                      backgroundColor: colors.fillQuaternary,
+                      borderColor: colors.borderSubtle,
+                    }}
+                  >
+                    <Text
+                      className="text-[11px] font-semibold uppercase tracking-[1.2px]"
+                      style={{ color: colors.secondaryText }}
+                    >
+                      {t.resourceSharedWithMe}
+                    </Text>
+                    <Text
+                      className="mt-2 text-[15px] font-semibold"
+                      style={{ color: colors.foreground }}
+                    >
+                      {rows.length}
+                    </Text>
+                    <Text
+                      className="mt-1 text-[13px] leading-5"
+                      style={{ color: colors.secondaryText }}
+                    >
+                      {t.resourceShareLinkSheetSubtitle}
+                    </Text>
+                  </View>
+                }
                 refreshControl={
                   <RefreshControl
                     refreshing={refreshing}

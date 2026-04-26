@@ -1,7 +1,7 @@
 // @vitest-environment node
 import type { ImageGenerationAsset, VideoGenerationAsset } from '@lobechat/types';
 import { AsyncTaskStatus, FileSource } from '@lobechat/types';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getTestDB } from '../../core/getTestDB';
@@ -20,18 +20,26 @@ import { GenerationModel } from '../generation';
 const serverDB: LobeChatDatabase = await getTestDB();
 
 // Mock FileService
+const mockCreateFileRecord = vi.fn();
 const mockGetFullFileUrl = vi.fn();
 vi.mock('@/server/services/file', () => ({
   FileService: vi.fn().mockImplementation(() => ({
+    createFileRecord: mockCreateFileRecord,
     getFullFileUrl: mockGetFullFileUrl,
   })),
 }));
 
 // Mock FileModel
-const mockFileModelCreate = vi.fn();
+const mockFileModelFindByUrls = vi.fn();
+const mockFileModelDeleteManyAny = vi.fn();
+const mockFileModelCheckHash = vi.fn();
+const mockFileModelHasFilesForBlob = vi.fn();
 vi.mock('../file', () => ({
   FileModel: vi.fn().mockImplementation(() => ({
-    create: mockFileModelCreate,
+    checkHash: mockFileModelCheckHash,
+    deleteManyAny: mockFileModelDeleteManyAny,
+    findByUrls: mockFileModelFindByUrls,
+    hasFilesForBlob: mockFileModelHasFilesForBlob,
   })),
 }));
 
@@ -96,7 +104,51 @@ beforeEach(async () => {
   vi.clearAllMocks();
 
   // Setup mock return values
+  mockCreateFileRecord.mockResolvedValue({
+    fileId: 'new-file-id',
+    url: 'v2/spaces/spc_personal/blobs/generations/images/new-generated-image.jpg',
+  });
   mockGetFullFileUrl.mockImplementation((url: string) => `https://example.com/${url}`);
+  mockFileModelFindByUrls.mockImplementation(async (urls: string[]) => {
+    if (!urls.length) return [];
+
+    return serverDB.query.files.findMany({
+      where: (table, { and, eq, inArray }) =>
+        and(eq(table.userId, userId), inArray(table.url, urls)),
+    });
+  });
+  mockFileModelDeleteManyAny.mockImplementation(async (ids: string[]) => {
+    if (!ids.length) return [];
+
+    const fileList = await serverDB.query.files.findMany({
+      where: inArray(files.id, ids),
+    });
+    await serverDB.delete(files).where(inArray(files.id, ids));
+
+    return fileList;
+  });
+  mockFileModelCheckHash.mockImplementation(async (hash: string) => {
+    const item = await serverDB.query.globalFiles.findFirst({
+      where: (table, { eq }) => eq(table.hashId, hash),
+    });
+
+    if (!item) return { isExist: false };
+
+    return {
+      fileType: item.fileType,
+      isExist: true,
+      metadata: item.metadata,
+      size: item.size,
+      url: item.url,
+    };
+  });
+  mockFileModelHasFilesForBlob.mockImplementation(async (blobId: string) => {
+    const remainingFiles = await serverDB.query.files.findMany({
+      where: and(eq(files.userId, userId), eq(files.blobId, blobId)),
+    });
+
+    return remainingFiles.length > 0;
+  });
 
   // Clear database and create test users
   await serverDB.delete(users);
@@ -125,9 +177,6 @@ beforeEach(async () => {
     userId,
   };
   await serverDB.insert(files).values(mockFileForUpdateTest);
-
-  // Setup FileModel mock to return the actual file ID that exists in database
-  mockFileModelCreate.mockResolvedValue({ id: 'new-file-id' });
 });
 
 afterEach(async () => {
@@ -326,9 +375,10 @@ describe('GenerationModel', () => {
 
       const newFileData = {
         name: 'new-generated-image.jpg',
-        url: 'https://example.com/new-generated-image.jpg',
+        sha256: 'sha-generated-image',
         size: 2097152,
         fileType: 'image/jpeg',
+        storageKey: 'v2/spaces/spc_personal/blobs/generations/images/new-generated-image.jpg',
       };
 
       const result = await generationModel.createAssetAndFile(
@@ -337,15 +387,17 @@ describe('GenerationModel', () => {
         newFileData,
       );
 
-      expect(result.file.id).toBe('new-file-id');
-      expect(mockFileModelCreate).toHaveBeenCalledWith(
-        {
-          ...newFileData,
-          source: FileSource.ImageGeneration,
-        },
-        true,
-        expect.any(Object), // transaction object
-      );
+      expect(result?.file.id).toBe('new-file-id');
+      expect(mockCreateFileRecord).toHaveBeenCalledWith({
+        fileType: 'image/jpeg',
+        metadata: undefined,
+        name: 'new-generated-image.jpg',
+        sha256: 'sha-generated-image',
+        size: 2097152,
+        source: FileSource.ImageGeneration,
+        spaceId: 'spc_personal',
+        storageKey: 'v2/spaces/spc_personal/blobs/generations/images/new-generated-image.jpg',
+      });
 
       // Verify generation was updated
       const updatedGeneration = await serverDB.query.generations.findFirst({
@@ -371,9 +423,10 @@ describe('GenerationModel', () => {
 
       const newFileData = {
         name: 'hacked-file.jpg',
-        url: 'https://example.com/hacked-file.jpg',
+        sha256: 'sha-hacked-file',
         size: 1,
         fileType: 'image/jpeg',
+        storageKey: 'v2/spaces/spc_personal/blobs/generations/images/hacked-file.jpg',
       };
 
       await generationModel.createAssetAndFile(otherUserGeneration.id, newAsset, newFileData);
@@ -384,15 +437,16 @@ describe('GenerationModel', () => {
       });
       expect(unchanged?.asset).toBeNull();
       expect(unchanged?.fileId).toBeNull();
+      expect(mockCreateFileRecord).not.toHaveBeenCalled();
     });
 
-    it('should handle FileModel errors in transaction', async () => {
+    it('should handle file record creation errors before updating generation', async () => {
       const [createdGeneration] = await serverDB
         .insert(generations)
         .values({ ...testGeneration, userId, asset: null, fileId: null })
         .returning();
 
-      mockFileModelCreate.mockRejectedValue(new Error('File creation failed'));
+      mockCreateFileRecord.mockRejectedValue(new Error('File creation failed'));
 
       const newAsset = {
         url: 'asset.jpg',
@@ -403,16 +457,17 @@ describe('GenerationModel', () => {
 
       const newFileData = {
         name: 'image.jpg',
-        url: 'https://example.com/image.jpg',
+        sha256: 'sha-image',
         size: 1024,
         fileType: 'image/jpeg',
+        storageKey: 'v2/spaces/spc_personal/blobs/generations/images/image.jpg',
       };
 
       await expect(
         generationModel.createAssetAndFile(createdGeneration.id, newAsset, newFileData),
       ).rejects.toThrow('File creation failed');
 
-      // Verify generation was not updated due to transaction rollback
+      // Verify generation was not updated when file creation failed
       const unchanged = await serverDB.query.generations.findFirst({
         where: eq(generations.id, createdGeneration.id),
       });
@@ -428,9 +483,11 @@ describe('GenerationModel', () => {
         .values({ ...testGeneration, userId })
         .returning();
 
-      const deletedGeneration = await generationModel.delete(createdGeneration.id);
+      const result = await generationModel.delete(createdGeneration.id);
 
-      expect(deletedGeneration.id).toBe(createdGeneration.id);
+      expect(result).toBeDefined();
+      expect(result!.deletedGeneration.id).toBe(createdGeneration.id);
+      expect(result!.filesToDelete).toEqual(['asset-url.jpg', 'thumbnail-url.jpg']);
 
       const deletedRecord = await serverDB.query.generations.findFirst({
         where: eq(generations.id, createdGeneration.id),
@@ -460,6 +517,37 @@ describe('GenerationModel', () => {
       const result = await generationModel.delete('non-existent-id');
       expect(result).toBeUndefined();
     });
+
+    it('should delete generated file rows and return removable URLs for file-backed generations', async () => {
+      const [createdGeneration] = await serverDB
+        .insert(generations)
+        .values({
+          ...testGeneration,
+          userId,
+          fileId: 'test-file-id',
+          asset: {
+            type: 'image',
+            url: testFile.url,
+            thumbnailUrl: 'thumbnail-file.jpg',
+            width: 1024,
+            height: 1024,
+          },
+        })
+        .returning();
+
+      const result = await generationModel.delete(createdGeneration.id);
+
+      expect(result).toBeDefined();
+      expect(result!.filesToDelete).toEqual([
+        'thumbnail-file.jpg',
+        'https://example.com/generated-image.jpg',
+      ]);
+
+      const deletedFile = await serverDB.query.files.findFirst({
+        where: eq(files.id, 'test-file-id'),
+      });
+      expect(deletedFile).toBeUndefined();
+    });
   });
 
   describe('findByIdAndTransform', () => {
@@ -487,7 +575,6 @@ describe('GenerationModel', () => {
         },
       });
 
-      expect(mockGetFullFileUrl).toHaveBeenCalledWith('asset-url.jpg');
       expect(mockGetFullFileUrl).toHaveBeenCalledWith('thumbnail-url.jpg');
     });
 
@@ -545,7 +632,7 @@ describe('GenerationModel', () => {
       expect(result).toMatchObject({
         id: 'test-gen-id',
         asset: {
-          url: 'https://example.com/original-asset.jpg',
+          url: '/f/file-id',
           thumbnailUrl: 'https://example.com/original-thumbnail.jpg',
           width: 1024,
           height: 1024,
@@ -558,7 +645,6 @@ describe('GenerationModel', () => {
         },
       });
 
-      expect(mockGetFullFileUrl).toHaveBeenCalledWith('original-asset.jpg');
       expect(mockGetFullFileUrl).toHaveBeenCalledWith('original-thumbnail.jpg');
     });
 
@@ -764,6 +850,69 @@ describe('GenerationModel', () => {
       expect(resultAsset.coverUrl).toBe('https://example.com/video-cover.jpg');
     });
 
+    it('should prefer stable file proxies for related generation asset URLs with file records', async () => {
+      await serverDB.insert(files).values([
+        {
+          id: 'file-video',
+          url: 'video-url.mp4',
+          fileType: 'video/mp4',
+          name: 'video-url.mp4',
+          size: 1024,
+          userId,
+        } as any,
+        {
+          id: 'file-thumbnail',
+          url: 'video-thumbnail.jpg',
+          fileType: 'image/jpeg',
+          name: 'video-thumbnail.jpg',
+          size: 512,
+          userId,
+        } as any,
+        {
+          id: 'file-cover',
+          url: 'video-cover.jpg',
+          fileType: 'image/jpeg',
+          name: 'video-cover.jpg',
+          size: 512,
+          userId,
+        } as any,
+      ]);
+
+      const videoAsset = {
+        url: 'video-url.mp4',
+        thumbnailUrl: 'video-thumbnail.jpg',
+        coverUrl: 'video-cover.jpg',
+        width: 1920,
+        height: 1080,
+        duration: 10,
+      } as VideoGenerationAsset;
+
+      const generationWithVideo = {
+        id: 'test-gen-id',
+        userId,
+        generationBatchId: 'batch-id',
+        asyncTaskId: null,
+        fileId: null,
+        seed: 12345,
+        asset: videoAsset,
+        accessedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        asyncTask: undefined,
+      };
+
+      const result = await generationModel.transformGeneration(generationWithVideo as any);
+
+      expect(mockGetFullFileUrl).not.toHaveBeenCalledWith('video-url.mp4');
+      expect(mockGetFullFileUrl).not.toHaveBeenCalledWith('video-thumbnail.jpg');
+      expect(mockGetFullFileUrl).not.toHaveBeenCalledWith('video-cover.jpg');
+
+      const resultAsset = result.asset as VideoGenerationAsset;
+      expect(resultAsset.url).toBe('/f/file-video');
+      expect(resultAsset.thumbnailUrl).toBe('/f/file-thumbnail');
+      expect(resultAsset.coverUrl).toBe('/f/file-cover');
+    });
+
     it('should not convert coverUrl when video asset has no coverUrl', async () => {
       const videoAssetNoCover = {
         url: 'video-url.mp4',
@@ -794,7 +943,64 @@ describe('GenerationModel', () => {
       expect(mockGetFullFileUrl).toHaveBeenCalledWith('video-thumbnail.jpg');
 
       const resultAsset = result.asset as VideoGenerationAsset;
+      expect(resultAsset.url).toBe('https://example.com/video-url.mp4');
       expect(resultAsset.coverUrl).toBeUndefined();
+    });
+
+    it('should fall back to full file URL when generation asset has no fileId', async () => {
+      const generationWithoutFileId = {
+        id: 'test-gen-id',
+        userId,
+        generationBatchId: 'batch-id',
+        asyncTaskId: null,
+        fileId: null,
+        seed: 12345,
+        asset: {
+          url: 'orphan-asset.jpg',
+          thumbnailUrl: 'orphan-thumbnail.jpg',
+          width: 1024,
+          height: 1024,
+        } as ImageGenerationAsset,
+        accessedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        asyncTask: undefined,
+      };
+
+      const result = await generationModel.transformGeneration(generationWithoutFileId as any);
+
+      expect(mockGetFullFileUrl).toHaveBeenCalledWith('orphan-asset.jpg');
+      expect(mockGetFullFileUrl).toHaveBeenCalledWith('orphan-thumbnail.jpg');
+      expect(result.asset?.url).toBe('https://example.com/orphan-asset.jpg');
+    });
+
+    it('should preserve stable proxy urls already stored on generation assets', async () => {
+      const generationWithStableProxyUrls = {
+        id: 'test-gen-id',
+        userId,
+        generationBatchId: 'batch-id',
+        asyncTaskId: null,
+        fileId: null,
+        seed: 12345,
+        asset: {
+          url: '/share/f/share-token-asset',
+          thumbnailUrl: '/share/f/share-token-thumb?password=secret',
+          width: 1024,
+          height: 1024,
+        } as ImageGenerationAsset,
+        accessedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        asyncTask: undefined,
+      };
+
+      const result = await generationModel.transformGeneration(
+        generationWithStableProxyUrls as any,
+      );
+
+      expect(result.asset?.url).toBe('/share/f/share-token-asset');
+      expect(result.asset?.thumbnailUrl).toBe('/share/f/share-token-thumb?password=secret');
+      expect(mockGetFullFileUrl).not.toHaveBeenCalled();
     });
   });
 
@@ -888,22 +1094,25 @@ describe('GenerationModel', () => {
 
       const fileData = {
         name: 'test-image.jpg',
-        url: 'https://example.com/test-image.jpg',
+        sha256: 'sha-test-image',
         size: 1024,
         fileType: 'image/jpeg',
+        storageKey: 'v2/spaces/spc_personal/blobs/generations/images/test-image.jpg',
       };
 
       await generationModel.createAssetAndFile(createdGeneration.id, asset, fileData);
 
-      expect(mockFileModelCreate).toHaveBeenCalledWith(
-        {
-          ...fileData,
-          source: FileSource.ImageGeneration,
-        },
-        true,
-        expect.any(Object),
-      );
-      expect(mockFileModelCreate).toHaveBeenCalledTimes(1);
+      expect(mockCreateFileRecord).toHaveBeenCalledWith({
+        fileType: 'image/jpeg',
+        metadata: undefined,
+        name: 'test-image.jpg',
+        sha256: 'sha-test-image',
+        size: 1024,
+        source: FileSource.ImageGeneration,
+        spaceId: 'spc_personal',
+        storageKey: 'v2/spaces/spc_personal/blobs/generations/images/test-image.jpg',
+      });
+      expect(mockCreateFileRecord).toHaveBeenCalledTimes(1);
     });
 
     it('should handle FileService errors gracefully', async () => {

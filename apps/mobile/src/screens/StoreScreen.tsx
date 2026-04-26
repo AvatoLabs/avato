@@ -34,6 +34,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -70,6 +71,7 @@ import {
 import { useMainTabScrollableContentPaddingBottom } from '../lib/bottomChrome';
 import { haptics } from '../lib/haptics';
 import { type I18nStore, type Locale, useI18n } from '../lib/i18n';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import { type ColorTokens, useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { AgentSkillItem, InstalledPlugin } from '../types';
@@ -425,7 +427,7 @@ const ItemCard = memo<{
     <PressableScale
       accessibilityLabel={item.name || item.identifier}
       accessibilityRole="button"
-      className="bg-foreground/[0.02] rounded-xl p-3.5 mb-2.5 mx-5"
+      className="mb-2.5 rounded-xl bg-foreground/[0.02] p-3.5"
       onPress={() => onPress(item)}
     >
       <View className="flex-row items-start">
@@ -575,7 +577,11 @@ const InstalledRow = memo<{
 });
 InstalledRow.displayName = 'InstalledRow';
 
-const InstalledSeparator = () => <View className="mx-5 h-px bg-foreground/[0.04]" />;
+const InstalledSeparator = ({ width }: { width: number }) => (
+  <View style={{ width }}>
+    <View className="h-px bg-foreground/[0.04]" />
+  </View>
+);
 
 function SimpleImportModal({
   buttonText,
@@ -1440,11 +1446,17 @@ function StoreItemModal({
 
 export default function StoreScreen() {
   const insets = useSafeAreaInsets();
-  const scrollListPaddingBottom = useMainTabScrollableContentPaddingBottom();
+  const scrollListPaddingBottom = useMainTabScrollableContentPaddingBottom() + 16;
   const colors = useThemeColors();
   const { t } = useI18n();
   const locale = useI18n((s) => s.locale);
   const toast = useToast();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const pageContentWidth = Math.min(
+    Math.max(screenWidth - 40, 0),
+    responsiveMetrics.headerMaxWidth,
+  );
 
   const [activeTab, setActiveTab] = useState<StoreTab>('explore');
   const [installedKindFilter, setInstalledKindFilter] = useState<InstalledKindFilter>('all');
@@ -2300,30 +2312,34 @@ export default function StoreScreen() {
 
   const renderMarketItem = useCallback(
     ({ item }: { item: MarketListItem }) => (
-      <ItemCard
-        installed={installedIds.has(item.identifier)}
-        item={item}
-        onInstall={(marketItem) => void handleInstall(marketItem)}
-        onPress={(marketItem) => {
-          haptics.light();
-          setSelectedEntry({ item: marketItem, source: 'market' });
-        }}
-      />
+      <View style={{ width: pageContentWidth }}>
+        <ItemCard
+          installed={installedIds.has(item.identifier)}
+          item={item}
+          onInstall={(marketItem) => void handleInstall(marketItem)}
+          onPress={(marketItem) => {
+            haptics.light();
+            setSelectedEntry({ item: marketItem, source: 'market' });
+          }}
+        />
+      </View>
     ),
-    [handleInstall, installedIds],
+    [handleInstall, installedIds, pageContentWidth],
   );
 
   const renderInstalledItem = useCallback(
     ({ item }: { item: StoreInstalledItem }) => (
-      <InstalledRow
-        item={item}
-        onPress={() => {
-          haptics.light();
-          setSelectedEntry({ item, source: 'installed' });
-        }}
-      />
+      <View style={{ width: pageContentWidth }}>
+        <InstalledRow
+          item={item}
+          onPress={() => {
+            haptics.light();
+            setSelectedEntry({ item, source: 'installed' });
+          }}
+        />
+      </View>
     ),
-    [],
+    [pageContentWidth],
   );
 
   const currentExploreTotal = activeExploreSource === 'mcp' ? marketMcpTotal : marketSkillTotal;
@@ -2521,26 +2537,30 @@ export default function StoreScreen() {
       </ScreenHeader>
 
       {loading && isEmpty ? (
-        <CardSkeleton />
+        <View style={{ alignSelf: 'center', width: pageContentWidth }}>
+          <CardSkeleton />
+        </View>
       ) : isEmpty && !loading ? (
         <View className="flex-1 items-center justify-center">
-          <EmptyState
-            iconVariant={emptyStatePresentation.iconVariant}
-            title={emptyStatePresentation.title}
-            action={
-              isExplore && marketFetchError ? (
-                <TouchableOpacity
-                  accessibilityLabel={t.errorRetry}
-                  accessibilityRole="button"
-                  className="rounded-xl px-5 py-2.5"
-                  style={{ backgroundColor: colors.primary }}
-                  onPress={() => refreshMarket()}
-                >
-                  <Text className="font-semibold text-white text-[14px]">{t.errorRetry}</Text>
-                </TouchableOpacity>
-              ) : undefined
-            }
-          />
+          <View style={{ width: pageContentWidth }}>
+            <EmptyState
+              iconVariant={emptyStatePresentation.iconVariant}
+              title={emptyStatePresentation.title}
+              action={
+                isExplore && marketFetchError ? (
+                  <TouchableOpacity
+                    accessibilityLabel={t.errorRetry}
+                    accessibilityRole="button"
+                    className="rounded-xl px-5 py-2.5"
+                    style={{ backgroundColor: colors.primary }}
+                    onPress={() => refreshMarket()}
+                  >
+                    <Text className="font-semibold text-white text-[14px]">{t.errorRetry}</Text>
+                  </TouchableOpacity>
+                ) : undefined
+              }
+            />
+          </View>
         </View>
       ) : isExplore ? (
         <FlatList
@@ -2549,31 +2569,35 @@ export default function StoreScreen() {
           renderItem={renderMarketItem}
           showsVerticalScrollIndicator={false}
           ListFooterComponent={
-            <View className="items-center pb-6 pt-3">
-              {activeExploreTotalCount > 0 ? (
-                <Text className="mb-2 text-[12px]" style={{ color: colors.secondaryText }}>
-                  {marketItems.length} / {activeExploreTotalCount}
-                </Text>
-              ) : null}
-              {marketLoadingMore ? (
-                <ActivityIndicator color={colors.primary} size="small" />
-              ) : marketHasMore ? (
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  className="rounded-full px-4 py-2"
-                  style={{ backgroundColor: colors.fillTertiary }}
-                  onPress={() => void loadMoreMarket()}
-                >
-                  <Text className="text-[12px] font-semibold" style={{ color: colors.primary }}>
-                    {t.storeLoadMore}
+            <View>
+              <View className="items-center pb-6 pt-3">
+                {activeExploreTotalCount > 0 ? (
+                  <Text className="mb-2 text-[12px]" style={{ color: colors.secondaryText }}>
+                    {marketItems.length} / {activeExploreTotalCount}
                   </Text>
-                </TouchableOpacity>
-              ) : null}
+                ) : null}
+                {marketLoadingMore ? (
+                  <ActivityIndicator color={colors.primary} size="small" />
+                ) : marketHasMore ? (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    className="rounded-full px-4 py-2"
+                    style={{ backgroundColor: colors.fillTertiary }}
+                    onPress={() => void loadMoreMarket()}
+                  >
+                    <Text className="text-[12px] font-semibold" style={{ color: colors.primary }}>
+                      {t.storeLoadMore}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <View pointerEvents="none" style={{ height: scrollListPaddingBottom }} />
             </View>
           }
           contentContainerStyle={{
+            alignItems: 'center',
             paddingTop: 12,
-            paddingBottom: scrollListPaddingBottom,
+            paddingBottom: 12,
           }}
           refreshControl={
             <RefreshControl
@@ -2587,14 +2611,18 @@ export default function StoreScreen() {
         />
       ) : (
         <FlatList
-          ItemSeparatorComponent={InstalledSeparator}
+          ItemSeparatorComponent={() => <InstalledSeparator width={pageContentWidth} />}
           data={filteredInstalled}
           keyExtractor={(item) => `${item.kind}-${item.id}`}
           renderItem={renderInstalledItem}
           showsVerticalScrollIndicator={false}
+          ListFooterComponent={
+            <View pointerEvents="none" style={{ height: scrollListPaddingBottom }} />
+          }
           contentContainerStyle={{
+            alignItems: 'center',
             paddingTop: 8,
-            paddingBottom: scrollListPaddingBottom,
+            paddingBottom: 12,
           }}
           refreshControl={
             <RefreshControl

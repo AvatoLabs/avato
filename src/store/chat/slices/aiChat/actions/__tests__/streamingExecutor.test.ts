@@ -1,9 +1,13 @@
+import { DocsAgentIdentifier } from '@lobechat/builtin-tool-docs-agent';
 import { type UIChatMessage } from '@lobechat/types';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import * as toolEngineering from '@/helpers/toolEngineering';
 import { chatService } from '@/services/chat';
 import * as agentConfigResolver from '@/services/chat/mecha/agentConfigResolver';
+import { messageMapKey } from '@/store/chat/utils/messageMapKey';
+import { docsAgentRuntime } from '@/store/tool/slices/builtin/executors/lobe-docs-agent';
 
 import { useChatStore } from '../../../../store';
 import {
@@ -304,7 +308,11 @@ describe('StreamingExecutor actions', () => {
         topicId: contextTopicId,
       } as UIChatMessage;
 
-      const streamSpy = vi.spyOn(chatService, 'createAssistantMessageStream');
+      const streamSpy = vi
+        .spyOn(chatService, 'createAssistantMessageStream')
+        .mockImplementation(async ({ onFinish }) => {
+          await onFinish?.(TEST_CONTENT.AI_RESPONSE, {} as any);
+        });
 
       await act(async () => {
         await result.current.internal_execAgentRuntime({
@@ -323,10 +331,12 @@ describe('StreamingExecutor actions', () => {
           }),
         }),
       );
+
+      streamSpy.mockRestore();
     });
 
     // Note: RAG metadata functionality has been removed
-    // RAG is now handled by Knowledge Base Tools (searchKnowledgeBase and readKnowledge)
+    // RAG is now handled by Knowledge Base Tools (searchSourceSet and readSourceFiles)
   });
 
   describe('afterCompletion hooks', () => {
@@ -669,7 +679,7 @@ describe('StreamingExecutor actions', () => {
 
       // Mock internal_createAgentState to include initialContext
       const mockInitialContext = {
-        pageEditor: {
+        docEditor: {
           markdown: '# Test Document',
           xml: '<root><h1>Test</h1></root>',
           metadata: { title: 'Test Doc', charCount: 15, lineCount: 1 },
@@ -750,7 +760,7 @@ describe('StreamingExecutor actions', () => {
         });
 
       const mockInitialContext = {
-        pageEditor: {
+        docEditor: {
           markdown: '# Preserved Context',
           xml: '<doc>preserved</doc>',
           metadata: { title: 'Preserved', charCount: 20, lineCount: 1 },
@@ -790,6 +800,99 @@ describe('StreamingExecutor actions', () => {
   });
 
   describe('internal_createAgentState with disableTools', () => {
+    it('should inject the scoped page context for the active page topic only', async () => {
+      const { result } = renderHook(() => useChatStore());
+      const userMessage = {
+        id: TEST_IDS.USER_MESSAGE_ID,
+        role: 'user',
+        content: TEST_CONTENT.USER_MESSAGE,
+        sessionId: TEST_IDS.SESSION_ID,
+        topicId: TEST_IDS.TOPIC_ID,
+      } as UIChatMessage;
+
+      vi.spyOn(agentConfigResolver, 'resolveAgentConfig').mockReturnValue({
+        agentConfig: {
+          ...createMockAgentConfig(),
+          plugins: [DocsAgentIdentifier],
+        },
+        chatConfig: createMockChatConfig(),
+        isBuiltinAgent: false,
+        plugins: [DocsAgentIdentifier],
+      });
+      vi.spyOn(toolEngineering, 'createAgentToolsEngine').mockReturnValue({
+        generateToolsDetailed: vi.fn().mockReturnValue({
+          enabledManifests: [
+            {
+              identifier: DocsAgentIdentifier,
+            },
+          ],
+          enabledToolIds: [DocsAgentIdentifier],
+          tools: [],
+        }),
+      } as any);
+
+      const topicAKey = messageMapKey({
+        agentId: TEST_IDS.SESSION_ID,
+        scope: 'doc',
+        topicId: 'topic-a',
+      });
+      const topicBKey = messageMapKey({
+        agentId: TEST_IDS.SESSION_ID,
+        scope: 'doc',
+        topicId: TEST_IDS.TOPIC_ID,
+      });
+
+      docsAgentRuntime.setScopedFallbackDocContentContext({
+        context: {
+          markdown: 'Only for topic A',
+          metadata: { title: 'Topic A file' },
+          xml: '',
+        },
+        contextKey: topicAKey,
+        docId: 'file-a',
+      });
+      docsAgentRuntime.setScopedFallbackDocContentContext({
+        context: {
+          markdown: 'Only for topic B',
+          metadata: { title: 'Topic B file' },
+          xml: '',
+        },
+        contextKey: topicBKey,
+        docId: 'file-b',
+      });
+
+      try {
+        let operationId = '';
+        act(() => {
+          ({ operationId } = result.current.startOperation({
+            context: { agentId: TEST_IDS.SESSION_ID, scope: 'doc', topicId: TEST_IDS.TOPIC_ID },
+            type: 'execAgentRuntime',
+          }));
+        });
+
+        const { context } = result.current.internal_createAgentState({
+          agentId: TEST_IDS.SESSION_ID,
+          messages: [userMessage],
+          operationId,
+          parentMessageId: userMessage.id,
+          topicId: TEST_IDS.TOPIC_ID,
+        });
+
+        expect(context.initialContext?.docEditor).toEqual({
+          markdown: 'Only for topic B',
+          metadata: {
+            charCount: 16,
+            lineCount: 1,
+            title: 'Topic B file',
+          },
+          xml: '',
+        });
+      } finally {
+        docsAgentRuntime.setScopedFallbackDocContentContext({ contextKey: topicAKey });
+        docsAgentRuntime.setScopedFallbackDocContentContext({ contextKey: topicBKey });
+      }
+    });
+
     it('should return empty toolManifestMap when disableTools is true', async () => {
       act(() => {
         useChatStore.setState({ internal_execAgentRuntime: realExecAgentRuntime });

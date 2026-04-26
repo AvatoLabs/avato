@@ -14,7 +14,7 @@ import {
   RemoveIdentityActionSchema,
   UpdateIdentityActionSchema,
 } from '@lobechat/memory-user-memory';
-import { LayersEnum, searchMemorySchema } from '@lobechat/types';
+import { type RetrieveMemoryResult, LayersEnum, searchMemorySchema } from '@lobechat/types';
 import { type SQL } from 'drizzle-orm';
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import pMap from 'p-map';
@@ -24,6 +24,9 @@ import {
   type IdentityEntryBasePayload,
   type IdentityEntryPayload,
 } from '@/database/models/userMemory';
+import { SpaceMemoryModel } from '@/database/models/spaceMemory';
+import { SpaceModel } from '@/database/models/space';
+import { TopicModel } from '@/database/models/topic';
 import {
   UserMemoryActivityModel,
   UserMemoryExperienceModel,
@@ -49,6 +52,7 @@ import {
   normalizeMemoryEffort,
   searchUserMemories,
 } from '@/server/services/memory/searchUserMemoriesCore';
+import { mergeRetrieveMemoryResultWithSpaceMemory } from '@/server/services/spaceMemory/recall';
 
 const getEmbeddingRuntime = async (serverDB: LobeChatDatabase, userId: string) => {
   const { provider, model: embeddingModel } =
@@ -117,6 +121,14 @@ const normalizeEmbeddable = (value?: string | null): string | undefined => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
+const createTopicRetrievalErrorResult = (): RetrieveMemoryResult => ({
+  ...EMPTY_SEARCH_RESULT,
+  retrieval: {
+    message: 'Failed to retrieve topic memories.',
+    status: 'error',
+  },
+});
+
 const memoryProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
   const userSettingsRow = await ctx.serverDB.query.userSettings.findFirst({
@@ -136,6 +148,9 @@ const memoryProcedure = authedProcedure.use(serverDatabase).use(async (opts) => 
       identityModel: new UserMemoryIdentityModel(ctx.serverDB, ctx.userId),
       memoryModel: new UserMemoryModel(ctx.serverDB, ctx.userId),
       memoryEffort,
+      spaceMemoryModel: new SpaceMemoryModel(ctx.serverDB, ctx.userId),
+      spaceModel: new SpaceModel(ctx.serverDB, ctx.userId),
+      topicModel: new TopicModel(ctx.serverDB, ctx.userId),
     },
   });
 });
@@ -808,10 +823,21 @@ export const userMemoriesRouter = router({
         };
 
         const result = await searchUserMemories(ctx, searchParams);
-        return result;
+        const topic = await ctx.topicModel.findById(input.topicId);
+        if (!topic?.spaceId) return result;
+
+        const space = await ctx.spaceModel.findAccessibleSpaceById(topic.spaceId);
+        if (!space?.id || space.kind !== 'team') return result;
+
+        const recallEntries = await ctx.spaceMemoryModel.listPublishedRecallEntries({
+          query,
+          spaceId: topic.spaceId,
+        });
+
+        return mergeRetrieveMemoryResultWithSpaceMemory(result, recallEntries, { query });
       } catch (error) {
         console.error('Failed to retrieve memory for topic:', error);
-        return EMPTY_SEARCH_RESULT;
+        return createTopicRetrievalErrorResult();
       }
     }),
 

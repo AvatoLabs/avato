@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ContentModel } from '@/database/models/content';
 import { DocumentModel } from '@/database/models/document';
+import { SpaceModel } from '@/database/models/space';
+import { TopicModel } from '@/database/models/topic';
 import { TopicDocumentModel } from '@/database/models/topicDocument';
 
 import { NotebookRuntimeService } from '../index';
 
 vi.mock('@/database/models/document');
+vi.mock('@/database/models/content');
+vi.mock('@/database/models/space');
+vi.mock('@/database/models/topic');
 vi.mock('@/database/models/topicDocument');
 
 describe('NotebookRuntimeService', () => {
@@ -13,6 +19,9 @@ describe('NotebookRuntimeService', () => {
   const mockDb = {} as any;
   const mockUserId = 'test-user';
   let mockDocumentModel: any;
+  let mockResourceModel: any;
+  let mockSpaceModel: any;
+  let mockTopicModel: any;
   let mockTopicDocumentModel: any;
 
   beforeEach(() => {
@@ -31,7 +40,27 @@ describe('NotebookRuntimeService', () => {
       findByTopicId: vi.fn(),
     };
 
+    mockResourceModel = {
+      ensureOwnerPermission: vi.fn(),
+      ensureContentRegistry: vi.fn().mockResolvedValue({ contentUid: 'res_doc_1' }),
+    };
+
+    mockSpaceModel = {
+      findAccessibleSpaceById: vi.fn().mockResolvedValue({
+        id: 'spc_topic',
+        membershipRole: 'editor',
+      }),
+      getOrCreatePersonalSpace: vi.fn().mockResolvedValue({ id: 'spc_test' }),
+    };
+
+    mockTopicModel = {
+      findById: vi.fn(),
+    };
+
     vi.mocked(DocumentModel).mockImplementation(() => mockDocumentModel);
+    vi.mocked(ContentModel).mockImplementation(() => mockResourceModel);
+    vi.mocked(SpaceModel).mockImplementation(() => mockSpaceModel);
+    vi.mocked(TopicModel).mockImplementation(() => mockTopicModel);
     vi.mocked(TopicDocumentModel).mockImplementation(() => mockTopicDocumentModel);
 
     service = new NotebookRuntimeService({ serverDB: mockDb, userId: mockUserId });
@@ -54,6 +83,11 @@ describe('NotebookRuntimeService', () => {
   describe('createDocument', () => {
     it('should create a document and return service result', async () => {
       mockDocumentModel.create.mockResolvedValue(mockDocument);
+      mockDocumentModel.findById.mockResolvedValue({
+        ...mockDocument,
+        contentUid: 'res_doc_1',
+        spaceId: 'spc_test',
+      });
 
       const params = {
         content: '# Hello',
@@ -67,7 +101,25 @@ describe('NotebookRuntimeService', () => {
 
       const result = await service.createDocument(params);
 
-      expect(mockDocumentModel.create).toHaveBeenCalledWith(params);
+      expect(mockTopicModel.findById).not.toHaveBeenCalled();
+      expect(mockDocumentModel.create).toHaveBeenCalledWith({
+        ...params,
+        spaceId: 'spc_test',
+      });
+      expect(mockResourceModel.ensureContentRegistry).toHaveBeenCalledWith({
+        createdBy: mockUserId,
+        kind: 'document',
+        localId: 'doc-1',
+        spaceId: 'spc_test',
+      });
+      expect(mockDocumentModel.update).toHaveBeenCalledWith('doc-1', {
+        contentUid: 'res_doc_1',
+        spaceId: 'spc_test',
+      });
+      expect(mockResourceModel.ensureOwnerPermission).toHaveBeenCalledWith({
+        contentUid: 'res_doc_1',
+        spaceId: 'spc_test',
+      });
       expect(result).toEqual({
         content: '# Hello',
         createdAt: mockDocument.createdAt,
@@ -82,8 +134,108 @@ describe('NotebookRuntimeService', () => {
       });
     });
 
+    it('should create a document in the topic space when topicId is provided', async () => {
+      mockTopicModel.findById.mockResolvedValue({ id: 'topic-1', spaceId: 'spc_topic' });
+      mockDocumentModel.create.mockResolvedValue(mockDocument);
+      mockDocumentModel.findById.mockResolvedValue({
+        ...mockDocument,
+        contentUid: 'res_doc_1',
+        spaceId: 'spc_topic',
+      });
+
+      await service.createDocument({
+        content: '# Hello',
+        fileType: 'markdown',
+        source: 'notebook:topic-1',
+        sourceType: 'api',
+        title: 'Test Doc',
+        topicId: 'topic-1',
+        totalCharCount: 7,
+        totalLineCount: 1,
+      });
+
+      expect(mockTopicModel.findById).toHaveBeenCalledWith('topic-1');
+      expect(mockDocumentModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          spaceId: 'spc_topic',
+        }),
+      );
+      expect(mockResourceModel.ensureContentRegistry).toHaveBeenCalledWith({
+        createdBy: mockUserId,
+        kind: 'document',
+        localId: 'doc-1',
+        spaceId: 'spc_topic',
+      });
+      expect(mockSpaceModel.findAccessibleSpaceById).toHaveBeenCalledWith('spc_topic');
+      expect(mockSpaceModel.getOrCreatePersonalSpace).not.toHaveBeenCalled();
+    });
+
+    it('should throw when topicId is provided but topic does not exist', async () => {
+      mockTopicModel.findById.mockResolvedValue(undefined);
+
+      await expect(
+        service.createDocument({
+          content: '# Hello',
+          fileType: 'markdown',
+          source: 'notebook:missing-topic',
+          sourceType: 'api',
+          title: 'Test Doc',
+          topicId: 'missing-topic',
+          totalCharCount: 7,
+          totalLineCount: 1,
+        }),
+      ).rejects.toThrow('Topic not found: missing-topic');
+    });
+
+    it('should reject inaccessible topic spaces before writing the document', async () => {
+      mockTopicModel.findById.mockResolvedValue({ id: 'topic-1', spaceId: 'spc_blocked' });
+      mockSpaceModel.findAccessibleSpaceById.mockResolvedValue(undefined);
+
+      await expect(
+        service.createDocument({
+          content: '# Hello',
+          fileType: 'markdown',
+          source: 'notebook:topic-1',
+          sourceType: 'api',
+          title: 'Test Doc',
+          topicId: 'topic-1',
+          totalCharCount: 7,
+          totalLineCount: 1,
+        }),
+      ).rejects.toThrow('SPACE_ACCESS_DENIED');
+
+      expect(mockDocumentModel.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject viewer-only topic spaces before writing the document', async () => {
+      mockTopicModel.findById.mockResolvedValue({ id: 'topic-1', spaceId: 'spc_viewer' });
+      mockSpaceModel.findAccessibleSpaceById.mockResolvedValue({
+        id: 'spc_viewer',
+        membershipRole: 'viewer',
+      });
+
+      await expect(
+        service.createDocument({
+          content: '# Hello',
+          fileType: 'markdown',
+          source: 'notebook:topic-1',
+          sourceType: 'api',
+          title: 'Test Doc',
+          topicId: 'topic-1',
+          totalCharCount: 7,
+          totalLineCount: 1,
+        }),
+      ).rejects.toThrow('SPACE_WRITE_DENIED');
+
+      expect(mockDocumentModel.create).not.toHaveBeenCalled();
+    });
+
     it('should convert topic sourceType to api', async () => {
       mockDocumentModel.create.mockResolvedValue({
+        ...mockDocument,
+        sourceType: 'topic',
+      });
+      mockDocumentModel.findById.mockResolvedValue({
         ...mockDocument,
         sourceType: 'topic',
       });

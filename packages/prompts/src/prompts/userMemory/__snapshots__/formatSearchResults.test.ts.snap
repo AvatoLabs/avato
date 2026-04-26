@@ -30,6 +30,7 @@ exports[`formatMemorySearchResults > should format experience memories with full
   <experience id="exp-1" type="lesson" confidence=9>
     <situation>Debugging complex state issues</situation>
     <keyLearning>Breakpoints save time in complex debugging</keyLearning>
+    <action>Used breakpoints instead of console.log</action>
   </experience>
 </experiences>
 </memories>"
@@ -57,7 +58,10 @@ exports[`formatMemorySearchResults > should format mixed results with all memory
 exports[`formatMemorySearchResults > should format preference memories with full content 1`] = `
 "<memories query="code style" total="1">
 <preferences count="1">
-  <preference id="pref-1" type="coding-standard" priority=10>Always use TypeScript strict mode</preference>
+  <preference id="pref-1" type="coding-standard" priority=10>
+    <conclusionDirectives>Always use TypeScript strict mode</conclusionDirectives>
+    <suggestions>Consider adding eslint rules</suggestions>
+  </preference>
 </preferences>
 </memories>"
 `;

@@ -46,6 +46,9 @@ export interface ChatTopicMetadata {
    * Cron job ID that triggered this topic creation (if created by scheduled task)
    */
   cronJobId?: string;
+  docContext?: {
+    documentId: string;
+  };
   model?: string;
   provider?: string;
   userMemoryExtractRunState?: TopicUserMemoryExtractRunState;
@@ -68,6 +71,7 @@ export interface ChatTopic extends Omit<BaseDataModel, 'meta'> {
   historySummary?: string;
   metadata?: ChatTopicMetadata;
   sessionId?: string;
+  spaceId?: string | null;
   tagId?: string | null;
   title: string;
   trigger?: string | null;
@@ -117,6 +121,7 @@ export interface CreateTopicParams {
   groupId?: string | null;
   messages?: string[];
   sessionId?: string | null;
+  spaceId?: string | null;
   tagId?: string | null;
   title: string;
 }
@@ -138,6 +143,7 @@ export interface QueryTopicParams {
    */
   isInbox?: boolean;
   pageSize?: number;
+  spaceId?: string | null;
   tagId?: string | null;
 }
 

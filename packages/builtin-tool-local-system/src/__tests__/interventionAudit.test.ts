@@ -32,6 +32,15 @@ describe('pathScopeAudit', () => {
       ).toBe(false);
     });
 
+    it('should return false when all paths array entries are within working directory', () => {
+      expect(
+        pathScopeAudit(
+          { paths: ['/Users/me/project/src/a.ts', 'src/b.ts'] },
+          { workingDirectory: '/Users/me/project' },
+        ),
+      ).toBe(false);
+    });
+
     it('should return false when path equals working directory', () => {
       expect(pathScopeAudit({ path: '/Users/me/project' }, metadata)).toBe(false);
     });
@@ -89,6 +98,12 @@ describe('pathScopeAudit', () => {
           },
           metadata,
         ),
+      ).toBe(true);
+    });
+
+    it('should return true when any paths array entry is outside working directory', () => {
+      expect(
+        pathScopeAudit({ paths: ['/Users/me/project/src/a.ts', '/Users/me/other/b.ts'] }, metadata),
       ).toBe(true);
     });
   });

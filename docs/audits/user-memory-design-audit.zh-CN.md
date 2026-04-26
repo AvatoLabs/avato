@@ -17,14 +17,14 @@
 
 | 优先级 | 结论                                                                                                                    | 状态   |
 | ------ | ----------------------------------------------------------------------------------------------------------------------- | ------ |
-| **P0** | 记忆抽取 Webhook 只有在配置了 `MEMORY_USER_MEMORY_WEBHOOK_HEADERS` 时才校验请求头                                       | 已确认 |
+| **P0** | 记忆抽取 Webhook 只有在配置了 `MEMORY_USER_MEMORY_WEBHOOK_HEADERS` 时才校验请求头                                       | 已于 2026-04-05 收紧 |
 | **P1** | Web 侧标准记忆注入路径不含 `identities`，移动端注入路径包含 `identities`，两端行为不一致                                | 已确认 |
 | **P1** | 话题检索查询串按时间升序拼接并截取前 7000 字符，长话题会偏向早期轮次                                                    | 已确认 |
 | **P1** | 话题记忆 SWR 仅以 `topicId` 为 key，且无失效调用方；同一话题内结果可能长期陈旧                                          | 已确认 |
 | **P1** | 话题一旦被标记 `completed`，默认批量抽取路径不会自动因新消息再次进入抽取                                                | 已确认 |
 | **P1** | `activities` 会被检索、缓存、组装进 `UserMemoryData`，但标准 `promptUserMemory` / `UserMemoryInjector` 不会把它注入模型 | 已确认 |
 | **P2** | `useInitIdentities` / `globalIdentities` / `queryIdentitiesForInjection` 管线已存在，但当前没有调用方                   | 已确认 |
-| **P2** | `retrieveMemoryForTopic` 走的是全局 memory effort，和 per-chat/per-agent 的 effort 设定没有打通                         | 已确认 |
+| **P2** | `retrieveMemoryForTopic` 走的是全局 memory effort，和 per-chat/per-agent 的 effort 设定没有打通                         | 已于 2026-04-05 接通 |
 | **P2** | “自动注入记忆” 与 “Memory 工具是否启用” 是两套开关，产品口径若不澄清，文档会误导落地                                    | 已确认 |
 
 ---
@@ -121,7 +121,7 @@
 1. 在消息发送成功后对当前 topic 触发 revalidate。
 2. 或在话题 messageCount/lastMessageAt 变化时重算 key。
 
-### 6. Webhook 认证是 “有配置才启用”（P0）
+### 6. Webhook 认证曾经是 “有配置才启用”（P0，已于 2026-04-05 收紧）
 
 `src/app/(backend)/api/webhooks/memory-extraction/route.ts` 中，只有在：
 
@@ -134,6 +134,12 @@ if (webhook.headers && Object.keys(webhook.headers).length > 0) {
 时才会做鉴权。也就是说，**不配置 header 时，此路由默认可调用**。
 
 这本身就是需要收紧的默认值。
+
+**更新（2026-04-05）**：
+
+1. 该链路现在默认 fail-closed，不再因为处于 `development/test` 就自动放行。
+2. 只有三种情况会通过：内部服务鉴权、显式配置 `MEMORY_USER_MEMORY_WEBHOOK_HEADERS`、或在非生产环境显式设置 `MEMORY_USER_MEMORY_WEBHOOK_ALLOW_INSECURE_DEV=true`。
+3. 生产环境始终不会接受 `MEMORY_USER_MEMORY_WEBHOOK_ALLOW_INSECURE_DEV` 作为绕过条件。
 
 **落地建议**：
 
@@ -162,10 +168,17 @@ if (webhook.headers && Object.keys(webhook.headers).length > 0) {
 1. 新消息到达时重置状态，或
 2. 批量抽取时比较 `messageCount/lastMessageAt` 与上次抽取状态。
 
-### 8. `retrieveMemoryForTopic` 和 per-chat effort 语义未打通（P2）
+### 8. `retrieveMemoryForTopic` 和 per-chat effort 语义曾未打通（P2，已于 2026-04-05 接通）
 
-`searchUserMemories()` 支持 `input.effort ?? ctx.memoryEffort`。\
-但 `retrieveMemoryForTopic` 当前没有传 `input.effort`，因此它走的是：
+`searchUserMemories()` 支持 `input.effort ?? ctx.memoryEffort`。
+
+**更新（2026-04-05）**：
+
+1. `retrieveMemoryForTopic` 已接收并透传 `effort`
+2. Web 侧 `ChatList` 已把 per-chat/per-agent 的 `effectiveMemoryEffort` 传给话题记忆预取
+3. 这条审计结论已不再代表当前实现现状
+
+在更早的实现阶段，`retrieveMemoryForTopic` 没有传 `input.effort`，因此它走的是：
 
 - `memoryProcedure` 从 DB 用户设置读取的全局 `memory.effort`
 
@@ -194,7 +207,7 @@ if (webhook.headers && Object.keys(webhook.headers).length > 0) {
 
 **建议**：把 “是否需要服务端去重 / 合并策略” 作为设计项明确，而不是默认相信上游抽取结果足够稳定。
 
-### 2. 检索失败目前对用户近乎不可见
+### 2. 检索失败此前对用户近乎不可见（已于 2026-04-05 部分收口）
 
 `retrieveMemoryForTopic` 失败后直接返回空结果。\
 这让前端无法区分：
@@ -202,7 +215,12 @@ if (webhook.headers && Object.keys(webhook.headers).length > 0) {
 - 真正没有相关记忆
 - 服务异常导致没检索出来
 
-如果未来要把记忆作为关键能力，这种静默降级需要补上可观测性。
+**更新（2026-04-05）**：
+
+1. `retrieveMemoryForTopic` 失败时现在会返回显式的 `retrieval.status = 'error'`
+2. Web 对话页会显示轻量 warning，而不是继续完全静默回空
+
+如果未来要把记忆作为关键能力，这条链路仍值得继续补更强的观测与诊断。
 
 ---
 

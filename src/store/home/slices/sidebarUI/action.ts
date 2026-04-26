@@ -5,7 +5,7 @@ import { agentService } from '@/services/agent';
 import { chatGroupService } from '@/services/chatGroup';
 import { homeService } from '@/services/home';
 import { sessionService } from '@/services/session';
-import { getAgentStoreState } from '@/store/agent';
+import { getAgentStoreState } from '@/store/agent/store';
 import { type HomeStore } from '@/store/home/store';
 import { type StoreSetter } from '@/store/types';
 import { type SessionGroupItemBase } from '@/types/session';

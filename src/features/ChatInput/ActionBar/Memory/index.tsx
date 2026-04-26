@@ -1,11 +1,11 @@
 import { cssVar } from 'antd-style';
-import { Brain, BrainCircuit } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CHAT_INPUT_ACTION_ICONS } from '@/config/entryIcons';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors, chatConfigByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 import { useAgentId } from '../../hooks/useAgentId';
 import { useUpdateAgentConfig } from '../../hooks/useUpdateAgentConfig';
@@ -22,12 +22,12 @@ const Memory = memo(() => {
   ]);
   const isMobile = useIsMobile();
 
-  if (isLoading) return <Action disabled icon={Brain} />;
+  if (isLoading) return <Action disabled icon={CHAT_INPUT_ACTION_ICONS.memory} />;
 
   return (
     <Action
       color={isEnabled ? cssVar.colorInfo : undefined}
-      icon={isEnabled ? BrainCircuit : Brain}
+      icon={CHAT_INPUT_ACTION_ICONS.memory}
       showTooltip={false}
       title={t('memory.title')}
       popover={{

@@ -1,6 +1,7 @@
 import type { FileMetadata } from '@lobechat/types';
 import { AsyncTaskStatus, AsyncTaskType } from '@lobechat/types';
-import { and, count, desc, eq, gte, ilike, inArray, lte, sum } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
+import { and, count, desc, eq, gte, ilike, inArray, lte, or, sum } from 'drizzle-orm';
 import { sha256 } from 'js-sha256';
 
 import { serverDBEnv } from '@/config/db';
@@ -8,30 +9,32 @@ import type { PERMISSION_ACTIONS } from '@/const/rbac';
 import { ALL_SCOPE } from '@/const/rbac';
 import { AsyncTaskModel } from '@/database/models/asyncTask';
 import { ChunkModel } from '@/database/models/chunk';
+import { ContentModel } from '@/database/models/content';
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
-import { KnowledgeBaseModel } from '@/database/models/knowledgeBase';
-import { ResourceModel } from '@/database/models/resource';
+import { SourceSetModel } from '@/database/models/sourceSet';
 import { SpaceModel } from '@/database/models/space';
 import type { FileItem } from '@/database/schemas';
 import {
   agentsToSessions,
   files,
   filesToSessions,
-  knowledgeBaseFiles,
-  knowledgeBases,
+  sourceSetFiles,
+  sourceSets,
   users,
 } from '@/database/schemas';
 import type { LobeChatDatabase } from '@/database/type';
-import { getPrivateBlobS3 } from '@/server/modules/PrivateBlobS3';
-import type { S3 } from '@/server/modules/S3';
-import { FileS3 } from '@/server/modules/S3';
+import { getBlobProvider } from '@/server/modules/BlobProvider';
+import { ContentAuthorizer } from '@/server/services/content';
+import { clampFileUrlExpiresIn } from '@/server/services/content/downloadPolicy';
 import { DocumentService } from '@/server/services/document';
 import { FileService as CoreFileService } from '@/server/services/file';
+import { resolveRemovableStorageUrls } from '@/server/services/file/removableStorageUrls';
 import { isChunkingUnsupported } from '@/utils/isChunkingUnsupported';
 import { nanoid } from '@/utils/uuid';
 
 import { BaseService } from '../common/base.service';
+import { ensureFileResponseUrl } from '../helpers/file';
 import { processPaginationConditions } from '../helpers/pagination';
 import type {
   AsyncTaskErrorResponse,
@@ -52,96 +55,206 @@ import type {
   PublicFileUploadRequest,
 } from '../types/file.type';
 import type {
-  KnowledgeBaseFileBatchRequest,
-  KnowledgeBaseFileListQuery,
-  KnowledgeBaseFileOperationResult,
-  MoveKnowledgeBaseFilesRequest,
-  MoveKnowledgeBaseFilesResponse,
-} from '../types/knowledge-base.type';
+  MoveSourceSetFilesRequest,
+  MoveSourceSetFilesResponse,
+  SourceSetFileBatchRequest,
+  SourceSetFileListQuery,
+  SourceSetFileOperationResult,
+} from '../types/source-set.type';
 
 /**
  * 文件上传服务类
  * 专门处理服务端模式的文件上传和管理功能
  */
 export class FileUploadService extends BaseService {
+  private contentAuthorizer: ContentAuthorizer;
   private fileModel: FileModel;
-  private resourceModel: ResourceModel;
+  private contentModel: ContentModel;
   private documentModel: DocumentModel;
   private coreFileService: CoreFileService;
   private documentService: DocumentService;
-  private s3Service: S3;
+  private blobProvider = getBlobProvider();
   private chunkModel: ChunkModel;
   private asyncTaskModel: AsyncTaskModel;
-  private knowledgeBaseModel: KnowledgeBaseModel;
+  private sourceSetModel: SourceSetModel;
+  private spaceModel: SpaceModel;
   // 延迟引入 ChunkService，避免循环依赖开销
   // 注意：ChunkService 仅在服务端环境可用
 
   constructor(db: LobeChatDatabase, userId: string) {
     super(db, userId);
+    this.contentAuthorizer = new ContentAuthorizer(db, userId);
     this.fileModel = new FileModel(db, userId);
-    this.resourceModel = new ResourceModel(db, userId);
+    this.contentModel = new ContentModel(db, userId);
     this.documentModel = new DocumentModel(db, userId);
     this.coreFileService = new CoreFileService(db, userId!);
     this.documentService = new DocumentService(db, userId);
-    this.s3Service = new FileS3();
     this.chunkModel = new ChunkModel(db, userId);
     this.asyncTaskModel = new AsyncTaskModel(db, userId);
-    this.knowledgeBaseModel = new KnowledgeBaseModel(db, userId);
+    this.sourceSetModel = new SourceSetModel(db, userId);
+    this.spaceModel = new SpaceModel(db, userId);
   }
 
-  /**
-   * 确保获取完整URL，避免重复拼接
-   * 检查URL是否已经是完整URL，如果不是则生成完整URL
-   */
-  private async ensureFullUrl(url?: string): Promise<string> {
-    if (!url) {
-      return '';
+  private async resolveResponseFileUrl(
+    file: Pick<FileItem, 'id' | 'url'>,
+    options?: {
+      access?: { contentUid: string; matchedBy?: string; spaceId: string };
+      downloadable?: boolean;
+      via?: 'openapi_file_detail' | 'openapi_file_list';
+    },
+  ): Promise<string> {
+    if (!file.url) return '';
+    if (options?.downloadable === false) return '';
+
+    let access = options?.access;
+
+    if (options?.downloadable !== true && !access) {
+      try {
+        access = await this.contentAuthorizer.assertCapability({
+          capability: 'download_blob',
+          id: file.id,
+          kind: 'file',
+        });
+      } catch (error) {
+        this.log('warn', 'Omitting non-downloadable file url from OpenAPI response', {
+          error,
+          fileId: file.id,
+        });
+        return '';
+      }
     }
 
-    // 检查URL是否已经是完整URL（向后兼容历史数据）
-    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
-      return url; // 已经是完整URL，直接返回
-    } else {
-      // 相对路径，生成完整URL
-      return await this.coreFileService.getFullFileUrl(url);
+    const fullUrl = await ensureFileResponseUrl({
+      getFullFileUrl: this.coreFileService.getFullFileUrl.bind(this.coreFileService),
+      url: file.url,
+    });
+
+    if (fullUrl && access && options?.via) {
+      this.recordResponseFileUrlIssuedAccess(file.id, access, options.via);
     }
+
+    return fullUrl;
+  }
+
+  private recordResponseFileUrlIssuedAccess(
+    fileId: string,
+    access: { contentUid: string; matchedBy?: string; spaceId: string },
+    via: 'openapi_file_detail' | 'openapi_file_list',
+  ) {
+    void this.contentModel
+      .createAccessEvent({
+        accessType: 'file_url_issued',
+        contentUid: access.contentUid,
+        metadata: {
+          fileId,
+          matchedBy: access.matchedBy,
+          via,
+        },
+        shareLinkId: null,
+        sourceIp: null,
+        spaceId: access.spaceId,
+        userAgent: null,
+      })
+      .catch((error) => {
+        this.log('warn', 'Failed to record OpenAPI response file URL issued access event', {
+          error,
+          fileId,
+          via,
+        });
+      });
+  }
+
+  private getFileArtifactKey(file: Pick<FileItem, 'blobId' | 'id'>): string {
+    if (file.blobId) return `blob:${file.blobId}`;
+
+    return `file:${file.id}`;
   }
 
   /**
    * 转换为上传响应格式
    */
-  private async convertToResponse(file: FileItem): Promise<FileDetailResponse['file']> {
-    const fullUrl = await this.ensureFullUrl(file.url);
+  private async convertToResponse(
+    file: FileItem,
+    options?: {
+      access?: { contentUid: string; matchedBy?: string; spaceId: string };
+      downloadable?: boolean;
+      via?: 'openapi_file_detail' | 'openapi_file_list';
+    },
+  ): Promise<FileDetailResponse['file']> {
+    const fullUrl = await this.resolveResponseFileUrl(file, options);
+    const { fileHash: _fileHash, ...safeFile } = file;
 
     return {
-      ...file,
-      url: fullUrl || file.url,
+      ...safeFile,
+      url: fullUrl,
     };
   }
 
+  private mapContentAccessError = (error: unknown, fallbackMessage: string): never => {
+    if (error instanceof TRPCError) {
+      if (error.code === 'NOT_FOUND') {
+        throw this.createNotFoundError(error.message);
+      }
+
+      if (error.code === 'FORBIDDEN') {
+        throw this.createAuthorizationError(error.message || fallbackMessage);
+      }
+    }
+
+    throw error;
+  };
+
   /**
-   * 校验知识库归属（仅允许当前用户的知识库）
+   * 校验来源集访问权限
    */
-  private async assertOwnedKnowledgeBase(
-    knowledgeBaseId: string,
+  private async assertSourceSetAccess(
+    sourceSetId: string,
     action: keyof typeof PERMISSION_ACTIONS,
+    capability: 'create_child' | 'read_metadata',
   ) {
-    const permissionResult = await this.resolveOperationPermission(action, {
-      targetKnowledgeBaseId: knowledgeBaseId,
-    });
+    const permissionResult = await this.resolveOperationPermission(action);
     if (!permissionResult.isPermitted) {
-      throw this.createAuthorizationError(permissionResult.message || '无权访问知识库文件');
+      throw this.createAuthorizationError(permissionResult.message || '无权访问来源集文件');
     }
 
-    const knowledgeBase = await this.db.query.knowledgeBases.findFirst({
-      where: eq(knowledgeBases.id, knowledgeBaseId),
-    });
-
-    if (!knowledgeBase) {
-      throw this.createNotFoundError('知识库不存在或无权访问');
+    try {
+      await this.contentAuthorizer.assertCapability({
+        capability,
+        id: sourceSetId,
+        kind: 'source_set',
+      });
+    } catch (error) {
+      this.mapContentAccessError(error, '无权访问来源集');
     }
 
-    return knowledgeBase;
+    const sourceSet = await this.sourceSetModel.findByIdAny(sourceSetId);
+
+    if (!sourceSet) {
+      throw this.createNotFoundError('来源集不存在或无权访问');
+    }
+
+    return sourceSet;
+  }
+
+  private async assertReadableSourceItems(ids: string[]) {
+    const uniqueIds = Array.from(new Set(ids));
+    const failed: SourceSetFileOperationResult['failed'] = [];
+    const successed: string[] = [];
+
+    for (const id of uniqueIds) {
+      try {
+        await this.contentAuthorizer.assertCapability({
+          capability: 'preview_content',
+          id,
+          kind: id.startsWith('docs_') ? 'document' : 'file',
+        });
+        successed.push(id);
+      } catch {
+        failed.push({ fileId: id, reason: '文件不存在或无权访问' });
+      }
+    }
+
+    return { failed, successed };
   }
 
   /**
@@ -169,7 +282,7 @@ export class FileUploadService extends BaseService {
           const result = await this.uploadFile(file, {
             agentId: request.agentId,
             directory: request.directory,
-            knowledgeBaseId: request.knowledgeBaseId,
+            sourceSetId: request.sourceSetId,
             sessionId: request.sessionId,
             skipCheckFileType: request.skipCheckFileType,
           });
@@ -203,13 +316,17 @@ export class FileUploadService extends BaseService {
    */
   async getFileList(request: FileListQuery): Promise<FileListResponse> {
     try {
+      if (request.sourceSetId) {
+        return this.getSourceSetFileList(request.sourceSetId, request);
+      }
+
       // 检查是否有全局权限
       const hasGlobalPermission = await this.hasGlobalPermission('FILE_READ');
 
       // 根据请求参数决定权限校验的资源范围
       // 1. queryAll=true 时，使用 ALL_SCOPE 查询全量数据
       // 2. 指定 userId 时，查询指定用户的数据
-      // 3. 如果查询知识库文件且有全局权限，使用 ALL_SCOPE 以获取所有文件
+      // 3. 如果查询来源集文件且有全局权限，使用 ALL_SCOPE 以获取所有文件
       // 4. 否则查询当前用户的数据
       let resourceInfo: { targetUserId: string } | typeof ALL_SCOPE | undefined;
 
@@ -217,8 +334,8 @@ export class FileUploadService extends BaseService {
         resourceInfo = ALL_SCOPE;
       } else if (request.userId) {
         resourceInfo = { targetUserId: request.userId };
-      } else if (request.knowledgeBaseId && hasGlobalPermission) {
-        // 查询知识库文件时，如果有全局权限，可查询所有文件
+      } else if (request.sourceSetId && hasGlobalPermission) {
+        // 查询来源集文件时，如果有全局权限，可查询所有文件
         resourceInfo = ALL_SCOPE;
       }
 
@@ -238,23 +355,23 @@ export class FileUploadService extends BaseService {
       const { limit, offset } = processPaginationConditions(request);
 
       // 构建查询条件
-      const { knowledgeBaseId } = request;
+      const { sourceSetId } = request;
 
-      // 如果指定了知识库ID，使用 JOIN 查询
-      if (knowledgeBaseId) {
+      // 如果指定了来源集 ID，使用 JOIN 查询
+      if (sourceSetId) {
         // 构建查询条件
         const whereConditions = [
-          eq(knowledgeBaseFiles.knowledgeBaseId, knowledgeBaseId),
+          eq(sourceSetFiles.sourceSetId, sourceSetId),
           ...this.buildFileWhereConditions(request, permissionResult),
         ];
 
         const whereClause = and(...whereConditions);
 
-        // 使用 JOIN 查询知识库关联的文件
+        // 使用 JOIN 查询来源集关联的文件
         const baseQuery = this.db
           .select({ file: files })
-          .from(knowledgeBaseFiles)
-          .innerJoin(files, eq(knowledgeBaseFiles.fileId, files.id))
+          .from(sourceSetFiles)
+          .innerJoin(files, eq(sourceSetFiles.fileId, files.id))
           .where(whereClause)
           .orderBy(desc(files.createdAt));
 
@@ -267,8 +384,8 @@ export class FileUploadService extends BaseService {
           listQuery,
           this.db
             .select({ count: count(), totalSize: sum(files.size) })
-            .from(knowledgeBaseFiles)
-            .innerJoin(files, eq(knowledgeBaseFiles.fileId, files.id))
+            .from(sourceSetFiles)
+            .innerJoin(files, eq(sourceSetFiles.fileId, files.id))
             .where(whereClause),
         ]);
 
@@ -282,9 +399,9 @@ export class FileUploadService extends BaseService {
           hasGlobalPermission,
         );
 
-        this.log('info', 'File list retrieved successfully (by knowledgeBase)', {
+        this.log('info', 'File list retrieved successfully (by sourceSet)', {
           count: responseFiles.length,
-          knowledgeBaseId,
+          sourceSetId,
           total,
         });
 
@@ -295,11 +412,11 @@ export class FileUploadService extends BaseService {
         };
       }
 
-      // 未指定知识库ID，使用关系查询(自动 join user 和 knowledgeBases)
+      // 未指定来源集 ID，使用关系查询(自动 join user 和 sourceSets)
       const whereConditions = this.buildFileWhereConditions(request, permissionResult);
       const whereClause = and(...whereConditions);
 
-      // 当前 files 关系未定义 user/knowledgeBases，采用基础查询并手动补齐关联数据
+      // 当前 files 关系未定义 user/sourceSets，采用基础查询并手动补齐关联数据
       const queryOptions = {
         limit,
         offset,
@@ -317,7 +434,7 @@ export class FileUploadService extends BaseService {
 
       const total = totalResult[0]?.count || 0;
 
-      // 构建响应 (关系查询已包含 user 和 knowledgeBases)
+      // 构建响应 (关系查询已包含 user 和 sourceSets)
       const responseFiles = await this.buildFileListResponse(
         filesResult,
         true,
@@ -340,211 +457,181 @@ export class FileUploadService extends BaseService {
   }
 
   /**
-   * 获取指定知识库下的文件列表
-   * 复用 getFileList 的查询逻辑，但使用 KNOWLEDGE_BASE_READ 权限
+   * 获取指定来源集下的文件列表
+   * 复用 getFileList 的查询逻辑，但使用 SOURCE_SET_READ 权限
    */
-  async getKnowledgeBaseFileList(
-    knowledgeBaseId: string,
-    request: KnowledgeBaseFileListQuery,
+  async getSourceSetFileList(
+    sourceSetId: string,
+    request: SourceSetFileListQuery,
   ): Promise<FileListResponse> {
     try {
-      // 权限校验（知识库读取权限）
-      const permissionResult = await this.resolveOperationPermission('KNOWLEDGE_BASE_READ');
+      // 权限校验（来源集读取权限）
+      const permissionResult = await this.resolveOperationPermission('SOURCE_SET_READ');
 
       if (!permissionResult.isPermitted) {
-        throw this.createAuthorizationError(permissionResult.message || '无权访问知识库文件列表');
+        throw this.createAuthorizationError(permissionResult.message || '无权访问来源集文件列表');
       }
 
-      // 校验知识库访问权限与存在性
-      const knowledgeBase = await this.knowledgeBaseModel.findById(knowledgeBaseId);
-      if (!knowledgeBase) {
-        throw this.createNotFoundError('Knowledge base not found or access denied');
-      }
+      await this.assertSourceSetAccess(sourceSetId, 'SOURCE_SET_READ', 'read_metadata');
 
-      this.log('info', 'Getting knowledge base file list', {
-        knowledgeBaseId,
+      this.log('info', 'Getting source set file list', {
+        sourceSetId,
         request,
       });
 
-      // 复用 getFileList 的查询逻辑
-      const fileListQuery: FileListQuery = {
-        ...request,
-        knowledgeBaseId,
-      };
+      const { limit, offset } = processPaginationConditions(request);
+      const whereConditions = [eq(sourceSetFiles.sourceSetId, sourceSetId)];
 
-      const result = await this.getFileList(fileListQuery);
+      if (request.keyword) {
+        whereConditions.push(ilike(files.name, `%${request.keyword}%`));
+      }
 
-      this.log('info', 'Knowledge base file list retrieved successfully', {
-        count: result.files.length,
-        knowledgeBaseId,
-        total: result.total,
+      if (request.fileType) {
+        whereConditions.push(ilike(files.fileType, `${request.fileType}%`));
+      }
+
+      const rows = await this.db
+        .select({ file: files })
+        .from(sourceSetFiles)
+        .innerJoin(files, eq(sourceSetFiles.fileId, files.id))
+        .where(and(...whereConditions))
+        .orderBy(desc(files.createdAt));
+
+      const visibleIds = new Set(
+        await this.contentAuthorizer.filterVisibleFileIdsForList(rows.map((row) => row.file.id)),
+      );
+
+      const visibleFiles = rows.map((row) => row.file).filter((file) => visibleIds.has(file.id));
+
+      const pagedFiles =
+        limit !== undefined && offset !== undefined
+          ? visibleFiles.slice(offset, offset + limit)
+          : visibleFiles;
+
+      const responseFiles = await this.buildFileListResponse(pagedFiles, true, false);
+
+      this.log('info', 'Source set file list retrieved successfully', {
+        count: responseFiles.length,
+        sourceSetId,
+        total: visibleFiles.length,
       });
 
-      return result;
+      return {
+        files: responseFiles,
+        total: visibleFiles.length,
+        totalSize: String(visibleFiles.reduce((acc, file) => acc + (file.size || 0), 0)),
+      };
     } catch (error) {
-      this.handleServiceError(error, '获取知识库文件列表');
+      this.handleServiceError(error, '获取来源集文件列表');
     }
   }
 
   /**
-   * 批量创建知识库与文件的关联
+   * 批量创建来源集与文件的关联
    */
-  async addFilesToKnowledgeBase(
-    knowledgeBaseId: string,
-    request: KnowledgeBaseFileBatchRequest,
-  ): Promise<KnowledgeBaseFileOperationResult> {
+  async addFilesToSourceSet(
+    sourceSetId: string,
+    request: SourceSetFileBatchRequest,
+  ): Promise<SourceSetFileOperationResult> {
     try {
-      await this.assertOwnedKnowledgeBase(knowledgeBaseId, 'KNOWLEDGE_BASE_UPDATE');
+      const sourceSet = await this.assertSourceSetAccess(
+        sourceSetId,
+        'SOURCE_SET_UPDATE',
+        'create_child',
+      );
 
-      const uniqueFileIds = Array.from(new Set(request.fileIds));
-      if (uniqueFileIds.length === 0) {
+      if (request.fileIds.length === 0) {
         throw this.createValidationError('文件ID列表不能为空');
       }
 
-      const ownedFiles = await this.db.query.files.findMany({
-        columns: { id: true },
-        where: and(inArray(files.id, uniqueFileIds), eq(files.userId, this.userId)),
-      });
-      const ownedIds = ownedFiles.map((file) => file.id);
+      const { failed, successed } = await this.assertReadableSourceItems(request.fileIds);
 
-      const failed = uniqueFileIds
-        .filter((fileId) => !ownedIds.includes(fileId))
-        .map((fileId) => ({ fileId, reason: '文件不存在或无权访问' }));
-
-      if (ownedIds.length) {
-        await this.db
-          .insert(knowledgeBaseFiles)
-          .values(
-            ownedIds.map((fileId) => ({
-              fileId,
-              knowledgeBaseId,
-              userId: this.userId,
-            })),
-          )
-          .onConflictDoNothing();
+      if (successed.length > 0) {
+        await this.sourceSetModel.addFilesToSourceSetAny(
+          sourceSetId,
+          successed,
+          sourceSet.spaceId ?? undefined,
+        );
       }
 
       return {
         failed,
-        successed: ownedIds,
+        successed,
       };
     } catch (error) {
-      this.handleServiceError(error, '批量添加知识库文件关联');
+      this.handleServiceError(error, '批量添加来源集文件关联');
     }
   }
 
   /**
-   * 批量移除知识库与文件的关联
+   * 批量移除来源集与文件的关联
    */
-  async removeFilesFromKnowledgeBase(
-    knowledgeBaseId: string,
-    request: KnowledgeBaseFileBatchRequest,
-  ): Promise<KnowledgeBaseFileOperationResult> {
+  async removeFilesFromSourceSet(
+    sourceSetId: string,
+    request: SourceSetFileBatchRequest,
+  ): Promise<SourceSetFileOperationResult> {
     try {
-      const uniqueFileIds = Array.from(new Set(request.fileIds));
-      if (uniqueFileIds.length === 0) {
+      if (request.fileIds.length === 0) {
         throw this.createValidationError('文件ID列表不能为空');
       }
 
-      await this.assertOwnedKnowledgeBase(knowledgeBaseId, 'KNOWLEDGE_BASE_UPDATE');
+      await this.assertSourceSetAccess(sourceSetId, 'SOURCE_SET_UPDATE', 'create_child');
+      const { failed, successed } = await this.assertReadableSourceItems(request.fileIds);
 
-      const ownedFiles = await this.db.query.files.findMany({
-        columns: { id: true },
-        where: and(inArray(files.id, uniqueFileIds), eq(files.userId, this.userId)),
-      });
-      const ownedIds = ownedFiles.map((file) => file.id);
-
-      const failed = uniqueFileIds
-        .filter((fileId) => !ownedIds.includes(fileId))
-        .map((fileId) => ({ fileId, reason: '文件不存在或无权访问' }));
-
-      if (ownedIds.length) {
-        await this.db
-          .delete(knowledgeBaseFiles)
-          .where(
-            and(
-              eq(knowledgeBaseFiles.knowledgeBaseId, knowledgeBaseId),
-              eq(knowledgeBaseFiles.userId, this.userId),
-              inArray(knowledgeBaseFiles.fileId, ownedIds),
-            ),
-          );
+      if (successed.length > 0) {
+        await this.sourceSetModel.removeFilesFromSourceSetAny(sourceSetId, successed);
       }
 
       return {
         failed,
-        successed: ownedIds,
+        successed,
       };
     } catch (error) {
-      this.handleServiceError(error, '批量移除知识库文件关联');
+      this.handleServiceError(error, '批量移除来源集文件关联');
     }
   }
 
   /**
-   * 批量移动文件到另一个知识库
+   * 批量移动文件到另一个来源集
    */
-  async moveFilesBetweenKnowledgeBases(
-    sourceKnowledgeBaseId: string,
-    request: MoveKnowledgeBaseFilesRequest,
-  ): Promise<MoveKnowledgeBaseFilesResponse> {
+  async moveFilesBetweenSourceSets(
+    sourceSourceSetId: string,
+    request: MoveSourceSetFilesRequest,
+  ): Promise<MoveSourceSetFilesResponse> {
     try {
-      if (sourceKnowledgeBaseId === request.targetKnowledgeBaseId) {
-        throw this.createValidationError('目标知识库不能与源知识库相同');
+      if (sourceSourceSetId === request.targetSourceSetId) {
+        throw this.createValidationError('目标来源集不能与源来源集相同');
       }
 
-      // 校验知识库归属
-      await this.assertOwnedKnowledgeBase(sourceKnowledgeBaseId, 'KNOWLEDGE_BASE_UPDATE');
-      await this.assertOwnedKnowledgeBase(request.targetKnowledgeBaseId, 'KNOWLEDGE_BASE_UPDATE');
+      await this.assertSourceSetAccess(sourceSourceSetId, 'SOURCE_SET_UPDATE', 'create_child');
+      const targetSourceSet = await this.assertSourceSetAccess(
+        request.targetSourceSetId,
+        'SOURCE_SET_UPDATE',
+        'create_child',
+      );
 
-      // 校验文件归属
-      const uniqueFileIds = Array.from(new Set(request.fileIds));
+      const { failed, successed } = await this.assertReadableSourceItems(request.fileIds);
 
-      const ownedFiles = await this.db.query.files.findMany({
-        columns: { id: true },
-        where: and(inArray(files.id, uniqueFileIds), eq(files.userId, this.userId)),
-      });
-
-      const ownedIds = ownedFiles.map((file) => file.id);
-
-      const failed: MoveKnowledgeBaseFilesResponse['failed'] = uniqueFileIds
-        .filter((fileId) => !ownedIds.includes(fileId))
-        .map((fileId) => ({ fileId, reason: '文件不存在或无权访问' }));
-
-      if (!ownedIds.length) {
+      if (!successed.length) {
         return {
           failed,
           successed: [],
         };
       }
 
-      await this.db.transaction(async (trx) => {
-        await trx
-          .delete(knowledgeBaseFiles)
-          .where(
-            and(
-              eq(knowledgeBaseFiles.knowledgeBaseId, sourceKnowledgeBaseId),
-              eq(knowledgeBaseFiles.userId, this.userId),
-              inArray(knowledgeBaseFiles.fileId, ownedIds),
-            ),
-          );
-
-        await trx
-          .insert(knowledgeBaseFiles)
-          .values(
-            ownedIds.map((fileId) => ({
-              fileId,
-              knowledgeBaseId: request.targetKnowledgeBaseId,
-              userId: this.userId,
-            })),
-          )
-          .onConflictDoNothing();
-      });
+      await this.sourceSetModel.removeFilesFromSourceSetAny(sourceSourceSetId, successed);
+      await this.sourceSetModel.addFilesToSourceSetAny(
+        request.targetSourceSetId,
+        successed,
+        targetSourceSet.spaceId ?? undefined,
+      );
 
       return {
         failed,
-        successed: ownedIds,
+        successed,
       };
     } catch (error) {
-      this.handleServiceError(error, '移动知识库文件');
+      this.handleServiceError(error, '移动来源集文件');
     }
   }
 
@@ -567,7 +654,7 @@ export class FileUploadService extends BaseService {
       // 检查是否为图片文件
       const isImage = file.fileType.startsWith('image/');
 
-      const convertedFile = await this.convertToResponse(file);
+      const convertedFile = await this.convertToResponse(file, { via: 'openapi_file_detail' });
 
       if (!isImage) {
         // 非图片文件：获取解析结果
@@ -621,12 +708,22 @@ export class FileUploadService extends BaseService {
       }
 
       const file = await this.findFileByIdWithPermission(fileId, permissionResult);
+      const access = await this.contentAuthorizer
+        .assertCapability({
+          capability: 'download_blob',
+          id: fileId,
+          kind: 'file',
+        })
+        .catch((error) => this.mapContentAccessError(error, '无权下载此文件'));
 
-      // 设置过期时间（默认1小时）
-      const expiresIn = options.expiresIn || 3600;
+      // 设置过期时间（默认并最大均为 1 小时）
+      const expiresIn = clampFileUrlExpiresIn(options.expiresIn);
 
-      // 使用S3服务生成预签名URL
-      const signedUrl = await this.s3Service.createPreSignedUrlForPreview(file.url, expiresIn);
+      const signedUrl = await ensureFileResponseUrl({
+        expiresIn,
+        getFullFileUrl: this.coreFileService.getFullFileUrl.bind(this.coreFileService),
+        url: file.url,
+      });
 
       // 计算过期时间戳
       const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
@@ -636,6 +733,28 @@ export class FileUploadService extends BaseService {
         fileId,
         name: file.name,
       });
+
+      try {
+        await this.contentModel.createAccessEvent({
+          accessType: 'file_url_issued',
+          contentUid: access.contentUid,
+          metadata: {
+            expiresIn,
+            fileId,
+            matchedBy: access.matchedBy,
+            via: 'openapi_signed_url',
+          },
+          shareLinkId: null,
+          sourceIp: null,
+          spaceId: access.spaceId,
+          userAgent: null,
+        });
+      } catch (eventError) {
+        this.log('warn', 'Failed to record OpenAPI file URL issued access event', {
+          error: eventError,
+          fileId,
+        });
+      }
 
       return {
         expiresAt,
@@ -670,28 +789,37 @@ export class FileUploadService extends BaseService {
       // 1. 验证文件
       await this.validateFile(file, options.skipCheckFileType);
 
-      // 2. 计算文件哈希
+      // 2. 计算文件 SHA-256
       const fileArrayBuffer = await file.arrayBuffer();
-      const hash = sha256(fileArrayBuffer);
+      const sha256Hex = sha256(fileArrayBuffer);
       const resolvedSessionId = await this.resolveSessionId(options);
       const uploadSpaceId = await this.resolveUploadSpaceId(options);
 
       // 3. 同一 Space 内去重：仅查询 space_blobs（不调用全局 global_files / checkHash，避免跨用户存在性侧信道）
       if (!options.skipDeduplication) {
-        const existingBlob = await this.resourceModel.findSpaceBlobByHash(uploadSpaceId, hash);
+        const existingBlob = await this.contentModel.findReadySpaceBlobBySha256(
+          uploadSpaceId,
+          sha256Hex,
+        );
 
         if (existingBlob) {
           this.log('info', 'OpenAPI upload dedup: space_blobs hit in space', {
-            hash,
+            sha256: sha256Hex,
             name: file.name,
             spaceId: uploadSpaceId,
             storageKey: existingBlob.storageKey,
           });
 
-          const existingUserFile = await this.findExistingUserFile(hash);
+          const existingUserFile = await this.fileModel.findExistingByBlobAndContext({
+            blobId: existingBlob.id,
+            fileType: file.type,
+            name: file.name,
+            sourceSetId: options.sourceSetId,
+            spaceId: uploadSpaceId,
+          });
 
           if (existingUserFile) {
-            this.log('info', 'User already has file row for this hash', {
+            this.log('info', 'User already has file row for this blob', {
               fileId: existingUserFile.id,
               name: existingUserFile.name,
             });
@@ -711,23 +839,17 @@ export class FileUploadService extends BaseService {
             (existingBlob.metadata as FileMetadata | undefined) ||
             this.generateFileMetadata(file, options.directory);
 
-          const fileRecord = {
-            chunkTaskId: null,
-            clientId: null,
-            embeddingTaskId: null,
-            fileHash: hash,
+          const createResult = await this.createSpaceScopedFileRecord({
+            blobId: existingBlob.id,
             fileType: file.type,
-            knowledgeBaseId: options.knowledgeBaseId,
             metadata: metaFromBlob,
             name: file.name,
+            sha256: sha256Hex,
             size: file.size,
+            sourceSetId: options.sourceSetId,
             spaceId: uploadSpaceId,
-            url: existingBlob.storageKey,
-            userId: this.userId,
-          };
-
-          // 仍尝试写入 global_files（onConflictDoNothing），满足 files.file_hash 外键；对象实际复用 space_blobs.storageKey
-          const createResult = await this.fileModel.create(fileRecord, true);
+            storageKey: existingBlob.storageKey,
+          });
 
           if (resolvedSessionId) {
             await this.createFileSessionRelation(createResult.id, resolvedSessionId);
@@ -747,21 +869,21 @@ export class FileUploadService extends BaseService {
         }
       }
 
-      // 4. 本 Space 无就绪 blob：走完整上传，并登记 space_blobs（仍写 global_files 以满足 fileHash 外键）
+      // 4. 本 Space 无就绪 blob：走完整上传，并登记 space_blobs / content registry
       const metadata = this.generateFileMetadata(file, options.directory);
 
       const fileBuffer = Buffer.from(fileArrayBuffer);
-      const privateBlobS3 = getPrivateBlobS3();
-      await privateBlobS3.uploadBuffer(metadata.path, fileBuffer, file.type);
-      const head = await privateBlobS3.getObjectMetadata(metadata.path);
+      const blobProvider = getBlobProvider();
+      await blobProvider.uploadBuffer(metadata.path, fileBuffer, file.type);
+      const head = await blobProvider.getObjectMetadata(metadata.path);
       if (head.contentLength !== file.size) {
-        await this.resourceModel.quarantineSpaceBlobAfterFailedVerify({
+        await this.contentModel.quarantineSpaceBlobAfterFailedVerify({
           actualSize: head.contentLength,
           createdBy: this.userId!,
           extraMetadata: { ...metadata, source: 'openapi_upload' } as Record<string, unknown>,
           fileType: file.type,
           reason: 'size_mismatch',
-          sha256: hash,
+          sha256: sha256Hex,
           size: head.contentLength,
           spaceId: uploadSpaceId,
           storageKey: metadata.path,
@@ -769,34 +891,29 @@ export class FileUploadService extends BaseService {
         throw this.createBusinessError('上传校验失败：存储对象大小与声明不一致');
       }
 
-      const fileRecord = {
-        chunkTaskId: null,
-        clientId: null,
-        embeddingTaskId: null,
-        fileHash: hash,
-        fileType: file.type,
-        knowledgeBaseId: options.knowledgeBaseId,
-        metadata,
-        name: file.name,
-        size: file.size,
-        spaceId: uploadSpaceId,
-        url: metadata.path,
-        userId: this.userId,
-      };
-
-      const createResult = await this.fileModel.create(fileRecord, true);
-
-      await this.resourceModel.upsertSpaceBlob({
+      const blob = await this.contentModel.upsertSpaceBlob({
         createdBy: this.userId!,
         etag: head.etag,
         fileType: file.type,
         metadata: metadata as Record<string, unknown>,
-        sha256: hash,
+        sha256: sha256Hex,
         size: file.size,
         spaceId: uploadSpaceId,
         status: 'ready',
         storageKey: metadata.path,
         verifiedAt: new Date(),
+      });
+
+      const createResult = await this.createSpaceScopedFileRecord({
+        blobId: blob.id,
+        fileType: file.type,
+        metadata,
+        name: file.name,
+        sha256: sha256Hex,
+        size: file.size,
+        sourceSetId: options.sourceSetId,
+        spaceId: uploadSpaceId,
+        storageKey: metadata.path,
       });
 
       if (resolvedSessionId) {
@@ -939,6 +1056,13 @@ export class FileUploadService extends BaseService {
       }
 
       const file = await this.findFileByIdWithPermission(fileId, permissionResult);
+      const access = await this.contentAuthorizer
+        .assertCapability({
+          capability: 'preview_content',
+          id: fileId,
+          kind: 'file',
+        })
+        .catch((error) => this.mapContentAccessError(error, '无权预览此文件'));
 
       if (isChunkingUnsupported(file.fileType)) {
         throw this.createBusinessError(`File type '${file.fileType}' does not support chunking`);
@@ -948,11 +1072,15 @@ export class FileUploadService extends BaseService {
       const { ChunkService } = await import('@/server/services/chunk');
       const chunkService = new ChunkService(this.db, this.userId);
 
-      const chunkTaskId = await chunkService.asyncParseFileToChunks(fileId, req.skipExist);
+      const chunkTaskId = await chunkService.asyncParseFileToChunks(fileId, req.skipExist, {
+        contentGuardAuthzEpoch: access.authzEpoch,
+      });
 
       let embeddingTaskId: string | null | undefined = null;
       if (req.autoEmbedding) {
-        embeddingTaskId = await chunkService.asyncEmbeddingFileChunks(fileId);
+        embeddingTaskId = await chunkService.asyncEmbeddingFileChunks(fileId, {
+          contentGuardAuthzEpoch: access.authzEpoch,
+        });
       }
 
       this.log('info', 'Chunk task created', {
@@ -1026,15 +1154,23 @@ export class FileUploadService extends BaseService {
       }
 
       const file = await this.findFileByIdWithPermission(fileId, permissionResult);
+      const removeGlobalFile = serverDBEnv.REMOVE_GLOBAL_FILE ?? true;
 
-      // 删除S3文件
-      await this.coreFileService.deleteFile(file.url);
-
-      // 删除数据库记录及关联 chunks / global_files（权限已在上方校验）
-      await this.fileModel.deleteAny(fileId, serverDBEnv.REMOVE_GLOBAL_FILE);
-      await this.resourceModel.invalidateAuthzEpochsAfterRemoval([
-        { resourceUid: file.resourceUid, spaceId: file.spaceId },
+      // 删除数据库记录及关联 chunks；底层对象是否可回收由 storage cleanup helper 判定。
+      await this.fileModel.deleteAny(fileId, removeGlobalFile);
+      await this.contentModel.invalidateAuthzEpochsAfterRemoval([
+        { contentUid: file.contentUid, spaceId: file.spaceId },
       ]);
+
+      const removableUrls = await resolveRemovableStorageUrls(
+        this.fileModel,
+        [file],
+        removeGlobalFile,
+      );
+
+      if (removableUrls.length > 0) {
+        await this.coreFileService.deleteFile(removableUrls[0]!);
+      }
 
       this.log('info', 'File deleted successfully', { fileId, key: file.url });
 
@@ -1148,19 +1284,19 @@ export class FileUploadService extends BaseService {
   }
 
   /**
-   * 上传归属的 Space：知识库优先其 spaceId，否则个人空间。
+   * 上传归属的 Space：来源集优先其 spaceId，否则个人空间。
    */
   private async resolveUploadSpaceId(options: PublicFileUploadRequest): Promise<string> {
-    if (options.knowledgeBaseId) {
-      const kb = await this.knowledgeBaseModel.findById(options.knowledgeBaseId);
-      if (!kb) {
-        throw this.createBusinessError('知识库不存在或无权访问');
-      }
-      if (kb.spaceId) return kb.spaceId;
+    if (options.sourceSetId) {
+      const sourceSet = await this.assertSourceSetAccess(
+        options.sourceSetId,
+        'SOURCE_SET_UPDATE',
+        'create_child',
+      );
+      if (sourceSet.spaceId) return sourceSet.spaceId;
     }
 
-    const spaceModel = new SpaceModel(this.db, this.userId!);
-    const personal = await spaceModel.getOrCreatePersonalSpace();
+    const personal = await this.spaceModel.getOrCreatePersonalSpace();
     return personal.id;
   }
 
@@ -1270,18 +1406,34 @@ export class FileUploadService extends BaseService {
     }
   }
 
-  /**
-   * 查找用户是否已有指定哈希的文件记录
-   */
-  private async findExistingUserFile(hash: string): Promise<FileItem | null> {
+  private async createSpaceScopedFileRecord(params: {
+    blobId: string;
+    fileType: string;
+    metadata: FileMetadata;
+    name: string;
+    sha256: string;
+    size: number;
+    sourceSetId?: string;
+    spaceId: string;
+    storageKey: string;
+  }): Promise<{ id: string }> {
     try {
-      const existingFile = await this.db.query.files.findFirst({
-        where: and(eq(files.fileHash, hash), eq(files.userId, this.userId)),
+      const { fileId } = await this.coreFileService.createFileRecord({
+        blobId: params.blobId,
+        blobMetadata: params.metadata as Record<string, unknown>,
+        fileType: params.fileType,
+        metadata: params.metadata,
+        name: params.name,
+        sha256: params.sha256,
+        sourceSetId: params.sourceSetId,
+        size: params.size,
+        spaceId: params.spaceId,
+        storageKey: params.storageKey,
       });
 
-      return existingFile || null;
+      return { id: fileId };
     } catch (error) {
-      this.handleServiceError(error, '查找用户是否已有指定哈希的文件记录');
+      this.handleServiceError(error, '创建空间文件记录');
     }
   }
 
@@ -1359,7 +1511,7 @@ export class FileUploadService extends BaseService {
    */
   private async buildFileListResponse(
     filesResult: (FileItem & {
-      knowledgeBases?: any[];
+      sourceSets?: any[];
       user?: any;
     })[],
     needsManualRelationFetch = false,
@@ -1367,18 +1519,18 @@ export class FileUploadService extends BaseService {
   ): Promise<FileDetailResponse['file'][]> {
     if (filesResult.length === 0) return [];
 
-    // 1. 按 fileHash 去重（相同 hash 的文件只保留第一个）
-    const uniqueFilesByHash = new Map<string, (typeof filesResult)[0]>();
+    // 1. 按 canonical artifact key 去重（blobId -> fileId）
+    const uniqueFilesByArtifact = new Map<string, (typeof filesResult)[0]>();
     for (const file of filesResult) {
-      const key = file.fileHash || file.id;
-      if (!uniqueFilesByHash.has(key)) {
-        uniqueFilesByHash.set(key, file);
+      const key = this.getFileArtifactKey(file);
+      if (!uniqueFilesByArtifact.has(key)) {
+        uniqueFilesByArtifact.set(key, file);
       }
     }
-    const dedupedFiles = Array.from(uniqueFilesByHash.values());
+    const dedupedFiles = Array.from(uniqueFilesByArtifact.values());
 
     const fileIds = dedupedFiles.map((file) => file.id);
-    const fileHashes = dedupedFiles.map((file) => file.fileHash).filter(Boolean) as string[];
+    const blobIds = dedupedFiles.map((file) => file.blobId).filter(Boolean) as string[];
 
     // 批量查询分块、任务状态
     const [chunkCounts, chunkTasks, embeddingTasks] = await Promise.all([
@@ -1393,19 +1545,24 @@ export class FileUploadService extends BaseService {
       ),
     ]);
 
-    // 2. 查询所有相同 hash 的文件对应的用户
+    // 2. 查询所有相同 blob 的文件对应的用户
     // 只有全局权限时才查询所有用户，否则只返回当前文件的用户
-    const hashUsersMap = new Map<string, any[]>();
+    const artifactUsersMap = new Map<string, any[]>();
+    const artifactConditions = [];
 
-    if (hasGlobalPermission && fileHashes.length > 0) {
-      // 查询所有相同 hash 的文件
-      const allFilesWithSameHash = await this.db.query.files.findMany({
-        columns: { fileHash: true, userId: true },
-        where: inArray(files.fileHash, fileHashes),
+    if (blobIds.length > 0) {
+      artifactConditions.push(inArray(files.blobId, blobIds));
+    }
+
+    if (hasGlobalPermission && artifactConditions.length > 0) {
+      const allFilesForArtifacts = await this.db.query.files.findMany({
+        columns: { blobId: true, id: true, userId: true },
+        where:
+          artifactConditions.length === 1 ? artifactConditions[0] : or(...artifactConditions),
       });
 
       // 收集所有用户 ID
-      const allUserIds = [...new Set(allFilesWithSameHash.map((f) => f.userId))];
+      const allUserIds = [...new Set(allFilesForArtifacts.map((f) => f.userId))];
 
       // 查询用户信息
       const allUsers =
@@ -1416,16 +1573,16 @@ export class FileUploadService extends BaseService {
             })
           : [];
 
-      // 构建 hash -> users 映射
-      for (const file of allFilesWithSameHash) {
-        if (!file.fileHash) continue;
+      // 构建 artifact -> users 映射
+      for (const file of allFilesForArtifacts) {
         const user = allUsers.find((u) => u.id === file.userId);
         if (user) {
-          if (!hashUsersMap.has(file.fileHash)) {
-            hashUsersMap.set(file.fileHash, []);
+          const key = this.getFileArtifactKey(file);
+          if (!artifactUsersMap.has(key)) {
+            artifactUsersMap.set(key, []);
           }
           // 避免重复添加同一用户
-          const existingUsers = hashUsersMap.get(file.fileHash)!;
+          const existingUsers = artifactUsersMap.get(key)!;
           if (!existingUsers.some((u) => u.id === user.id)) {
             existingUsers.push(user);
           }
@@ -1433,25 +1590,25 @@ export class FileUploadService extends BaseService {
       }
     }
 
-    // 如果是 JOIN 查询,需要单独查询知识库和用户信息
-    let fileKnowledgeBases: any[] = [];
+    // 如果是 JOIN 查询,需要单独查询来源集和用户信息
+    let fileSourceSets: any[] = [];
     let usersData: any[] = [];
 
     if (needsManualRelationFetch) {
       const userIds = [...new Set(dedupedFiles.map((file) => file.userId))];
 
-      [fileKnowledgeBases, usersData] = await Promise.all([
+      [fileSourceSets, usersData] = await Promise.all([
         this.db
           .select({
-            fileId: knowledgeBaseFiles.fileId,
-            knowledgeBaseAvatar: knowledgeBases.avatar,
-            knowledgeBaseDescription: knowledgeBases.description,
-            knowledgeBaseId: knowledgeBases.id,
-            knowledgeBaseName: knowledgeBases.name,
+            fileId: sourceSetFiles.fileId,
+            sourceSetAvatar: sourceSets.avatar,
+            sourceSetDescription: sourceSets.description,
+            sourceSetId: sourceSets.id,
+            sourceSetName: sourceSets.name,
           })
-          .from(knowledgeBaseFiles)
-          .innerJoin(knowledgeBases, eq(knowledgeBaseFiles.knowledgeBaseId, knowledgeBases.id))
-          .where(inArray(knowledgeBaseFiles.fileId, fileIds)),
+          .from(sourceSetFiles)
+          .innerJoin(sourceSets, eq(sourceSetFiles.sourceSetId, sourceSets.id))
+          .where(inArray(sourceSetFiles.fileId, fileIds)),
         userIds.length > 0
           ? this.db.query.users.findMany({
               columns: {
@@ -1467,10 +1624,18 @@ export class FileUploadService extends BaseService {
       ]);
     }
 
+    const downloadableFileAccessById =
+      await this.contentAuthorizer.getDownloadableFileAccessByIdForList(fileIds);
+
     // 构建响应数据
     return Promise.all(
       dedupedFiles.map(async (file) => {
-        const base = await this.convertToResponse(file);
+        const access = downloadableFileAccessById[file.id];
+        const base = await this.convertToResponse(file, {
+          access,
+          downloadable: Boolean(access),
+          via: access ? 'openapi_file_list' : undefined,
+        });
 
         const chunkCountItem = chunkCounts.find((c) => c.id === file.id);
         const chunkTask = file.chunkTaskId
@@ -1480,24 +1645,25 @@ export class FileUploadService extends BaseService {
           ? embeddingTasks.find((task) => task.id === file.embeddingTaskId)
           : null;
 
-        // 获取知识库信息
-        const knowledgeBases = needsManualRelationFetch
-          ? fileKnowledgeBases
-              .filter((kb) => kb.fileId === file.id)
-              .map((kb) => ({
-                avatar: kb.knowledgeBaseAvatar,
-                description: kb.knowledgeBaseDescription,
-                id: kb.knowledgeBaseId,
-                name: kb.knowledgeBaseName,
+        // 获取来源集信息
+        const sourceSets = needsManualRelationFetch
+          ? fileSourceSets
+              .filter((sourceSet) => sourceSet.fileId === file.id)
+              .map((sourceSet) => ({
+                avatar: sourceSet.sourceSetAvatar,
+                description: sourceSet.sourceSetDescription,
+                id: sourceSet.sourceSetId,
+                name: sourceSet.sourceSetName,
               }))
-          : file.knowledgeBases?.map((kb) => kb.knowledgeBase) || [];
+          : file.sourceSets?.map((sourceSet) => sourceSet.sourceSet) || [];
 
         // 获取用户信息
         let fileUsers = [];
 
-        if (hasGlobalPermission && file.fileHash && hashUsersMap.has(file.fileHash)) {
-          // 全局权限：返回所有关联该 hash 的用户
-          fileUsers = hashUsersMap.get(file.fileHash) || [];
+        const artifactKey = this.getFileArtifactKey(file);
+        if (hasGlobalPermission && artifactUsersMap.has(artifactKey)) {
+          // 全局权限：返回所有关联该 artifact 的用户
+          fileUsers = artifactUsersMap.get(artifactKey) || [];
         } else {
           // 非全局权限：只返回当前文件的用户
           const currentUser = needsManualRelationFetch
@@ -1533,7 +1699,7 @@ export class FileUploadService extends BaseService {
           ...base,
           chunking,
           embedding,
-          knowledgeBases,
+          sourceSets,
           users: fileUsers,
         };
       }),
@@ -1546,7 +1712,7 @@ export class FileUploadService extends BaseService {
    */
   async updateFile(
     fileId: string,
-    updateData: { knowledgeBaseId?: string | null },
+    updateData: { sourceSetId?: string | null },
   ): Promise<FileDetailResponse> {
     try {
       // 1. 权限校验
@@ -1558,37 +1724,26 @@ export class FileUploadService extends BaseService {
       }
 
       // 2. 查询文件
-      const file = await this.findFileByIdWithPermission(fileId, permissionResult);
+      await this.findFileByIdWithPermission(fileId, permissionResult);
 
-      // 3. 处理知识库关联
-      if ('knowledgeBaseId' in updateData) {
+      // 3. 处理来源集关联
+      if ('sourceSetId' in updateData) {
         await this.db.transaction(async (trx) => {
-          // 删除现有的知识库关联（对于全局权限用户，使用文件的实际 userId）
-          const targetUserId = file.userId;
-          await trx
-            .delete(knowledgeBaseFiles)
-            .where(
-              and(
-                eq(knowledgeBaseFiles.fileId, fileId),
-                eq(knowledgeBaseFiles.userId, targetUserId),
-              ),
+          await trx.delete(sourceSetFiles).where(eq(sourceSetFiles.fileId, fileId));
+
+          // 如果提供了新的来源集 ID，创建新的关联
+          if (updateData.sourceSetId) {
+            const sourceSet = await this.assertSourceSetAccess(
+              updateData.sourceSetId,
+              'SOURCE_SET_UPDATE',
+              'create_child',
             );
 
-          // 如果提供了新的知识库ID，创建新的关联
-          if (updateData.knowledgeBaseId) {
-            // 验证知识库是否存在且用户有权访问
-            const knowledgeBase = await this.knowledgeBaseModel.findById(
-              updateData.knowledgeBaseId,
-            );
-
-            if (!knowledgeBase) {
-              throw this.createNotFoundError('知识库不存在或无权访问');
-            }
-
-            await trx.insert(knowledgeBaseFiles).values({
+            await trx.insert(sourceSetFiles).values({
               fileId,
-              knowledgeBaseId: updateData.knowledgeBaseId,
-              userId: targetUserId,
+              sourceSetId: updateData.sourceSetId,
+              spaceId: sourceSet.spaceId,
+              userId: this.userId,
             });
           }
         });

@@ -3,7 +3,7 @@
 import { Flexbox, SearchBar, Skeleton } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
 import { type ChangeEvent } from 'react';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Virtuoso } from 'react-virtuoso';
 
@@ -30,13 +30,37 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 interface AvailableAgentListProps {
   agents: AgentItemData[];
   isLoading: boolean;
+  open: boolean;
 }
 
-const AvailableAgentList = memo<AvailableAgentListProps>(({ agents, isLoading }) => {
+const AvailableAgentList = memo<AvailableAgentListProps>(({ agents, isLoading, open }) => {
   const { t } = useTranslation(['chat', 'common']);
   const [searchTerm, setSearchTerm] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isViewportReady, setIsViewportReady] = useState(false);
 
   const defaultTitle = useMemo(() => t('defaultSession', { ns: 'common' }), [t]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+
+    if (!container || !open) {
+      setIsViewportReady(false);
+      return;
+    }
+
+    const updateViewportReady = () => {
+      const { height, width } = container.getBoundingClientRect();
+      setIsViewportReady(height > 0 && width > 0);
+    };
+
+    updateViewportReady();
+
+    const observer = new ResizeObserver(updateViewportReady);
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, [open]);
 
   const handleSearchChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -66,7 +90,7 @@ const AvailableAgentList = memo<AvailableAgentListProps>(({ agents, isLoading })
         onChange={handleSearchChange}
       />
 
-      <Flexbox flex={1} style={{ minHeight: 0 }}>
+      <Flexbox flex={1} ref={containerRef} style={{ minHeight: 0 }}>
         {isLoading ? (
           <Flexbox gap={8} padding={8}>
             <Skeleton active paragraph={{ rows: 1 }} title={false} />
@@ -78,9 +102,12 @@ const AvailableAgentList = memo<AvailableAgentListProps>(({ agents, isLoading })
             search={Boolean(searchTerm)}
             variant={searchTerm ? 'empty' : 'noAvailable'}
           />
+        ) : !open || !isViewportReady ? (
+          <div style={{ flex: 1 }} />
         ) : (
           <Virtuoso
-            style={{ flex: 1 }}
+            defaultItemHeight={44}
+            style={{ flex: 1, height: '100%' }}
             totalCount={filteredAgents.length}
             itemContent={(index) => {
               const agent = filteredAgents[index];

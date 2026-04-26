@@ -11,6 +11,12 @@ import { agentCronJobService } from '@/services/agentCronJob';
 
 export const useAgentCronJobs = (agentId?: string, enabled: boolean = true) => {
   const { t } = useTranslation('setting');
+  const notifyFailure = useCallback(
+    (key: string) => {
+      message.error(t(key as any));
+    },
+    [t],
+  );
 
   // Fetch cron jobs for the agent
   const {
@@ -24,7 +30,7 @@ export const useAgentCronJobs = (agentId?: string, enabled: boolean = true) => {
     {
       onError: (error) => {
         console.error('Failed to fetch cron jobs:', error);
-        message.error('Failed to load scheduled tasks');
+        notifyFailure('agentCronJobs.loadFailed');
       },
     },
   );
@@ -45,13 +51,15 @@ export const useAgentCronJobs = (agentId?: string, enabled: boolean = true) => {
           await mutate();
           return result.data;
         }
+
+        notifyFailure('agentCronJobs.createFailed');
       } catch (error) {
         console.error('Failed to create cron job:', error);
-        message.error('Failed to create scheduled task');
+        notifyFailure('agentCronJobs.createFailed');
         throw error;
       }
     },
-    [agentId, mutate, t],
+    [agentId, mutate, notifyFailure, t],
   );
 
   // Update a cron job
@@ -65,13 +73,15 @@ export const useAgentCronJobs = (agentId?: string, enabled: boolean = true) => {
           await mutate();
           return result.data;
         }
+
+        notifyFailure('agentCronJobs.updateFailed');
       } catch (error) {
         console.error('Failed to update cron job:', error);
-        message.error('Failed to update scheduled task');
+        notifyFailure('agentCronJobs.updateFailed');
         throw error;
       }
     },
-    [mutate, t],
+    [mutate, notifyFailure, t],
   );
 
   // Delete a cron job
@@ -83,14 +93,17 @@ export const useAgentCronJobs = (agentId?: string, enabled: boolean = true) => {
         if (result.success) {
           message.success(t('agentCronJobs.deleteSuccess'));
           await mutate();
+          return;
         }
+
+        notifyFailure('agentCronJobs.deleteFailed');
       } catch (error) {
         console.error('Failed to delete cron job:', error);
-        message.error('Failed to delete scheduled task');
+        notifyFailure('agentCronJobs.deleteFailed');
         throw error;
       }
     },
-    [mutate, t],
+    [mutate, notifyFailure, t],
   );
 
   // Get execution statistics
@@ -99,9 +112,10 @@ export const useAgentCronJobs = (agentId?: string, enabled: boolean = true) => {
       return await agentCronJobService.getStats();
     } catch (error) {
       console.error('Failed to get cron job stats:', error);
+      notifyFailure('agentCronJobs.loadStatsFailed');
       throw error;
     }
-  }, []);
+  }, [notifyFailure]);
 
   // Reset execution counts
   const resetExecutions = useCallback(
@@ -110,17 +124,19 @@ export const useAgentCronJobs = (agentId?: string, enabled: boolean = true) => {
         const result = await agentCronJobService.resetExecutions(id, newMaxExecutions);
 
         if (result.success) {
-          message.success('Execution counts reset successfully');
+          message.success(t('agentCronJobs.resetExecutionsSuccess'));
           await mutate();
           return result.data;
         }
+
+        notifyFailure('agentCronJobs.resetExecutionsFailed');
       } catch (error) {
         console.error('Failed to reset executions:', error);
-        message.error('Failed to reset execution counts');
+        notifyFailure('agentCronJobs.resetExecutionsFailed');
         throw error;
       }
     },
-    [mutate],
+    [mutate, notifyFailure, t],
   );
 
   return {

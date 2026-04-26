@@ -3,7 +3,7 @@
 import { Modal } from '@lobehub/ui';
 import { memo } from 'react';
 
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 
 import Content from './Content';
 
@@ -25,7 +25,9 @@ const AgentSettings = memo(() => {
           position: 'relative',
         },
       }}
-      onCancel={() => useAgentStore.setState({ showAgentSetting: false })}
+      onCancel={() =>
+        useAgentStore.setState({ activeAgentSettingTab: undefined, showAgentSetting: false })
+      }
     >
       <Content />
     </Modal>

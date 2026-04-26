@@ -76,16 +76,59 @@ export const generationTopicRouter = router({
   updateTopic: generationTopicProcedure
     .input(updateTopicSchema)
     .mutation(async ({ ctx, input }) => {
-      return ctx.generationTopicModel.update(input.id, input.value as Partial<GenerationTopicItem>);
+      const value: Partial<GenerationTopicItem> = { ...input.value };
+      const previousTopic =
+        input.value.coverUrl !== undefined
+          ? await ctx.generationTopicModel.findById(input.id)
+          : undefined;
+
+      if (input.value.coverUrl !== undefined) {
+        value.coverUrl =
+          input.value.coverUrl === null
+            ? null
+            : await ctx.generationService.createCoverFromUrl(input.value.coverUrl);
+      }
+
+      const updatedTopic = await ctx.generationTopicModel.update(input.id, value);
+
+      if (
+        updatedTopic &&
+        previousTopic?.coverUrl &&
+        previousTopic.coverUrl !== updatedTopic.coverUrl
+      ) {
+        try {
+          await ctx.fileService.deleteFile(previousTopic.coverUrl);
+        } catch (error) {
+          console.error('Failed to delete old topic cover from S3:', error);
+        }
+      }
+
+      return updatedTopic;
     }),
   updateTopicCover: generationTopicProcedure
     .input(updateTopicCoverSchema)
     .mutation(async ({ ctx, input }) => {
+      const previousTopic = await ctx.generationTopicModel.findById(input.id);
+
       // Process the cover image and get key
       const newCoverKey = await ctx.generationService.createCoverFromUrl(input.coverUrl);
 
       // Update the topic with the new cover key
-      return ctx.generationTopicModel.update(input.id, { coverUrl: newCoverKey });
+      const updatedTopic = await ctx.generationTopicModel.update(input.id, { coverUrl: newCoverKey });
+
+      if (
+        updatedTopic &&
+        previousTopic?.coverUrl &&
+        previousTopic.coverUrl !== updatedTopic.coverUrl
+      ) {
+        try {
+          await ctx.fileService.deleteFile(previousTopic.coverUrl);
+        } catch (error) {
+          console.error('Failed to delete old topic cover from S3:', error);
+        }
+      }
+
+      return updatedTopic;
     }),
 });
 

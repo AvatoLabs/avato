@@ -184,11 +184,20 @@ export const POST = async (req: Request, { params }: { params: Promise<{ provide
       generation.id,
       asset,
       {
-        fileHash: processResult.fileHash,
         fileType: processResult.mimeType,
+        metadata: {
+          coverPath: processResult.coverKey,
+          duration: processResult.duration,
+          generationId: generation.id,
+          height: processResult.height,
+          path: processResult.videoKey,
+          thumbnailPath: processResult.thumbnailKey,
+          width: processResult.width,
+        },
         name: `${sanitizeFileName(batch?.prompt ?? '', generation.id)}.mp4`,
+        sha256: processResult.sha256,
         size: processResult.fileSize,
-        url: processResult.videoKey,
+        storageKey: processResult.videoKey,
       },
       FileSource.VideoGeneration,
     );

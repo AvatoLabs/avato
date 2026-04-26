@@ -34,9 +34,10 @@ vi.mock('js-sha256', () => ({
   }),
 }));
 
-const mockStorageKey = 'uploads/spc_test/sess_1/opq_upload_id';
+const mockStorageKey = 'v2/spaces/spc_test/blobs/sess_1/opq_upload_id';
 const mockSessionId = 'ups_sess_1';
 const mockPreSignUrl = 'https://example.com/presign';
+const UPLOAD_SESSION_ID_HEADER = 'x-lobe-upload-session-id';
 
 function mockXhrSuccess() {
   const xhrMock = {
@@ -88,7 +89,7 @@ describe('UploadService', () => {
       expect(result.success).toBe(true);
       expect(result.data).toEqual({
         date: '1',
-        dirname: 'uploads/spc_test/sess_1',
+        dirname: 'v2/spaces/spc_test/blobs/sess_1',
         filename: 'test.png',
         path: mockStorageKey,
       });
@@ -100,7 +101,7 @@ describe('UploadService', () => {
 
     it('should forward space context to prepareResourceUpload', async () => {
       await uploadService.uploadFileToS3(mockFile, {
-        knowledgeBaseId: 'kb_1',
+        sourceSetId: 'kb_1',
         parentId: 'doc_1',
         sha256: 'prefixed',
         spaceId: 'spc_x',
@@ -108,7 +109,7 @@ describe('UploadService', () => {
 
       expect(lambdaClient.upload.prepareResourceUpload.mutate).toHaveBeenCalledWith(
         expect.objectContaining({
-          knowledgeBaseId: 'kb_1',
+          sourceSetId: 'kb_1',
           parentId: 'doc_1',
           sha256: 'prefixed',
           spaceId: 'spc_x',
@@ -138,7 +139,7 @@ describe('UploadService', () => {
 
       expect(result).toMatchObject({
         fileType: 'image/png',
-        hash: expect.any(String),
+        sha256: expect.any(String),
         metadata: expect.objectContaining({
           path: mockStorageKey,
         }),
@@ -190,7 +191,7 @@ describe('UploadService', () => {
         expiresAt: new Date().toISOString(),
         presignedUrl: mockPreSignUrl,
         sessionId: mockSessionId,
-        storageKey: 'uploads/spc_test/sess_1/opq_json',
+        storageKey: 'v2/spaces/spc_test/blobs/sess_1/opq_json',
       });
 
       const data = { key: 'value', number: 123 };
@@ -205,7 +206,7 @@ describe('UploadService', () => {
         expiresAt: new Date().toISOString(),
         presignedUrl: mockPreSignUrl,
         sessionId: mockSessionId,
-        storageKey: 'uploads/spc_test/sess_1/opq_custom',
+        storageKey: 'v2/spaces/spc_test/blobs/sess_1/opq_custom',
       });
 
       const data = { test: true };
@@ -252,10 +253,11 @@ describe('UploadService', () => {
 
       expect(result).toEqual({
         date: '1',
-        dirname: 'uploads/spc_test/sess_1',
+        dirname: 'v2/spaces/spc_test/blobs/sess_1',
         filename: 'test.png',
         path: mockStorageKey,
       });
+      expect(xhr.send).toHaveBeenCalledWith(mockFile);
     });
 
     it('should report progress during upload', async () => {
@@ -319,6 +321,46 @@ describe('UploadService', () => {
       });
 
       await expect(uploadService.uploadToServerS3(mockFile, {})).rejects.toBe('Bad Request');
+    });
+
+    it('should use same-origin raw upload fallback for mixed-content uploads', async () => {
+      const originalWindow = globalThis.window;
+      Object.defineProperty(globalThis, 'window', {
+        configurable: true,
+        value: { location: { protocol: 'https:' } },
+      });
+
+      vi.mocked(lambdaClient.upload.prepareResourceUpload.mutate).mockResolvedValueOnce({
+        expiresAt: new Date().toISOString(),
+        presignedUrl: 'http://example.com/presign',
+        sessionId: mockSessionId,
+        storageKey: mockStorageKey,
+      });
+
+      const xhr = new XMLHttpRequest();
+
+      vi.spyOn(xhr, 'addEventListener').mockImplementation((event, handler) => {
+        if (event === 'load') {
+          // @ts-expect-error - mock implementation
+          handler({ target: { status: 200 } });
+        }
+      });
+
+      await uploadService.uploadToServerS3(mockFile, {});
+
+      expect(xhr.open).toHaveBeenCalledWith('POST', API_ENDPOINTS.fileUploadSession);
+      expect(xhr.setRequestHeader).toHaveBeenCalledWith(UPLOAD_SESSION_ID_HEADER, mockSessionId);
+      expect(xhr.setRequestHeader).toHaveBeenCalledWith('Content-Type', mockFile.type);
+      expect(xhr.send).toHaveBeenCalledWith(mockFile);
+
+      if (originalWindow === undefined) {
+        delete (globalThis as { window?: Window }).window;
+      } else {
+        Object.defineProperty(globalThis, 'window', {
+          configurable: true,
+          value: originalWindow,
+        });
+      }
     });
   });
 

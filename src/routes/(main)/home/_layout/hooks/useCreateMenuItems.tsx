@@ -9,13 +9,14 @@ import useSWRMutation from 'swr/mutation';
 import { useGroupTemplates } from '@/components/ChatGroupWizard/templates';
 import { ACTION_ENTRY_ICONS } from '@/config/entryIcons';
 import { DEFAULT_CHAT_GROUP_CHAT_CONFIG } from '@/const/settings';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { type CreateAgentParams } from '@/services/agent';
 import { type GroupMemberConfig } from '@/services/chatGroup';
 import { chatGroupService } from '@/services/chatGroup';
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 import { useAgentGroupStore } from '@/store/agentGroup';
-import { useHomeStore } from '@/store/home';
-import { usePageStore } from '@/store/page';
+import { usePageStore } from '@/store/docs';
+import { useHomeStore } from '@/store/home/store';
 
 interface CreateAgentOptions {
   groupId?: string;
@@ -25,7 +26,7 @@ interface CreateAgentOptions {
 
 /**
  * Hook for generating menu items for top-level create actions
- * Used in Body/Agent/Actions.tsx and Header/AddButton.tsx
+ * Used in Body/Agent (actions, lists, dropdowns), CommandMenu, DesktopFileMenuBridge, etc.
  */
 export const useCreateMenuItems = () => {
   const { t } = useTranslation('chat');
@@ -45,6 +46,22 @@ export const useCreateMenuItems = () => {
 
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [isCreatingSessionGroup, setIsCreatingSessionGroup] = useState(false);
+
+  const handleCreateAgentError = useCallback(
+    (error: unknown) => {
+      console.error('Failed to create agent:', error);
+      message.error({ content: t('createAgentFailed') });
+    },
+    [message, t],
+  );
+
+  const handleCreateGroupError = useCallback(
+    (error: unknown) => {
+      console.error('Failed to create group:', error);
+      message.error({ content: t('createGroupFailed') });
+    },
+    [message, t],
+  );
 
   // SWR-based agent creation with auto navigation to profile
   const { trigger: mutateAgent, isMutating: isMutatingAgent } = useSWRMutation(
@@ -90,10 +107,14 @@ export const useCreateMenuItems = () => {
    */
   const createAgent = useCallback(
     async (options?: CreateAgentOptions) => {
-      await mutateAgent({ groupId: options?.groupId });
-      options?.onSuccess?.();
+      try {
+        await mutateAgent({ groupId: options?.groupId });
+        options?.onSuccess?.();
+      } catch (error) {
+        handleCreateAgentError(error);
+      }
     },
-    [mutateAgent],
+    [handleCreateAgentError, mutateAgent],
   );
 
   /**
@@ -200,9 +221,13 @@ export const useCreateMenuItems = () => {
    */
   const createEmptyGroup = useCallback(
     async (options?: CreateAgentOptions) => {
-      await mutateGroup(options);
+      try {
+        await mutateGroup(options);
+      } catch (error) {
+        handleCreateGroupError(error);
+      }
     },
-    [mutateGroup],
+    [handleCreateGroupError, mutateGroup],
   );
 
   /**
@@ -233,11 +258,17 @@ export const useCreateMenuItems = () => {
       onClick: async (info) => {
         info.domEvent?.stopPropagation();
         setIsCreatingSessionGroup(true);
-        await addGroup(t('sessionGroup.newGroup'));
-        setIsCreatingSessionGroup(false);
+        try {
+          await addGroup(t('sessionGroup.newGroup'));
+        } catch (error) {
+          console.error('Failed to create session group:', error);
+          message.error({ content: t('createGroupFailed') });
+        } finally {
+          setIsCreatingSessionGroup(false);
+        }
       },
     }),
-    [t, addGroup],
+    [t, addGroup, message],
   );
 
   /**
@@ -261,14 +292,15 @@ export const useCreateMenuItems = () => {
    */
   const createPage = useCallback(async () => {
     const untitledTitle = tFile('pageList.untitled');
+    const activeSpaceId = resolveWorkspaceSpaceId();
+
     try {
-      const newPageId = await createNewPage(untitledTitle);
-      navigate(`/page/${newPageId}`);
+      await createNewPage(untitledTitle, { spaceId: activeSpaceId });
     } catch (error) {
       console.error('Failed to create page:', error);
       message.error(tFile('pageList.createFailed'));
     }
-  }, [createNewPage, tFile, navigate, message]);
+  }, [createNewPage, tFile, message]);
 
   /**
    * Create page menu item

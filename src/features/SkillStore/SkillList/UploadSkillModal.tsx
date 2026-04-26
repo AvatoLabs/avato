@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 import { lambdaClient } from '@/libs/trpc/client/lambda';
 import { uploadService } from '@/services/upload';
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 
 interface UploadSkillModalProps {
   onOpenChange: (open: boolean) => void;
@@ -35,19 +35,19 @@ const UploadSkillModal = memo<UploadSkillModalProps>(({ open, onOpenChange }) =>
 
     try {
       const buf = await file.arrayBuffer();
-      const hash = sha256(buf);
+      const sha256Hex = sha256(buf);
       const { data: metadata } = await uploadService.uploadFileToS3(
         new File([buf], file.name, { type: file.type }),
-        { directory: 'skills', sha256: hash },
+        { directory: 'skills', sha256: sha256Hex },
       );
 
       const result = await lambdaClient.file.createFile.mutate({
         fileType: file.type || 'application/zip',
-        hash,
+        sha256: sha256Hex,
         metadata: {},
         name: file.name,
         size: file.size,
-        url: metadata.path,
+        storageKey: metadata.path,
       });
 
       await importAgentSkillFromZip({ zipFileId: result.id });
@@ -62,10 +62,10 @@ const UploadSkillModal = memo<UploadSkillModalProps>(({ open, onOpenChange }) =>
 
   return (
     <Modal
-      destroyOnClose
+      destroyOnHidden
       closable={!loading}
       footer={null}
-      maskClosable={!loading}
+      mask={{ closable: !loading }}
       open={open}
       title={null}
       width={480}

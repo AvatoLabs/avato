@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { access, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -22,6 +23,8 @@ import {
   type PickFileResult,
   type PrepareSkillDirectoryParams,
   type PrepareSkillDirectoryResult,
+  type ReadLocalFileAsBase64Params,
+  type ReadLocalFileAsBase64Result,
   type RenameLocalFileResult,
   type ResolveSkillResourcePathParams,
   type ResolveSkillResourcePathResult,
@@ -46,6 +49,60 @@ import { ControllerModule, IpcMethod } from './index';
 
 // Create logger
 const logger = createLogger('controllers:LocalFileCtr');
+
+const SKILL_ARCHIVE_HASH_PATTERN = /^[\w-]{1,128}$/;
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
+const MAX_EXPORT_FILE_BYTES = 100 * 1024 * 1024;
+const MIME_TYPE_BY_EXTENSION: Record<string, string> = {
+  csv: 'text/csv',
+  gif: 'image/gif',
+  html: 'text/html',
+  jpeg: 'image/jpeg',
+  jpg: 'image/jpeg',
+  json: 'application/json',
+  md: 'text/markdown',
+  mp3: 'audio/mpeg',
+  mp4: 'video/mp4',
+  pdf: 'application/pdf',
+  png: 'image/png',
+  svg: 'image/svg+xml',
+  txt: 'text/plain',
+  webp: 'image/webp',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  zip: 'application/zip',
+};
+
+const assertSafeSkillArchiveHash = (zipSha256: string) => {
+  if (!SKILL_ARCHIVE_HASH_PATTERN.test(zipSha256)) {
+    throw new Error('Invalid skill archive hash');
+  }
+};
+
+const verifySkillArchiveHash = (buffer: Buffer, zipSha256: string) => {
+  if (!SHA256_HEX_PATTERN.test(zipSha256)) return;
+
+  const actualHash = createHash('sha256').update(buffer).digest('hex');
+  if (actualHash !== zipSha256.toLowerCase()) {
+    throw new Error('Downloaded skill archive hash mismatch');
+  }
+};
+
+const getMimeType = (filePath: string) => {
+  const extension = path.extname(filePath).toLowerCase().slice(1);
+  return MIME_TYPE_BY_EXTENSION[extension] || 'application/octet-stream';
+};
+
+const resolveFilePathWithinBaseDir = (filePath: string, baseDir?: string) => {
+  if (!baseDir) return path.resolve(filePath);
+
+  const root = path.resolve(baseDir);
+  const target = path.isAbsolute(filePath) ? path.resolve(filePath) : path.resolve(root, filePath);
+  if (target !== root && !target.startsWith(`${root}${path.sep}`)) {
+    throw new Error(`File path escapes the skill execution directory: ${filePath}`);
+  }
+
+  return target;
+};
 
 export default class LocalFileCtr extends ControllerModule {
   static override readonly groupName = 'localSystem';
@@ -192,6 +249,48 @@ export default class LocalFileCtr extends ControllerModule {
 
     logger.debug('Batch file reading completed', { count: results.length });
     return results;
+  }
+
+  @IpcMethod()
+  async handleReadFileAsBase64({
+    baseDir,
+    path: filePath,
+  }: ReadLocalFileAsBase64Params): Promise<ReadLocalFileAsBase64Result> {
+    try {
+      const resolvedPath = resolveFilePathWithinBaseDir(filePath, baseDir);
+      const stats = await stat(resolvedPath);
+      if (stats.isDirectory()) {
+        return {
+          error: 'Cannot export a directory',
+          path: resolvedPath,
+          success: false,
+        };
+      }
+      if (stats.size > MAX_EXPORT_FILE_BYTES) {
+        return {
+          error: `File is too large to export (${stats.size} bytes)`,
+          path: resolvedPath,
+          success: false,
+        };
+      }
+
+      const buffer = await readFile(resolvedPath);
+
+      return {
+        base64: buffer.toString('base64'),
+        filename: path.basename(resolvedPath),
+        mimeType: getMimeType(resolvedPath),
+        path: resolvedPath,
+        sha256: createHash('sha256').update(buffer).digest('hex'),
+        size: buffer.length,
+        success: true,
+      };
+    } catch (error) {
+      return {
+        error: (error as Error).message,
+        success: false,
+      };
+    }
   }
 
   @IpcMethod()
@@ -561,9 +660,12 @@ export default class LocalFileCtr extends ControllerModule {
   }
 
   @IpcMethod()
-  async handleWriteFile({ path: filePath, content }: WriteLocalFileParams) {
+  async handleWriteFile({ path: filePath, content, encoding = 'utf8' }: WriteLocalFileParams) {
     const logPrefix = `[Writing file ${filePath}]`;
-    logger.debug(`${logPrefix} Starting to write file`, { contentLength: content?.length });
+    logger.debug(`${logPrefix} Starting to write file`, {
+      contentLength: content?.length,
+      encoding,
+    });
 
     // Validate parameters
     if (!filePath) {
@@ -584,7 +686,11 @@ export default class LocalFileCtr extends ControllerModule {
 
       // Write file content
       logger.debug(`${logPrefix} Starting to write content to file`);
-      await writeFile(filePath, content, 'utf8');
+      if (encoding === 'base64') {
+        await writeFile(filePath, Buffer.from(content, 'base64'));
+      } else {
+        await writeFile(filePath, content, 'utf8');
+      }
       logger.info(`${logPrefix} File written successfully`, {
         path: filePath,
         size: content.length,
@@ -604,16 +710,33 @@ export default class LocalFileCtr extends ControllerModule {
   async handlePrepareSkillDirectory({
     forceRefresh,
     url,
-    zipHash,
+    zipSha256,
   }: PrepareSkillDirectoryParams): Promise<PrepareSkillDirectoryResult> {
     const cacheRoot = path.join(this.app.appStoragePath, 'file-storage', 'skills');
-    const extractedDir = path.join(cacheRoot, 'extracted', zipHash);
+    let extractedDir = path.join(cacheRoot, 'extracted', 'invalid');
+    let zipPath = path.join(cacheRoot, 'archives', 'invalid.zip');
+
+    try {
+      assertSafeSkillArchiveHash(zipSha256);
+      extractedDir = path.join(cacheRoot, 'extracted', zipSha256);
+      zipPath = path.join(cacheRoot, 'archives', `${zipSha256}.zip`);
+    } catch (error) {
+      return {
+        error: (error as Error).message,
+        extractedDir,
+        success: false,
+        zipPath,
+      };
+    }
+
     const markerPath = path.join(extractedDir, '.prepared');
-    const zipPath = path.join(cacheRoot, 'archives', `${zipHash}.zip`);
 
     try {
       if (!forceRefresh) {
         await access(markerPath, constants.F_OK);
+        if (SHA256_HEX_PATTERN.test(zipSha256)) {
+          verifySkillArchiveHash(await readFile(zipPath), zipSha256);
+        }
         return { extractedDir, success: true, zipPath };
       }
     } catch {
@@ -629,6 +752,7 @@ export default class LocalFileCtr extends ControllerModule {
       }
 
       const buffer = Buffer.from(await response.arrayBuffer());
+      verifySkillArchiveHash(buffer, zipSha256);
       const extractedFiles = unzipSync(new Uint8Array(buffer));
 
       await rm(extractedDir, { force: true, recursive: true });
@@ -649,7 +773,11 @@ export default class LocalFileCtr extends ControllerModule {
         await writeFile(targetPath, Buffer.from(fileContent as Uint8Array));
       }
 
-      await writeFile(markerPath, JSON.stringify({ preparedAt: Date.now(), url, zipHash }), 'utf8');
+      await writeFile(
+        markerPath,
+        JSON.stringify({ preparedAt: Date.now(), url, zipSha256 }),
+        'utf8',
+      );
 
       return { extractedDir, success: true, zipPath };
     } catch (error) {
@@ -666,9 +794,9 @@ export default class LocalFileCtr extends ControllerModule {
   async handleResolveSkillResourcePath({
     path: resourcePath,
     url,
-    zipHash,
+    zipSha256,
   }: ResolveSkillResourcePathParams): Promise<ResolveSkillResourcePathResult> {
-    const prepared = await this.handlePrepareSkillDirectory({ url, zipHash });
+    const prepared = await this.handlePrepareSkillDirectory({ url, zipSha256 });
 
     if (!prepared.success) {
       return { error: prepared.error, success: false };

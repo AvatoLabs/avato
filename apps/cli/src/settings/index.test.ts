@@ -51,7 +51,7 @@ describe('settings', () => {
   });
 
   it('should clear official server settings instead of persisting them', () => {
-    saveSettings({ serverUrl: 'https://app.lobehub.com/' });
+    saveSettings({ serverUrl: 'https://avato.turingmesh.com/' });
 
     expect(fs.existsSync(settingsFile)).toBe(false);
     expect(loadSettings()).toBeNull();

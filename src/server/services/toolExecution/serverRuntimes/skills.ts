@@ -2,45 +2,167 @@ import { builtinSkills } from '@lobechat/builtin-skills';
 import { type CommandResult, SkillsIdentifier } from '@lobechat/builtin-tool-skills';
 import {
   type ExportFileResult,
+  type SkillRuntimeContext,
   type SkillRuntimeService,
   SkillsExecutionRuntime,
 } from '@lobechat/builtin-tool-skills/executionRuntime';
 import type { LobeChatDatabase } from '@lobechat/database';
 import type { SkillItem, SkillListItem, SkillResourceContent } from '@lobechat/types';
-import type { CodeInterpreterToolName } from '@lobehub/market-sdk';
 import debug from 'debug';
-import { sha256 } from 'js-sha256';
 
 import { AgentSkillModel } from '@/database/models/agentSkill';
 import { FileModel } from '@/database/models/file';
-import { SpaceModel } from '@/database/models/space';
-import { UserModel } from '@/database/models/user';
 import { filterBuiltinSkills } from '@/helpers/skillFilters';
-import { FileS3 } from '@/server/modules/S3';
+import { getBlobProvider } from '@/server/modules/BlobProvider';
 import { FileService } from '@/server/services/file';
-import { resolveSpaceIdForSandboxExport } from '@/server/services/file/resolveSpaceIdForSandboxExport';
-import { MarketService } from '@/server/services/market';
+import {
+  generateSandboxExportStorageKey,
+  resolveTargetSpaceIdForSandboxExport,
+} from '@/server/services/file/sandboxExport';
+import { resolveAccessibleSkillZipProxyUrl } from '@/server/services/skill/resolveAccessibleSkillZipProxyUrl';
 import { SkillResourceService } from '@/server/services/skill/resource';
+import { deviceProxy } from '@/server/services/toolExecution/deviceProxy';
 
 import { type ServerRuntimeRegistration } from './types';
 
 const log = debug('lobe-server:skills-runtime');
+
+interface ExecScriptDeviceParams {
+  command: string;
+  config?: { description?: string; id?: string; name?: string };
+  description: string;
+  executionContextId?: string;
+  timeout?: number;
+  zipSha256?: string;
+  zipUrl?: string;
+}
+
+interface ExportFileDeviceResult {
+  error?: string;
+  filename?: string;
+  mimeType?: string;
+  path?: string;
+  sha256?: string;
+  size?: number;
+  success?: boolean;
+}
+
+interface RemoteCommandResult {
+  error?: string;
+  exit_code?: number;
+  exitCode?: number;
+  output?: string;
+  shell_id?: string;
+  stderr?: string;
+  stdout?: string;
+  success?: boolean;
+}
+
+const remoteCommandResultKeys = [
+  'error',
+  'exitCode',
+  'exit_code',
+  'output',
+  'shell_id',
+  'stderr',
+  'stdout',
+  'success',
+] as const;
+
+const REMOTE_COMMAND_DEFAULT_TIMEOUT = 120_000;
+const REMOTE_COMMAND_MIN_TIMEOUT = 1000;
+const REMOTE_COMMAND_MAX_TIMEOUT = 600_000;
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+};
+
+const isRemoteCommandResult = (value: unknown): value is RemoteCommandResult => {
+  return isRecord(value) && remoteCommandResultKeys.some((key) => key in value);
+};
+
+const normalizeRemoteCommandTimeout = (timeout?: number) => {
+  if (typeof timeout !== 'number' || !Number.isFinite(timeout)) return undefined;
+
+  return Math.min(
+    Math.max(Math.trunc(timeout), REMOTE_COMMAND_MIN_TIMEOUT),
+    REMOTE_COMMAND_MAX_TIMEOUT,
+  );
+};
+
+const stringifyRemoteOutput = (value: unknown, fallback: string) => {
+  if (typeof value === 'string') return value;
+  if (value === undefined) return fallback;
+  return JSON.stringify(value);
+};
+
+const parseRemoteCommandResult = (content?: string): RemoteCommandResult => {
+  if (!content) return { output: '', success: true };
+
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    return isRemoteCommandResult(parsed)
+      ? parsed
+      : { output: stringifyRemoteOutput(parsed, content), success: true };
+  } catch {
+    return { output: content, success: true };
+  }
+};
+
+const toCommandResult = (result: RemoteCommandResult): CommandResult => {
+  const exitCode = result.exitCode ?? result.exit_code ?? (result.success === false ? 1 : 0);
+
+  return {
+    exitCode,
+    output: result.stdout || result.output || '',
+    stderr: result.stderr || result.error || '',
+    success: result.success ?? exitCode === 0,
+  };
+};
+
+const toFailedCommandResult = (
+  response: { content: string; error?: string },
+  fallbackError: string,
+): CommandResult => {
+  const parsedResult = toCommandResult(parseRemoteCommandResult(response.content));
+
+  return {
+    exitCode: parsedResult.exitCode === 0 ? 1 : parsedResult.exitCode,
+    output: parsedResult.output || response.content || '',
+    stderr: parsedResult.stderr || response.error || fallbackError,
+    success: false,
+  };
+};
+
+const resolveExecutionContextId = (context?: SkillRuntimeContext) =>
+  context?.operationId || context?.messageId;
+
+const parseRemoteExportFileResult = (content?: string): ExportFileDeviceResult => {
+  if (!content) return { success: true };
+
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    return isRecord(parsed) ? (parsed as ExportFileDeviceResult) : { success: true };
+  } catch {
+    return { success: true };
+  }
+};
 
 class SkillServerRuntimeService implements SkillRuntimeService {
   private resourceService: SkillResourceService;
   private serverDB: LobeChatDatabase;
   private spaceId?: string;
   private skillModel: AgentSkillModel;
-  private marketService: MarketService;
   private fileService: FileService;
   private fileModel: FileModel;
   private topicId?: string;
   private userId: string;
+  private activeDeviceId?: string;
 
   constructor(options: {
+    activeDeviceId?: string;
     fileModel: FileModel;
     fileService: FileService;
-    marketService: MarketService;
     resourceService: SkillResourceService;
     serverDB: LobeChatDatabase;
     spaceId?: string;
@@ -52,11 +174,11 @@ class SkillServerRuntimeService implements SkillRuntimeService {
     this.resourceService = options.resourceService;
     this.serverDB = options.serverDB;
     this.spaceId = options.spaceId;
-    this.marketService = options.marketService;
     this.fileService = options.fileService;
     this.fileModel = options.fileModel;
     this.topicId = options.topicId;
     this.userId = options.userId;
+    this.activeDeviceId = options.activeDeviceId;
   }
 
   findAll = (): Promise<{ data: SkillListItem[]; total: number }> => {
@@ -82,23 +204,36 @@ class SkillServerRuntimeService implements SkillRuntimeService {
     command: string,
     options: {
       config?: { description?: string; id?: string; name?: string };
+      context?: SkillRuntimeContext;
       description: string;
       runInClient?: boolean;
+      timeout?: number;
     },
   ): Promise<CommandResult> => {
-    const { config, description } = options;
+    const { config, context, description } = options;
 
-    if (!this.topicId) {
-      throw new Error('topicId is required for execScript');
+    if (!this.activeDeviceId) {
+      return {
+        exitCode: 1,
+        output: '',
+        stderr:
+          'No active desktop device selected. Start Avato Desktop, connect it to Device Gateway, enable Remote Tool Execution, and activate the device before running Skills.',
+        success: false,
+      };
     }
 
     try {
       // Look up skill zipUrl if config is provided (same logic as market.ts)
-      const enhancedParams: any = {
+      const enhancedParams: ExecScriptDeviceParams = {
         command,
         config,
         description,
       };
+      const executionContextId = resolveExecutionContextId(context);
+      if (executionContextId) enhancedParams.executionContextId = executionContextId;
+
+      const timeout = normalizeRemoteCommandTimeout(options.timeout);
+      if (timeout !== undefined) enhancedParams.timeout = timeout;
 
       if (config?.name) {
         const skill = await this.skillModel.findByName(config.name);
@@ -122,51 +257,26 @@ class SkillServerRuntimeService implements SkillRuntimeService {
           };
         }
 
-        if (skill.zipFileHash) {
-          // Get S3 key from globalFiles
-          const canAccess = await this.fileModel.canAccessGlobalFileByHash(skill.zipFileHash);
-          const fileInfo = canAccess
-            ? await this.fileModel.checkHash(skill.zipFileHash)
-            : { isExist: false };
-
-          if (fileInfo.isExist && fileInfo.url) {
-            // Convert S3 key to full URL
-            const fullUrl = await this.fileService.getFullFileUrl(fileInfo.url);
-            if (fullUrl) {
-              enhancedParams.zipUrl = fullUrl;
-              log('Added zipUrl to execScript params for skill %s: %s', skill.name, fullUrl);
-            }
+        if (skill.zipSha256) {
+          const zipUrl = await resolveAccessibleSkillZipProxyUrl({
+            fileModel: this.fileModel,
+            internal: true,
+            skillId: skill.id,
+            zipSha256: skill.zipSha256,
+          });
+          if (zipUrl) {
+            enhancedParams.zipUrl = zipUrl;
+            enhancedParams.zipSha256 = skill.zipSha256;
+            log(
+              'Added stable zipUrl to execScript params for skill %s: %s',
+              skill.name,
+              enhancedParams.zipUrl,
+            );
           }
         }
       }
 
-      // Call market-sdk's runBuildInTool
-      const market = this.marketService.market;
-      const response = await market.plugins.runBuildInTool(
-        'execScript' as CodeInterpreterToolName,
-        enhancedParams,
-        { topicId: this.topicId, userId: this.userId },
-      );
-
-      log('execScript response: %O', response);
-
-      if (!response.success) {
-        return {
-          exitCode: 1,
-          output: '',
-          stderr: response.error?.message || 'Command execution failed',
-          success: false,
-        };
-      }
-
-      const result = response.data?.result || {};
-
-      return {
-        exitCode: result.exitCode ?? (response.success ? 0 : 1),
-        output: result.stdout || result.output || '',
-        stderr: result.stderr || '',
-        success: response.success && (result.exitCode === 0 || result.exitCode === undefined),
-      };
+      return await this.execScriptOnDevice(enhancedParams);
     } catch (error) {
       log('Error executing script: %O', error);
       return {
@@ -178,31 +288,80 @@ class SkillServerRuntimeService implements SkillRuntimeService {
     }
   };
 
-  exportFile = async (path: string, filename: string): Promise<ExportFileResult> => {
+  private execScriptOnDevice = async (params: ExecScriptDeviceParams): Promise<CommandResult> => {
+    if (!this.activeDeviceId) {
+      return {
+        exitCode: 1,
+        output: '',
+        stderr: 'No active device selected',
+        success: false,
+      };
+    }
+
+    const response = await deviceProxy.executeToolCall(
+      { deviceId: this.activeDeviceId, userId: this.userId },
+      {
+        apiName: 'execScript',
+        arguments: JSON.stringify(params),
+        identifier: SkillsIdentifier,
+      },
+      params.timeout ?? REMOTE_COMMAND_DEFAULT_TIMEOUT,
+    );
+
+    if (!response.success) {
+      return toFailedCommandResult(response, 'Device command execution failed');
+    }
+
+    return toCommandResult(parseRemoteCommandResult(response.content));
+  };
+
+  exportFile = async (
+    path: string,
+    filename: string,
+    context?: SkillRuntimeContext,
+  ): Promise<ExportFileResult> => {
     if (!this.topicId) {
       throw new Error('topicId is required for exportFile');
     }
+    if (!this.activeDeviceId) {
+      return {
+        filename,
+        success: false,
+      };
+    }
 
     try {
-      const s3 = new FileS3();
+      const exportSpaceId = await resolveTargetSpaceIdForSandboxExport({
+        db: this.serverDB,
+        ...(this.spaceId ? { spaceId: this.spaceId } : {}),
+        topicId: this.topicId,
+        userId: this.userId,
+      });
 
-      // Use date-based sharding (same as market.ts)
-      const today = new Date().toISOString().split('T')[0];
-      const key = `code-interpreter-exports/${today}/${this.topicId}/${filename}`;
+      const blobProvider = getBlobProvider();
+      const key = generateSandboxExportStorageKey(exportSpaceId);
 
       // Step 1: Generate pre-signed upload URL
-      const uploadUrl = await s3.createPreSignedUrl(key);
+      const uploadUrl = await blobProvider.createUploadUrl(key);
       log('Generated upload URL for key: %s', key);
 
-      // Step 2: Call sandbox's exportFile tool with the upload URL
-      const market = this.marketService.market;
-      const response = await market.plugins.runBuildInTool(
-        'exportFile' as CodeInterpreterToolName,
-        { path, uploadUrl },
-        { topicId: this.topicId, userId: this.userId },
+      // Step 2: Ask the active desktop device to upload the generated file directly to storage.
+      const response = await deviceProxy.executeToolCall(
+        { deviceId: this.activeDeviceId, userId: this.userId },
+        {
+          apiName: 'exportFile',
+          arguments: JSON.stringify({
+            executionContextId: resolveExecutionContextId(context),
+            filename,
+            path,
+            uploadUrl,
+          }),
+          identifier: SkillsIdentifier,
+        },
+        120_000,
       );
 
-      log('Sandbox exportFile response: %O', response);
+      log('Device exportFile response: %O', response);
 
       if (!response.success) {
         return {
@@ -211,7 +370,7 @@ class SkillServerRuntimeService implements SkillRuntimeService {
         };
       }
 
-      const result = response.data?.result;
+      const result = parseRemoteExportFileResult(response.content);
       const uploadSuccess = result?.success !== false;
 
       if (!uploadSuccess) {
@@ -221,36 +380,20 @@ class SkillServerRuntimeService implements SkillRuntimeService {
         };
       }
 
-      // Step 3: Get file metadata from S3
-      const metadata = await s3.getFileMetadata(key);
-      const fileSize = metadata.contentLength;
+      // Step 3: Resolve content type from storage metadata / device response
+      const metadata = await blobProvider.getObjectMetadata(key);
       const mimeType = metadata.contentType || result?.mimeType || 'application/octet-stream';
 
-      // Step 4: Create persistent file record
-      const fileHash = sha256(key + Date.now().toString());
-
-      let exportSpaceId: string | undefined;
-      if (this.spaceId) {
-        const space = await new SpaceModel(this.serverDB, this.userId).findAccessibleSpaceById(
-          this.spaceId,
-        );
-        exportSpaceId = space?.id;
-      }
-      if (exportSpaceId === undefined) {
-        exportSpaceId = await resolveSpaceIdForSandboxExport(
-          this.serverDB,
-          this.userId,
-          this.topicId,
-        );
-      }
-
-      const { fileId, url } = await this.fileService.createFileRecord({
-        fileHash,
+      // Step 4: Create a persistent file record using the real stored-object sha256
+      const {
+        fileId,
+        size: fileSize,
+        url,
+      } = await this.fileService.createFileRecordFromStorageObject({
         fileType: mimeType,
         name: filename,
-        size: fileSize,
-        ...(exportSpaceId !== undefined ? { spaceId: exportSpaceId } : {}),
-        url: key, // Store S3 key
+        spaceId: exportSpaceId,
+        storageKey: key, // Store S3 key
       });
 
       log('Created file record: fileId=%s, url=%s', fileId, url);
@@ -286,34 +429,15 @@ export const skillsRuntime: ServerRuntimeRegistration = {
       throw new Error('userId is required for Skills execution');
     }
 
-    // Fetch market access token from user settings
-    let marketAccessToken: string | undefined;
-    try {
-      const userModel = new UserModel(context.serverDB, context.userId);
-      const userSettings = await userModel.getUserSettings();
-      marketAccessToken = (userSettings?.market as any)?.accessToken;
-      log(
-        'Fetched market accessToken for user %s: %s',
-        context.userId,
-        marketAccessToken ? 'exists' : 'not found',
-      );
-    } catch (error) {
-      log('Failed to fetch market accessToken for user %s: %O', context.userId, error);
-    }
-
     const skillModel = new AgentSkillModel(context.serverDB, context.userId);
     const resourceService = new SkillResourceService(context.serverDB, context.userId);
-    const marketService = new MarketService({
-      accessToken: marketAccessToken,
-      userInfo: { userId: context.userId },
-    });
     const fileService = new FileService(context.serverDB, context.userId);
     const fileModel = new FileModel(context.serverDB, context.userId);
 
     const service = new SkillServerRuntimeService({
+      activeDeviceId: context.activeDeviceId,
       fileModel,
       fileService,
-      marketService,
       resourceService,
       serverDB: context.serverDB,
       spaceId: context.spaceId,

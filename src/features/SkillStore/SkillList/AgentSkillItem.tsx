@@ -8,7 +8,7 @@ import { lazy, memo, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { agentSkillService } from '@/services/skill';
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 import { type SkillListItem } from '@/types/index';
 import { downloadFile } from '@/utils/client/downloadFile';
 
@@ -42,14 +42,14 @@ interface AgentSkillItemProps {
 const AgentSkillItem = memo<AgentSkillItemProps>(({ skill }) => {
   const { t } = useTranslation('plugin');
   const { t: tc } = useTranslation('common');
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
   const [detailOpen, setDetailOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const deleteAgentSkill = useToolStore((s) => s.deleteAgentSkill);
 
   const handleDownload = async () => {
-    if (!skill.zipFileHash) return;
+    if (!skill.zipSha256) return;
 
     setLoading(true);
     try {
@@ -67,7 +67,12 @@ const AgentSkillItem = memo<AgentSkillItemProps>(({ skill }) => {
       centered: true,
       okButtonProps: { danger: true },
       onOk: async () => {
-        await deleteAgentSkill(skill.id);
+        try {
+          await deleteAgentSkill(skill.id);
+        } catch (error) {
+          console.error('Failed to delete agent skill:', error);
+          message.error(t('store.actions.uninstallFailed'));
+        }
       },
       title: t('store.actions.confirmUninstall'),
       type: 'error',
@@ -106,10 +111,10 @@ const AgentSkillItem = memo<AgentSkillItemProps>(({ skill }) => {
               />
             )}
             <DropdownMenu
-              nativeButton={false}
+              nativeButton
               placement="bottomRight"
               items={[
-                ...(skill.zipFileHash
+                ...(skill.zipSha256
                   ? [
                       {
                         icon: <Icon icon={DownloadIcon} />,

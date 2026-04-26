@@ -11,7 +11,7 @@ import { Link } from 'react-router-dom';
 import AgentGroupAvatar from '@/features/AgentGroupAvatar';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { useGlobalStore } from '@/store/global';
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
 
 import Actions from '../Item/Actions';
 import { useGroupDropdownMenu } from './useDropdownMenu';
@@ -23,7 +23,7 @@ interface GroupItemProps {
 }
 
 const GroupItem = memo<GroupItemProps>(({ item, style, className }) => {
-  const { id, avatar, backgroundColor, title, pinned } = item;
+  const { id, avatar, title, pinned } = item;
   const { t } = useTranslation('chat');
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
 
@@ -77,16 +77,17 @@ const GroupItem = memo<GroupItemProps>(({ item, style, className }) => {
     const customAvatar = typeof avatar === 'string' ? avatar : undefined;
     // If avatar is an array, it's member avatars for composition
     const memberAvatars = Array.isArray(avatar) ? avatar : [];
+    const neutralMembers = memberAvatars.map(({ avatar: a }) => ({ avatar: a }));
 
     return (
       <AgentGroupAvatar
         avatar={customAvatar}
-        backgroundColor={backgroundColor || undefined}
-        memberAvatars={memberAvatars}
+        backgroundColor={cssVar.colorFillQuaternary}
+        memberAvatars={neutralMembers}
         size={22}
       />
     );
-  }, [isUpdating, avatar, backgroundColor]);
+  }, [isUpdating, avatar]);
 
   const customAvatar = typeof avatar === 'string' ? avatar : undefined;
   const memberAvatars = Array.isArray(avatar) ? avatar : [];
@@ -94,7 +95,7 @@ const GroupItem = memo<GroupItemProps>(({ item, style, className }) => {
   const dropdownMenu = useGroupDropdownMenu({
     anchor,
     avatar: customAvatar,
-    backgroundColor: backgroundColor || undefined,
+    backgroundColor: item.backgroundColor || undefined,
     id,
     memberAvatars,
     pinned: pinned ?? false,

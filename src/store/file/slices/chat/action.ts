@@ -1,4 +1,5 @@
 import { type ChatContextContent } from '@lobechat/types';
+import { createNanoId } from '@lobechat/utils';
 
 import { uploadErrorNotification } from '@/components/Error/uploadErrorNotification';
 import { FILE_UPLOAD_BLACKLIST } from '@/const/file';
@@ -16,6 +17,7 @@ import { setNamespace } from '@/utils/storeDebug';
 import { type FileStore } from '../../store';
 
 const n = setNamespace('chat');
+const createUploadId = createNanoId(12);
 
 type Setter = StoreSetter<FileStore>;
 export const createFileSlice = (set: Setter, get: () => FileStore, _api?: unknown) =>
@@ -60,9 +62,16 @@ export class FileActionImpl {
 
   removeChatUploadFile = async (id: string): Promise<void> => {
     const { dispatchChatUploadFileList } = this.#get();
+    const uploadItem = this.#get().chatUploadFileList.find((item) => item.id === id);
+
+    if (uploadItem?.abortController) {
+      uploadItem.abortController.abort();
+    }
 
     dispatchChatUploadFileList({ id, type: 'removeFile' });
-    await fileService.removeFile(id);
+    if (uploadItem?.fileId) {
+      await fileService.removeFile(uploadItem.fileId);
+    }
   };
 
   startAsyncTask = async (
@@ -123,32 +132,41 @@ export class FileActionImpl {
           base64Url = `data:${file.type};base64,${base64}`;
         }
 
-        return { base64Url, file, id: file.name, previewUrl, status: 'pending' } as UploadFileItem;
+        return {
+          abortController: new AbortController(),
+          base64Url,
+          file,
+          id: createUploadId(),
+          previewUrl,
+          status: 'pending',
+        } as UploadFileItem;
       }),
     );
 
     dispatchChatUploadFileList({ files: uploadFiles, type: 'addFiles' });
 
     // upload files and process it
-    const pools = files.map(async (file) => {
+    const pools = uploadFiles.map(async (uploadFile) => {
       let fileResult: { id: string; url: string } | undefined;
 
       try {
         fileResult = await this.#get().uploadWithProgress({
-          file,
+          abortController: uploadFile.abortController,
+          file: uploadFile.file,
           onStatusUpdate: dispatchChatUploadFileList,
+          uploadId: uploadFile.id,
         });
       } catch (error) {
         // skip `UNAUTHORIZED` error
         if ((error as any)?.message !== 'UNAUTHORIZED') uploadErrorNotification.error(error);
 
-        dispatchChatUploadFileList({ id: file.name, type: 'removeFile' });
+        dispatchChatUploadFileList({ id: uploadFile.id, type: 'removeFile' });
       }
 
       if (!fileResult) return;
 
       // image don't need to be chunked and embedding
-      if (isChunkingUnsupported(file.type)) return;
+      if (isChunkingUnsupported(uploadFile.file.type)) return;
 
       const data = await ragService.parseFileContent(fileResult.id);
       console.info('parseFileContent data:', data);

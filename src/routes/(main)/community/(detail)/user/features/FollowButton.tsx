@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@lobehub/ui';
+import { App } from 'antd';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -13,6 +14,7 @@ interface FollowButtonProps {
 
 const FollowButton = memo<FollowButtonProps>(({ userId }) => {
   const { t } = useTranslation('discover');
+  const { message } = App.useApp();
   const { isAuthenticated, signIn } = useMarketAuth();
   const [loading, setLoading] = useState(false);
 
@@ -33,12 +35,15 @@ const FollowButton = memo<FollowButtonProps>(({ userId }) => {
     try {
       if (isFollowing) {
         await unfollow(userId);
+        message.success(t('user.unfollowSuccess'));
       } else {
         await follow(userId);
+        message.success(t('user.followSuccess'));
       }
       await mutate();
     } catch (error) {
       console.error('Follow action failed:', error);
+      message.error(t(isFollowing ? 'user.unfollowFailed' : 'user.followFailed'));
     } finally {
       setLoading(false);
     }

@@ -10,6 +10,7 @@ export interface UserMemoryContextItem {
 }
 
 export interface UserMemoryExperienceItem {
+  action?: string | null;
   id?: string;
   keyLearning?: string | null;
   situation?: string | null;
@@ -18,6 +19,7 @@ export interface UserMemoryExperienceItem {
 export interface UserMemoryPreferenceItem {
   conclusionDirectives?: string | null;
   id?: string;
+  suggestions?: string | null;
 }
 
 export interface UserMemoryActivityItem {
@@ -80,16 +82,24 @@ const formatContextItem = (item: UserMemoryContextItem): string => {
  * Check if an experience item has meaningful content
  */
 const isValidExperienceItem = (item: UserMemoryExperienceItem): boolean => {
-  return !!(item.id || item.situation || item.keyLearning);
+  return !!(item.id || item.situation || item.keyLearning || item.action);
 };
 
 /**
  * Formats a single experience memory item
  */
 const formatExperienceItem = (item: UserMemoryExperienceItem): string => {
+  const children = [
+    `    <situation>${item.situation || ''}</situation>`,
+    `    <key_learning>${item.keyLearning || ''}</key_learning>`,
+  ];
+
+  if (item.action) {
+    children.push(`    <action>${item.action}</action>`);
+  }
+
   return `  <experience id="${item.id || ''}">
-    <situation>${item.situation || ''}</situation>
-    <key_learning>${item.keyLearning || ''}</key_learning>
+${children.join('\n')}
   </experience>`;
 };
 
@@ -104,6 +114,13 @@ const isValidPreferenceItem = (item: UserMemoryPreferenceItem): boolean => {
  * Formats a single preference memory item
  */
 const formatPreferenceItem = (item: UserMemoryPreferenceItem): string => {
+  if (item.suggestions) {
+    return `  <preference id="${item.id || ''}">
+    <conclusion_directives>${item.conclusionDirectives}</conclusion_directives>
+    <suggestions>${item.suggestions}</suggestions>
+  </preference>`;
+  }
+
   return `  <preference id="${item.id || ''}">${item.conclusionDirectives}</preference>`;
 };
 

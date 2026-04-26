@@ -1,12 +1,14 @@
 import {
   type AgentEvent,
   type AgentInstruction,
+  type AgentState,
   type CallLLMPayload,
   type GeneralAgentCallLLMResultPayload,
   type InstructionExecutor,
   UsageCounter,
 } from '@lobechat/agent-runtime';
 import { LocalSystemManifest } from '@lobechat/builtin-tool-local-system';
+import { RemoteDeviceIdentifier } from '@lobechat/builtin-tool-remote-device';
 import {
   buildStepToolDelta,
   type LobeToolManifest,
@@ -40,8 +42,47 @@ const TOOL_PRICING: Record<string, number> = {
   'lobe-web-browsing/search': 0,
 };
 
+const isRecord = (value: unknown): value is Record<string, any> => {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+};
+
+const pickStringRecord = (value: unknown): Record<string, string> | undefined => {
+  if (!isRecord(value)) return undefined;
+
+  const entries = Object.entries(value).filter(
+    (entry): entry is [string, string] => typeof entry[1] === 'string',
+  );
+
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+};
+
+const applyDeviceActivationMetadata = (
+  state: AgentState,
+  toolIdentifier: string | undefined,
+  metadata: unknown,
+) => {
+  if (toolIdentifier !== RemoteDeviceIdentifier) return;
+  if (!isRecord(metadata) || typeof metadata.activeDeviceId !== 'string') return;
+
+  const activeDeviceId = metadata.activeDeviceId.trim();
+  if (!activeDeviceId) return;
+
+  state.metadata = {
+    ...state.metadata,
+    activeDeviceId,
+    devicePlatform:
+      typeof metadata.devicePlatform === 'string' ? metadata.devicePlatform : undefined,
+    deviceSystemInfo: pickStringRecord(metadata.deviceSystemInfo),
+  };
+};
+
 export interface RuntimeExecutorContext {
   agentConfig?: any;
+  conversationFileContents?: Array<{
+    content: string;
+    fileId: string;
+    filename: string;
+  }>;
   discordContext?: any;
   evalContext?: EvalContext;
   fileService?: any;
@@ -206,6 +247,7 @@ export const createRuntimeExecutors = (
           forceFinish: state.forceFinish,
           historyCount: agentConfig.chatConfig?.historyCount ?? undefined,
           knowledge: {
+            conversationFileContents: ctx.conversationFileContents,
             fileContents: agentConfig.files
               ?.filter((f: { enabled?: boolean | null }) => f.enabled === true)
               .map((f: { content?: string | null; id?: string; name?: string }) => ({
@@ -213,7 +255,7 @@ export const createRuntimeExecutors = (
                 fileId: f.id ?? '',
                 filename: f.name ?? '',
               })),
-            knowledgeBases: agentConfig.knowledgeBases
+            sourceSets: agentConfig.sourceSets
               ?.filter((kb: { enabled?: boolean | null }) => kb.enabled === true)
               .map((kb: { id?: string; name?: string }) => ({
                 id: kb.id ?? '',
@@ -623,15 +665,17 @@ export const createRuntimeExecutors = (
 
       // Execute tool using ToolExecutionService
       log(`[${operationLogId}] Executing tool ${toolName} ...`);
-      const knowledgeBaseIds = agentConfig?.knowledgeBases
+      const sourceSetIds = agentConfig?.sourceSets
         ?.filter((kb: { enabled?: boolean | null }) => kb.enabled === true)
         .map((kb: { id?: string }) => kb.id)
         .filter(Boolean) as string[] | undefined;
 
       const executionResult = await toolExecutionService.executeTool(chatToolPayload, {
         activeDeviceId: state.metadata?.activeDeviceId,
-        knowledgeBaseIds,
+        messageId: chatToolPayload.id,
+        sourceSetIds,
         memoryToolPermission: agentConfig?.chatConfig?.memory?.toolPermission,
+        operationId,
         serverDB: ctx.serverDB,
         spaceId: ctx.spaceId,
         toolManifestMap: effectiveManifestMap,
@@ -687,6 +731,11 @@ export const createRuntimeExecutors = (
         role: 'tool',
         tool_call_id: chatToolPayload.id,
       });
+      applyDeviceActivationMetadata(
+        newState,
+        chatToolPayload.identifier,
+        executionResult.state?.metadata,
+      );
 
       events.push({ id: chatToolPayload.id, result: executionResult, type: 'tool_result' });
 
@@ -847,15 +896,17 @@ export const createRuntimeExecutors = (
           };
 
           const batchAgentConfig = state.metadata?.agentConfig;
-          const knowledgeBaseIds = batchAgentConfig?.knowledgeBases
+          const sourceSetIds = batchAgentConfig?.sourceSets
             ?.filter((kb: { enabled?: boolean | null }) => kb.enabled === true)
             .map((kb: { id?: string }) => kb.id)
             .filter(Boolean) as string[] | undefined;
 
           const executionResult = await toolExecutionService.executeTool(chatToolPayload, {
             activeDeviceId: state.metadata?.activeDeviceId,
-            knowledgeBaseIds,
+            messageId: chatToolPayload.id,
+            sourceSetIds,
             memoryToolPermission: batchAgentConfig?.chatConfig?.memory?.toolPermission,
+            operationId,
             serverDB: ctx.serverDB,
             spaceId: ctx.spaceId,
             toolManifestMap: batchManifestMap,
@@ -959,6 +1010,10 @@ export const createRuntimeExecutors = (
         newState.usage = usage;
         if (cost) newState.cost = cost;
       }
+    }
+    for (const toolCall of toolsCalling) {
+      const result = toolResults.find((item) => item.toolCallId === toolCall.id);
+      applyDeviceActivationMetadata(newState, toolCall.identifier, result?.data?.state?.metadata);
     }
 
     // Persist ToolsActivator discovery results from batch tool executions

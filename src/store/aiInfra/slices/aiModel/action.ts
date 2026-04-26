@@ -125,11 +125,12 @@ export class AiModelActionImpl {
     if (!activeAiProvider) return;
 
     this.#get().internal_toggleAiModelLoading(params.id, true);
-
-    await aiModelService.toggleModelEnabled({ ...params, providerId: activeAiProvider });
-    await this.#get().refreshAiModelList(activeAiProvider);
-
-    this.#get().internal_toggleAiModelLoading(params.id, false);
+    try {
+      await aiModelService.toggleModelEnabled({ ...params, providerId: activeAiProvider });
+      await this.#get().refreshAiModelList(activeAiProvider);
+    } finally {
+      this.#get().internal_toggleAiModelLoading(params.id, false);
+    }
   };
 
   updateAiModelsConfig = async (

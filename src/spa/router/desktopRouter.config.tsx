@@ -273,11 +273,55 @@ export const desktopRoutes: RouteObject[] = [
 
       // Resource routes
       {
+        element: dynamicElement(
+          () => import('@/routes/(main)/spaces/shared'),
+          'Desktop > Spaces > Shared',
+        ),
+        errorElement: <ErrorBoundary resetPath="/spaces/shared" />,
+        path: 'spaces/shared',
+      },
+      {
+        element: dynamicElement(
+          () => import('@/routes/(main)/spaces/trash'),
+          'Desktop > Spaces > Trash',
+        ),
+        errorElement: <ErrorBoundary resetPath="/spaces/trash" />,
+        path: 'spaces/trash',
+      },
+      {
+        element: dynamicElement(
+          () => import('@/features/ResourceSpaces/LegacySharedFilesRedirectPage'),
+          'Desktop > Files > Shared > Legacy Redirect',
+        ),
+        errorElement: <ErrorBoundary resetPath="/spaces/shared" />,
+        path: 'content/shared',
+      },
+      {
+        element: dynamicElement(
+          () => import('@/features/ResourceSpaces/LegacyTrashRedirectPage'),
+          'Desktop > Files > Trash > Legacy Redirect',
+        ),
+        errorElement: <ErrorBoundary resetPath="/spaces/trash" />,
+        path: 'content/trash',
+      },
+      {
         children: [
           {
             element: dynamicElement(
-              () => import('@/routes/(main)/resource'),
-              'Desktop > Resource > Redirect',
+              () => import('@/routes/(main)/spaces'),
+              'Desktop > Spaces > Redirect',
+            ),
+            index: true,
+          },
+        ],
+        path: 'spaces',
+      },
+      {
+        children: [
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/spaces/[spaceId]'),
+              'Desktop > Space > Redirect',
             ),
             index: true,
           },
@@ -285,84 +329,127 @@ export const desktopRoutes: RouteObject[] = [
             children: [
               {
                 element: dynamicElement(
-                  () => import('@/routes/(main)/resource/shared'),
-                  'Desktop > Resource > Shared',
-                ),
-                path: 'shared',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/resource/(home)'),
-                  'Desktop > Resource > Space Home',
-                ),
-                path: 'space/:spaceId',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/resource/space/[spaceId]/settings'),
-                  'Desktop > Resource > Space Settings',
-                ),
-                path: 'space/:spaceId/settings',
-              },
-            ],
-            element: dynamicElement(
-              () => import('@/routes/(main)/resource/(home)/_layout'),
-              'Desktop > Resource > Home > Layout',
-            ),
-          },
-          {
-            children: [
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/resource/library'),
-                  'Desktop > Resource > Library',
+                  () => import('@/routes/(main)/spaces/[spaceId]/docs'),
+                  'Desktop > Space > Docs',
                 ),
                 index: true,
               },
               {
+                children: [
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/spaces/[spaceId]/docs/table'),
+                      'Desktop > Space > Docs > Table',
+                    ),
+                    index: true,
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/spaces/[spaceId]/docs/table/[id]'),
+                      'Desktop > Space > Docs > Table > Detail',
+                    ),
+                    path: ':id',
+                  },
+                ],
+                path: 'table',
+              },
+              {
                 element: dynamicElement(
-                  () => import('@/routes/(main)/resource/library/[slug]'),
-                  'Desktop > Resource > Library > Slug',
+                  () => import('@/routes/(main)/spaces/[spaceId]/docs/[id]'),
+                  'Desktop > Space > Docs > Detail',
                 ),
-                path: ':slug',
+                path: ':id',
               },
             ],
-            element: dynamicElement(
-              () => import('@/routes/(main)/resource/library/_layout'),
-              'Desktop > Resource > Library > Layout',
+            element: dynamicLayout(
+              () => import('@/routes/(main)/docs/_layout'),
+              'Desktop > Space > Docs > Layout',
             ),
-            path: 'library/:id',
+            errorElement: <ErrorBoundary resetPath="/spaces" />,
+            path: 'docs',
           },
           {
             children: [
               {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/resource/library'),
-                  'Desktop > Resource > Space Library',
+                children: [
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/(home)'),
+                      'Desktop > Space > Files',
+                    ),
+                    index: true,
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/(home)'),
+                      'Desktop > Space > Files > Item',
+                    ),
+                    path: 'item/:fileId',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/(home)'),
+                      'Desktop > Space > Files > Folder',
+                    ),
+                    path: ':slug',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/(home)'),
+                      'Desktop > Space > Files > Folder > Item',
+                    ),
+                    path: ':slug/item/:fileId',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/spaces/[spaceId]/trash'),
+                      'Desktop > Space > Files > Trash',
+                    ),
+                    path: 'trash',
+                  },
+                ],
+                element: dynamicLayout(
+                  () => import('@/routes/(main)/content/(home)/_layout'),
+                  'Desktop > Space > Files > Layout',
                 ),
-                index: true,
+                path: 'files',
               },
               {
                 element: dynamicElement(
-                  () => import('@/routes/(main)/resource/library/[slug]'),
-                  'Desktop > Resource > Space Library > Slug',
+                  () => import('@/routes/(main)/spaces/[spaceId]/memory/audit/[entryId]'),
+                  'Desktop > Space > Memory > Audit',
                 ),
-                path: ':slug',
+                path: 'memory/audit/:entryId',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/spaces/[spaceId]/memory'),
+                  'Desktop > Space > Memory',
+                ),
+                path: 'memory',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/spaces/[spaceId]/settings'),
+                  'Desktop > Space > Settings',
+                ),
+                path: 'settings',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/spaces/[spaceId]/members'),
+                  'Desktop > Space > Members',
+                ),
+                path: 'members',
               },
             ],
-            element: dynamicElement(
-              () => import('@/routes/(main)/resource/library/_layout'),
-              'Desktop > Resource > Space Library > Layout',
+            element: dynamicLayout(
+              () => import('@/routes/(main)/content/_layout'),
+              'Desktop > Space > Layout',
             ),
-            path: 'space/:spaceId/library/:id',
           },
         ],
-        element: dynamicElement(
-          () => import('@/routes/(main)/resource/_layout'),
-          'Desktop > Resource > Layout',
-        ),
-        errorElement: <ErrorBoundary resetPath="/resource" />,
-        path: 'resource',
+        path: 'spaces/:spaceId',
       },
 
       // Settings routes
@@ -505,29 +592,6 @@ export const desktopRoutes: RouteObject[] = [
       },
 
       ...BusinessDesktopRoutesWithMainLayout,
-
-      // Pages routes
-      {
-        children: [
-          {
-            element: dynamicElement(() => import('@/routes/(main)/page'), 'Desktop > Page'),
-            index: true,
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/page/[id]'),
-              'Desktop > Page > Detail',
-            ),
-            path: ':id',
-          },
-        ],
-        element: dynamicLayout(
-          () => import('@/routes/(main)/page/_layout'),
-          'Desktop > Page > Layout',
-        ),
-        errorElement: <ErrorBoundary resetPath="/page" />,
-        path: 'page',
-      },
 
       // Default route - home page (handled by persistent layout)
       {

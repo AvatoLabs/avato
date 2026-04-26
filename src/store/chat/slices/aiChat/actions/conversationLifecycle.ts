@@ -14,10 +14,12 @@ import { TRPCClientError } from '@trpc/client';
 import { t } from 'i18next';
 
 import { markUserValidAction } from '@/business/client/markUserValidAction';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { aiChatService } from '@/services/aiChat';
-import { getAgentStoreState } from '@/store/agent';
+import { topicService } from '@/services/topic';
 import { agentSelectors } from '@/store/agent/selectors';
-import { agentGroupByIdSelectors, getChatGroupStoreState } from '@/store/agentGroup';
+import { getAgentStoreState } from '@/store/agent/store';
+import { agentGroupByIdSelectors } from '@/store/agentGroup/selectors';
 import { type ChatStore } from '@/store/chat/store';
 import { getFileStoreState } from '@/store/file/store';
 import { useGlobalStore } from '@/store/global';
@@ -47,9 +49,23 @@ export interface SendMessageResult {
   assistantMessageId: string;
   /** The created thread ID (if a new thread was created) */
   createdThreadId?: string;
+  /** The topic ID used for this conversation after send completes */
+  topicId?: string;
   /** The created user message ID */
   userMessageId: string;
 }
+
+const getDocTopicMetadata = (context: ConversationContext) => {
+  const documentId = context.scope === 'doc' ? context.metadata?.documentId : undefined;
+
+  if (typeof documentId !== 'string' || !documentId) return undefined;
+
+  return {
+    docContext: {
+      documentId,
+    },
+  };
+};
 
 /**
  * Actions managing the complete lifecycle of conversations including sending,
@@ -76,7 +92,7 @@ export class ConversationLifecycleActionImpl {
     context,
     messages: inputMessages,
     parentId: inputParentId,
-    pageSelections,
+    docSelections,
   }: SendMessageWithContextParams): Promise<SendMessageResult | undefined> => {
     const { internal_execAgentRuntime, mainInputEditor } = this.#get();
 
@@ -89,9 +105,9 @@ export class ConversationLifecycleActionImpl {
     const newThread =
       isCreatingNewThread && context.sourceMessageId && context.threadType
         ? {
-          sourceMessageId: context.sourceMessageId,
-          type: context.threadType as ChatThreadType,
-        }
+            sourceMessageId: context.sourceMessageId,
+            type: context.threadType as ChatThreadType,
+          }
         : undefined;
 
     if (!agentId) return;
@@ -100,6 +116,7 @@ export class ConversationLifecycleActionImpl {
     // Check if current agentId is the supervisor agent of the group
     let isGroupSupervisor = false;
     if (context.groupId) {
+      const { getChatGroupStoreState } = await import('@/store/agentGroup/store');
       const group = agentGroupByIdSelectors.groupById(context.groupId)(getChatGroupStoreState());
       isGroupSupervisor = group?.supervisorAgentId === agentId;
     }
@@ -109,7 +126,7 @@ export class ConversationLifecycleActionImpl {
       ...(isGroupSupervisor && { isSupervisor: true }),
     };
 
-    const fileIdList = files?.map((f) => f.id);
+    const fileIdList = files?.flatMap((f) => (f.fileId ? [f.fileId] : []));
 
     const hasFile = !!fileIdList && fileIdList.length > 0;
 
@@ -184,8 +201,7 @@ export class ConversationLifecycleActionImpl {
         threadId: operationContext.threadId ?? undefined,
         imageList: tempImages.length > 0 ? tempImages : undefined,
         videoList: tempVideos.length > 0 ? tempVideos : undefined,
-        // Pass pageSelections metadata for immediate display
-        metadata: pageSelections?.length ? { pageSelections } : undefined,
+        metadata: docSelections?.length ? { docSelections } : undefined,
       },
       { operationId, tempMessageId: tempId },
     );
@@ -222,26 +238,27 @@ export class ConversationLifecycleActionImpl {
       const topicId = operationContext.topicId;
       data = await aiChatService.sendMessageInServer(
         {
-          newUserMessage: { content: message, files: fileIdList, pageSelections, parentId },
+          newUserMessage: { content: message, docSelections, files: fileIdList, parentId },
           // if there is topicId，then add topicId to message
           topicId: topicId ?? undefined,
           threadId: operationContext.threadId ?? undefined,
           // Support creating new thread along with message
           newThread: newThread
             ? {
-              sourceMessageId: newThread.sourceMessageId,
-              type: newThread.type,
-            }
+                sourceMessageId: newThread.sourceMessageId,
+                type: newThread.type,
+              }
             : undefined,
           newTopic: !topicId
             ? {
-              topicMessageIds: messages.map((m) => m.id),
-              title: message.slice(0, 20) || t('defaultTitle', { ns: 'topic' }),
-            }
+                topicMessageIds: messages.map((m) => m.id),
+                title: message.slice(0, 20) || t('defaultTitle', { ns: 'topic' }),
+              }
             : undefined,
           agentId: operationContext.agentId,
           // Pass groupId for group chat scenarios
           groupId: operationContext.groupId ?? undefined,
+          spaceId: resolveWorkspaceSpaceId({ spaceId: operationContext.spaceId }),
           newAssistantMessage: {
             // Pass isSupervisor metadata for group orchestration
             metadata: operationContext.isSupervisor ? { isSupervisor: true } : undefined,
@@ -251,6 +268,34 @@ export class ConversationLifecycleActionImpl {
         },
         abortController,
       );
+      const docTopicMetadata = getDocTopicMetadata(operationContext);
+
+      if (data?.topicId && docTopicMetadata) {
+        const currentTopicId = data.topicId;
+        const matchedTopic = data.topics?.items.find((topic) => topic.id === currentTopicId);
+        const nextMetadata = { ...matchedTopic?.metadata, ...docTopicMetadata };
+
+        if (data.topics) {
+          data = {
+            ...data,
+            topics: {
+              ...data.topics,
+              items: data.topics.items.map((topic) =>
+                topic.id === currentTopicId ? { ...topic, metadata: nextMetadata } : topic,
+              ),
+            },
+          };
+        }
+
+        const persistDocTopic = topicService.updateTopic(data.topicId, { metadata: nextMetadata });
+
+        if (persistDocTopic && typeof persistDocTopic.catch === 'function') {
+          void persistDocTopic.catch((error) => {
+            console.error('[conversationLifecycle] Failed to tag doc topic metadata:', error);
+          });
+        }
+      }
+
       // Use created topicId/threadId if available, otherwise use original from context
       let finalTopicId = operationContext.topicId;
       const finalThreadId = data.createdThreadId ?? operationContext.threadId;
@@ -300,6 +345,7 @@ export class ConversationLifecycleActionImpl {
         // clearNewKey: true ensures the _new key data is cleared after topic creation
         await this.#get().switchTopic(data.topicId, {
           clearNewKey: true,
+          scope: operationContext.scope,
           skipRefreshMessage: true,
         });
       }
@@ -371,15 +417,6 @@ export class ConversationLifecycleActionImpl {
         inPortalThread: !!data.createdThreadId,
         skipCreateFirstMessage: true,
       });
-
-      const userFiles = dbMessageSelectors
-        .dbUserFiles(this.#get())
-        .map((f) => f?.id)
-        .filter(Boolean) as string[];
-
-      if (userFiles.length > 0) {
-        await getAgentStoreState().addFilesToAgent(userFiles, false);
-      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -390,6 +427,7 @@ export class ConversationLifecycleActionImpl {
     return {
       assistantMessageId: data.assistantMessageId,
       createdThreadId: data.createdThreadId,
+      topicId: data.topicId,
       userMessageId: data.userMessageId,
     };
   };

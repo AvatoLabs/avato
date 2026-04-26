@@ -22,6 +22,7 @@ import {
   ChevronUp,
   Cpu,
   FileText,
+  Menu,
   MessageCircle,
   MessageSquarePlus,
   Pencil,
@@ -37,10 +38,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
+  FlatList,
   Image as RNImage,
-  Keyboard,
   LayoutAnimation,
+  type ListRenderItemInfo,
   Modal,
   Platform,
   Pressable,
@@ -50,6 +51,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -63,7 +65,6 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/shallow';
 
-import ChatListHeader from '../components/ChatListHeader';
 import AgentSelectionSheet from '../components/ui/AgentSelectionSheet';
 import AttachmentSheet from '../components/ui/AttachmentSheet';
 import { ChatComposerBody } from '../components/ui/ChatComposerBody';
@@ -75,15 +76,19 @@ import { ModelDrawer } from '../components/ui/ModelDrawer';
 import PromptModal from '../components/ui/PromptModal';
 import { QuickActionChip } from '../components/ui/QuickActionChip';
 import ResourcePickerSheet from '../components/ui/ResourcePickerSheet';
-import { HeaderIconButton } from '../components/ui/ScreenHeader';
-import { SectionBlock } from '../components/ui/SectionBlock';
+import { HeaderIconButton, ScreenHeader } from '../components/ui/ScreenHeader';
 import SkillsSheet from '../components/ui/SkillsSheet';
 import { TagEditorSheet } from '../components/ui/TagEditorSheet';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl, inferProviderFromModelId } from '../constants/cdn';
 import type { MobileRecommendedBuiltinIcon } from '../constants/recommendedBuiltins';
 import { MOBILE_RECOMMENDED_BUILTIN_SKILLS } from '../constants/recommendedBuiltins';
-import { DEFAULT_INBOX_AVATAR, INBOX_SESSION_ID, isBuiltinInboxAvatar } from '../constants/session';
+import {
+  AVATO_INBOX_ICON_ASSET,
+  DEFAULT_INBOX_AVATAR,
+  INBOX_SESSION_ID,
+  isBuiltinInboxAvatar,
+} from '../constants/session';
 import { resolveTagColor, withAlpha } from '../constants/tags';
 import {
   agentApi,
@@ -99,16 +104,22 @@ import {
   userApi,
 } from '../lib/api';
 import { useMainTabBottomInsets } from '../lib/bottomChrome';
+import {
+  createChatContextSelectionFromResource,
+  isChatContextEligibleResource,
+} from '../lib/chatContext';
 import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
-import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
+import { createComposerKeyboardSubscriptions, resolveComposerLift } from '../lib/keyboard';
 import { navigateToLogin } from '../lib/navigation';
 import {
   PERSONAL_NOTEBOOK_SESSION_STORAGE_KEY,
   shouldHidePersonalNotebookSession,
 } from '../lib/personalNotebookSession';
 import { useResolvedRemoteAsset } from '../lib/remoteAsset';
+import { getCanonicalResourceKind } from '../lib/resourceList';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import { loadSkillPickerSelection, saveSkillPickerSelection } from '../lib/skillPicker';
 import { recordUsage } from '../lib/streak';
 import { generateBestTitle } from '../lib/titleGeneration';
@@ -159,6 +170,12 @@ interface SidebarTopicMeta {
   updatedAt: string;
 }
 
+type SidebarDirectoryListItem =
+  | { id: string; title: string; type: 'section' }
+  | { id: string; type: 'divider' }
+  | { id: string; session: ChatSession; showTopicPreview: boolean; type: 'assistant' }
+  | { expanded: boolean; id: string; totalCount: number; type: 'showAll' };
+
 const sortTags = (tags: TagItem[]) =>
   [...tags].sort((left, right) => {
     const leftSort = left.sort ?? Number.MAX_SAFE_INTEGER;
@@ -175,15 +192,12 @@ const trimSearchSnippet = (value: string, maxLength = 88) => {
   return `${normalized.slice(0, maxLength - 1)}…`;
 };
 
-const DIRECTORY_DRAWER_WIDTH = Math.min(Dimensions.get('window').width * 0.88, 390);
 /** Max `absoluteX` from screen left to allow edge-swipe open (avoid a full-height hit overlay). */
 const DIRECTORY_EDGE_OPEN_MAX_X = 28;
 /** Collapsed recents in directory drawer before "Show all". */
 const SIDEBAR_RECENTS_VISIBLE = 20;
 const SIDEBAR_TAG_FILTER_ALL = '__all__';
 const SIDEBAR_TAG_FILTER_NONE = '__none__';
-const AVATO_AGENT_LOGO_ASSET = require('../../assets/avato-logo.png');
-
 function formatTimeAgo(dateStr: string, t: RelativeTimeText): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const minutes = Math.floor(diff / 60_000);
@@ -242,10 +256,10 @@ function SessionLogo({
       >
         <RNImage
           resizeMode="contain"
-          source={AVATO_AGENT_LOGO_ASSET}
+          source={AVATO_INBOX_ICON_ASSET}
           style={{
-            width: size,
-            height: size,
+            width: iconSize,
+            height: iconSize,
             ...(avatoLogoTint ? { tintColor: avatoLogoTint } : {}),
           }}
         />
@@ -385,6 +399,16 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   const toast = useToast();
   const colors = useThemeColors();
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const hasPersistentDirectory = responsiveMetrics.isWideTablet;
+  const directoryPanelWidth = responsiveMetrics.chatDirectoryWidth;
+  const mainPanePad = hasPersistentDirectory ? 24 : 0;
+  const mainPaneGap = hasPersistentDirectory ? 24 : 0;
+  const availableHomeWidth = hasPersistentDirectory
+    ? Math.max(360, screenWidth - directoryPanelWidth - mainPaneGap - mainPanePad * 2)
+    : screenWidth;
+  const homeContentMaxWidth = Math.min(availableHomeWidth, responsiveMetrics.chatHomeMaxWidth);
 
   const {
     sessions,
@@ -409,8 +433,14 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   const removeTopic = useTopicStore((s) => s.removeTopic);
   const updateTopicTag = useTopicStore((s) => s.updateTopicTag);
   const updateTopic = useTopicStore((s) => s.updateTopic);
-  const pendingFiles = useFileStore((s) => s.pendingFiles);
+  const { chatContextSelectionsCount, pendingFilesCount } = useFileStore(
+    useShallow((s) => ({
+      chatContextSelectionsCount: s.chatContextSelections.length,
+      pendingFilesCount: s.pendingFiles.length,
+    })),
+  );
   const addFile = useFileStore((s) => s.addFile);
+  const addChatContextSelection = useFileStore((s) => s.addChatContextSelection);
 
   const selectedModel = useModelStore((s) => s.selectedModel);
   const selectedProvider = useModelStore((s) => s.selectedProvider);
@@ -450,8 +480,6 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   const [actionSession, setActionSession] = useState<ChatSession | null>(null);
   const [_actionPanel, setActionPanel] = useState<'root' | 'move-tag'>('root');
   const [createGroupSheetVisible, setCreateGroupSheetVisible] = useState(false);
-  const [draftAssistantPickerVisible, setDraftAssistantPickerVisible] = useState(false);
-  const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [directoryVisible, setDirectoryVisible] = useState(false);
   const [directoryMounted, setDirectoryMounted] = useState(false);
@@ -504,7 +532,7 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   const lastRecentTopicsRefreshAtRef = useRef(0);
   const hydratedTopicSessionIdsRef = useRef<Set<string>>(new Set());
   const [persistedSkillIdentifiers, setPersistedSkillIdentifiers] = useState<string[]>([]);
-  const drawerTranslateX = useSharedValue(-DIRECTORY_DRAWER_WIDTH);
+  const drawerTranslateX = useSharedValue(-directoryPanelWidth);
   const drawerBackdropOpacity = useSharedValue(0);
   const hints = useMemo(
     () => [t.chatAskAnything, t.chatHint1, t.chatHint2, t.chatHint3, t.chatHint4],
@@ -526,11 +554,6 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
       ),
     [visibleInboxSession, visibleSessions],
   );
-  const getSessionDisplayTitle = useCallback(
-    (session?: ChatSession | null) =>
-      session?.id === visibleInboxSession?.id ? 'Avato' : session?.title || 'Avato',
-    [visibleInboxSession?.id],
-  );
   const draftAgentSessions = useMemo(() => {
     const entries = [
       visibleInboxSession,
@@ -541,15 +564,6 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
       (session, index, list) => list.findIndex((item) => item.id === session.id) === index,
     );
   }, [visibleInboxSession, visibleSessions]);
-  const draftSession = useMemo(
-    () =>
-      draftAgentSessions.find((session) => session.id === draftSessionId) ??
-      draftAgentSessions[0] ??
-      null,
-    [draftAgentSessions, draftSessionId],
-  );
-  const draftSessionIsInbox = draftSession?.id === visibleInboxSession?.id;
-
   const topicStoreSessionIds = useMemo(() => {
     const ids = new Set<string>();
     for (const s of browsableSessions) ids.add(s.id);
@@ -786,33 +800,14 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   }, [toolbarProviderLogo, selectedProvider]);
 
   useEffect(() => {
-    const handleKeyboardShow = (event: any) => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setKeyboardOffset(getKeyboardOffset(event, insets.bottom));
-    };
-
-    const handleKeyboardHide = () => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setKeyboardOffset(0);
-    };
-
-    const subscriptions =
-      Platform.OS === 'ios'
-        ? [
-            Keyboard.addListener('keyboardWillShow', handleKeyboardShow),
-            Keyboard.addListener('keyboardWillHide', handleKeyboardHide),
-            Keyboard.addListener('keyboardWillChangeFrame', (event) => {
-              if (getKeyboardOffset(event, insets.bottom) <= 0) {
-                handleKeyboardHide();
-              } else {
-                handleKeyboardShow(event);
-              }
-            }),
-          ]
-        : [
-            Keyboard.addListener('keyboardDidShow', handleKeyboardShow),
-            Keyboard.addListener('keyboardDidHide', handleKeyboardHide),
-          ];
+    const subscriptions = createComposerKeyboardSubscriptions({
+      bottomInset: insets.bottom,
+      onBeforeChange: () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      },
+      onKeyboardOffsetChange: setKeyboardOffset,
+      platform: Platform.OS,
+    });
 
     return () => {
       for (const subscription of subscriptions) {
@@ -822,6 +817,14 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   }, [insets.bottom]);
 
   useEffect(() => {
+    if (hasPersistentDirectory) {
+      drawerBackdropOpacity.value = 0;
+      drawerTranslateX.value = 0;
+      if (directoryMounted) setDirectoryMounted(false);
+      if (directoryVisible) setDirectoryVisible(false);
+      return;
+    }
+
     if (directoryVisible) {
       setDirectoryMounted(true);
       drawerTranslateX.value = withTiming(0, { duration: 260 });
@@ -832,16 +835,28 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     if (!directoryMounted) return;
 
     drawerBackdropOpacity.value = withTiming(0, { duration: 180 });
-    drawerTranslateX.value = withTiming(-DIRECTORY_DRAWER_WIDTH, { duration: 220 }, (finished) => {
+    drawerTranslateX.value = withTiming(-directoryPanelWidth, { duration: 220 }, (finished) => {
       if (finished) {
         runOnJS(setDirectoryMounted)(false);
       }
     });
-  }, [directoryMounted, directoryVisible, drawerBackdropOpacity, drawerTranslateX]);
+  }, [
+    directoryMounted,
+    directoryPanelWidth,
+    directoryVisible,
+    drawerBackdropOpacity,
+    drawerTranslateX,
+    hasPersistentDirectory,
+  ]);
 
   useEffect(() => {
-    if (!directoryVisible) setSidebarRecentsExpanded(false);
-  }, [directoryVisible]);
+    if (hasPersistentDirectory || directoryMounted) return;
+    drawerTranslateX.value = -directoryPanelWidth;
+  }, [directoryMounted, directoryPanelWidth, drawerTranslateX, hasPersistentDirectory]);
+
+  useEffect(() => {
+    if (!directoryVisible && !hasPersistentDirectory) setSidebarRecentsExpanded(false);
+  }, [directoryVisible, hasPersistentDirectory]);
 
   useEffect(() => {
     void refreshRecentTopics();
@@ -984,17 +999,15 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     [t.chatListNewConversation],
   );
 
-  const handleCreateChat = async () => {
+  const handleCreateChat = useCallback(async () => {
     try {
       const nextPlugins = [...enabledSkills];
-      const sessionId =
-        draftSession?.id ??
-        (await createQuickChatSession({
-          includeComposerConfig: true,
-          model: selectedModel || undefined,
-          plugins: nextPlugins,
-          provider: selectedProvider || undefined,
-        }));
+      const sessionId = await createQuickChatSession({
+        includeComposerConfig: true,
+        model: selectedModel || undefined,
+        plugins: nextPlugins,
+        provider: selectedProvider || undefined,
+      });
       const agentConfig = await agentApi.getConfigBySession(sessionId).catch(() => null);
       const configPayload = {
         chatConfig: {
@@ -1018,11 +1031,23 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
 
       const topicId = await createQuickTopic(sessionId);
       haptics.success();
-      navigation.navigate('ChatDetail', topicId ? { sessionId, topicId } : { sessionId });
+      navigation.push('ChatDetail', topicId ? { sessionId, topicId } : { sessionId });
     } catch {
       toast.show('error', t.errorNetwork);
     }
-  };
+  }, [
+    createQuickChatSession,
+    createQuickTopic,
+    enabledSkills,
+    memoryEffort,
+    memoryEnabled,
+    navigation,
+    selectedModel,
+    selectedProvider,
+    t.errorNetwork,
+    toast,
+    webSearchEnabled,
+  ]);
 
   const handleCreateAgent = useCallback(async () => {
     haptics.light();
@@ -1040,20 +1065,20 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
 
   const handleHeroSubmit = useCallback(async () => {
     const prompt = heroText.trim();
-    const hasAttachment = pendingFiles.length > 0;
+    const hasAttachment = pendingFilesCount + chatContextSelectionsCount > 0;
     if (!prompt && !hasAttachment) return;
 
     try {
+      const fileState = useFileStore.getState();
+      const pendingFiles = fileState.pendingFiles;
+      const chatContextSelections = fileState.chatContextSelections;
       const nextPlugins = [...enabledSkills];
-      const sessionId =
-        draftSession?.id ??
-        (await createQuickChatSession({
-          includeComposerConfig: true,
-          model: selectedModel || undefined,
-          plugins: nextPlugins,
-          provider: selectedProvider || undefined,
-        }));
-      const topicId = await createQuickTopic(sessionId);
+      const sessionId = await createQuickChatSession({
+        includeComposerConfig: true,
+        model: selectedModel || undefined,
+        plugins: nextPlugins,
+        provider: selectedProvider || undefined,
+      });
 
       const agentConfig = await agentApi.getConfigBySession(sessionId).catch(() => null);
       const configPayload = {
@@ -1076,29 +1101,39 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
         });
       }
 
+      const topicId = await createQuickTopic(sessionId);
+
+      useTopicStore.getState().switchTopic(sessionId, topicId);
+      useChatStore.setState((state) => ({
+        fetchingMessagesBySession: { ...state.fetchingMessagesBySession, [sessionId]: false },
+        messagesBySession: { ...state.messagesBySession, [sessionId]: [] },
+      }));
+
       void sendMessage(sessionId, prompt, topicId ?? undefined, {
+        chatContextSelections,
         memoryEffort,
         memoryEnabled,
+        pendingFiles,
         plugins: nextPlugins.length > 0 ? nextPlugins : undefined,
         searchEnabled: webSearchEnabled,
       });
 
       setHeroText('');
       setDirectoryVisible(false);
-      navigation.navigate('ChatDetail', topicId ? { sessionId, topicId } : { sessionId });
+      navigation.push('ChatDetail', topicId ? { sessionId, topicId } : { sessionId });
     } catch {
       toast.show('error', t.errorNetwork);
     }
   }, [
     createQuickChatSession,
     createQuickTopic,
-    draftSession?.id,
     enabledSkills,
     heroText,
     memoryEffort,
     memoryEnabled,
     navigation,
-    pendingFiles.length,
+    pendingFilesCount,
+    chatContextSelectionsCount,
     selectedModel,
     selectedProvider,
     sendMessage,
@@ -1196,9 +1231,26 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     async (items: FileListItem[]) => {
       const base = await getApiUrl();
       const baseUrl = base?.replace(/\/$/, '') ?? '';
+      let failedContextCount = 0;
 
       for (const item of items) {
-        if (item.sourceType !== 'file' || !item.id || item.id.startsWith('docs_')) continue;
+        if (!item.id) continue;
+        const itemKind = getCanonicalResourceKind(item);
+
+        if (isChatContextEligibleResource(item)) {
+          const context = await createChatContextSelectionFromResource(item).catch(() => null);
+          if (context) {
+            addChatContextSelection(context);
+            continue;
+          }
+
+          if (itemKind === 'document') {
+            failedContextCount += 1;
+            continue;
+          }
+        }
+
+        if (itemKind !== 'file') continue;
 
         const fileUrl = item.url?.startsWith('http')
           ? item.url
@@ -1216,8 +1268,12 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
           url: fileUrl,
         });
       }
+
+      if (failedContextCount > 0) {
+        toast.show('error', t.fileUploadFailed);
+      }
     },
-    [addFile],
+    [addChatContextSelection, addFile, t.fileUploadFailed, toast],
   );
 
   const handlePluginsPress = useCallback(() => {
@@ -1307,7 +1363,7 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     });
   }, []);
 
-  const loadDraftSessionConfig = useCallback(
+  const loadHomeComposerConfig = useCallback(
     async (sessionId: string | null) => {
       if (!sessionId) return;
 
@@ -1336,9 +1392,9 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   );
 
   useEffect(() => {
-    if (!draftSession?.id) return;
-    void loadDraftSessionConfig(draftSession.id);
-  }, [draftSession?.id, loadDraftSessionConfig]);
+    if (!visibleInboxSession?.id) return;
+    void loadHomeComposerConfig(visibleInboxSession.id);
+  }, [loadHomeComposerConfig, visibleInboxSession?.id]);
 
   const closeActionSheet = useCallback(() => {
     setActionPanel('root');
@@ -1532,9 +1588,79 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     const rest = matchedSessions.filter((session) => !session.pinned);
     return { pinnedSessions: pinned, filteredSessions: rest };
   }, [matchesActiveTagFilter, visibleSessions]);
+  const visibleSidebarRecentSessions = useMemo(
+    () =>
+      filteredSessions.slice(
+        0,
+        sidebarRecentsExpanded ? filteredSessions.length : SIDEBAR_RECENTS_VISIBLE,
+      ),
+    [filteredSessions, sidebarRecentsExpanded],
+  );
+  const hasSidebarRecentsContent = Boolean(filteredInboxSession) || filteredSessions.length > 0;
+  const sidebarDirectoryItems = useMemo(() => {
+    const items: SidebarDirectoryListItem[] = [];
+
+    if (pinnedSessions.length > 0) {
+      items.push({ id: 'section-pinned', title: t.groupPinned, type: 'section' });
+
+      for (const session of pinnedSessions) {
+        items.push({
+          id: `assistant-${session.id}`,
+          session,
+          showTopicPreview: true,
+          type: 'assistant',
+        });
+      }
+    }
+
+    if (pinnedSessions.length > 0 && hasSidebarRecentsContent) {
+      items.push({ id: 'divider-recents', type: 'divider' });
+    }
+
+    if (hasSidebarRecentsContent) {
+      items.push({ id: 'section-recents', title: t.homeRecents, type: 'section' });
+
+      if (filteredInboxSession) {
+        items.push({
+          id: `assistant-${filteredInboxSession.id}`,
+          session: filteredInboxSession,
+          showTopicPreview: true,
+          type: 'assistant',
+        });
+      }
+
+      for (const session of visibleSidebarRecentSessions) {
+        items.push({
+          id: `assistant-${session.id}`,
+          session,
+          showTopicPreview: true,
+          type: 'assistant',
+        });
+      }
+
+      if (filteredSessions.length > SIDEBAR_RECENTS_VISIBLE) {
+        items.push({
+          expanded: sidebarRecentsExpanded,
+          id: 'show-all-recents',
+          totalCount: filteredSessions.length,
+          type: 'showAll',
+        });
+      }
+    }
+
+    return items;
+  }, [
+    filteredInboxSession,
+    filteredSessions.length,
+    hasSidebarRecentsContent,
+    pinnedSessions,
+    sidebarRecentsExpanded,
+    t.groupPinned,
+    t.homeRecents,
+    visibleSidebarRecentSessions,
+  ]);
   const hasFilteredSidebarSessions =
     pinnedSessions.length > 0 || filteredSessions.length > 0 || Boolean(filteredInboxSession);
-  const hasSidebarRecentsContent = Boolean(filteredInboxSession) || filteredSessions.length > 0;
   const activeTagFilterLabel = useMemo(() => {
     if (activeTagFilterId === SIDEBAR_TAG_FILTER_ALL) return t.homeAgentAll;
     if (activeTagFilterId === SIDEBAR_TAG_FILTER_NONE) return t.tagNone;
@@ -1630,17 +1756,6 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     tagEditingTarget,
     toast,
   ]);
-
-  useEffect(() => {
-    if (draftAgentSessions.length === 0) return;
-
-    const hasSelectedDraft =
-      draftSessionId && draftAgentSessions.some((session) => session.id === draftSessionId);
-
-    if (!hasSelectedDraft) {
-      setDraftSessionId(draftAgentSessions[0].id);
-    }
-  }, [draftAgentSessions, draftSessionId]);
 
   const ensureSessionTopicsLoaded = useCallback(
     (sessionId: string) => {
@@ -1938,186 +2053,456 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     [ensureSessionTopicsLoaded],
   );
 
-  const renderAssistantRow = (item: ChatSession, showTopicPreview?: boolean) => {
-    const itemIsInbox = isInboxSession(item);
-    const providerId =
-      item.provider || (item.model ? inferProviderFromModelId(item.model) : undefined);
-    const isExpanded = expandedSessionIds.has(item.id);
-    const latestTopic = latestTopicBySessionId.get(item.id);
-    const previewTagId = latestTopic?.tagId ?? undefined;
-    const previewTime = latestTopic?.updatedAt
-      ? formatTimeAgo(latestTopic.updatedAt, t)
-      : item.updatedAt
-        ? formatTimeAgo(item.updatedAt, t)
-        : null;
-    const topics = topicsBySession[item.id] ?? [];
-    return (
-      <View
-        className="mx-4 mb-2.5 overflow-hidden rounded-[20px]"
-        key={item.id}
-        style={{
-          backgroundColor: colors.fillQuaternary,
-          borderColor: isExpanded ? colors.primaryBorder : colors.borderSubtle,
-          borderWidth: 1,
-        }}
-      >
-        <View className="flex-row items-center">
-          <TouchableOpacity
-            accessibilityLabel={item.title}
-            accessibilityRole="button"
-            activeOpacity={0.4}
-            className="flex-1 flex-row items-start px-3.5 py-3.5 active:bg-foreground/5"
-            onLongPress={() => handleLongPress(item)}
-            onPress={() => toggleAssistantExpand(item.id)}
-          >
-            <View className="mr-3 mt-0.5 h-10 w-10 items-center justify-center rounded-full">
-              <SessionLogo
-                avatar={item.avatar}
-                isGroup={item.type === 'group'}
-                isInbox={itemIsInbox}
-                provider={providerId}
-                size={38}
-              />
-            </View>
-            <View className="mr-2.5 mt-0.5 flex-1">
-              <View className="flex-row items-center mb-0.5 flex-wrap">
-                {item.pinned && (
-                  <Pin
-                    color={colors.primary}
-                    size={11}
-                    strokeWidth={tokens.icon.strokeWidth}
-                    style={{ marginRight: 4 }}
-                  />
-                )}
-                <Text
-                  className="text-foreground text-[15px] font-medium tracking-tight"
-                  numberOfLines={1}
-                >
-                  {item.title || t.chatListNewConversation}
-                </Text>
+  const renderAssistantRow = useCallback(
+    (item: ChatSession, showTopicPreview?: boolean) => {
+      const itemIsInbox = isInboxSession(item);
+      const providerId =
+        item.provider || (item.model ? inferProviderFromModelId(item.model) : undefined);
+      const isExpanded = expandedSessionIds.has(item.id);
+      const latestTopic = latestTopicBySessionId.get(item.id);
+      const previewTagId = latestTopic?.tagId ?? undefined;
+      const previewTime = latestTopic?.updatedAt
+        ? formatTimeAgo(latestTopic.updatedAt, t)
+        : item.updatedAt
+          ? formatTimeAgo(item.updatedAt, t)
+          : null;
+      const topics = topicsBySession[item.id] ?? [];
+      return (
+        <View
+          className="mx-4 mb-2.5 overflow-hidden rounded-[20px]"
+          key={item.id}
+          style={{
+            backgroundColor: colors.fillQuaternary,
+            borderColor: isExpanded ? colors.primaryBorder : colors.borderSubtle,
+            borderWidth: 1,
+          }}
+        >
+          <View className="flex-row items-center">
+            <TouchableOpacity
+              accessibilityLabel={item.title}
+              accessibilityRole="button"
+              activeOpacity={0.4}
+              className="flex-1 flex-row items-start px-3.5 py-3.5 active:bg-foreground/5"
+              onLongPress={() => handleLongPress(item)}
+              onPress={() => toggleAssistantExpand(item.id)}
+            >
+              <View className="mr-3 mt-0.5 h-10 w-10 items-center justify-center rounded-full">
+                <SessionLogo
+                  avatar={item.avatar}
+                  isGroup={item.type === 'group'}
+                  isInbox={itemIsInbox}
+                  provider={providerId}
+                  size={38}
+                />
               </View>
-              <Text
-                className="text-[12px] font-medium"
-                numberOfLines={2}
-                style={{ color: colors.secondaryText }}
-              >
-                {showTopicPreview
-                  ? (() => {
-                      if (latestTopic?.title) return `${t.topicTitle}: ${latestTopic.title}`;
-                      if (itemIsInbox) return item.description || '';
-                      return item.description ?? '';
-                    })()
-                  : (item.description ?? '')}
-              </Text>
-              {showTopicPreview && (previewTagId || item.type === 'group' || previewTime) ? (
-                <View className="mt-2 flex-row flex-wrap items-center">
-                  {item.type === 'group' ? renderGroupTagChip() : renderTagChip(previewTagId)}
-                  {previewTime ? (
-                    <Text
-                      className="ml-2 text-[11px] font-medium"
-                      style={{ color: colors.secondaryText }}
-                    >
-                      {previewTime}
-                    </Text>
-                  ) : null}
+              <View className="mr-2.5 mt-0.5 flex-1">
+                <View className="mb-0.5 flex-row items-center flex-wrap">
+                  {item.pinned && (
+                    <Pin
+                      color={colors.primary}
+                      size={11}
+                      strokeWidth={tokens.icon.strokeWidth}
+                      style={{ marginRight: 4 }}
+                    />
+                  )}
+                  <Text
+                    className="text-foreground text-[15px] font-medium tracking-tight"
+                    numberOfLines={1}
+                  >
+                    {item.title || t.chatListNewConversation}
+                  </Text>
                 </View>
-              ) : null}
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            accessibilityRole="button"
-            activeOpacity={0.7}
-            className="px-3.5 py-3.5"
-            accessibilityLabel={
-              isExpanded ? t.chatListCollapseAssistant : t.chatListExpandAssistant
-            }
-            onPress={(e) => {
-              e.stopPropagation();
-              toggleAssistantExpand(item.id);
-            }}
-          >
-            {isExpanded ? (
-              <ChevronUp
-                color={colors.secondaryText}
-                size={20}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
-            ) : (
-              <ChevronDown
-                color={colors.secondaryText}
-                size={20}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
-            )}
-          </TouchableOpacity>
-        </View>
-        {isExpanded && topics.length > 0 && (
-          <View
-            className="px-3.5 pb-3.5 pt-1.5"
-            style={{ borderColor: colors.borderSubtle, borderTopWidth: 1 }}
-          >
-            {topics.map((topic: Topic) => (
-              <TouchableOpacity
-                accessibilityLabel={topic.title}
-                accessibilityRole="button"
-                activeOpacity={0.65}
-                className="mt-2 flex-row items-center rounded-xl px-3 py-2.5 active:bg-foreground/5"
-                key={topic.id}
-                style={{
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.borderSubtle,
-                  borderWidth: 1,
-                }}
-                onLongPress={() => {
-                  haptics.medium();
-                  setTopicActionTarget({
-                    sessionId: item.id,
-                    topicId: topic.id,
-                    topicTagId: topic.tagId ?? null,
-                    topicTitle: topic.title ?? '',
-                    topicType: item.type,
-                  });
-                }}
-                onPress={() => {
-                  setDirectoryVisible(false);
-                  navigation.navigate('ChatDetail', {
-                    sessionId: item.id,
-                    topicId: topic.id,
-                  });
-                }}
-              >
                 <Text
-                  className="flex-1 text-[14px] font-medium"
-                  numberOfLines={1}
-                  style={{ color: colors.foreground }}
-                >
-                  {topic.title || t.chatListNewConversation}
-                </Text>
-                {item.type === 'group' && renderGroupTagChip()}
-                {renderTagChip(topic.tagId ?? undefined)}
-                <Text
-                  className="ml-2 text-[11px] font-medium"
+                  className="text-[12px] font-medium"
+                  numberOfLines={2}
                   style={{ color: colors.secondaryText }}
                 >
-                  {formatTimeAgo(topic.updatedAt, t)}
+                  {showTopicPreview
+                    ? (() => {
+                        if (latestTopic?.title) return `${t.topicTitle}: ${latestTopic.title}`;
+                        if (itemIsInbox) return item.description || '';
+                        return item.description ?? '';
+                      })()
+                    : (item.description ?? '')}
                 </Text>
-              </TouchableOpacity>
-            ))}
+                {showTopicPreview && (previewTagId || item.type === 'group' || previewTime) ? (
+                  <View className="mt-2 flex-row flex-wrap items-center">
+                    {item.type === 'group' ? renderGroupTagChip() : renderTagChip(previewTagId)}
+                    {previewTime ? (
+                      <Text
+                        className="ml-2 text-[11px] font-medium"
+                        style={{ color: colors.secondaryText }}
+                      >
+                        {previewTime}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              activeOpacity={0.7}
+              className="px-3.5 py-3.5"
+              accessibilityLabel={
+                isExpanded ? t.chatListCollapseAssistant : t.chatListExpandAssistant
+              }
+              onPress={(e) => {
+                e.stopPropagation();
+                toggleAssistantExpand(item.id);
+              }}
+            >
+              {isExpanded ? (
+                <ChevronUp
+                  color={colors.secondaryText}
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              ) : (
+                <ChevronDown
+                  color={colors.secondaryText}
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              )}
+            </TouchableOpacity>
           </View>
-        )}
-        {isExpanded && topics.length === 0 && (
-          <View
-            className="px-3.5 pb-3.5 pt-2.5"
-            style={{ borderColor: colors.borderSubtle, borderTopWidth: 1 }}
+          {isExpanded && topics.length > 0 && (
+            <View
+              className="px-3.5 pb-3.5 pt-1.5"
+              style={{ borderColor: colors.borderSubtle, borderTopWidth: 1 }}
+            >
+              {topics.map((topic: Topic) => (
+                <TouchableOpacity
+                  accessibilityLabel={topic.title}
+                  accessibilityRole="button"
+                  activeOpacity={0.65}
+                  className="mt-2 flex-row items-center rounded-xl px-3 py-2.5 active:bg-foreground/5"
+                  key={topic.id}
+                  style={{
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.borderSubtle,
+                    borderWidth: 1,
+                  }}
+                  onLongPress={() => {
+                    haptics.medium();
+                    setTopicActionTarget({
+                      sessionId: item.id,
+                      topicId: topic.id,
+                      topicTagId: topic.tagId ?? null,
+                      topicTitle: topic.title ?? '',
+                      topicType: item.type,
+                    });
+                  }}
+                  onPress={() => {
+                    setDirectoryVisible(false);
+                    navigation.navigate('ChatDetail', {
+                      sessionId: item.id,
+                      topicId: topic.id,
+                    });
+                  }}
+                >
+                  <Text
+                    className="flex-1 text-[14px] font-medium"
+                    numberOfLines={1}
+                    style={{ color: colors.foreground }}
+                  >
+                    {topic.title || t.chatListNewConversation}
+                  </Text>
+                  {item.type === 'group' && renderGroupTagChip()}
+                  {renderTagChip(topic.tagId ?? undefined)}
+                  <Text
+                    className="ml-2 text-[11px] font-medium"
+                    style={{ color: colors.secondaryText }}
+                  >
+                    {formatTimeAgo(topic.updatedAt, t)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {isExpanded && topics.length === 0 && (
+            <View
+              className="px-3.5 pb-3.5 pt-2.5"
+              style={{ borderColor: colors.borderSubtle, borderTopWidth: 1 }}
+            >
+              <Text className="text-[13px]" style={{ color: colors.secondaryText }}>
+                {t.chatListTopicEmpty}
+              </Text>
+            </View>
+          )}
+        </View>
+      );
+    },
+    [
+      colors.borderSubtle,
+      colors.fillQuaternary,
+      colors.foreground,
+      colors.primary,
+      colors.primaryBorder,
+      colors.secondaryText,
+      colors.surfaceElevated,
+      expandedSessionIds,
+      handleLongPress,
+      isInboxSession,
+      latestTopicBySessionId,
+      navigation,
+      renderGroupTagChip,
+      renderTagChip,
+      t,
+      toggleAssistantExpand,
+      topicsBySession,
+    ],
+  );
+
+  const renderSidebarDirectoryHeader = useCallback(
+    () => (
+      <View className="px-4 pb-3 pt-1">
+        <View className="mb-2 flex-row items-center justify-between px-1">
+          <Text
+            className="text-[11px] font-semibold uppercase tracking-[1.4px]"
+            style={{ color: colors.secondaryText }}
           >
-            <Text className="text-[13px]" style={{ color: colors.secondaryText }}>
-              {t.chatListTopicEmpty}
+            {t.chatSidebarTags}
+          </Text>
+          <Text className="text-[11px] font-medium" style={{ color: colors.secondaryText }}>
+            {activeTagFilterCount}/{topicCount}
+          </Text>
+        </View>
+        <ScrollView
+          horizontal
+          contentContainerStyle={{ paddingRight: 4 }}
+          keyboardShouldPersistTaps="handled"
+          showsHorizontalScrollIndicator={false}
+        >
+          <View className="flex-row" style={{ gap: 8 }}>
+            {renderSidebarTagFilterChip({
+              count: topicCount,
+              filterId: SIDEBAR_TAG_FILTER_ALL,
+              label: t.homeAgentAll,
+            })}
+            {renderSidebarTagFilterChip({
+              color: colors.secondaryText,
+              count: tagTopicCounts.untaggedCount,
+              filterId: SIDEBAR_TAG_FILTER_NONE,
+              label: t.tagNone,
+            })}
+            {tags.map((tag) =>
+              renderSidebarTagFilterChip({
+                color: tag.color,
+                count: tagTopicCounts.counts.get(tag.id) ?? 0,
+                filterId: tag.id,
+                label: tag.name,
+              }),
+            )}
+          </View>
+        </ScrollView>
+        {tags.length === 0 ? (
+          <TouchableOpacity
+            accessibilityLabel={t.tagCreate}
+            accessibilityRole="button"
+            activeOpacity={0.72}
+            className="mt-2.5 flex-row items-center rounded-xl px-2.5 py-2.5"
+            style={{ backgroundColor: withAlpha(colors.primary, '0a') }}
+            onPress={() => {
+              haptics.light();
+              openCreateTagEditor();
+            }}
+          >
+            <Tag color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
+            <Text
+              className="ml-2.5 flex-1 text-[12px] font-medium leading-[17px]"
+              style={{ color: colors.secondaryText }}
+            >
+              {t.chatSidebarTagsHint}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    ),
+    [
+      activeTagFilterCount,
+      colors.primary,
+      colors.secondaryText,
+      openCreateTagEditor,
+      renderSidebarTagFilterChip,
+      t.chatSidebarTags,
+      t.chatSidebarTagsHint,
+      t.homeAgentAll,
+      t.tagCreate,
+      t.tagNone,
+      tagTopicCounts.counts,
+      tagTopicCounts.untaggedCount,
+      tags,
+      topicCount,
+    ],
+  );
+
+  const renderSidebarDirectoryEmpty = useCallback(() => {
+    if (loading && !hasFilteredSidebarSessions) {
+      return <ListSkeleton />;
+    }
+
+    if (!loading && !hasFilteredSidebarSessions && activeTagFilterId === SIDEBAR_TAG_FILTER_ALL) {
+      return (
+        <EmptyState
+          compact
+          description={t.chatSidebarEmptyDesc}
+          iconVariant="chat"
+          style={{ paddingHorizontal: 12, paddingVertical: 16 }}
+          title={t.chatSidebarEmptyTitle}
+          action={
+            <TouchableOpacity
+              accessibilityLabel={t.chatListNewConversation}
+              accessibilityRole="button"
+              activeOpacity={0.85}
+              className="items-center self-center rounded-full px-6 py-3"
+              style={{ backgroundColor: colors.primary }}
+              onPress={() => {
+                haptics.light();
+                setDirectoryVisible(false);
+                void handleCreateChat();
+              }}
+            >
+              <Text className="text-[15px] font-semibold" style={{ color: colors.iconOnPrimary }}>
+                {t.chatListNewConversation}
+              </Text>
+            </TouchableOpacity>
+          }
+        />
+      );
+    }
+
+    if (!loading && !hasFilteredSidebarSessions && activeTagFilterId !== SIDEBAR_TAG_FILTER_ALL) {
+      return (
+        <View className="px-4">
+          <View
+            className="items-center rounded-[28px] px-5 py-8"
+            style={{
+              backgroundColor: colors.fillQuaternary,
+              borderColor: colors.borderSubtle,
+              borderWidth: 1,
+            }}
+          >
+            <View
+              className="h-12 w-12 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: colors.surfaceElevated }}
+            >
+              <Tag color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+            </View>
+            <Text className="mt-4 text-[16px] font-semibold text-foreground">
+              {activeTagFilterLabel}
+            </Text>
+            <Text
+              className="mt-2 text-center text-[13px] leading-5"
+              style={{ color: colors.secondaryText }}
+            >
+              {t.chatSidebarTagEmpty}
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.82}
+              className="mt-4 rounded-full px-4 py-2.5"
+              style={{ backgroundColor: colors.primarySubtle }}
+              onPress={() => {
+                haptics.light();
+                setActiveTagFilterId(SIDEBAR_TAG_FILTER_ALL);
+              }}
+            >
+              <Text className="text-[13px] font-semibold" style={{ color: colors.primary }}>
+                {t.homeAgentAll}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    return null;
+  }, [
+    activeTagFilterId,
+    activeTagFilterLabel,
+    colors.borderSubtle,
+    colors.fillQuaternary,
+    colors.iconOnPrimary,
+    colors.primary,
+    colors.primarySubtle,
+    colors.secondaryText,
+    colors.surfaceElevated,
+    handleCreateChat,
+    hasFilteredSidebarSessions,
+    loading,
+    t.chatListNewConversation,
+    t.chatSidebarEmptyDesc,
+    t.chatSidebarEmptyTitle,
+    t.chatSidebarTagEmpty,
+    t.homeAgentAll,
+  ]);
+
+  const renderSidebarDirectoryItem = useCallback(
+    ({ item }: ListRenderItemInfo<SidebarDirectoryListItem>) => {
+      if (item.type === 'section') {
+        return (
+          <View className="px-4 pb-2 pt-1">
+            <Text
+              className="text-[11px] font-semibold uppercase tracking-[1.4px]"
+              style={{ color: colors.secondaryText }}
+            >
+              {item.title}
             </Text>
           </View>
-        )}
-      </View>
-    );
-  };
+        );
+      }
+
+      if (item.type === 'divider') {
+        return (
+          <View
+            className="mx-4 mb-1 mt-1"
+            style={{
+              backgroundColor: colors.divider,
+              height: StyleSheet.hairlineWidth,
+            }}
+          />
+        );
+      }
+
+      if (item.type === 'showAll') {
+        return (
+          <TouchableOpacity
+            accessibilityRole="button"
+            activeOpacity={0.78}
+            className="mx-4 mb-0.5 mt-0.5 items-center rounded-xl py-3"
+            style={{
+              backgroundColor: colors.fillTertiary,
+              borderColor: colors.borderSubtle,
+              borderWidth: 1,
+            }}
+            onPress={() => {
+              haptics.light();
+              setSidebarRecentsExpanded((expanded) => !expanded);
+            }}
+          >
+            <Text className="text-[13px] font-semibold" style={{ color: colors.primary }}>
+              {item.expanded
+                ? t.chatSidebarRecentsShowLess
+                : t.chatSidebarRecentsShowAll.replace('{count}', String(item.totalCount))}
+            </Text>
+          </TouchableOpacity>
+        );
+      }
+
+      return renderAssistantRow(item.session, item.showTopicPreview);
+    },
+    [
+      colors.borderSubtle,
+      colors.divider,
+      colors.fillTertiary,
+      colors.primary,
+      colors.secondaryText,
+      renderAssistantRow,
+      t.chatSidebarRecentsShowAll,
+      t.chatSidebarRecentsShowLess,
+    ],
+  );
 
   const renderSearchResultRow = useCallback(
     ({ matchType, messageId, session, summary, topicId }: SearchSessionResult) => {
@@ -2247,54 +2632,36 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
     ],
     [t],
   );
-  const homeHeroMinHeight = Math.max(Dimensions.get('window').height * 0.36, 320);
+  const homeHeroMinHeight = Math.max(screenHeight * 0.36, 320);
   const animatedKeyboard = useAnimatedKeyboard();
   const composerLiftStyle = useAnimatedStyle(() => {
-    const lift =
-      Platform.OS === 'android'
-        ? Math.max(
-            0,
-            animatedKeyboard.height.value - insets.bottom - ANDROID_COMPOSER_LIFT_ADJUSTMENT,
-          )
-        : keyboardOffset;
+    const lift = resolveComposerLift({
+      animatedKeyboardHeight: animatedKeyboard.height.value,
+      bottomInset: insets.bottom,
+      keyboardOffset,
+      platform: Platform.OS,
+    });
 
     return {
       transform: [{ translateY: -lift }],
     };
   }, [insets.bottom, keyboardOffset]);
-  const composerActive = keyboardOffset > 0 || Boolean(heroText.trim()) || pendingFiles.length > 0;
+  const composerAttachmentCount = pendingFilesCount + chatContextSelectionsCount;
+  const composerActive =
+    keyboardOffset > 0 || Boolean(heroText.trim()) || composerAttachmentCount > 0;
   const actionSessionIsGroup = actionSession?.type === 'group';
   const actionSessionIsInbox = isInboxSession(actionSession);
+  const sidebarActive = hasPersistentDirectory || directoryVisible;
   const drawerBackdropStyle = useAnimatedStyle(() => ({
     opacity: drawerBackdropOpacity.value,
   }));
   const drawerStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: drawerTranslateX.value }],
   }));
-  const drawerGesture = Gesture.Pan()
-    .activeOffsetX([-8, 8])
-    .onUpdate((event) => {
-      const nextX = Math.min(0, Math.max(-DIRECTORY_DRAWER_WIDTH, event.translationX));
-      drawerTranslateX.value = nextX;
-      drawerBackdropOpacity.value = 1 + nextX / DIRECTORY_DRAWER_WIDTH;
-    })
-    .onEnd((event) => {
-      const shouldClose =
-        event.translationX < -DIRECTORY_DRAWER_WIDTH * 0.2 || event.velocityX < -520;
-
-      if (shouldClose) {
-        runOnJS(setDirectoryVisible)(false);
-        return;
-      }
-
-      drawerTranslateX.value = withTiming(0, { duration: 180 });
-      drawerBackdropOpacity.value = withTiming(1, { duration: 180 });
-    });
-
   const openDrawerGesture = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(!directoryMounted)
+        .enabled(!directoryMounted && !hasPersistentDirectory)
         .manualActivation(true)
         .onTouchesDown((e, stateManager) => {
           'worklet';
@@ -2315,212 +2682,544 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
             runOnJS(setDirectoryVisible)(true);
           }
         }),
-    [directoryMounted],
+    [directoryMounted, hasPersistentDirectory],
+  );
+
+  const directoryPanelContent = (
+    <>
+      {!hasPersistentDirectory ? (
+        <View
+          accessible={false}
+          className="items-center pb-2 pt-0.5"
+          importantForAccessibility="no-hide-descendants"
+        >
+          <View
+            style={{
+              backgroundColor: withAlpha(colors.foreground, '16'),
+              borderRadius: 100,
+              height: 5,
+              width: 42,
+            }}
+          />
+        </View>
+      ) : null}
+
+      <View className="px-4 pb-2">
+        <View
+          className="px-3.5 py-3"
+          style={{
+            backgroundColor: colors.fillQuaternary,
+            borderColor: colors.borderSubtle,
+            borderRadius: 20,
+            borderWidth: 1,
+          }}
+        >
+          <View className="flex-row items-center justify-between">
+            <View className="min-w-0 flex-1 pr-2">
+              <View className="flex-row items-center">
+                <View
+                  className="h-10 w-10 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: withAlpha(colors.primary, '14') }}
+                >
+                  <MessageCircle
+                    color={colors.primary}
+                    size={18}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                </View>
+                <View className="ml-3 min-w-0 flex-1">
+                  <Text className="text-[18px] font-semibold tracking-tight text-foreground">
+                    {t.tabChats}
+                  </Text>
+                  <View className="mt-1.5 flex-row flex-wrap items-center" style={{ gap: 6 }}>
+                    <View
+                      className="rounded-full px-2.5 py-1"
+                      style={{
+                        backgroundColor: colors.surfaceElevated,
+                        borderColor: colors.borderSubtle,
+                        borderWidth: 1,
+                      }}
+                    >
+                      <Text
+                        className="text-[11px] font-semibold"
+                        numberOfLines={1}
+                        style={{ color: colors.secondaryText }}
+                      >
+                        {activeTagFilterLabel}
+                      </Text>
+                    </View>
+                    <Text
+                      className="text-[12px] font-medium"
+                      style={{ color: colors.tertiaryText }}
+                    >
+                      {t.activeTopics.replace('{count}', String(activeTagFilterCount))}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+            <View className="flex-row items-center" style={{ gap: 4 }}>
+              <HeaderIconButton
+                accessibilityLabel={t.chatListSearch}
+                active={searchEnabled}
+                onPress={handleToggleSearch}
+              >
+                <Search
+                  color={searchEnabled ? colors.primary : colors.secondaryText}
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </HeaderIconButton>
+              {!hasPersistentDirectory ? (
+                <HeaderIconButton
+                  accessibilityLabel={t.cancel}
+                  onPress={() => {
+                    haptics.light();
+                    setDirectoryVisible(false);
+                  }}
+                >
+                  <X color={colors.secondaryText} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                </HeaderIconButton>
+              ) : null}
+            </View>
+          </View>
+
+          <Text
+            className="mt-3 text-[12px] font-medium leading-[18px]"
+            numberOfLines={2}
+            style={{ color: colors.tertiaryText }}
+          >
+            {`${assistantCount} ${assistantSummaryLabel} · ${groupCount} ${t.chatListViewGroup} · ${t.activeTopics.replace('{count}', String(topicCount))}`}
+          </Text>
+
+          <View className="mt-3" style={{ gap: 10 }}>
+            {(
+              [
+                [
+                  {
+                    accessibilityLabel: t.chatListNewAssistant,
+                    icon: Bot,
+                    label: t.chatListNewAssistant,
+                    onPress: handleCreateAgent,
+                    primary: true,
+                  },
+                  {
+                    accessibilityLabel: t.chatListNewConversation,
+                    icon: MessageSquarePlus,
+                    label: t.chatListNewConversation,
+                    onPress: handleCreateChat,
+                    primary: false,
+                  },
+                ],
+                [
+                  {
+                    accessibilityLabel: t.chatListCreateGroup,
+                    icon: UsersRound,
+                    label: t.chatListCreateGroup,
+                    onPress: handleCreateGroup,
+                    primary: false,
+                  },
+                  {
+                    accessibilityLabel: t.tagCreate,
+                    icon: Tag,
+                    label: t.tagCreate,
+                    onPress: openCreateTagEditor,
+                    primary: false,
+                  },
+                ],
+              ] as const
+            ).map((row, rowIndex) => (
+              <View className="flex-row" key={`dir-row-${rowIndex}`} style={{ gap: 10 }}>
+                {row.map(({ accessibilityLabel, icon: Icon, label, onPress, primary }) => (
+                  <TouchableOpacity
+                    accessibilityLabel={accessibilityLabel}
+                    accessibilityRole="button"
+                    activeOpacity={0.82}
+                    className="flex-1 items-center justify-center rounded-2xl px-2 py-2.5"
+                    key={accessibilityLabel}
+                    style={{
+                      backgroundColor: primary ? colors.primarySubtle : colors.surfaceElevated,
+                      borderColor: primary ? colors.primaryBorder : colors.borderSubtle,
+                      borderWidth: 1,
+                      minHeight: 76,
+                    }}
+                    onPress={() => {
+                      haptics.light();
+                      void onPress();
+                    }}
+                  >
+                    <Icon
+                      color={primary ? colors.primary : colors.foreground}
+                      size={18}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                    <Text
+                      className="mt-1.5 text-center text-[11px] font-semibold leading-[14px]"
+                      numberOfLines={2}
+                      style={{ color: primary ? colors.primary : colors.foreground }}
+                    >
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))}
+          </View>
+        </View>
+      </View>
+
+      {searchEnabled ? (
+        <Animated.View className="px-4 pb-2" entering={enteringSection()}>
+          <View
+            className="flex-row items-center rounded-2xl px-3.5 py-3"
+            style={{
+              backgroundColor: colors.fillQuaternary,
+              borderColor: colors.borderSubtle,
+              borderWidth: 1,
+            }}
+          >
+            <Search
+              color={colors.secondaryText}
+              size={tokens.icon.size.sm}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
+            <TextInput
+              className="ml-2.5 flex-1 text-[14px] text-foreground"
+              clearButtonMode="while-editing"
+              placeholder={t.chatListSearch}
+              placeholderTextColor={colors.secondaryText}
+              ref={searchInputRef}
+              returnKeyType="search"
+              value={searchText}
+              onChangeText={setSearchText}
+            />
+            <TouchableOpacity
+              accessibilityLabel={t.cancel}
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => {
+                haptics.light();
+                setSearchEnabled(false);
+                setSearchText('');
+              }}
+            >
+              <X
+                color={colors.secondaryText}
+                size={tokens.icon.size.sm}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      ) : null}
+
+      {searchQuery ? (
+        searching ? (
+          <View
+            className="flex-1 items-center justify-center px-6"
+            style={{
+              paddingBottom: bottomChrome.overlayListPaddingBottom,
+              paddingTop: 4,
+            }}
+          >
+            <ActivityIndicator color={colors.primary} size="small" />
+            <Text
+              className="mt-3 text-center text-[14px] font-medium"
+              style={{ color: colors.tertiaryText }}
+            >
+              {t.chatSearchSearching}
+            </Text>
+          </View>
+        ) : filteredSearchResults.length > 0 ? (
+          <FlatList
+            ListHeaderComponent={searchResultsListHeader}
+            className="flex-1"
+            data={filteredSearchResults}
+            keyExtractor={(item) => item.id}
+            keyboardDismissMode="on-drag"
+            keyboardShouldPersistTaps="handled"
+            renderItem={renderSearchResultFlatItem}
+            showsVerticalScrollIndicator={false}
+            windowSize={10}
+            contentContainerStyle={{
+              paddingBottom: bottomChrome.overlayListPaddingBottom,
+              paddingTop: 4,
+            }}
+          />
+        ) : (
+          <View
+            className="flex-1"
+            style={{
+              paddingBottom: bottomChrome.overlayListPaddingBottom,
+              paddingTop: 4,
+            }}
+          >
+            <EmptyState
+              compact
+              description={t.chatSidebarSearchEmptyDesc}
+              iconVariant="discover"
+              style={{ paddingHorizontal: 8, paddingVertical: 24 }}
+              title={t.chatSearchNoResults}
+            />
+          </View>
+        )
+      ) : (
+        <FlatList
+          ListEmptyComponent={renderSidebarDirectoryEmpty}
+          ListHeaderComponent={renderSidebarDirectoryHeader}
+          className="flex-1"
+          data={sidebarDirectoryItems}
+          keyExtractor={(item) => item.id}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          renderItem={renderSidebarDirectoryItem}
+          showsVerticalScrollIndicator={false}
+          windowSize={10}
+          contentContainerStyle={{
+            paddingBottom: bottomChrome.overlayListPaddingBottom,
+            paddingTop: 4,
+          }}
+        />
+      )}
+    </>
   );
 
   return (
     <GestureDetector gesture={openDrawerGesture}>
       <View className="flex-1 bg-background">
-        <ChatListHeader
-          directoryVisible={directoryVisible}
-          subtitle={selectedModel}
-          title={getSessionDisplayTitle(draftSession)}
-          avatar={
-            <SessionLogo
-              isInbox={draftSessionIsInbox}
-              providerLogo={draftSessionIsInbox ? undefined : toolbarProviderLogo}
-              size={34}
-              avatar={
-                draftSessionIsInbox
-                  ? draftSession?.avatar || DEFAULT_INBOX_AVATAR
-                  : draftSession?.avatar
-              }
-              provider={
-                draftSessionIsInbox
-                  ? undefined
-                  : draftSession?.provider ||
-                    (draftSession?.model
-                      ? inferProviderFromModelId(draftSession.model)
-                      : undefined) ||
-                    selectedProvider ||
-                    undefined
-              }
-            />
+        <ScreenHeader
+          headerLevel="root"
+          title={t.tabChats}
+          leftActions={
+            hasPersistentDirectory ? undefined : (
+              <HeaderIconButton
+                accessibilityLabel={t.accessibilityChatDirectory}
+                active={sidebarActive}
+                onPress={() => {
+                  haptics.light();
+                  setDirectoryVisible(true);
+                }}
+              >
+                <Menu
+                  color={sidebarActive ? colors.primary : colors.foreground}
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </HeaderIconButton>
+            )
           }
-          onOpenAssistantPicker={() => {
-            haptics.light();
-            setDraftAssistantPickerVisible(true);
-          }}
-          onOpenDirectory={() => {
-            haptics.light();
-            setDirectoryVisible(true);
-          }}
         />
 
-        <View className="flex-1">
-          <ScrollView
-            className="flex-1"
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{
-              flexGrow: 1,
-              paddingBottom: bottomChrome.homeScrollPaddingBottom,
-              paddingTop: 18,
-            }}
-            refreshControl={
-              <RefreshControl
-                colors={[colors.primary]}
-                refreshing={refreshing}
-                tintColor={colors.primary}
-                onRefresh={onRefresh}
-              />
-            }
-          >
+        <View
+          className="flex-1"
+          style={
+            hasPersistentDirectory
+              ? {
+                  flexDirection: 'row',
+                  gap: mainPaneGap,
+                  paddingBottom: 12,
+                  paddingHorizontal: mainPanePad,
+                }
+              : undefined
+          }
+        >
+          {hasPersistentDirectory ? (
             <View
+              className="h-full overflow-hidden"
               style={{
-                minHeight: homeHeroMinHeight,
-                paddingTop: 10,
+                backgroundColor: colors.background,
+                borderColor: colors.borderSubtle,
+                borderRadius: 28,
+                borderWidth: StyleSheet.hairlineWidth,
+                shadowColor: colors.shadow,
+                shadowOffset: { height: 12, width: -4 },
+                shadowOpacity: 0.08,
+                shadowRadius: 20,
+                width: directoryPanelWidth,
               }}
             >
-              {sessionErrorMessage ? (
-                <Animated.View entering={enteringSection(180)}>
-                  <View className="px-5 pt-4">
-                    <View
-                      className="rounded-2xl px-4 py-4"
-                      style={{ backgroundColor: colors.fillTertiary }}
-                    >
-                      <Text className="text-[14px] font-semibold text-foreground">
-                        {sessionErrorMessage}
-                      </Text>
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        className="mt-3 rounded-full self-start px-4 py-2"
-                        style={{ backgroundColor: colors.primary }}
-                        onPress={() => void onRefresh()}
-                      >
-                        <Text className="text-[13px] font-semibold text-white">{t.errorRetry}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </Animated.View>
-              ) : (
-                <Animated.View entering={enteringEmptyState()}>
-                  <EmptyState
-                    compact
-                    className="px-5 pb-2 pt-6"
-                    description={t.chatEmptyDesc}
-                    iconVariant="chat"
-                    title={t.chatEmptyWave}
-                    action={
-                      <Animated.View
-                        className="w-full items-center"
-                        entering={enteringSection(200)}
-                        style={{ alignSelf: 'center', maxWidth: 320 }}
-                      >
-                        <View className="mt-3 w-full flex-row flex-wrap justify-between gap-y-3">
-                          {homeSuggestions.map(({ icon: Icon, label }) => (
-                            <QuickActionChip
-                              className="w-[48.5%] justify-center px-4 py-3"
-                              key={label}
-                              label={label}
-                              icon={
-                                <Icon
-                                  color={colors.primary}
-                                  size={15}
-                                  strokeWidth={tokens.icon.strokeWidth}
-                                />
-                              }
-                              onPress={() => {
-                                haptics.light();
-                                setHeroText(label);
-                              }}
-                            />
-                          ))}
-                        </View>
-                      </Animated.View>
-                    }
-                  />
-                </Animated.View>
-              )}
+              {directoryPanelContent}
             </View>
-          </ScrollView>
+          ) : null}
 
-          <Animated.View
-            style={[
-              {
-                paddingBottom: bottomChrome.composerPaddingBottom,
-                paddingHorizontal: 16,
-                paddingTop: 4,
-              },
-              composerLiftStyle,
-            ]}
-          >
-            <ChatComposerBody
-              textEditable
-              active={composerActive}
-              canSend={Boolean(heroText.trim()) || pendingFiles.length > 0}
-              memoryEnabled={memoryEnabled}
-              modelDrawerVisible={modelDrawerVisible}
-              pendingFilesCount={pendingFiles.length}
-              placeholder={hints[hintIndex]}
-              pluginsEnabled={enabledSkills.size > 0}
-              providerLogoError={providerLogoError}
-              searchEnabled={webSearchEnabled}
-              toolbarProviderLogo={toolbarProviderLogo}
-              value={heroText}
-              variant="home"
-              topSlot={
-                pendingFiles.length > 0 ? (
-                  <View className="px-3 pt-2">
-                    <FilePreview />
-                  </View>
-                ) : undefined
-              }
-              onAttach={handleAttach}
-              onChangeText={setHeroText}
-              onMemoryPress={handleToggleMemory}
-              onModelPress={handleModelPress}
-              onPluginsPress={handlePluginsPress}
-              onProviderLogoError={() => setProviderLogoError(true)}
-              onSend={handleHeroSubmit}
-              onToggleSearch={handleToggleWebSearch}
-            />
-          </Animated.View>
-        </View>
-
-        <Modal
-          accessibilityViewIsModal
-          transparent
-          accessibilityLabel={t.tabChats}
-          animationType="none"
-          visible={directoryMounted}
-          onRequestClose={() => setDirectoryVisible(false)}
-        >
           <View className="flex-1">
+            <ScrollView
+              className="flex-1"
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{
+                flexGrow: 1,
+                paddingBottom: bottomChrome.homeScrollPaddingBottom,
+                paddingTop: 18,
+              }}
+              refreshControl={
+                <RefreshControl
+                  colors={[colors.primary]}
+                  refreshing={refreshing}
+                  tintColor={colors.primary}
+                  onRefresh={onRefresh}
+                />
+              }
+            >
+              <View
+                style={
+                  hasPersistentDirectory
+                    ? { alignSelf: 'center', maxWidth: homeContentMaxWidth, width: '100%' }
+                    : undefined
+                }
+              >
+                <View
+                  style={{
+                    minHeight: homeHeroMinHeight,
+                    paddingTop: 10,
+                  }}
+                >
+                  {sessionErrorMessage ? (
+                    <Animated.View entering={enteringSection(180)}>
+                      <View className="px-5 pt-4">
+                        <View
+                          className="rounded-2xl px-4 py-4"
+                          style={{ backgroundColor: colors.fillTertiary }}
+                        >
+                          <Text className="text-[14px] font-semibold text-foreground">
+                            {sessionErrorMessage}
+                          </Text>
+                          <TouchableOpacity
+                            activeOpacity={0.8}
+                            className="mt-3 rounded-full self-start px-4 py-2"
+                            style={{ backgroundColor: colors.primary }}
+                            onPress={() => void onRefresh()}
+                          >
+                            <Text className="text-[13px] font-semibold text-white">
+                              {t.errorRetry}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </Animated.View>
+                  ) : (
+                    <Animated.View entering={enteringEmptyState()}>
+                      <EmptyState
+                        compact
+                        description={t.chatEmptyDesc}
+                        iconVariant="chat"
+                        style={{ paddingBottom: 8, paddingHorizontal: 20, paddingTop: 24 }}
+                        title={t.chatEmptyWave}
+                        action={
+                          <Animated.View
+                            className="w-full items-center"
+                            entering={enteringSection(200)}
+                            style={{ alignSelf: 'center', maxWidth: 320 }}
+                          >
+                            <View className="mt-3 w-full flex-row flex-wrap justify-between gap-y-3">
+                              {homeSuggestions.map(({ icon: Icon, label }) => (
+                                <QuickActionChip
+                                  className="w-[48.5%] justify-center px-4 py-3"
+                                  key={label}
+                                  label={label}
+                                  icon={
+                                    <Icon
+                                      color={colors.primary}
+                                      size={15}
+                                      strokeWidth={tokens.icon.strokeWidth}
+                                    />
+                                  }
+                                  onPress={() => {
+                                    haptics.light();
+                                    setHeroText(label);
+                                  }}
+                                />
+                              ))}
+                            </View>
+                          </Animated.View>
+                        }
+                      />
+                    </Animated.View>
+                  )}
+                </View>
+              </View>
+            </ScrollView>
+
             <Animated.View
               style={[
                 {
-                  backgroundColor: colors.modalOverlay,
-                  bottom: 0,
-                  left: 0,
-                  position: 'absolute',
-                  right: 0,
-                  top: 0,
+                  paddingBottom: bottomChrome.composerPaddingBottom,
+                  paddingHorizontal: 16,
+                  paddingTop: 4,
                 },
-                drawerBackdropStyle,
+                hasPersistentDirectory
+                  ? { alignSelf: 'center', maxWidth: homeContentMaxWidth + 32, width: '100%' }
+                  : null,
+                composerLiftStyle,
               ]}
             >
-              <Pressable
-                accessibilityElementsHidden
-                className="flex-1"
-                importantForAccessibility="no-hide-descendants"
-                onPress={() => {
-                  haptics.light();
-                  setDirectoryVisible(false);
-                }}
+              <ChatComposerBody
+                textEditable
+                active={composerActive}
+                canSend={Boolean(heroText.trim()) || composerAttachmentCount > 0}
+                memoryEnabled={memoryEnabled}
+                modelDrawerVisible={modelDrawerVisible}
+                pendingFilesCount={composerAttachmentCount}
+                placeholder={hints[hintIndex]}
+                pluginsEnabled={enabledSkills.size > 0}
+                providerLogoError={providerLogoError}
+                searchEnabled={webSearchEnabled}
+                toolbarProviderLogo={toolbarProviderLogo}
+                value={heroText}
+                variant="home"
+                topSlot={
+                  composerAttachmentCount > 0 ? (
+                    <View className="px-3 pt-2">
+                      <FilePreview />
+                    </View>
+                  ) : undefined
+                }
+                onAttach={handleAttach}
+                onChangeText={setHeroText}
+                onMemoryPress={handleToggleMemory}
+                onModelPress={handleModelPress}
+                onPluginsPress={handlePluginsPress}
+                onProviderLogoError={() => setProviderLogoError(true)}
+                onSend={handleHeroSubmit}
+                onToggleSearch={handleToggleWebSearch}
               />
             </Animated.View>
-            <GestureDetector gesture={drawerGesture}>
+          </View>
+        </View>
+
+        {!hasPersistentDirectory ? (
+          <Modal
+            accessibilityViewIsModal
+            transparent
+            accessibilityLabel={t.tabChats}
+            animationType="none"
+            visible={directoryMounted}
+            onRequestClose={() => setDirectoryVisible(false)}
+          >
+            <View className="flex-1">
+              <Animated.View
+                style={[
+                  {
+                    backgroundColor: colors.modalOverlay,
+                    bottom: 0,
+                    left: 0,
+                    position: 'absolute',
+                    right: 0,
+                    top: 0,
+                  },
+                  drawerBackdropStyle,
+                ]}
+              >
+                <Pressable
+                  accessibilityElementsHidden
+                  className="flex-1"
+                  importantForAccessibility="no-hide-descendants"
+                  onPress={() => {
+                    haptics.light();
+                    setDirectoryVisible(false);
+                  }}
+                />
+              </Animated.View>
               <Animated.View
                 className="h-full overflow-hidden"
                 style={[
@@ -2536,528 +3235,16 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
                     shadowOffset: { height: 12, width: -4 },
                     shadowOpacity: 0.14,
                     shadowRadius: 20,
-                    width: DIRECTORY_DRAWER_WIDTH,
+                    width: directoryPanelWidth,
                   },
                   drawerStyle,
                 ]}
               >
-                <View
-                  accessible={false}
-                  className="items-center pb-2 pt-0.5"
-                  importantForAccessibility="no-hide-descendants"
-                >
-                  <View
-                    style={{
-                      backgroundColor: withAlpha(colors.foreground, '16'),
-                      borderRadius: 100,
-                      height: 5,
-                      width: 42,
-                    }}
-                  />
-                </View>
-
-                <View className="px-4 pb-2">
-                  <View
-                    className="px-3.5 py-3"
-                    style={{
-                      backgroundColor: colors.fillQuaternary,
-                      borderColor: colors.borderSubtle,
-                      borderRadius: 20,
-                      borderWidth: 1,
-                    }}
-                  >
-                    <View className="flex-row items-center justify-between">
-                      <View className="min-w-0 flex-1 pr-2">
-                        <View className="flex-row items-center">
-                          <View
-                            className="h-10 w-10 items-center justify-center rounded-2xl"
-                            style={{ backgroundColor: withAlpha(colors.primary, '14') }}
-                          >
-                            <MessageCircle
-                              color={colors.primary}
-                              size={18}
-                              strokeWidth={tokens.icon.strokeWidth}
-                            />
-                          </View>
-                          <View className="ml-3 min-w-0 flex-1">
-                            <Text className="text-[18px] font-semibold tracking-tight text-foreground">
-                              {t.tabChats}
-                            </Text>
-                            <View
-                              className="mt-1.5 flex-row flex-wrap items-center"
-                              style={{ gap: 6 }}
-                            >
-                              <View
-                                className="rounded-full px-2.5 py-1"
-                                style={{
-                                  backgroundColor: colors.surfaceElevated,
-                                  borderColor: colors.borderSubtle,
-                                  borderWidth: 1,
-                                }}
-                              >
-                                <Text
-                                  className="text-[11px] font-semibold"
-                                  numberOfLines={1}
-                                  style={{ color: colors.secondaryText }}
-                                >
-                                  {activeTagFilterLabel}
-                                </Text>
-                              </View>
-                              <Text
-                                className="text-[12px] font-medium"
-                                style={{ color: colors.tertiaryText }}
-                              >
-                                {t.activeTopics.replace('{count}', String(activeTagFilterCount))}
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
-                      </View>
-                      <View className="flex-row items-center" style={{ gap: 4 }}>
-                        <HeaderIconButton
-                          accessibilityLabel={t.chatListSearch}
-                          active={searchEnabled}
-                          onPress={handleToggleSearch}
-                        >
-                          <Search
-                            color={searchEnabled ? colors.primary : colors.secondaryText}
-                            size={20}
-                            strokeWidth={tokens.icon.strokeWidth}
-                          />
-                        </HeaderIconButton>
-                        <HeaderIconButton
-                          accessibilityLabel={t.cancel}
-                          onPress={() => {
-                            haptics.light();
-                            setDirectoryVisible(false);
-                          }}
-                        >
-                          <X
-                            color={colors.secondaryText}
-                            size={20}
-                            strokeWidth={tokens.icon.strokeWidth}
-                          />
-                        </HeaderIconButton>
-                      </View>
-                    </View>
-
-                    <Text
-                      className="mt-3 text-[12px] font-medium leading-[18px]"
-                      numberOfLines={2}
-                      style={{ color: colors.tertiaryText }}
-                    >
-                      {`${assistantCount} ${assistantSummaryLabel} · ${groupCount} ${t.chatListViewGroup} · ${t.activeTopics.replace('{count}', String(topicCount))}`}
-                    </Text>
-
-                    <View className="mt-3" style={{ gap: 10 }}>
-                      {(
-                        [
-                          [
-                            {
-                              accessibilityLabel: t.chatListNewAssistant,
-                              icon: Bot,
-                              label: t.chatListNewAssistant,
-                              onPress: handleCreateAgent,
-                              primary: true,
-                            },
-                            {
-                              accessibilityLabel: t.chatListNewConversation,
-                              icon: MessageSquarePlus,
-                              label: t.chatListNewConversation,
-                              onPress: handleCreateChat,
-                              primary: false,
-                            },
-                          ],
-                          [
-                            {
-                              accessibilityLabel: t.chatListCreateGroup,
-                              icon: UsersRound,
-                              label: t.chatListCreateGroup,
-                              onPress: handleCreateGroup,
-                              primary: false,
-                            },
-                            {
-                              accessibilityLabel: t.tagCreate,
-                              icon: Tag,
-                              label: t.tagCreate,
-                              onPress: openCreateTagEditor,
-                              primary: false,
-                            },
-                          ],
-                        ] as const
-                      ).map((row, rowIndex) => (
-                        <View className="flex-row" key={`dir-row-${rowIndex}`} style={{ gap: 10 }}>
-                          {row.map(
-                            ({ accessibilityLabel, icon: Icon, label, onPress, primary }) => (
-                              <TouchableOpacity
-                                accessibilityLabel={accessibilityLabel}
-                                accessibilityRole="button"
-                                activeOpacity={0.82}
-                                className="flex-1 items-center justify-center rounded-2xl px-2 py-2.5"
-                                key={accessibilityLabel}
-                                style={{
-                                  backgroundColor: primary
-                                    ? colors.primarySubtle
-                                    : colors.surfaceElevated,
-                                  borderColor: primary ? colors.primaryBorder : colors.borderSubtle,
-                                  borderWidth: 1,
-                                  minHeight: 76,
-                                }}
-                                onPress={() => {
-                                  haptics.light();
-                                  void onPress();
-                                }}
-                              >
-                                <Icon
-                                  color={primary ? colors.primary : colors.foreground}
-                                  size={18}
-                                  strokeWidth={tokens.icon.strokeWidth}
-                                />
-                                <Text
-                                  className="mt-1.5 text-center text-[11px] font-semibold leading-[14px]"
-                                  numberOfLines={2}
-                                  style={{ color: primary ? colors.primary : colors.foreground }}
-                                >
-                                  {label}
-                                </Text>
-                              </TouchableOpacity>
-                            ),
-                          )}
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                </View>
-
-                {searchEnabled ? (
-                  <Animated.View className="px-4 pb-2" entering={enteringSection()}>
-                    <View
-                      className="flex-row items-center rounded-2xl px-3.5 py-3"
-                      style={{
-                        backgroundColor: colors.fillQuaternary,
-                        borderColor: colors.borderSubtle,
-                        borderWidth: 1,
-                      }}
-                    >
-                      <Search
-                        color={colors.secondaryText}
-                        size={tokens.icon.size.sm}
-                        strokeWidth={tokens.icon.strokeWidth}
-                      />
-                      <TextInput
-                        className="ml-2.5 flex-1 text-[14px] text-foreground"
-                        clearButtonMode="while-editing"
-                        placeholder={t.chatListSearch}
-                        placeholderTextColor={colors.secondaryText}
-                        ref={searchInputRef}
-                        returnKeyType="search"
-                        value={searchText}
-                        onChangeText={setSearchText}
-                      />
-                      <TouchableOpacity
-                        accessibilityLabel={t.cancel}
-                        accessibilityRole="button"
-                        hitSlop={8}
-                        onPress={() => {
-                          haptics.light();
-                          setSearchEnabled(false);
-                          setSearchText('');
-                        }}
-                      >
-                        <X
-                          color={colors.secondaryText}
-                          size={tokens.icon.size.sm}
-                          strokeWidth={tokens.icon.strokeWidth}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </Animated.View>
-                ) : null}
-
-                {searchQuery ? (
-                  searching ? (
-                    <View
-                      className="flex-1 items-center justify-center px-6"
-                      style={{
-                        paddingBottom: bottomChrome.overlayListPaddingBottom,
-                        paddingTop: 4,
-                      }}
-                    >
-                      <ActivityIndicator color={colors.primary} size="small" />
-                      <Text
-                        className="mt-3 text-center text-[14px] font-medium"
-                        style={{ color: colors.tertiaryText }}
-                      >
-                        {t.chatSearchSearching}
-                      </Text>
-                    </View>
-                  ) : filteredSearchResults.length > 0 ? (
-                    <FlatList
-                      ListHeaderComponent={searchResultsListHeader}
-                      className="flex-1"
-                      data={filteredSearchResults}
-                      keyExtractor={(item) => item.id}
-                      keyboardDismissMode="on-drag"
-                      keyboardShouldPersistTaps="handled"
-                      renderItem={renderSearchResultFlatItem}
-                      showsVerticalScrollIndicator={false}
-                      windowSize={10}
-                      contentContainerStyle={{
-                        paddingBottom: bottomChrome.overlayListPaddingBottom,
-                        paddingTop: 4,
-                      }}
-                    />
-                  ) : (
-                    <View
-                      className="flex-1"
-                      style={{
-                        paddingBottom: bottomChrome.overlayListPaddingBottom,
-                        paddingTop: 4,
-                      }}
-                    >
-                      <EmptyState
-                        compact
-                        className="px-2 py-6"
-                        description={t.chatSidebarSearchEmptyDesc}
-                        iconVariant="discover"
-                        title={t.chatSearchNoResults}
-                      />
-                    </View>
-                  )
-                ) : (
-                  <ScrollView
-                    className="flex-1"
-                    keyboardDismissMode="on-drag"
-                    keyboardShouldPersistTaps="handled"
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{
-                      paddingBottom: bottomChrome.overlayListPaddingBottom,
-                      paddingTop: 4,
-                    }}
-                  >
-                    <>
-                      <View className="px-4 pb-3 pt-1">
-                        <View className="mb-2 flex-row items-center justify-between px-1">
-                          <Text
-                            className="text-[11px] font-semibold uppercase tracking-[1.4px]"
-                            style={{ color: colors.secondaryText }}
-                          >
-                            {t.chatSidebarTags}
-                          </Text>
-                          <Text
-                            className="text-[11px] font-medium"
-                            style={{ color: colors.secondaryText }}
-                          >
-                            {activeTagFilterCount}/{topicCount}
-                          </Text>
-                        </View>
-                        <ScrollView
-                          horizontal
-                          contentContainerStyle={{ paddingRight: 4 }}
-                          keyboardShouldPersistTaps="handled"
-                          showsHorizontalScrollIndicator={false}
-                        >
-                          <View className="flex-row" style={{ gap: 8 }}>
-                            {renderSidebarTagFilterChip({
-                              count: topicCount,
-                              filterId: SIDEBAR_TAG_FILTER_ALL,
-                              label: t.homeAgentAll,
-                            })}
-                            {renderSidebarTagFilterChip({
-                              color: colors.secondaryText,
-                              count: tagTopicCounts.untaggedCount,
-                              filterId: SIDEBAR_TAG_FILTER_NONE,
-                              label: t.tagNone,
-                            })}
-                            {tags.map((tag) =>
-                              renderSidebarTagFilterChip({
-                                color: tag.color,
-                                count: tagTopicCounts.counts.get(tag.id) ?? 0,
-                                filterId: tag.id,
-                                label: tag.name,
-                              }),
-                            )}
-                          </View>
-                        </ScrollView>
-                        {tags.length === 0 ? (
-                          <TouchableOpacity
-                            accessibilityLabel={t.tagCreate}
-                            accessibilityRole="button"
-                            activeOpacity={0.72}
-                            className="mt-2.5 flex-row items-center rounded-xl px-2.5 py-2.5"
-                            style={{ backgroundColor: withAlpha(colors.primary, '0a') }}
-                            onPress={() => {
-                              haptics.light();
-                              openCreateTagEditor();
-                            }}
-                          >
-                            <Tag
-                              color={colors.primary}
-                              size={16}
-                              strokeWidth={tokens.icon.strokeWidth}
-                            />
-                            <Text
-                              className="ml-2.5 flex-1 text-[12px] font-medium leading-[17px]"
-                              style={{ color: colors.secondaryText }}
-                            >
-                              {t.chatSidebarTagsHint}
-                            </Text>
-                          </TouchableOpacity>
-                        ) : null}
-                      </View>
-
-                      {pinnedSessions.length > 0 ? (
-                        <SectionBlock compact title={t.groupPinned}>
-                          {pinnedSessions.map((session) => renderAssistantRow(session, true))}
-                        </SectionBlock>
-                      ) : null}
-
-                      {pinnedSessions.length > 0 && hasSidebarRecentsContent ? (
-                        <View
-                          className="mx-4 mb-1"
-                          style={{
-                            backgroundColor: colors.divider,
-                            height: StyleSheet.hairlineWidth,
-                          }}
-                        />
-                      ) : null}
-
-                      {hasSidebarRecentsContent ? (
-                        <SectionBlock compact title={t.homeRecents}>
-                          {filteredInboxSession
-                            ? renderAssistantRow(filteredInboxSession, true)
-                            : null}
-                          {filteredSessions
-                            .slice(
-                              0,
-                              sidebarRecentsExpanded
-                                ? filteredSessions.length
-                                : SIDEBAR_RECENTS_VISIBLE,
-                            )
-                            .map((session) => renderAssistantRow(session, true))}
-                          {filteredSessions.length > SIDEBAR_RECENTS_VISIBLE ? (
-                            <TouchableOpacity
-                              accessibilityRole="button"
-                              activeOpacity={0.78}
-                              className="mx-4 mb-0.5 mt-0.5 items-center rounded-xl py-3"
-                              style={{
-                                backgroundColor: colors.fillTertiary,
-                                borderColor: colors.borderSubtle,
-                                borderWidth: 1,
-                              }}
-                              onPress={() => {
-                                haptics.light();
-                                setSidebarRecentsExpanded((expanded) => !expanded);
-                              }}
-                            >
-                              <Text
-                                className="text-[13px] font-semibold"
-                                style={{ color: colors.primary }}
-                              >
-                                {sidebarRecentsExpanded
-                                  ? t.chatSidebarRecentsShowLess
-                                  : t.chatSidebarRecentsShowAll.replace(
-                                      '{count}',
-                                      String(filteredSessions.length),
-                                    )}
-                              </Text>
-                            </TouchableOpacity>
-                          ) : null}
-                        </SectionBlock>
-                      ) : null}
-
-                      {!loading &&
-                      !hasFilteredSidebarSessions &&
-                      activeTagFilterId === SIDEBAR_TAG_FILTER_ALL ? (
-                        <EmptyState
-                          compact
-                          className="px-3 py-4"
-                          description={t.chatSidebarEmptyDesc}
-                          iconVariant="chat"
-                          title={t.chatSidebarEmptyTitle}
-                          action={
-                            <TouchableOpacity
-                              accessibilityLabel={t.chatListNewConversation}
-                              accessibilityRole="button"
-                              activeOpacity={0.85}
-                              className="items-center self-center rounded-full px-6 py-3"
-                              style={{ backgroundColor: colors.primary }}
-                              onPress={() => {
-                                haptics.light();
-                                setDirectoryVisible(false);
-                                void handleCreateChat();
-                              }}
-                            >
-                              <Text
-                                className="text-[15px] font-semibold"
-                                style={{ color: colors.iconOnPrimary }}
-                              >
-                                {t.chatListNewConversation}
-                              </Text>
-                            </TouchableOpacity>
-                          }
-                        />
-                      ) : null}
-
-                      {!loading &&
-                      !hasFilteredSidebarSessions &&
-                      activeTagFilterId !== SIDEBAR_TAG_FILTER_ALL ? (
-                        <View className="px-4">
-                          <View
-                            className="items-center rounded-[28px] px-5 py-8"
-                            style={{
-                              backgroundColor: colors.fillQuaternary,
-                              borderColor: colors.borderSubtle,
-                              borderWidth: 1,
-                            }}
-                          >
-                            <View
-                              className="h-12 w-12 items-center justify-center rounded-2xl"
-                              style={{ backgroundColor: colors.surfaceElevated }}
-                            >
-                              <Tag
-                                color={colors.primary}
-                                size={20}
-                                strokeWidth={tokens.icon.strokeWidth}
-                              />
-                            </View>
-                            <Text className="mt-4 text-[16px] font-semibold text-foreground">
-                              {activeTagFilterLabel}
-                            </Text>
-                            <Text
-                              className="mt-2 text-center text-[13px] leading-5"
-                              style={{ color: colors.secondaryText }}
-                            >
-                              {t.chatSidebarTagEmpty}
-                            </Text>
-                            <TouchableOpacity
-                              activeOpacity={0.82}
-                              className="mt-4 rounded-full px-4 py-2.5"
-                              style={{ backgroundColor: colors.primarySubtle }}
-                              onPress={() => {
-                                haptics.light();
-                                setActiveTagFilterId(SIDEBAR_TAG_FILTER_ALL);
-                              }}
-                            >
-                              <Text
-                                className="text-[13px] font-semibold"
-                                style={{ color: colors.primary }}
-                              >
-                                {t.homeAgentAll}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      ) : null}
-
-                      {loading && !hasFilteredSidebarSessions ? <ListSkeleton /> : null}
-                    </>
-                  </ScrollView>
-                )}
+                {directoryPanelContent}
               </Animated.View>
-            </GestureDetector>
-          </View>
-        </Modal>
+            </View>
+          </Modal>
+        ) : null}
 
         <AgentSelectionSheet
           allowEmptySelection
@@ -3462,103 +3649,6 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
                     ) : null}
                   </Pressable>
                 ))}
-              </ScrollView>
-            </Pressable>
-          </Pressable>
-        </Modal>
-
-        <Modal
-          accessibilityViewIsModal
-          transparent
-          animationType="slide"
-          visible={draftAssistantPickerVisible}
-          onRequestClose={() => setDraftAssistantPickerVisible(false)}
-        >
-          <Pressable
-            className="flex-1 justify-end bg-black/40"
-            onPress={() => setDraftAssistantPickerVisible(false)}
-          >
-            <Pressable
-              className="bg-card rounded-t-2xl"
-              style={{ maxHeight: '72%', paddingBottom: insets.bottom + 16 }}
-              onPress={(event) => event.stopPropagation()}
-            >
-              <View className="items-center pt-3 pb-2">
-                <View className="w-9 h-1 rounded-full bg-foreground/10" />
-              </View>
-              <View className="flex-row items-center justify-between px-5 pb-3 pt-1">
-                <Text className="text-[18px] font-semibold tracking-tight text-foreground">
-                  {t.chatListAssistants}
-                </Text>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  className="h-10 w-10 items-center justify-center"
-                  onPress={() => setDraftAssistantPickerVisible(false)}
-                >
-                  <X color={colors.secondaryText} size={20} strokeWidth={tokens.icon.strokeWidth} />
-                </TouchableOpacity>
-              </View>
-              <ScrollView
-                className="px-5"
-                contentContainerStyle={{ paddingBottom: 16 }}
-                keyboardShouldPersistTaps="handled"
-              >
-                {draftAgentSessions.map((session) => {
-                  const isSelected = draftSession?.id === session.id;
-                  const providerId =
-                    session.provider ||
-                    (session.model ? inferProviderFromModelId(session.model) : undefined);
-
-                  return (
-                    <TouchableOpacity
-                      activeOpacity={0.72}
-                      className="mb-2 flex-row items-center rounded-2xl px-3 py-3"
-                      key={session.id}
-                      style={{
-                        backgroundColor: isSelected
-                          ? withAlpha(colors.primary, '14')
-                          : colors.fillTertiary,
-                      }}
-                      onPress={() => {
-                        haptics.light();
-                        setDraftSessionId(session.id);
-                        setDraftAssistantPickerVisible(false);
-                      }}
-                    >
-                      <View className="mr-3">
-                        <SessionLogo
-                          avatar={session.avatar}
-                          isGroup={false}
-                          isInbox={session.id === visibleInboxSession?.id}
-                          provider={providerId}
-                          size={38}
-                        />
-                      </View>
-                      <View className="min-w-0 flex-1">
-                        <Text
-                          className="text-[15px] font-semibold text-foreground"
-                          numberOfLines={1}
-                        >
-                          {getSessionDisplayTitle(session)}
-                        </Text>
-                        <Text
-                          className="mt-0.5 text-[12px]"
-                          numberOfLines={1}
-                          style={{ color: colors.secondaryText }}
-                        >
-                          {session.description || session.model || t.chatListTapToContinue}
-                        </Text>
-                      </View>
-                      {isSelected ? (
-                        <Check
-                          color={colors.primary}
-                          size={18}
-                          strokeWidth={tokens.icon.strokeWidth}
-                        />
-                      ) : null}
-                    </TouchableOpacity>
-                  );
-                })}
               </ScrollView>
             </Pressable>
           </Pressable>

@@ -2,11 +2,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { getTestDB } from '../../core/getTestDB';
-import { documents } from '../../schemas';
+import { documents, spaceMembers, spaces } from '../../schemas';
 import type { NewAgent } from '../../schemas/agent';
 import { agents } from '../../schemas/agent';
 import type { NewFile } from '../../schemas/file';
-import { files } from '../../schemas/file';
+import { files, sourceSetFiles, sourceSets } from '../../schemas/file';
 import { messages } from '../../schemas/message';
 import type { NewTopic } from '../../schemas/topic';
 import { topics } from '../../schemas/topic';
@@ -23,6 +23,15 @@ const serverDB: LobeChatDatabase = await getTestDB();
 
 beforeEach(async () => {
   // Clean up
+  await serverDB.delete(spaceMembers);
+  await serverDB.delete(spaces);
+  await serverDB.delete(sourceSetFiles);
+  await serverDB.delete(sourceSets);
+  await serverDB.delete(documents);
+  await serverDB.delete(files);
+  await serverDB.delete(messages);
+  await serverDB.delete(topics);
+  await serverDB.delete(agents);
   await serverDB.delete(users);
 
   // Create test users
@@ -159,6 +168,86 @@ describe('SearchRepo', () => {
       const agentResults = results.filter((r) => r.type === 'agent');
       expect(agentResults.length).toBeGreaterThanOrEqual(1);
       expect(agentResults[0].tags).toContain('frontend');
+    });
+
+    it('should include shared-space files, docs, folders, and source sets', async () => {
+      await serverDB.insert(spaces).values({
+        createdBy: otherUserId,
+        id: 'spc_shared_search',
+        kind: 'team',
+        name: 'Shared Search Space',
+      });
+      await serverDB.insert(spaceMembers).values([
+        {
+          createdBy: otherUserId,
+          role: 'owner',
+          spaceId: 'spc_shared_search',
+          userId: otherUserId,
+        },
+        {
+          createdBy: otherUserId,
+          role: 'viewer',
+          spaceId: 'spc_shared_search',
+          userId,
+        },
+      ]);
+      await serverDB.insert(files).values({
+        fileType: 'application/pdf',
+        name: 'shared-file.pdf',
+        size: 42,
+        spaceId: 'spc_shared_search',
+        url: 'file://shared-file.pdf',
+        userId: otherUserId,
+      });
+      await serverDB.insert(documents).values([
+        {
+          fileType: 'custom/document',
+          id: 'docs_shared_document',
+          source: 'document',
+          sourceType: 'api',
+          spaceId: 'spc_shared_search',
+          title: 'Shared Doc',
+          totalCharCount: 10,
+          totalLineCount: 1,
+          userId: otherUserId,
+        },
+        {
+          fileType: 'custom/folder',
+          id: 'docs_shared_folder',
+          source: 'document',
+          sourceType: 'api',
+          spaceId: 'spc_shared_search',
+          title: 'Shared Folder',
+          totalCharCount: 0,
+          totalLineCount: 0,
+          userId: otherUserId,
+        },
+      ]);
+      await serverDB.insert(sourceSets).values({
+        name: 'Shared Source Set',
+        spaceId: 'spc_shared_search',
+        userId: otherUserId,
+      });
+
+      const results = await searchRepo.search({ query: 'shared' });
+      const resultTypes = new Set(results.map((result) => `${result.type}:${result.title}`));
+      const sharedFile = results.find(
+        (result) => result.type === 'file' && result.title === 'shared-file.pdf',
+      );
+      const sharedFolder = results.find(
+        (result) => result.type === 'folder' && result.title === 'Shared Folder',
+      );
+      const sharedSourceSet = results.find(
+        (result) => result.type === 'sourceSet' && result.title === 'Shared Source Set',
+      );
+
+      expect(resultTypes.has('file:shared-file.pdf')).toBe(true);
+      expect(resultTypes.has('page:Shared Doc')).toBe(true);
+      expect(resultTypes.has('folder:Shared Folder')).toBe(true);
+      expect(resultTypes.has('sourceSet:Shared Source Set')).toBe(true);
+      expect(sharedFile).toMatchObject({ spaceId: 'spc_shared_search' });
+      expect(sharedFolder).toMatchObject({ spaceId: 'spc_shared_search' });
+      expect(sharedSourceSet).toMatchObject({ spaceId: 'spc_shared_search' });
     });
   });
 
@@ -757,7 +846,7 @@ describe('SearchRepo', () => {
           content: 'This is the content of my notes page',
           fileType: 'custom/document',
           filename: 'my-notes.md',
-          source: 'internal://page-1',
+          source: 'internal://docs-1',
           sourceType: 'file',
           title: 'My Notes Page',
           totalCharCount: 100,
@@ -768,7 +857,7 @@ describe('SearchRepo', () => {
           content: 'Documentation for the project',
           fileType: 'custom/document',
           filename: 'readme.md',
-          source: 'internal://page-2',
+          source: 'internal://docs-2',
           sourceType: 'file',
           title: 'Project README',
           totalCharCount: 200,

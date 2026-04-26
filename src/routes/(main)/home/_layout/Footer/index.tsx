@@ -8,15 +8,16 @@ import { useTranslation } from 'react-i18next';
 import ChangelogModal from '@/components/ChangelogModal';
 import HighlightNotification from '@/components/HighlightNotification';
 import LabsModal from '@/components/LabsModal';
-import ThemeButton from '@/features/User/UserPanel/ThemeButton';
+import { OFFICIAL_SITE } from '@/const/url';
 import { useFeedbackModal } from '@/hooks/useFeedbackModal';
+import User from '@/routes/(main)/home/_layout/Header/components/User';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors/systemStatus';
 
 const PRODUCT_HUNT_NOTIFICATION = {
   actionHref: 'https://www.producthunt.com/products/lobehub?launch=lobehub',
   endTime: new Date('2026-02-01T00:00:00Z'),
-  image: 'https://hub-apac-1.lobeobjects.space/og/lobehub-ph.png',
+  image: `${OFFICIAL_SITE}/og/product-hunt.png`,
   slug: 'product-hunt-2026',
   startTime: new Date('2026-01-27T08:00:00Z'),
 };
@@ -63,7 +64,7 @@ const Footer = memo(() => {
 
   const { open: openFeedbackModal } = useFeedbackModal();
 
-  const handleOpenLabsModal = () => {
+  const _handleOpenLabsModal = () => {
     setIsLabsModalOpen(true);
   };
 
@@ -71,7 +72,7 @@ const Footer = memo(() => {
     setIsLabsModalOpen(false);
   };
 
-  const handleOpenChangelogModal = () => {
+  const _handleOpenChangelogModal = () => {
     setShouldLoadChangelog(true);
     setIsChangelogModalOpen(true);
   };
@@ -80,11 +81,11 @@ const Footer = memo(() => {
     setIsChangelogModalOpen(false);
   };
 
-  const handleOpenFeedbackModal = () => {
+  const _handleOpenFeedbackModal = () => {
     openFeedbackModal();
   };
 
-  const handleOpenProductHuntCard = () => {
+  const _handleOpenProductHuntCard = () => {
     setIsProductHuntCardOpen(true);
     trackProductHuntEvent('product_hunt_card_viewed', {
       spm: 'homepage.product_hunt.viewed',
@@ -113,9 +114,8 @@ const Footer = memo(() => {
 
   return (
     <>
-      <Flexbox horizontal align={'center'} gap={2} justify={'space-between'} padding={8}>
-        <Flexbox horizontal align={'center'} flex={1} gap={2} />
-        <ThemeButton placement={'topCenter'} size={16} />
+      <Flexbox flex={'none'} padding={'6px 6px 8px'}>
+        <User />
       </Flexbox>
       <LabsModal open={isLabsModalOpen} onClose={handleCloseLabsModal} />
       <ChangelogModal

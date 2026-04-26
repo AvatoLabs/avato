@@ -7,9 +7,9 @@ import { useTranslation } from 'react-i18next';
 
 import PluginAvatar from '@/components/Plugins/PluginAvatar';
 import PluginTag from '@/components/Plugins/PluginTag';
-import { useAgentStore } from '@/store/agent';
-import { useToolStore } from '@/store/tool';
+import { useAgentStore } from '@/store/agent/store';
 import { mcpStoreSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 import { type McpConnectionParams } from '@/types/plugins';
 import { type LobeToolCustomPlugin } from '@/types/tool/plugin';
 

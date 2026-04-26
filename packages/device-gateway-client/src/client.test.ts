@@ -27,6 +27,7 @@ vi.mock('ws', async () => {
 
     send = vi.fn();
     close = vi.fn();
+    terminate = vi.fn();
     override removeAllListeners = vi.fn(() => {
       return this;
     });
@@ -47,6 +48,7 @@ describe('GatewayClient', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     client = new GatewayClient({
+      allowRemoteTools: true,
       autoReconnect: false,
       deviceId: 'test-device-id',
       gatewayUrl: 'https://gateway.test.com',
@@ -90,6 +92,40 @@ describe('GatewayClient', () => {
       expect(statusChanges).toContain('authenticating');
     });
 
+    it('can wait until gateway authentication succeeds', async () => {
+      const connectPromise = client.connect({ timeoutMs: 5000, waitForAuth: true });
+      await vi.advanceTimersByTimeAsync(1);
+
+      const handler = (client as any).handleMessage;
+      handler(JSON.stringify({ type: 'auth_success' }));
+
+      await expect(connectPromise).resolves.toBeUndefined();
+      expect(client.connectionStatus).toBe('connected');
+    });
+
+    it('rejects wait-for-auth connect when gateway authentication fails', async () => {
+      const connectPromise = client.connect({ timeoutMs: 5000, waitForAuth: true });
+      const expectation = expect(connectPromise).rejects.toThrow('invalid token');
+      await vi.advanceTimersByTimeAsync(1);
+
+      const handler = (client as any).handleMessage;
+      handler(JSON.stringify({ type: 'auth_failed', reason: 'invalid token' }));
+
+      await expectation;
+    });
+
+    it('rejects wait-for-auth connect when authentication times out', async () => {
+      const connectPromise = client.connect({ timeoutMs: 5000, waitForAuth: true });
+      const expectation = expect(connectPromise).rejects.toThrow(
+        'Device Gateway authentication timed out after 5000ms',
+      );
+      await vi.advanceTimersByTimeAsync(1);
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      await expectation;
+    });
+
     it('should not reconnect if already connected', async () => {
       client.connect();
       await vi.advanceTimersByTimeAsync(1);
@@ -119,6 +155,19 @@ describe('GatewayClient', () => {
       expect(ws.url).toContain('deviceId=test-device-id');
       expect(ws.url).toContain('hostname=test-host');
       expect(ws.url).toContain('userId=test-user');
+      expect(ws.url).toContain('allowRemoteTools=true');
+    });
+
+    it('should normalize trailing slashes in gateway URL', () => {
+      const c = new GatewayClient({
+        autoReconnect: false,
+        gatewayUrl: 'https://gateway.test.com///',
+        token: 'tok',
+      });
+      c.connect();
+      const ws = (c as any).ws;
+      expect(ws.url).toContain('wss://gateway.test.com/ws');
+      c.disconnect();
     });
 
     it('should build ws URL for http gateway', () => {
@@ -130,6 +179,62 @@ describe('GatewayClient', () => {
       c.connect();
       const ws = (c as any).ws;
       expect(ws.url).toContain('ws://localhost:3000/ws');
+      c.disconnect();
+    });
+
+    it('should preserve explicit websocket gateway protocols', () => {
+      const secureClient = new GatewayClient({
+        autoReconnect: false,
+        gatewayUrl: 'wss://gateway.test.com',
+        token: 'tok',
+      });
+      secureClient.connect();
+      expect((secureClient as any).ws.url).toContain('wss://gateway.test.com/ws');
+      secureClient.disconnect();
+
+      const localClient = new GatewayClient({
+        autoReconnect: false,
+        gatewayUrl: 'ws://localhost:3000',
+        token: 'tok',
+      });
+      localClient.connect();
+      expect((localClient as any).ws.url).toContain('ws://localhost:3000/ws');
+      localClient.disconnect();
+    });
+
+    it('should preserve gateway URL path prefixes', () => {
+      const c = new GatewayClient({
+        autoReconnect: false,
+        gatewayUrl: 'https://gateway.test.com/device-gateway/',
+        token: 'tok',
+      });
+      c.connect();
+      const ws = (c as any).ws;
+      expect(ws.url).toContain('wss://gateway.test.com/device-gateway/ws');
+      c.disconnect();
+    });
+
+    it('should redact websocket query parameters in connection logs', () => {
+      const logger = {
+        debug: vi.fn(),
+        error: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+      };
+      const c = new GatewayClient({
+        autoReconnect: false,
+        deviceId: 'device-1',
+        gatewayUrl: 'https://gateway.test.com/device-gateway/',
+        logger,
+        token: 'tok',
+        userId: 'user-1',
+      });
+
+      c.connect();
+
+      expect(logger.debug).toHaveBeenCalledWith(
+        'Connecting to: wss://gateway.test.com/device-gateway/ws',
+      );
       c.disconnect();
     });
   });
@@ -194,6 +299,22 @@ describe('GatewayClient', () => {
       expect(toolCallCb).toHaveBeenCalledWith(msg);
     });
 
+    it('should ignore malformed tool_call_request messages', () => {
+      const toolCallCb = vi.fn();
+      client.on('tool_call_request', toolCallCb);
+
+      handler(JSON.stringify({ requestId: 'req-1', type: 'tool_call_request' }));
+      handler(
+        JSON.stringify({
+          requestId: 'req-1',
+          toolCall: { apiName: '', arguments: '{}', identifier: 'test' },
+          type: 'tool_call_request',
+        }),
+      );
+
+      expect(toolCallCb).not.toHaveBeenCalled();
+    });
+
     it('should handle system_info_request', () => {
       const sysInfoCb = vi.fn();
       client.on('system_info_request', sysInfoCb);
@@ -204,6 +325,16 @@ describe('GatewayClient', () => {
       expect(sysInfoCb).toHaveBeenCalledWith(msg);
     });
 
+    it('should ignore malformed system_info_request messages', () => {
+      const sysInfoCb = vi.fn();
+      client.on('system_info_request', sysInfoCb);
+
+      handler(JSON.stringify({ type: 'system_info_request' }));
+      handler(JSON.stringify({ requestId: '', type: 'system_info_request' }));
+
+      expect(sysInfoCb).not.toHaveBeenCalled();
+    });
+
     it('should handle auth_expired', () => {
       const expiredCb = vi.fn();
       client.on('auth_expired', expiredCb);
@@ -211,6 +342,7 @@ describe('GatewayClient', () => {
       handler(JSON.stringify({ type: 'auth_expired' }));
 
       expect(expiredCb).toHaveBeenCalled();
+      expect(client.connectionStatus).toBe('disconnected');
     });
 
     it('should handle unknown message type', () => {
@@ -221,6 +353,11 @@ describe('GatewayClient', () => {
     it('should handle invalid JSON', () => {
       // Should not throw
       handler('not json');
+    });
+
+    it('should handle non-object JSON messages', () => {
+      // Should not throw
+      handler(JSON.stringify(null));
     });
   });
 
@@ -316,9 +453,44 @@ describe('GatewayClient', () => {
       // Only the auth message was sent
       expect(calls.length).toBe(1);
     });
+
+    it('should emit error instead of throwing when ws.send fails', async () => {
+      const errorCb = vi.fn();
+      client.on('error', errorCb);
+      client.connect();
+      await vi.advanceTimersByTimeAsync(1);
+
+      const ws = (client as any).ws;
+      ws.send.mockImplementationOnce(() => {
+        throw new Error('send failed');
+      });
+
+      expect(() =>
+        client.sendToolCallResponse({
+          requestId: 'req-1',
+          result: { content: 'result', success: true },
+        }),
+      ).not.toThrow();
+      expect(errorCb).toHaveBeenCalledWith(expect.objectContaining({ message: 'send failed' }));
+    });
   });
 
   describe('heartbeat', () => {
+    it('should send a heartbeat immediately after authentication succeeds', async () => {
+      client.connect();
+      await vi.advanceTimersByTimeAsync(1);
+
+      const ws = (client as any).ws;
+      ws.send.mockClear();
+
+      const handler = (client as any).handleMessage;
+      handler(JSON.stringify({ type: 'auth_success' }));
+
+      expect(ws.send).toHaveBeenCalledWith(
+        JSON.stringify({ allowRemoteTools: true, type: 'heartbeat' }),
+      );
+    });
+
     it('should send heartbeat after connection', async () => {
       client.connect();
       await vi.advanceTimersByTimeAsync(1);
@@ -332,7 +504,44 @@ describe('GatewayClient', () => {
       // Advance 30 seconds for heartbeat
       await vi.advanceTimersByTimeAsync(30_000);
 
-      expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: 'heartbeat' }));
+      expect(ws.send).toHaveBeenCalledWith(
+        JSON.stringify({ allowRemoteTools: true, type: 'heartbeat' }),
+      );
+    });
+
+    it('syncs permission changes made during authentication after auth_success', async () => {
+      client.connect();
+      await vi.advanceTimersByTimeAsync(1);
+
+      const ws = (client as any).ws;
+      client.setAllowRemoteTools(false);
+
+      expect(ws.send).toHaveBeenCalledTimes(1);
+      expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: 'auth', token: 'test-token' }));
+
+      const handler = (client as any).handleMessage;
+      handler(JSON.stringify({ type: 'auth_success' }));
+
+      expect(ws.send).toHaveBeenLastCalledWith(
+        JSON.stringify({ allowRemoteTools: false, type: 'heartbeat' }),
+      );
+    });
+
+    it('sends the latest remote tool permission in heartbeat messages', async () => {
+      client.connect();
+      await vi.advanceTimersByTimeAsync(1);
+
+      const handler = (client as any).handleMessage;
+      handler(JSON.stringify({ type: 'auth_success' }));
+
+      const ws = (client as any).ws;
+      ws.send.mockClear();
+
+      client.setAllowRemoteTools(false);
+
+      expect(ws.send).toHaveBeenCalledWith(
+        JSON.stringify({ allowRemoteTools: false, type: 'heartbeat' }),
+      );
     });
   });
 
@@ -428,6 +637,69 @@ describe('GatewayClient', () => {
 
       expect(disconnectedCb).toHaveBeenCalled();
     });
+
+    it('should ignore late close events from a stale websocket after reconnecting', async () => {
+      const reconnectClient = new GatewayClient({
+        autoReconnect: true,
+        gatewayUrl: 'https://gateway.test.com',
+        token: 'tok',
+      });
+
+      reconnectClient.connect();
+      await vi.advanceTimersByTimeAsync(1);
+      const firstWs = (reconnectClient as any).ws;
+
+      const closeHandler = (reconnectClient as any).handleClose;
+      closeHandler(firstWs, 1000, Buffer.from('network closed'));
+
+      expect(reconnectClient.connectionStatus).toBe('reconnecting');
+
+      await vi.advanceTimersByTimeAsync(1000);
+      const secondWs = (reconnectClient as any).ws;
+
+      expect(secondWs).not.toBe(firstWs);
+      expect(secondWs).toBeTruthy();
+
+      closeHandler(firstWs, 1000, Buffer.from('late stale close'));
+
+      expect((reconnectClient as any).ws).toBe(secondWs);
+
+      reconnectClient.disconnect();
+    });
+
+    it('should ignore late messages from a stale websocket after reconnecting', async () => {
+      const reconnectClient = new GatewayClient({
+        autoReconnect: true,
+        gatewayUrl: 'https://gateway.test.com',
+        token: 'tok',
+      });
+      const toolCallCb = vi.fn();
+      reconnectClient.on('tool_call_request', toolCallCb);
+
+      reconnectClient.connect();
+      await vi.advanceTimersByTimeAsync(1);
+      const firstWs = (reconnectClient as any).ws;
+
+      const closeHandler = (reconnectClient as any).handleClose;
+      closeHandler(firstWs, 1000, Buffer.from('network closed'));
+
+      await vi.advanceTimersByTimeAsync(1000);
+      const secondWs = (reconnectClient as any).ws;
+      const messageHandler = (reconnectClient as any).handleMessage;
+      const message = JSON.stringify({
+        requestId: 'req-1',
+        toolCall: { apiName: 'runCommand', arguments: '{}', identifier: 'lobe-local-system' },
+        type: 'tool_call_request',
+      });
+
+      messageHandler(firstWs, message);
+      expect(toolCallCb).not.toHaveBeenCalled();
+
+      messageHandler(secondWs, message);
+      expect(toolCallCb).toHaveBeenCalledTimes(1);
+
+      reconnectClient.disconnect();
+    });
   });
 
   describe('handleError', () => {
@@ -443,6 +715,15 @@ describe('GatewayClient', () => {
 
       expect(errorCb).toHaveBeenCalledWith(expect.objectContaining({ message: 'test error' }));
     });
+
+    it('should not throw when no error listener is registered', async () => {
+      client.connect();
+      await vi.advanceTimersByTimeAsync(1);
+
+      const errorHandler = (client as any).handleError;
+
+      expect(() => errorHandler(new Error('test error'))).not.toThrow();
+    });
   });
 
   describe('doConnect error', () => {
@@ -450,16 +731,21 @@ describe('GatewayClient', () => {
       mockWsShouldThrow = true;
 
       const disconnectedCb = vi.fn();
+      const errorCb = vi.fn();
       const c = new GatewayClient({
         autoReconnect: false,
         gatewayUrl: 'https://gateway.test.com',
         token: 'tok',
       });
       c.on('disconnected', disconnectedCb);
+      c.on('error', errorCb);
 
       c.connect();
 
       expect(c.connectionStatus).toBe('disconnected');
+      expect(errorCb).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'connection refused' }),
+      );
       expect(disconnectedCb).toHaveBeenCalled();
     });
 
@@ -467,17 +753,35 @@ describe('GatewayClient', () => {
       mockWsShouldThrow = true;
 
       const reconnectingCb = vi.fn();
+      const errorCb = vi.fn();
       const c = new GatewayClient({
         autoReconnect: true,
         gatewayUrl: 'https://gateway.test.com',
         token: 'tok',
       });
       c.on('reconnecting', reconnectingCb);
+      c.on('error', errorCb);
 
       c.connect();
 
+      expect(errorCb).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'connection refused' }),
+      );
       expect(reconnectingCb).toHaveBeenCalled();
       c.disconnect();
+    });
+
+    it('should not throw constructor errors when no error listener is registered', () => {
+      mockWsShouldThrow = true;
+
+      const c = new GatewayClient({
+        autoReconnect: false,
+        gatewayUrl: 'https://gateway.test.com',
+        token: 'tok',
+      });
+
+      expect(() => c.connect()).not.toThrow();
+      expect(c.connectionStatus).toBe('disconnected');
     });
   });
 
@@ -501,9 +805,29 @@ describe('GatewayClient', () => {
       const ws = (client as any).ws;
       ws.readyState = 0; // CONNECTING
       ws.close = vi.fn();
+      ws.terminate = vi.fn(function (this: any) {
+        this.emit('error', new Error('WebSocket was closed before the connection was established'));
+      });
       ws.removeAllListeners = vi.fn();
 
-      (client as any).closeWebSocket();
+      expect(() => (client as any).closeWebSocket()).not.toThrow();
+      expect(ws.close).not.toHaveBeenCalled();
+      expect(ws.terminate).toHaveBeenCalled();
+      expect(ws.removeAllListeners).not.toHaveBeenCalled();
+    });
+
+    it('should not throw if closing ws fails', async () => {
+      client.connect();
+      await vi.advanceTimersByTimeAsync(1);
+
+      const ws = (client as any).ws;
+      ws.readyState = 1; // OPEN
+      ws.close = vi.fn(() => {
+        throw new Error('close failed');
+      });
+      ws.removeAllListeners = vi.fn();
+
+      expect(() => (client as any).closeWebSocket()).not.toThrow();
       expect(ws.close).toHaveBeenCalled();
     });
 

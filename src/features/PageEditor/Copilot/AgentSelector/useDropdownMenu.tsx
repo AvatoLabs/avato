@@ -5,7 +5,7 @@ import { Trash2 } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
 
 interface UseDropdownMenuProps {
   agentId: string;
@@ -20,7 +20,7 @@ export const useDropdownMenu = ({
   onClose,
 }: UseDropdownMenuProps): MenuProps['items'] => {
   const { t } = useTranslation(['common', 'chat']);
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
   const removeAgent = useHomeStore((s) => s.removeAgent);
 
   const handleDelete = () => {
@@ -30,8 +30,14 @@ export const useDropdownMenu = ({
       okButtonProps: { danger: true },
       okText: t('delete'),
       onOk: async () => {
-        await removeAgent(agentId);
-        onClose();
+        try {
+          await removeAgent(agentId);
+          message.success(t('confirmRemoveSessionSuccess', { ns: 'chat' }));
+          onClose();
+        } catch (error) {
+          console.error('Failed to delete copilot agent:', error);
+          message.error(t('confirmRemoveSessionError', { ns: 'chat' }));
+        }
       },
       title: t('confirmRemoveSessionItemAlert', { ns: 'chat' }),
     });

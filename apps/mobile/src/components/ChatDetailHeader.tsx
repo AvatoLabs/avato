@@ -33,6 +33,8 @@ export interface ChatDetailHeaderProps {
   navigation: RootStackNavigationProp;
   /** Callback to open notebook */
   onOpenNotebook?: () => void;
+  /** Callback to open thread list */
+  onOpenThreads?: () => void;
   /** Session ID */
   sessionId?: string;
   /** Current model name */

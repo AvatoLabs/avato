@@ -32,6 +32,27 @@ LobeHub provides some additional configuration options during deployment, which 
 
 <GenerateSecret envName="KEY_VAULTS_SECRET" />
 
+### `MEMORY_USER_MEMORY_WEBHOOK_HEADERS`
+
+- Type: Optional
+- Description: Shared-secret headers required by user-memory webhooks such as `/api/webhooks/memory-extraction`. Use `Header=Value` pairs separated by commas.
+- Default: -
+- Example: `Authorization=Bearer internal-memory-secret` or `x-memory-secret=super-secret`
+
+Use this when calling the memory extraction webhooks from an external scheduler or worker. LobeHub will compare every configured header exactly.
+
+### `MEMORY_USER_MEMORY_WEBHOOK_ALLOW_INSECURE_DEV`
+
+- Type: Optional
+- Description: Allows unauthenticated user-memory webhooks only outside production. This is intended strictly for local development.
+- Default: `false`
+- Example: `true`
+
+<Callout type="warning">
+  This bypass is ignored in production. In production, configure
+  `MEMORY_USER_MEMORY_WEBHOOK_HEADERS` or use internal service auth instead.
+</Callout>
+
 ### `API_KEY_SELECT_MODE`
 
 - Type：Optional

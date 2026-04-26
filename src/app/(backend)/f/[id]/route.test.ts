@@ -2,6 +2,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { auth } from '@/auth';
+import { LOBE_CHAT_AUTH_HEADER, LOBE_CHAT_OIDC_AUTH_HEADER } from '@/envs/auth';
+import { validateOIDCJWT } from '@/libs/oidc-provider/jwt';
 
 import { GET } from './route';
 
@@ -17,6 +19,14 @@ vi.mock('@/envs/app', () => ({
   appEnv: {
     APP_URL: 'https://app.example.com',
   },
+}));
+
+vi.mock('@lobechat/utils/server', () => ({
+  getXorPayload: vi.fn(),
+}));
+
+vi.mock('@/libs/oidc-provider/jwt', () => ({
+  validateOIDCJWT: vi.fn(),
 }));
 
 const mockGetServerDB = vi.fn();
@@ -39,6 +49,7 @@ vi.mock('@/server/modules/file-proxy/serveAuthorizedFileDownload', () => ({
 describe('GET /f/[id]', () => {
   beforeEach(() => {
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
+    vi.mocked(validateOIDCJWT).mockReset();
     mockGetServerDB.mockReset();
     mockGetFileById.mockReset();
     mockServeAuthorizedFileDownload.mockReset();
@@ -93,6 +104,16 @@ describe('GET /f/[id]', () => {
   });
 
   describe('session download', () => {
+    it('should 404 for document-shaped file ids before lookup', async () => {
+      const req = new Request('https://app.example.com/f/docs_1');
+      const res = await GET(req, { params: Promise.resolve({ id: 'docs_1' }) });
+
+      expect(res.status).toBe(404);
+      expect(mockGetServerDB).not.toHaveBeenCalled();
+      expect(mockGetFileById).not.toHaveBeenCalled();
+      expect(mockServeAuthorizedFileDownload).not.toHaveBeenCalled();
+    });
+
     it('should 401 when no session and no token', async () => {
       const req = new Request('https://app.example.com/f/file-1');
       const res = await GET(req, { params: Promise.resolve({ id: 'file-1' }) });
@@ -130,6 +151,61 @@ describe('GET /f/[id]', () => {
           fileId: 'f1',
           shareToken: null,
           userId: 'user-1',
+        }),
+      );
+    });
+
+    it('should serve authorized download when mobile auth header carries a user id', async () => {
+      const { getXorPayload } = await import('@lobechat/utils/server');
+      vi.mocked(getXorPayload).mockReturnValue({ userId: 'mobile-user-1' });
+
+      mockGetServerDB.mockResolvedValue({});
+      mockGetFileById.mockResolvedValue({ id: 'f1', url: 'k' });
+      mockServeAuthorizedFileDownload.mockResolvedValue(
+        new Response(null, { status: 302, headers: { Location: 'https://s3/presigned' } }),
+      );
+
+      const req = new Request('https://app.example.com/f/f1', {
+        headers: {
+          [LOBE_CHAT_AUTH_HEADER]: 'encrypted-mobile-auth',
+        },
+      });
+      const res = await GET(req, { params: Promise.resolve({ id: 'f1' }) });
+
+      expect(res.status).toBe(302);
+      expect(mockServeAuthorizedFileDownload).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileId: 'f1',
+          userId: 'mobile-user-1',
+        }),
+      );
+    });
+
+    it('should prefer oidc auth header user id when provided by mobile', async () => {
+      const { getXorPayload } = await import('@lobechat/utils/server');
+      vi.mocked(getXorPayload).mockReturnValue({ userId: 'encrypted-user-id' });
+      vi.mocked(validateOIDCJWT).mockResolvedValue({ userId: 'oidc-user-1' } as any);
+
+      mockGetServerDB.mockResolvedValue({});
+      mockGetFileById.mockResolvedValue({ id: 'f1', url: 'k' });
+      mockServeAuthorizedFileDownload.mockResolvedValue(
+        new Response(null, { status: 302, headers: { Location: 'https://s3/presigned' } }),
+      );
+
+      const req = new Request('https://app.example.com/f/f1', {
+        headers: {
+          [LOBE_CHAT_AUTH_HEADER]: 'encrypted-mobile-auth',
+          [LOBE_CHAT_OIDC_AUTH_HEADER]: 'oidc-token',
+        },
+      });
+      const res = await GET(req, { params: Promise.resolve({ id: 'f1' }) });
+
+      expect(res.status).toBe(302);
+      expect(validateOIDCJWT).toHaveBeenCalledWith('oidc-token');
+      expect(mockServeAuthorizedFileDownload).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileId: 'f1',
+          userId: 'oidc-user-1',
         }),
       );
     });

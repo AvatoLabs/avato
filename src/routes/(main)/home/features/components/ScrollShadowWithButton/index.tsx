@@ -13,19 +13,30 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 
     color: ${cssVar.colorTextSecondary};
 
-    opacity: 0;
+    opacity: 0.72;
 
-    transition: opacity ${cssVar.motionDurationMid} ${cssVar.motionEaseInOut};
+    transition:
+      opacity ${cssVar.motionDurationMid} ${cssVar.motionEaseInOut},
+      transform ${cssVar.motionDurationMid} ${cssVar.motionEaseOut};
 
     &:hover {
+      transform: translateY(-50%) scale(1.03);
       border-color: ${cssVar.colorBorder} !important;
       box-shadow: ${cssVar.boxShadowTertiary} !important;
+    }
+
+    @media (hover: none) {
+      opacity: 1;
     }
   `,
   container: css`
     position: relative;
 
     &:hover .scroll-button {
+      opacity: 1;
+    }
+
+    &:focus-within .scroll-button {
       opacity: 1;
     }
   `,
@@ -74,7 +85,7 @@ const ScrollShadowWithButton = memo<FlexboxProps>(({ children, ...rest }) => {
 
   useEffect(() => {
     checkScrollability();
-  }, []);
+  }, [checkScrollability]);
 
   return (
     <Flexbox horizontal className={styles.container} width={'100%'} {...rest}>

@@ -68,7 +68,7 @@ export const uploadErrorNotification = {
   error: (error: unknown, options?: UploadErrorOptions) => {
     notification.error({
       description: options?.description ?? getUploadErrorDescription(error),
-      message: options?.message ?? t('upload.title', { ns: 'error' }),
+      title: options?.message ?? t('upload.title', { ns: 'error' }),
     });
   },
 };

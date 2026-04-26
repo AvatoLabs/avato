@@ -9,10 +9,10 @@
  * - Gets model capabilities from provided function
  * - No dependency on frontend stores (useToolStore, useAgentStore, etc.)
  */
-import { KnowledgeBaseManifest } from '@lobechat/builtin-tool-knowledge-base';
 import { LocalSystemManifest } from '@lobechat/builtin-tool-local-system';
 import { MemoryManifest } from '@lobechat/builtin-tool-memory';
 import { RemoteDeviceManifest } from '@lobechat/builtin-tool-remote-device';
+import { SourceSetManifest } from '@lobechat/builtin-tool-source-set';
 import { WebBrowsingManifest } from '@lobechat/builtin-tool-web-browsing';
 import { builtinTools, defaultToolIds } from '@lobechat/builtin-tools';
 import {
@@ -109,7 +109,7 @@ export const createServerAgentToolsEngine = (
     agentConfig,
     deviceContext,
     globalMemoryEnabled = false,
-    hasEnabledKnowledgeBases = false,
+    hasEnabledSourceSets = false,
     model,
     provider,
   } = params;
@@ -132,9 +132,9 @@ export const createServerAgentToolsEngine = (
     defaultToolIds,
     enableChecker: createEnableChecker({
       rules: {
-        [KnowledgeBaseManifest.identifier]: hasEnabledKnowledgeBases,
+        [SourceSetManifest.identifier]: hasEnabledSourceSets,
         [LocalSystemManifest.identifier]:
-          !!deviceContext?.gatewayConfigured && !!deviceContext?.deviceOnline,
+          !!deviceContext?.gatewayConfigured && !!deviceContext?.activeDeviceReady,
         [MemoryManifest.identifier]: globalMemoryEnabled,
         [RemoteDeviceManifest.identifier]: !!deviceContext?.gatewayConfigured,
         [WebBrowsingManifest.identifier]: isSearchEnabled,

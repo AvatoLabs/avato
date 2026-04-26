@@ -15,8 +15,8 @@ import {
 } from '@lobechat/builtin-tool-tools/executionRuntime';
 import { ToolsActivatorExecutor } from '@lobechat/builtin-tool-tools/executor';
 
-import { getToolStoreState } from '@/store/tool';
 import { toolSelectors } from '@/store/tool/selectors/tool';
+import { getToolStoreState } from '@/store/tool/store';
 
 const service: ToolsActivatorRuntimeService = {
   getActivatedToolIds: () => [],

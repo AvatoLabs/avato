@@ -421,6 +421,34 @@ describe('InternalEditor', () => {
       expect(markdown).toContain('Test content');
     });
 
+    it('should preserve table cell br tags as line breaks in markdown round-trip', async () => {
+      let editorInstance: IEditor | undefined;
+
+      render(
+        <MinimalTestWrapper
+          onEditorReady={(e) => {
+            editorInstance = e;
+          }}
+        />,
+      );
+
+      await act(async () => {
+        await moment();
+      });
+
+      await waitFor(() => {
+        expect(editorInstance).toBeDefined();
+      });
+
+      await act(async () => {
+        editorInstance!.setDocument('markdown', '| Cost |\\n| --- |\\n| 22,500<br />(4,500/人) |');
+        await moment();
+      });
+
+      const markdown = editorInstance!.getDocument('markdown') as unknown as string;
+      expect(markdown).toContain('22,500<br />(4,500/人)');
+    });
+
     it('should allow getting document as JSON', async () => {
       let editorInstance: IEditor | undefined;
 
@@ -723,6 +751,47 @@ describe('InternalEditor', () => {
         },
         { timeout: 2000 },
       );
+    });
+  });
+
+  describe('snapshot safety', () => {
+    it('should ignore snapshot read failures during update listeners', async () => {
+      const onContentChange = vi.fn();
+      let editorInstance: IEditor | undefined;
+
+      render(
+        <MinimalTestWrapper
+          onContentChange={onContentChange}
+          onEditorReady={(e) => {
+            editorInstance = e;
+          }}
+        />,
+      );
+
+      await act(async () => {
+        await moment();
+      });
+
+      await waitFor(() => {
+        expect(editorInstance).toBeDefined();
+      });
+
+      const originalGetDocument = editorInstance!.getDocument.bind(editorInstance);
+      vi.spyOn(editorInstance!, 'getDocument').mockImplementation((type: any) => {
+        if (type === 'json') {
+          throw new Error('Expected node root to have a parent.');
+        }
+
+        return originalGetDocument(type);
+      });
+
+      await act(async () => {
+        editorInstance!.setDocument('text', 'Updated content');
+        await moment();
+      });
+
+      expect(onContentChange).not.toHaveBeenCalled();
+      expect(console.warn).not.toHaveBeenCalled();
     });
   });
 });

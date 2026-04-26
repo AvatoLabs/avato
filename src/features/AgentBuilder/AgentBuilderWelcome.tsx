@@ -8,8 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { conversationSelectors, useConversationStore } from '@/features/Conversation';
 import { type SuggestMode } from '@/features/SuggestQuestions';
 import SuggestQuestions from '@/features/SuggestQuestions';
-import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 interface AgentBuilderWelcomeProps {
   mode?: SuggestMode;

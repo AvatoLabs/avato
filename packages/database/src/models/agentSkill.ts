@@ -18,7 +18,7 @@ const skillItemColumns = {
   resources: agentSkills.resources,
   source: agentSkills.source,
   updatedAt: agentSkills.updatedAt,
-  zipFileHash: agentSkills.zipFileHash,
+  zipSha256: agentSkills.zipFileHash,
 };
 
 const skillListColumns = {
@@ -30,7 +30,7 @@ const skillListColumns = {
   name: agentSkills.name,
   source: agentSkills.source,
   updatedAt: agentSkills.updatedAt,
-  zipFileHash: agentSkills.zipFileHash,
+  zipSha256: agentSkills.zipFileHash,
 };
 
 export class AgentSkillModel {
@@ -130,12 +130,19 @@ export class AgentSkillModel {
 
   update = async (id: string, data: Partial<NewAgentSkill>): Promise<SkillItem> => {
     const existing = await this.findById(id);
-
-    const updateData = merge(existing || {}, { ...data, updatedAt: new Date() });
+    const merged = merge(existing || {}, {
+      ...data,
+      ...(data.zipFileHash !== undefined ? { zipSha256: data.zipFileHash } : {}),
+      updatedAt: new Date(),
+    });
+    const { zipSha256, ...rest } = merged;
 
     const [result] = await this.db
       .update(agentSkills)
-      .set(updateData)
+      .set({
+        ...rest,
+        ...(zipSha256 !== undefined ? { zipFileHash: zipSha256 } : {}),
+      })
       .where(and(eq(agentSkills.id, id), eq(agentSkills.userId, this.userId)))
       .returning(skillItemColumns);
     return result;

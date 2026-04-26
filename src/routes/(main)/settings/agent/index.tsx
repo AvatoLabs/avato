@@ -11,7 +11,7 @@ import SystemAgentForm from './features/SystemAgentForm';
 
 const Page = () => {
   const { t } = useTranslation('setting');
-  const { enableKnowledgeBase } = useServerConfigStore(featureFlagsSelectors);
+  const { enableSourceSet } = useServerConfigStore(featureFlagsSelectors);
   return (
     <>
       <SettingHeader title={t('tab.agent')} />
@@ -21,7 +21,7 @@ const Page = () => {
       <SystemAgentForm systemAgentKey="translation" />
       <SystemAgentForm systemAgentKey="historyCompress" />
       <SystemAgentForm systemAgentKey="agentMeta" />
-      {enableKnowledgeBase && (
+      {enableSourceSet && (
         <SystemAgentForm
           allowCustomPrompt
           allowDisable

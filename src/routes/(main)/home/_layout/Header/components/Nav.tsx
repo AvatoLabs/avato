@@ -4,19 +4,19 @@ import { Flexbox, Tag } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { type NavItemProps } from '@/features/NavPanel/components/NavItem';
 import NavItem from '@/features/NavPanel/components/NavItem';
+import { glassSidebarStyles } from '@/features/NavPanel/glassSidebar.styles';
+import { buildFilesRootPath } from '@/features/ResourceSpaces';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useActiveTabKey } from '@/hooks/useActiveTabKey';
 import { useGlobalStore } from '@/store/global';
 import { SidebarTabKey } from '@/store/global/initialState';
-import {
-  featureFlagsSelectors,
-  serverConfigSelectors,
-  useServerConfigStore,
-} from '@/store/serverConfig';
+import { featureFlagsSelectors, useServerConfigStore } from '@/store/serverConfig';
+import { getPageRootPath } from '@/utils/docs';
 import { isModifierClick } from '@/utils/navigation';
 
 interface Item {
@@ -25,6 +25,7 @@ interface Item {
   icon: NavItemProps['icon'];
   key: string;
   onClick?: () => void;
+  sectionBreak?: boolean;
   title: NavItemProps['title'];
   url?: string;
 }
@@ -33,12 +34,14 @@ const Nav = memo(() => {
   const tab = useActiveTabKey();
   const navigate = useNavigate();
   const { t } = useTranslation('common');
+  const { t: tHome } = useTranslation('home');
   const { t: tSetting } = useTranslation('setting');
+  const { spaceId: routeSpaceId } = useParams<{ spaceId?: string }>();
+  const resolvedSpaceId = resolveWorkspaceSpaceId({ spaceId: routeSpaceId });
   const toggleCommandMenu = useGlobalStore((s) => s.toggleCommandMenu);
   const { showMarket, showAiImage } = useServerConfigStore(featureFlagsSelectors);
-  const enableBusinessFeatures = useServerConfigStore(serverConfigSelectors.enableBusinessFeatures);
 
-  const items: Item[] = useMemo(
+  const globalActions: Item[] = useMemo(
     () => [
       {
         icon: APP_ENTRY_ICONS.search,
@@ -48,6 +51,12 @@ const Nav = memo(() => {
         },
         title: t('tab.search'),
       },
+    ],
+    [t, toggleCommandMenu],
+  );
+
+  const mainNav: Item[] = useMemo(
+    () => [
       {
         icon: APP_ENTRY_ICONS.home,
         key: SidebarTabKey.Home,
@@ -55,20 +64,33 @@ const Nav = memo(() => {
         url: '/',
       },
       {
+        icon: APP_ENTRY_ICONS.page,
+        key: 'docs',
+        title: t('tab.pages'),
+        url: getPageRootPath('doc', resolvedSpaceId),
+      },
+      {
         badge: 'beta',
         icon: APP_ENTRY_ICONS.studio,
         key: SidebarTabKey.Studio,
+        sectionBreak: true,
         title: t('tab.avatoStudio'),
         url: '/studio',
       },
       {
-        icon: APP_ENTRY_ICONS.page,
-        key: SidebarTabKey.Pages,
-        title: t('tab.pages'),
-        url: '/page',
+        icon: APP_ENTRY_ICONS.resource,
+        key: 'content',
+        title: t('tab.resource'),
+        url: buildFilesRootPath(resolvedSpaceId),
       },
       {
-        hidden: !enableBusinessFeatures,
+        icon: APP_ENTRY_ICONS.memory,
+        key: SidebarTabKey.Memory,
+        title: t('tab.memory'),
+        url: '/memory',
+      },
+      {
+        /** 服务端已有视频生成能力（lambda/video）；入口常驻侧栏，不依赖 enableBusinessFeatures */
         icon: APP_ENTRY_ICONS.video,
         key: SidebarTabKey.Video,
         title: t('tab.video'),
@@ -85,11 +107,12 @@ const Nav = memo(() => {
         hidden: !showMarket,
         icon: APP_ENTRY_ICONS.community,
         key: SidebarTabKey.Community,
+        sectionBreak: true,
         title: t('tab.community'),
         url: '/community',
       },
     ],
-    [enableBusinessFeatures, showAiImage, showMarket, t, toggleCommandMenu],
+    [resolvedSpaceId, showAiImage, showMarket, t],
   );
 
   const newBadge = (
@@ -99,60 +122,61 @@ const Nav = memo(() => {
   );
   const betaBadge = (
     <Tag
+      color={cssVar.colorPrimary}
       size="small"
-      variant={'filled'}
-      style={{
-        background: cssVar.colorFillSecondary,
-        border: `1px solid ${cssVar.colorFillTertiary}`,
-        color: cssVar.colorTextDescription,
-        marginInlineStart: 4,
-      }}
+      style={{ marginInlineStart: 4 }}
+      variant="outlined"
     >
       {tSetting('tab.beta')}
     </Tag>
   );
 
-  return (
-    <Flexbox gap={1} paddingInline={4}>
-      {items.map((item) => {
-        const extra =
-          item.badge === 'new' ? newBadge : item.badge === 'beta' ? betaBadge : undefined;
-        const content = (
-          <NavItem
-            active={tab === item.key}
-            extra={extra}
-            hidden={item.hidden}
-            icon={item.icon}
-            key={item.key}
-            title={item.title}
-            onClick={item.onClick}
-          />
-        );
-        if (!item.url) return content;
+  const renderItem = (item: Item) => {
+    const extra = item.badge === 'new' ? newBadge : item.badge === 'beta' ? betaBadge : undefined;
+    const mt = item.sectionBreak ? 10 : undefined;
+    const content = (
+      <NavItem
+        active={tab === item.key}
+        extra={extra}
+        hidden={item.hidden}
+        icon={item.icon}
+        key={item.key}
+        style={{ marginTop: mt }}
+        title={item.title}
+        onClick={item.onClick}
+      />
+    );
+    if (!item.url) return content;
+    const url = item.url;
 
-        return (
-          <Link
-            key={item.key}
-            to={item.url}
-            onClick={(e) => {
-              if (isModifierClick(e)) return;
-              e.preventDefault();
-              item?.onClick?.();
-              if (item.url) {
-                navigate(item.url);
-              }
-            }}
-          >
-            <NavItem
-              active={tab === item.key}
-              extra={extra}
-              hidden={item.hidden}
-              icon={item.icon}
-              title={item.title}
-            />
-          </Link>
-        );
-      })}
+    return (
+      <NavItem
+        active={tab === item.key}
+        extra={extra}
+        hidden={item.hidden}
+        href={url}
+        icon={item.icon}
+        key={item.key}
+        style={{ marginTop: mt }}
+        title={item.title}
+        onClick={(e) => {
+          if (isModifierClick(e)) return;
+          item?.onClick?.();
+          navigate(url);
+        }}
+      />
+    );
+  };
+
+  return (
+    <Flexbox gap={2} paddingBlock={'4px 0'} paddingInline={6}>
+      {globalActions.map(renderItem)}
+      <Flexbox horizontal align={'center'} gap={6} wrap={'wrap'}>
+        <span className={glassSidebarStyles.sectionLabel}>
+          {tHome('workspace.sidebar.section.navigation')}
+        </span>
+      </Flexbox>
+      {mainNav.map(renderItem)}
     </Flexbox>
   );
 });

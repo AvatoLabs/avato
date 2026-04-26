@@ -19,8 +19,8 @@ import { useTranslation } from 'react-i18next';
 
 import { openEditingPopover } from '@/features/EditingPopover/store';
 import { useGlobalStore } from '@/store/global';
-import { useHomeStore } from '@/store/home';
 import { homeAgentListSelectors } from '@/store/home/selectors';
+import { useHomeStore } from '@/store/home/store';
 
 interface UseAgentDropdownMenuParams {
   anchor: HTMLElement | null;
@@ -135,8 +135,13 @@ export const useAgentDropdownMenu = ({
               centered: true,
               okButtonProps: { danger: true },
               onOk: async () => {
-                await removeAgent(id);
-                message.success(t('confirmRemoveSessionSuccess'));
+                try {
+                  await removeAgent(id);
+                  message.success(t('confirmRemoveSessionSuccess'));
+                } catch (error) {
+                  console.error('Failed to delete agent:', error);
+                  message.error(t('confirmRemoveSessionError'));
+                }
               },
               title: t('confirmRemoveSessionItemAlert'),
             });

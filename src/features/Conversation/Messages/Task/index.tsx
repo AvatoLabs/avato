@@ -10,8 +10,8 @@ import { ChatItem } from '@/features/Conversation/ChatItem';
 import { useNewScreen } from '@/features/Conversation/Messages/components/useNewScreen';
 import TaskAvatar from '@/features/Conversation/Messages/Tasks/shared/TaskAvatar';
 import { useOpenChatSettings } from '@/hooks/useInterceptingRoutes';
-import { useAgentStore } from '@/store/agent';
 import { builtinAgentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useGlobalStore } from '@/store/global';
 
 import ErrorMessageExtra, { useErrorContent } from '../../Error';

@@ -11,7 +11,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     inset-block-start: 50%;
     transform: translateY(-50%);
 
-    color: ${cssVar.colorTextSecondary};
+    color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
 
     opacity: 0;
 

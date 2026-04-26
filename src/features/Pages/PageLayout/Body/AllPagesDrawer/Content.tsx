@@ -7,30 +7,37 @@ import { VList } from 'virtua';
 
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import PageEmpty from '@/features/PageEmpty';
-import { pageSelectors, usePageStore } from '@/store/page';
+import { usePageKind } from '@/features/Pages/usePageKind';
+import { pageSelectors, usePageStore } from '@/store/docs';
 import { type LobeDocument } from '@/types/document';
 
 import Item from '../List/Item';
 
 interface ContentProps {
-  searchKeyword: string;
+  searchKeyword?: string;
 }
 
 const Content = memo<ContentProps>(({ searchKeyword }) => {
+  const pageKind = usePageKind();
   const virtuaRef = useRef<VListHandle>(null);
   const fetchedCountRef = useRef(-1);
+  const filteredDocumentsSelector = useMemo(
+    () => pageSelectors.getFilteredDocumentsSnapshotByKind(pageKind),
+    [pageKind],
+  );
 
   const [hasMore, isLoadingMore, loadMoreDocuments] = usePageStore((s) => [
     pageSelectors.hasMoreDocuments(s),
     pageSelectors.isLoadingMoreDocuments(s),
     s.loadMoreDocuments,
   ]);
+  const globalSearchKeywords = usePageStore((s) => s.searchKeywords);
 
-  const allFilteredDocuments = usePageStore(pageSelectors.getFilteredDocuments);
+  const { items: allFilteredDocuments } = usePageStore(filteredDocumentsSelector);
 
-  // Filter by search keyword
+  // Optional client-side search for drawer-local filtering.
   const displayDocuments = useMemo(() => {
-    if (!searchKeyword.trim()) return allFilteredDocuments;
+    if (!searchKeyword?.trim()) return allFilteredDocuments;
 
     const keyword = searchKeyword.toLowerCase();
     return allFilteredDocuments.filter((doc: LobeDocument) => {
@@ -41,7 +48,7 @@ const Content = memo<ContentProps>(({ searchKeyword }) => {
   }, [allFilteredDocuments, searchKeyword]);
 
   const count = displayDocuments.length;
-  const isSearching = searchKeyword.trim().length > 0;
+  const isSearching = (searchKeyword ?? globalSearchKeywords).trim().length > 0;
 
   // Handle scroll - use findItemIndex (official pattern)
   const handleScroll = useCallback(async () => {
@@ -65,7 +72,7 @@ const Content = memo<ContentProps>(({ searchKeyword }) => {
 
   // Show empty state
   if (count === 0) {
-    return <PageEmpty search={isSearching} />;
+    return <PageEmpty pageKind={pageKind} search={isSearching} />;
   }
 
   return (

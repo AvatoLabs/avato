@@ -90,11 +90,40 @@ export interface LocalReadFilesParams {
   paths: string[];
 }
 
+export interface ReadLocalFileAsBase64Params {
+  /**
+   * Optional root directory. When set, relative paths are resolved from this root and the final
+   * path must stay inside it.
+   */
+  baseDir?: string;
+  /**
+   * File path to read.
+   */
+  path: string;
+}
+
+export interface ReadLocalFileAsBase64Result {
+  base64?: string;
+  error?: string;
+  filename?: string;
+  mimeType?: string;
+  path?: string;
+  sha256?: string;
+  size?: number;
+  success: boolean;
+}
+
 export interface WriteLocalFileParams {
   /**
    * Content to write
    */
   content: string;
+
+  /**
+   * Content encoding
+   * @default 'utf8'
+   */
+  encoding?: 'base64' | 'utf8';
 
   /**
    * File path to write to
@@ -346,7 +375,7 @@ export interface ShowSaveDialogResult {
 export interface PrepareSkillDirectoryParams {
   forceRefresh?: boolean;
   url: string;
-  zipHash: string;
+  zipSha256: string;
 }
 
 export interface PrepareSkillDirectoryResult {
@@ -359,7 +388,7 @@ export interface PrepareSkillDirectoryResult {
 export interface ResolveSkillResourcePathParams {
   path: string;
   url: string;
-  zipHash: string;
+  zipSha256: string;
 }
 
 export interface ResolveSkillResourcePathResult {

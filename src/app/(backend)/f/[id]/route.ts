@@ -1,14 +1,44 @@
+import { getXorPayload } from '@lobechat/utils/server';
 import debug from 'debug';
 
 import { auth } from '@/auth';
 import { FileModel } from '@/database/models/file';
 import { getServerDB } from '@/database/server';
 import { appEnv } from '@/envs/app';
+import { LOBE_CHAT_AUTH_HEADER, LOBE_CHAT_OIDC_AUTH_HEADER } from '@/envs/auth';
+import { validateOIDCJWT } from '@/libs/oidc-provider/jwt';
 import { serveAuthorizedFileDownload } from '@/server/modules/file-proxy/serveAuthorizedFileDownload';
+import { isRawFileContentId } from '@/types/content';
 
 const log = debug('lobe-file:proxy');
 
 type Params = Promise<{ id: string }>;
+
+const resolveRequestUserId = async (req: Request) => {
+  const session =
+    process.env.NOAUTH_MODE === '1'
+      ? { user: { id: process.env.NOAUTH_USER_ID || 'local-user' } }
+      : await auth.api.getSession({ headers: req.headers });
+
+  if (session?.user?.id) return session.user.id;
+
+  const encryptedAuth = req.headers.get(LOBE_CHAT_AUTH_HEADER);
+  if (!encryptedAuth) return undefined;
+
+  try {
+    const jwtPayload = getXorPayload(encryptedAuth);
+    const oidcAuthorization = req.headers.get(LOBE_CHAT_OIDC_AUTH_HEADER);
+
+    if (oidcAuthorization) {
+      const oidc = await validateOIDCJWT(oidcAuthorization);
+      return oidc.userId;
+    }
+
+    return jwtPayload.userId || undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 /**
  * File proxy service
@@ -25,35 +55,34 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
   try {
     const params = await segmentData.params;
     const { id } = params;
-    const { searchParams } = new URL(req.url);
-    const shareToken = searchParams.get('token');
+    const requestUrl =
+      req.url.startsWith('http://') || req.url.startsWith('https://')
+        ? new URL(req.url)
+        : new URL(req.url, appEnv.APP_URL);
+    const { searchParams } = requestUrl;
+    const shareToken = searchParams.get('token')?.trim() || null;
     const sharePassword = searchParams.get('password');
 
     log('File proxy request: %s', id);
 
-    const session =
-      process.env.NOAUTH_MODE === '1'
-        ? { user: { id: process.env.NOAUTH_USER_ID || 'local-user' } }
-        : await auth.api.getSession({ headers: req.headers });
+    if (!isRawFileContentId(id)) {
+      return new Response('File not found', { status: 404 });
+    }
 
-    const userId = session?.user?.id;
+    const userId = await resolveRequestUserId(req);
 
     if (!userId && !shareToken) {
       return new Response('Unauthorized', { status: 401 });
     }
 
     // Token-first share download: do not keep resource id in the URL surface.
-    if (shareToken?.trim()) {
-      const base =
-        req.url.startsWith('http://') || req.url.startsWith('https://')
-          ? new URL(req.url)
-          : new URL(req.url, appEnv.APP_URL);
-      base.pathname = `/share/f/${encodeURIComponent(shareToken.trim())}`;
-      base.search = '';
+    if (shareToken) {
+      requestUrl.pathname = `/share/f/${encodeURIComponent(shareToken)}`;
+      requestUrl.search = '';
       if (sharePassword) {
-        base.searchParams.set('password', sharePassword);
+        requestUrl.searchParams.set('password', sharePassword);
       }
-      return Response.redirect(base.toString(), 307);
+      return Response.redirect(requestUrl.toString(), 307);
     }
 
     const db = await getServerDB();

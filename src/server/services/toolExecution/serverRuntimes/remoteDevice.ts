@@ -16,6 +16,7 @@ export const remoteDeviceRuntime: ServerRuntimeRegistration = {
 
     return new RemoteDeviceExecutionRuntime({
       queryDeviceList: () => deviceProxy.queryDeviceList(userId),
+      queryDeviceSystemInfo: (deviceId) => deviceProxy.queryDeviceSystemInfo(userId, deviceId),
     });
   },
   identifier: RemoteDeviceIdentifier,

@@ -6,7 +6,9 @@ import { useTranslation } from 'react-i18next';
 
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import SideBarDrawer from '@/features/NavPanel/SideBarDrawer';
+import { usePageKind } from '@/features/Pages/usePageKind';
 import dynamic from '@/libs/next/dynamic';
+import { TABLE_PAGE_KIND } from '@/utils/docs';
 
 const Content = dynamic(() => import('./Content'), {
   loading: () => (
@@ -24,18 +26,20 @@ interface AllPagesDrawerProps {
 
 const AllPagesDrawer = memo<AllPagesDrawerProps>(({ open, onClose }) => {
   const { t } = useTranslation('file');
+  const pageKind = usePageKind();
+  const isTablePage = pageKind === TABLE_PAGE_KIND;
   const [searchKeyword, setSearchKeyword] = useState('');
 
   return (
     <SideBarDrawer
       open={open}
-      title={t('pageList.title')}
+      title={t(isTablePage ? 'pageList.tableTitle' : 'pageList.title')}
       subHeader={
         <Flexbox paddingBlock={'0 8px'} paddingInline={8}>
           <SearchBar
             allowClear
             defaultValue={searchKeyword}
-            placeholder={t('searchPagePlaceholder')}
+            placeholder={t(isTablePage ? 'searchTablePlaceholder' : 'searchPagePlaceholder')}
             onSearch={(keyword) => setSearchKeyword(keyword)}
             onInputChange={(keyword) => {
               if (!keyword) setSearchKeyword('');

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getTestDB } from '../../core/getTestDB';
 import type { NewGenerationBatch } from '../../schemas';
-import { generationBatches, generations, generationTopics, users } from '../../schemas';
+import { files, generationBatches, generations, generationTopics, users } from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
 import { GenerationBatchModel } from '../generationBatch';
 
@@ -362,6 +362,86 @@ describe('GenerationBatchModel', () => {
       });
     });
 
+    it('should prefer stable file proxies for config image references with file records', async () => {
+      await serverDB.insert(files).values([
+        {
+          id: 'file-start',
+          userId,
+          fileType: 'image/png',
+          name: 'start',
+          size: 1,
+          url: 'single-image.jpg',
+        },
+        {
+          id: 'file-end',
+          userId,
+          fileType: 'image/png',
+          name: 'end',
+          size: 1,
+          url: 'end-frame.jpg',
+        },
+        {
+          id: 'file-1',
+          userId,
+          fileType: 'image/png',
+          name: 'one',
+          size: 1,
+          url: 'url1.jpg',
+        },
+      ]);
+
+      await serverDB.insert(generationBatches).values({
+        ...testBatch,
+        userId,
+        config: {
+          imageUrl: 'single-image.jpg',
+          endImageUrl: 'end-frame.jpg',
+          imageUrls: ['url1.jpg', 'url2.jpg'],
+          prompt: 'test prompt',
+        },
+      });
+
+      const results = await generationBatchModel.queryGenerationBatchesByTopicIdWithGenerations(
+        testTopic.id,
+      );
+
+      expect(results[0].config).toEqual({
+        imageUrl: '/f/file-start',
+        endImageUrl: '/f/file-end',
+        imageUrls: ['/f/file-1', 'https://example.com/url2.jpg'],
+        prompt: 'test prompt',
+      });
+      expect(mockGetFullFileUrl).toHaveBeenCalledWith('url2.jpg');
+      expect(mockGetFullFileUrl).not.toHaveBeenCalledWith('single-image.jpg');
+      expect(mockGetFullFileUrl).not.toHaveBeenCalledWith('end-frame.jpg');
+      expect(mockGetFullFileUrl).not.toHaveBeenCalledWith('url1.jpg');
+    });
+
+    it('should preserve stable share proxy urls in config without re-signing them', async () => {
+      await serverDB.insert(generationBatches).values({
+        ...testBatch,
+        userId,
+        config: {
+          imageUrl: '/share/f/share-token-1?password=secret',
+          endImageUrl: '/share/t/share_1/f/file_end',
+          imageUrls: ['/share/f/share-token-2', '/f/file-2'],
+          prompt: 'test prompt',
+        },
+      });
+
+      const results = await generationBatchModel.queryGenerationBatchesByTopicIdWithGenerations(
+        testTopic.id,
+      );
+
+      expect(results[0].config).toEqual({
+        imageUrl: '/share/f/share-token-1?password=secret',
+        endImageUrl: '/share/t/share_1/f/file_end',
+        imageUrls: ['/share/f/share-token-2', '/f/file-2'],
+        prompt: 'test prompt',
+      });
+      expect(mockGetFullFileUrl).not.toHaveBeenCalled();
+    });
+
     it('should transform single config imageUrl through FileService', async () => {
       const [createdBatch] = await serverDB
         .insert(generationBatches)
@@ -563,6 +643,47 @@ describe('GenerationBatchModel', () => {
         where: eq(generationBatches.id, createdBatch.id),
       });
       expect(deletedBatch).toBeUndefined();
+    });
+
+    it('should delete generated file rows and only return orphaned main asset URLs', async () => {
+      const [createdBatch] = await serverDB
+        .insert(generationBatches)
+        .values({ ...testBatch, userId })
+        .returning();
+
+      await serverDB.insert(files).values({
+        id: 'generated-file-1',
+        userId,
+        fileType: 'image/jpeg',
+        name: 'generated-image',
+        size: 1024,
+        url: 'asset-file.jpg',
+      });
+
+      await serverDB.insert(generations).values({
+        ...testGeneration,
+        generationBatchId: createdBatch.id,
+        fileId: 'generated-file-1',
+        asset: {
+          type: 'image',
+          url: 'asset-file.jpg',
+          thumbnailUrl: 'thumbnail-file.jpg',
+          width: 1024,
+          height: 1024,
+        },
+      });
+
+      const result = await generationBatchModel.delete(createdBatch.id);
+
+      expect(result).toBeDefined();
+      expect(result!.filesToDelete).toHaveLength(2);
+      expect(result!.filesToDelete).toContain('thumbnail-file.jpg');
+      expect(result!.filesToDelete).toContain('asset-file.jpg');
+
+      const deletedFile = await serverDB.query.files.findFirst({
+        where: eq(files.id, 'generated-file-1'),
+      });
+      expect(deletedFile).toBeUndefined();
     });
 
     it('should collect multiple thumbnail URLs from multiple generations', async () => {

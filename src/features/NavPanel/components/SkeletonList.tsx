@@ -19,6 +19,7 @@ export const SkeletonItem = memo<{ avatarSize?: number } & Omit<FlexboxProps, 'c
         {...rest}
       >
         <Skeleton.Button
+          active
           size={'small'}
           style={{
             borderRadius: cssVar.borderRadius,
@@ -48,16 +49,16 @@ export const SkeletonItem = memo<{ avatarSize?: number } & Omit<FlexboxProps, 'c
   },
 );
 
-export const SkeletonList = memo<{ rows?: number } & Omit<FlexboxProps, 'children'>>(
-  ({ rows = 3, ...rest }) => {
-    return (
-      <Flexbox gap={2} {...rest}>
-        {Array.from({ length: rows }).map((_, i) => (
-          <SkeletonItem key={i} />
-        ))}
-      </Flexbox>
-    );
-  },
-);
+export const SkeletonList = memo<
+  { avatarSize?: number; rows?: number } & Omit<FlexboxProps, 'children'>
+>(({ avatarSize, rows = 3, ...rest }) => {
+  return (
+    <Flexbox gap={2} {...rest}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <SkeletonItem avatarSize={avatarSize} key={i} />
+      ))}
+    </Flexbox>
+  );
+});
 
 export default SkeletonList;

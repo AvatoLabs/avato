@@ -6,8 +6,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DevModal from '@/features/PluginDevModal';
-import { useAgentStore } from '@/store/agent';
-import { useToolStore } from '@/store/tool';
+import { useAgentStore } from '@/store/agent/store';
+import { useToolStore } from '@/store/tool/store';
 
 const AddPluginButton = ({ ref, ...props }: ButtonProps & { ref?: Ref<HTMLButtonElement> }) => {
   const { t } = useTranslation('setting');

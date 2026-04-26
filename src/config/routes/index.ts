@@ -69,14 +69,14 @@ export const NAVIGATION_ROUTES: NavigationRoute[] = [
     pathPrefix: '/studio',
   },
   {
-    cmdkKey: 'cmdk.resource',
+    cmdkKey: 'cmdk.content',
     electronKey: 'navigation.resources',
     icon: APP_ENTRY_ICONS.resource,
     id: 'resource',
     keywords: ['knowledge', 'files', 'library', 'documents'],
     keywordsKey: 'cmdk.keywords.resources',
-    path: '/resource',
-    pathPrefix: '/resource',
+    path: '/spaces',
+    pathPrefix: '/spaces',
   },
   {
     cmdkKey: 'cmdk.pages',
@@ -85,8 +85,8 @@ export const NAVIGATION_ROUTES: NavigationRoute[] = [
     id: 'page',
     keywords: ['documents', 'write', 'notes'],
     keywordsKey: 'cmdk.keywords.pages',
-    path: '/page',
-    pathPrefix: '/page',
+    path: '/spaces',
+    pathPrefix: '/spaces',
     useDynamicTitle: true,
   },
   {

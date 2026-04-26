@@ -20,6 +20,6 @@
   "notebook.delete": "Eliminar",
   "notebook.empty": "Aún no hay páginas. Las páginas vinculadas a este tema aparecerán aquí.",
   "notebook.title": "Cuaderno",
-  "openInPageEditor": "Editar en la página",
+  "openInDocEditor": "Editar en la página",
   "title": "Espacio de trabajo"
 }

@@ -130,7 +130,7 @@ export interface OAuthDeviceFlowAuthProps {
 const OAuthDeviceFlowAuth = memo<OAuthDeviceFlowAuthProps>(
   ({ providerId, name, onAuthChange, title, extra }) => {
     const { t } = useTranslation('modelProvider');
-    const { modal } = App.useApp();
+    const { message, modal } = App.useApp();
     const { styles } = useStyles();
 
     const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -173,11 +173,16 @@ const OAuthDeviceFlowAuth = memo<OAuthDeviceFlowAuthProps>(
         okButtonProps: { danger: true },
         okText: t('providerModels.config.oauth.disconnect'),
         onOk: async () => {
-          await revokeAuth.mutateAsync({ providerId });
+          try {
+            await revokeAuth.mutateAsync({ providerId });
+          } catch (error) {
+            console.error('Failed to disconnect OAuth provider:', error);
+            message.error(t('providerModels.config.oauth.disconnectError'));
+          }
         },
         title: t('providerModels.config.oauth.disconnect'),
       });
-    }, [modal, providerId, revokeAuth, t]);
+    }, [message, modal, providerId, revokeAuth, t]);
 
     const handleStartAuth = useCallback(async () => {
       hasAutoClosedRef.current = false;

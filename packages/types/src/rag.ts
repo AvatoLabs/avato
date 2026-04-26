@@ -9,7 +9,7 @@ export const SemanticSearchSchema = z.object({
   chunkTopK: z.number().optional(),
   fileIds: z.array(z.string()).optional(),
   fileTopK: z.number().optional(),
-  knowledgeIds: z.array(z.string()).optional(),
+  sourceSetIds: z.array(z.string()).optional(),
   query: z.string(),
 });
 

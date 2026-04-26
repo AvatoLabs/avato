@@ -47,7 +47,6 @@ import {
 } from '@lobechat/types';
 import debug from 'debug';
 import { and, asc, eq, inArray } from 'drizzle-orm';
-import { join } from 'pathe';
 import { z } from 'zod';
 
 import { AsyncTaskModel } from '@/database/models/asyncTask';
@@ -64,6 +63,8 @@ import { type MemoryAgentConfig } from '@/server/globalConfig/parseMemoryExtract
 import { parseMemoryExtractionConfig } from '@/server/globalConfig/parseMemoryExtractionConfig';
 import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
 import { S3 } from '@/server/modules/S3';
+import { SpaceMemoryUserMemoryIngestionService } from '@/server/services/spaceMemory/userMemoryIngestion';
+import { buildInternalServiceAuthHeaders } from '@/server/utils/internalServiceAuth';
 import { AsyncTaskError, AsyncTaskErrorType, AsyncTaskStatus } from '@/types/asyncTask';
 import { type GlobalMemoryLayer } from '@/types/serverConfig';
 import { type ProviderConfig } from '@/types/user/settings';
@@ -71,6 +72,8 @@ import { type MergeStrategyEnum } from '@/types/userMemory';
 import { LayersEnum, MemorySourceType, TypesEnum } from '@/types/userMemory';
 import { trimBasedOnBatchProbe } from '@/utils/chunkers';
 import { encodeAsync } from '@/utils/tokenizer';
+
+import { buildMemoryExtractionTraceBasePath, buildMemoryExtractionTracePath } from './extractionTracePath';
 
 const SOURCE_ALIAS_MAP: Record<string, MemorySourceType> = {
   benchmark_locomo: MemorySourceType.BenchmarkLocomo,
@@ -1124,7 +1127,15 @@ export class MemoryExtractionExecutor {
         try {
           const db = await this.db;
           const topic = await db.query.topics.findFirst({
-            columns: { createdAt: true, id: true, metadata: true, updatedAt: true, userId: true },
+            columns: {
+              createdAt: true,
+              id: true,
+              metadata: true,
+              spaceId: true,
+              title: true,
+              updatedAt: true,
+              userId: true,
+            },
             where: and(eq(topics.id, job.topicId), eq(topics.userId, job.userId)),
           });
 
@@ -1389,6 +1400,41 @@ export class MemoryExtractionExecutor {
             ...persistedRes,
             processedMemoryCount: persistedRes.createdIds.length,
           });
+          try {
+            const spaceMemoryIngestion = new SpaceMemoryUserMemoryIngestionService(db, job.userId);
+            const spaceMemoryResult = await spaceMemoryIngestion.triggerTopicExtraction({
+              extraction,
+              messageIds,
+              producer: 'user-memory-extractor',
+              topic: {
+                id: topic.id,
+                spaceId: topic.spaceId,
+                title: topic.title,
+              },
+              traceId: `user-memory-topic:${topic.id}:${span.spanContext().traceId}`,
+            });
+
+            if (spaceMemoryResult.status === 'scheduled') {
+              span.setAttribute(
+                'memory.space_memory_candidate_count',
+                spaceMemoryResult.draftCount ?? 0,
+              );
+            } else {
+              span.setAttribute(
+                'memory.space_memory_ingest_status',
+                spaceMemoryResult.reason ?? 'skipped',
+              );
+            }
+          } catch (spaceMemoryError) {
+            console.error(
+              '[memory-extraction] failed to ingest space memory candidates',
+              spaceMemoryError,
+              'topicId:',
+              topic.id,
+              'userId:',
+              job.userId,
+            );
+          }
           this.recordJobMetrics(extractionJob, 'completed', Date.now() - startTime);
           span.setStatus({ code: SpanStatusCode.OK });
           span.setAttribute('memory.processed_memory_count', persistedRes.createdIds.length);
@@ -1464,23 +1510,16 @@ export class MemoryExtractionExecutor {
   }
 
   private getOnExtractHooksPath(
-    userId: string,
     source: string,
-    sourceId: string,
   ): string | undefined {
     if (!this.modelConfig.observabilityS3?.enabled) {
       return undefined;
     }
 
-    const withoutBase = `memory-extraction/${userId}/${source}/${sourceId}/`;
-    const base = this.modelConfig.observabilityS3?.pathPrefix
-      ? this.modelConfig.observabilityS3?.pathPrefix.startsWith('/')
-        ? this.modelConfig.observabilityS3?.pathPrefix.slice(1)
-        : this.modelConfig.observabilityS3?.pathPrefix
-      : '';
-
-    const key = join(`${base}`, withoutBase);
-    return key;
+    return buildMemoryExtractionTraceBasePath({
+      pathPrefix: this.modelConfig.observabilityS3?.pathPrefix,
+      source,
+    });
   }
 
   private async uploadExtractionTrace(
@@ -1496,11 +1535,10 @@ export class MemoryExtractionExecutor {
   ) {
     if (!this.modelConfig.observabilityS3?.enabled) return;
 
-    const key = join(
-      this.getOnExtractHooksPath(userId, source, sourceId)!,
-      'trace',
-      `${new Date().toISOString()}.json`,
-    );
+    const key = buildMemoryExtractionTracePath({
+      pathPrefix: this.modelConfig.observabilityS3?.pathPrefix,
+      source,
+    });
 
     await s3.uploadContent(key, JSON.stringify(payload, null, 2));
   }
@@ -2264,7 +2302,7 @@ const buildTriggerUrl = (path: string, baseUrl: string) => {
 const createTriggerHeaders = (extraHeaders?: Record<string, string>) => {
   const { webhook } = parseMemoryExtractionConfig();
 
-  return {
+  const headers = {
     'Content-Type': 'application/json',
     ...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET && {
       'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
@@ -2272,6 +2310,16 @@ const createTriggerHeaders = (extraHeaders?: Record<string, string>) => {
     ...webhook.headers,
     ...extraHeaders,
   };
+
+  const hasAuthorizationHeader = Object.keys(headers).some(
+    (headerKey) => headerKey.toLowerCase() === 'authorization',
+  );
+
+  if (!hasAuthorizationHeader && process.env.KEY_VAULTS_SECRET) {
+    Object.assign(headers, buildInternalServiceAuthHeaders());
+  }
+
+  return headers;
 };
 
 const triggerInternalEndpoint = (

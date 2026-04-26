@@ -3,7 +3,7 @@ import {
   type DeviceStatusResult,
   type DeviceSystemInfo,
   GatewayHttpClient,
-} from '@lobechat/device-gateway-client';
+} from '@lobechat/device-gateway-client/http';
 import debug from 'debug';
 
 import { gatewayEnv } from '@/envs/gateway';
@@ -12,11 +12,32 @@ const log = debug('lobe-server:device-proxy');
 
 export type { DeviceAttachment, DeviceStatusResult, DeviceSystemInfo };
 
+const normalizeGatewayUrl = (value: string | undefined) => {
+  const url = value?.trim();
+  if (!url) return undefined;
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
+    return url.replace(/\/+$/, '');
+  } catch {
+    return undefined;
+  }
+};
+
+const resolveLastSeen = (connectedAt: number) => {
+  const timestamp = Number.isFinite(connectedAt) ? connectedAt : Date.now();
+  const date = new Date(timestamp);
+
+  return Number.isFinite(date.getTime()) ? date.toISOString() : new Date(Date.now()).toISOString();
+};
+
 export class DeviceProxy {
   private client: GatewayHttpClient | null = null;
+  private clientKey?: string;
 
   get isConfigured(): boolean {
-    return !!gatewayEnv.DEVICE_GATEWAY_URL;
+    return !!this.resolveConfig();
   }
 
   async queryDeviceStatus(userId: string): Promise<DeviceStatusResult> {
@@ -39,9 +60,10 @@ export class DeviceProxy {
       // Transform gateway format to runtime-expected format
       // All devices from gateway have active WebSocket connections, so they're online
       return devices.map((d) => ({
+        allowRemoteTools: d.allowRemoteTools === true,
         deviceId: d.deviceId,
         hostname: d.hostname,
-        lastSeen: new Date(d.connectedAt).toISOString(),
+        lastSeen: resolveLastSeen(d.connectedAt),
         online: true,
         platform: d.platform,
       }));
@@ -67,7 +89,7 @@ export class DeviceProxy {
   }
 
   async executeToolCall(
-    params: { deviceId: string; userId: string },
+    params: { deviceId?: string; userId: string },
     toolCall: { apiName: string; arguments: string; identifier: string },
     timeout = 30_000,
   ): Promise<{ content: string; error?: string; success: boolean }> {
@@ -101,14 +123,24 @@ export class DeviceProxy {
   }
 
   private getClient(): GatewayHttpClient | null {
-    const url = gatewayEnv.DEVICE_GATEWAY_URL;
-    const token = gatewayEnv.DEVICE_GATEWAY_SERVICE_TOKEN;
-    if (!url || !token) return null;
+    const config = this.resolveConfig();
+    if (!config) return null;
 
-    if (!this.client) {
+    const { token, url } = config;
+    const clientKey = `${url}\n${token}`;
+    if (!this.client || this.clientKey !== clientKey) {
       this.client = new GatewayHttpClient({ gatewayUrl: url, serviceToken: token });
+      this.clientKey = clientKey;
     }
     return this.client;
+  }
+
+  private resolveConfig(): { token: string; url: string } | undefined {
+    const url = normalizeGatewayUrl(gatewayEnv.DEVICE_GATEWAY_URL);
+    const token = gatewayEnv.DEVICE_GATEWAY_SERVICE_TOKEN?.trim();
+    if (!url || !token) return undefined;
+
+    return { token, url };
   }
 }
 

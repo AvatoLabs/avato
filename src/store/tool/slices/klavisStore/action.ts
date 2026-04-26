@@ -285,8 +285,9 @@ export class KlavisStoreActionImpl {
     }
   };
 
-  removeKlavisServer = async (identifier: string): Promise<void> => {
+  removeKlavisServer = async (identifier: string): Promise<boolean> => {
     const { servers } = this.#get();
+    const previousServers = [...servers];
     // Find server using identifier
     const server = servers.find((s) => s.identifier === identifier);
 
@@ -300,15 +301,26 @@ export class KlavisStoreActionImpl {
     );
 
     // Delete from Klavis API and database
-    if (server) {
-      try {
-        await lambdaClient.klavis.deleteServerInstance.mutate({
-          identifier,
-          instanceId: server.instanceId,
-        });
-      } catch (error) {
-        console.error('[Klavis] Failed to delete server instance:', error);
-      }
+    if (!server) return true;
+
+    try {
+      await lambdaClient.klavis.deleteServerInstance.mutate({
+        identifier,
+        instanceId: server.instanceId,
+      });
+      return true;
+    } catch (error) {
+      console.error('[Klavis] Failed to delete server instance:', error);
+
+      this.#set(
+        produce((draft: KlavisStoreState) => {
+          draft.servers = previousServers;
+        }),
+        false,
+        n('removeKlavisServer/error'),
+      );
+
+      return false;
     }
   };
 

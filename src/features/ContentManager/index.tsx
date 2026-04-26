@@ -1,0 +1,319 @@
+'use client';
+
+import { BRANDING_NAME } from '@lobechat/business-const';
+import { type DocumentItem } from '@lobechat/database/schemas';
+import { Flexbox } from '@lobehub/ui';
+import { createStaticStyles, useTheme } from 'antd-style';
+import { memo, useCallback, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+
+import DragUploadZone from '@/components/DragUploadZone';
+import { PageEditor } from '@/features/PageEditor';
+import { stripFilesItemPath } from '@/features/ResourceSpaces';
+import dynamic from '@/libs/next/dynamic';
+import { useContentManagerStore } from '@/routes/(main)/content/features/store';
+import { documentService } from '@/services/document';
+import { abortableRequest } from '@/services/utils/abortableRequest';
+import { useFileStore } from '@/store/file';
+import { documentSelectors } from '@/store/file/slices/document/selectors';
+import { DocumentSourceType, type LobeDocument } from '@/types/document';
+import { getPageKindFromDocument } from '@/utils/docs';
+
+import FileEditor from './components/Editor';
+import Explorer from './components/Explorer';
+import UploadDock from './components/UploadDock';
+
+const ChunkDrawer = dynamic(() => import('./components/ChunkDrawer'), { ssr: false });
+
+const DOC_EDITOR_FETCH_KEY = 'content-manager-doc-editor';
+
+const mapDocumentItemToLobeDocument = (document: DocumentItem): LobeDocument => {
+  let editorData: Record<string, any> | null = document.editorData ?? null;
+  if (typeof editorData === 'string') {
+    try {
+      editorData = JSON.parse(editorData) as Record<string, any>;
+    } catch {
+      editorData = null;
+    }
+  }
+
+  return {
+    content: document.content || null,
+    createdAt: document.createdAt ? new Date(document.createdAt) : new Date(),
+    editorData,
+    fileType: document.fileType,
+    filename: document.title || document.filename || 'Untitled',
+    id: document.id,
+    metadata: document.metadata || {},
+    source: 'document',
+    sourceType: DocumentSourceType.EDITOR,
+    title: document.title || '',
+    totalCharCount: document.content?.length || 0,
+    totalLineCount: 0,
+    updatedAt: document.updatedAt ? new Date(document.updatedAt) : new Date(),
+  };
+};
+
+const styles = createStaticStyles(({ css, cssVar }) => {
+  return {
+    container: css`
+      position: relative;
+      overflow: hidden;
+    `,
+    explorerStage: css`
+      height: 100%;
+      transition:
+        opacity 180ms ease,
+        transform 180ms ease,
+        visibility 0s linear;
+    `,
+    explorerStage_inert: css`
+      pointer-events: none;
+      user-select: none;
+      visibility: hidden;
+      opacity: 0;
+      transform: scale(0.992);
+    `,
+    editorOverlay: css`
+      position: absolute;
+      z-index: 1;
+      inset: 0;
+
+      width: 100%;
+      height: 100%;
+      padding: clamp(10px, 1.8vw, 18px);
+
+      background:
+        radial-gradient(circle at top left, rgb(82 149 255 / 8%), transparent 28%),
+        linear-gradient(
+          180deg,
+          var(--editor-overlay-bg, ${cssVar.colorBgContainer}) 0%,
+          ${cssVar.colorBgLayout} 100%
+        );
+    `,
+    docEditorOverlay: css`
+      position: absolute;
+      z-index: 1;
+      inset: 0;
+
+      width: 100%;
+      height: 100%;
+      padding: clamp(10px, 1.8vw, 18px);
+
+      background:
+        radial-gradient(circle at top left, rgb(82 149 255 / 8%), transparent 28%),
+        linear-gradient(180deg, ${cssVar.colorBgLayout} 0%, ${cssVar.colorBgContainer} 100%);
+    `,
+    overlayStage: css`
+      overflow: hidden;
+
+      width: 100%;
+      height: 100%;
+      border: 1px solid color-mix(in srgb, ${cssVar.colorBorderSecondary} 90%, transparent);
+      border-radius: 24px;
+
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, ${cssVar.colorBgContainer} 97%, ${cssVar.colorBgElevated}) 0%,
+          color-mix(in srgb, ${cssVar.colorBgContainer} 92%, ${cssVar.colorBgLayout}) 100%
+        );
+      box-shadow:
+        0 28px 72px -48px color-mix(in srgb, ${cssVar.colorText} 24%, transparent),
+        inset 0 1px 0 color-mix(in srgb, white 55%, transparent);
+      backdrop-filter: blur(16px);
+
+      @media (max-width: 768px) {
+        border-radius: 18px;
+      }
+    `,
+    overlayStage_doc: css`
+      background: color-mix(in srgb, ${cssVar.colorBgLayout} 96%, ${cssVar.colorBgContainer});
+    `,
+    overlayStage_editor: css`
+      background: color-mix(
+        in srgb,
+        var(--editor-overlay-bg, ${cssVar.colorBgContainer}) 96%,
+        ${cssVar.colorBgContainer}
+      );
+    `,
+  };
+});
+
+export type ContentManagerMode = 'doc' | 'editor' | 'explorer';
+
+/**
+ * Manage content within the current workspace or source set.
+ *
+ * Business component, no need be reusable.
+ */
+const ContentManager = memo(() => {
+  const theme = useTheme();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [
+    mode,
+    currentViewItemId,
+    sourceSetId,
+    currentFolderId,
+    setMode,
+    setCurrentViewItemId,
+    spaceId,
+  ] = useContentManagerStore((s) => [
+    s.mode,
+    s.currentViewItemId,
+    s.sourceSetId,
+    s.currentFolderId,
+    s.setMode,
+    s.setCurrentViewItemId,
+    s.spaceId,
+  ]);
+
+  const currentDocument = useFileStore(documentSelectors.getDocumentById(currentViewItemId));
+  const pushDockFileList = useFileStore((s) => s.pushDockFileList);
+  const updateDocumentOptimistically = useFileStore((s) => s.updateDocumentOptimistically);
+
+  const handleUploadFiles = useCallback(
+    (files: File[]) => pushDockFileList(files, sourceSetId, currentFolderId ?? undefined, spaceId),
+    [currentFolderId, sourceSetId, pushDockFileList, spaceId],
+  );
+
+  const cssVariables = useMemo<Record<string, string>>(
+    () => ({
+      '--editor-overlay-bg': theme.colorBgContainerSecondary,
+    }),
+    [theme.colorBgContainerSecondary],
+  );
+  const isOverlayMode = mode !== 'explorer';
+
+  // Fetch the current doc when switching to doc mode if it is not already loaded.
+  useEffect(() => {
+    if (mode !== 'doc' || !currentViewItemId || currentDocument) {
+      return undefined;
+    }
+
+    const requestedId = currentViewItemId;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const raw = await documentService.getDocumentById(requestedId, DOC_EDITOR_FETCH_KEY);
+        if (cancelled || !raw || raw.id !== requestedId) return;
+
+        const contentManager = useContentManagerStore.getState();
+        if (contentManager.mode !== 'doc' || contentManager.currentViewItemId !== requestedId) {
+          return;
+        }
+
+        const page = mapDocumentItemToLobeDocument(raw);
+
+        useFileStore.setState((state) => {
+          if (state.documents.some((d) => d.id === page.id)) return state;
+          return { documents: [...state.documents, page] };
+        });
+      } catch {
+        // Aborted (new navigation) or request failure — avoid unhandled rejection
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      abortableRequest.cancel(DOC_EDITOR_FETCH_KEY);
+    };
+  }, [mode, currentViewItemId, currentDocument]);
+
+  const handleBack = () => {
+    setMode('explorer');
+    setCurrentViewItemId(undefined);
+    const nextParams = new URLSearchParams(location.search);
+    nextParams.delete('file');
+
+    const nextPath = stripFilesItemPath(location.pathname);
+    const nextSearch = nextParams.toString();
+    navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
+
+    // Reset document title to default
+    document.title = BRANDING_NAME;
+  };
+
+  // Optimistic update handlers for doc title and emoji
+  const handleTitleChange = useCallback(
+    (newTitle: string) => {
+      if (currentViewItemId) {
+        updateDocumentOptimistically(currentViewItemId, { title: newTitle });
+      }
+    },
+    [currentViewItemId, updateDocumentOptimistically],
+  );
+
+  const handleEmojiChange = useCallback(
+    (newEmoji: string | undefined) => {
+      if (currentViewItemId) {
+        updateDocumentOptimistically(currentViewItemId, {
+          metadata: { ...currentDocument?.metadata, emoji: newEmoji },
+        });
+      }
+    },
+    [currentViewItemId, currentDocument?.metadata, updateDocumentOptimistically],
+  );
+
+  return (
+    <>
+      <DragUploadZone
+        disabled={isOverlayMode}
+        enabledFiles
+        style={{ height: '100%' }}
+        onUploadFiles={handleUploadFiles}
+      >
+        <Flexbox className={styles.container} height={'100%'} style={cssVariables}>
+          {/* Explorer is always rendered to preserve its state */}
+          <div
+            aria-hidden={isOverlayMode}
+            data-testid={'content-manager-explorer-stage'}
+            className={`${styles.explorerStage} ${isOverlayMode ? styles.explorerStage_inert : ''}`}
+          >
+            <Explorer />
+          </div>
+
+          {/* Editor overlay */}
+          {mode === 'editor' && (
+            <Flexbox className={styles.editorOverlay}>
+              <div
+                className={`${styles.overlayStage} ${styles.overlayStage_editor}`}
+                data-testid={'content-manager-editor-stage'}
+              >
+                <FileEditor onBack={handleBack} />
+              </div>
+            </Flexbox>
+          )}
+
+          {/* Doc editor overlay */}
+          {mode === 'doc' && (
+            <Flexbox className={styles.docEditorOverlay}>
+              <div
+                className={`${styles.overlayStage} ${styles.overlayStage_doc}`}
+                data-testid={'content-manager-doc-stage'}
+              >
+                <PageEditor
+                  emoji={currentDocument?.metadata?.emoji as string | undefined}
+                  pageId={currentViewItemId}
+                  pageKind={getPageKindFromDocument(currentDocument)}
+                  sourceSetId={sourceSetId}
+                  title={currentDocument?.title}
+                  onBack={handleBack}
+                  onDelete={handleBack}
+                  onEmojiChange={handleEmojiChange}
+                  onTitleChange={handleTitleChange}
+                />
+              </div>
+            </Flexbox>
+          )}
+        </Flexbox>
+      </DragUploadZone>
+      <UploadDock />
+      <ChunkDrawer />
+    </>
+  );
+});
+
+export default ContentManager;

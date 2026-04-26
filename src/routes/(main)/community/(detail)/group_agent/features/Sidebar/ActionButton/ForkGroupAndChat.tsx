@@ -63,7 +63,9 @@ const ForkGroupAndChat = memo<{ mobile?: boolean }>(() => {
     if (!isAuthenticated) {
       try {
         await signIn();
-      } catch {
+      } catch (error) {
+        console.error('Fork group sign-in failed:', error);
+        message.error(t('fork.failed'));
         return;
       }
     }

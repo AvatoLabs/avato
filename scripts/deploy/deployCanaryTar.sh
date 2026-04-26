@@ -43,6 +43,11 @@ REMOTE_ARTIFACT_PRUNE_FROM=$((KEEP_REMOTE_ARTIFACTS + 1))
 REMOTE_IMAGE_PRUNE_FROM=$((KEEP_REMOTE_RUNTIME_IMAGES + 1))
 
 SSH_CONFIG_FILE="${SSH_CONFIG_FILE:-/tmp/ssh_config_canary}"
+SSH_CONNECT_TIMEOUT="${SSH_CONNECT_TIMEOUT:-10}"
+SSH_RETRY_COUNT="${SSH_RETRY_COUNT:-3}"
+SSH_RETRY_DELAY_SECONDS="${SSH_RETRY_DELAY_SECONDS:-5}"
+SSH_SERVER_ALIVE_INTERVAL="${SSH_SERVER_ALIVE_INTERVAL:-15}"
+SSH_SERVER_ALIVE_COUNT_MAX="${SSH_SERVER_ALIVE_COUNT_MAX:-3}"
 
 cat >"${SSH_CONFIG_FILE}" <<EOF
 Host canary-deploy
@@ -50,7 +55,24 @@ Host canary-deploy
   User ${DEPLOY_USER}
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
+  PreferredAuthentications password
+  PubkeyAuthentication no
+  NumberOfPasswordPrompts 1
+  ConnectTimeout ${SSH_CONNECT_TIMEOUT}
+  ConnectionAttempts 3
+  ServerAliveInterval ${SSH_SERVER_ALIVE_INTERVAL}
+  ServerAliveCountMax ${SSH_SERVER_ALIVE_COUNT_MAX}
 EOF
+
+SSH_COMMON_ARGS=(
+  -F "${SSH_CONFIG_FILE}"
+  -o PreferredAuthentications=password
+  -o PubkeyAuthentication=no
+  -o ConnectTimeout="${SSH_CONNECT_TIMEOUT}"
+  -o ConnectionAttempts=1
+  -o ServerAliveInterval=15
+  -o ServerAliveCountMax=3
+)
 
 run_with_expect() {
   EXPECT_PASSWORD="${DEPLOY_PASSWORD}" expect -f - "$@" <<'EOF'
@@ -74,6 +96,34 @@ exit $exit_code
 EOF
 }
 
+run_with_retry() {
+  local attempt=1
+  local exit_code=0
+
+  while true; do
+    if "$@"; then
+      return 0
+    fi
+
+    exit_code=$?
+    if [ "${exit_code}" -ne 255 ] || [ "${attempt}" -ge "${SSH_RETRY_COUNT}" ]; then
+      return "${exit_code}"
+    fi
+
+    echo "SSH transport failed with exit ${exit_code}; retrying in ${SSH_RETRY_DELAY_SECONDS}s (${attempt}/${SSH_RETRY_COUNT})" >&2
+    sleep "${SSH_RETRY_DELAY_SECONDS}"
+    attempt=$((attempt + 1))
+  done
+}
+
+ssh_expect() {
+  run_with_retry run_with_expect ssh "${SSH_COMMON_ARGS[@]}" "$@"
+}
+
+scp_expect() {
+  run_with_retry run_with_expect scp "${SSH_COMMON_ARGS[@]}" "$@"
+}
+
 restore_build_env() {
   if [ -n "${BUILD_ENV_BACKUP_FILE:-}" ] && [ -f "${BUILD_ENV_BACKUP_FILE}" ]; then
     mv "${BUILD_ENV_BACKUP_FILE}" "${ROOT_DIR}/.env.production"
@@ -91,6 +141,117 @@ cleanup_tmp_build_dir() {
 cleanup_on_exit() {
   restore_build_env
   cleanup_tmp_build_dir
+}
+
+build_runtime_image() {
+  local image_name="$1"
+  local build_dir="$2"
+  local build_log
+
+  build_log="$(mktemp "${TMP_BUILD_ROOT}.buildx-log.XXXXXX")"
+
+  if docker buildx build --platform linux/amd64 --load -t "${image_name}" "${build_dir}" 2>&1 | tee "${build_log}"; then
+    rm -f "${build_log}"
+    return 0
+  fi
+
+  if ! grep -q 'lease does not exist' "${build_log}"; then
+    rm -f "${build_log}"
+    return 1
+  fi
+
+  echo "BuildKit cache lease is stale; pruning buildx cache and retrying once..." >&2
+  docker buildx prune -af >/dev/null 2>&1 || docker builder prune -af >/dev/null 2>&1 || true
+
+  if docker buildx build --platform linux/amd64 --load -t "${image_name}" "${build_dir}"; then
+    rm -f "${build_log}"
+    return 0
+  fi
+
+  rm -f "${build_log}"
+  return 1
+}
+
+prune_runtime_native_modules() {
+  local app_dir="$1"
+  local node_modules_dir="${app_dir}/node_modules"
+  local pnpm_dir="${node_modules_dir}/.pnpm"
+
+  [ -d "${node_modules_dir}" ] || return 0
+
+  # Sharp is injected later from sharp-runtime. Replace the top-level package
+  # with the linux-x64 build, but keep the traced .pnpm entries because
+  # Turbopack external module aliases still resolve through them.
+  rm -rf "${node_modules_dir}/sharp" "${node_modules_dir}/@img"
+
+  # Keep only the generic canvas loader and the linux-x64-gnu native binding.
+  if [ -d "${node_modules_dir}/@napi-rs" ]; then
+    find "${node_modules_dir}/@napi-rs" -mindepth 1 -maxdepth 1 \
+      ! -name 'canvas' \
+      ! -name 'canvas-linux-x64-gnu' \
+      -exec rm -rf {} +
+  fi
+
+  if [ -d "${pnpm_dir}" ]; then
+    find "${pnpm_dir}" -mindepth 1 -maxdepth 1 -type d \
+      \( -name '@napi-rs+canvas-android-*' \
+      -o -name '@napi-rs+canvas-darwin-*' \
+      -o -name '@napi-rs+canvas-linux-arm-*' \
+      -o -name '@napi-rs+canvas-linux-arm64-*' \
+      -o -name '@napi-rs+canvas-linux-riscv64-*' \
+      -o -name '@napi-rs+canvas-linux-x64-musl*' \
+      -o -name '@napi-rs+canvas-win32-*' \) \
+      -exec rm -rf {} +
+
+    find "${pnpm_dir}" -type d -path '*/node_modules/@napi-rs' | while read -r native_dir; do
+      find "${native_dir}" -mindepth 1 -maxdepth 1 \
+        ! -name 'canvas' \
+        ! -name 'canvas-linux-x64-gnu' \
+        -exec rm -rf {} +
+    done
+  fi
+}
+
+materialize_next_external_modules() {
+  local app_dir="$1"
+  local standalone_app_name="$2"
+  local next_node_modules_dir="${app_dir}/.next/node_modules"
+
+  [ -d "${next_node_modules_dir}" ] || return 0
+
+  find "${next_node_modules_dir}" -type l | while read -r link; do
+    local raw_target resolved_target suffix candidate_target fallback_suffix fallback_target
+
+    raw_target="$(readlink "${link}")"
+    resolved_target="$(readlink -f "${link}" 2>/dev/null || true)"
+
+    if [ -e "${resolved_target}" ] || [ -z "${raw_target}" ]; then
+      continue
+    fi
+
+    case "${raw_target}" in
+      "../../../${standalone_app_name}/"*)
+        suffix="${raw_target#"../../../${standalone_app_name}/"}"
+        candidate_target="${app_dir}/${suffix}"
+
+        if [ -e "${candidate_target}" ]; then
+          rm -f "${link}"
+          ln -s "../../${suffix}" "${link}"
+          continue
+        fi
+
+        if [[ "${suffix}" == *"node_modules/"* ]]; then
+          fallback_suffix="${suffix#*node_modules/}"
+          fallback_target="${app_dir}/node_modules/${fallback_suffix}"
+
+          if [ -e "${fallback_target}" ]; then
+            rm -f "${link}"
+            ln -s "../../node_modules/${fallback_suffix}" "${link}"
+          fi
+        fi
+        ;;
+    esac
+  done || true
 }
 
 get_env_value() {
@@ -161,8 +322,12 @@ ENV NODE_ENV=production
 ENV PORT=3210
 ENV HOSTNAME=0.0.0.0
 COPY app/ ./lobehub/
+COPY docker.cjs ./docker.cjs
+COPY errorHint.js ./errorHint.js
+COPY migrations/ ./migrations/
 COPY --from=sharp-runtime /sharp-runtime/node_modules/sharp ./lobehub/node_modules/sharp
 COPY --from=sharp-runtime /sharp-runtime/node_modules/@img ./lobehub/node_modules/@img
+RUN ln -sfn ./lobehub/node_modules ./node_modules
 WORKDIR /app/lobehub
 EXPOSE 3210
 CMD ["node", "server.js"]
@@ -170,6 +335,7 @@ EOF
 
 # Auto-detect standalone app path (handles both lobehub/ and RustRoverProjects/minkhub/)
 STANDALONE_APP_DIR="$(dirname "$(find .next/standalone -maxdepth 5 -name server.js -type f | head -1)")"
+STANDALONE_APP_NAME="$(basename "${STANDALONE_APP_DIR}")"
 rsync -a \
   --exclude='dist/desktop/' \
   --exclude='dist/mobile/' \
@@ -182,23 +348,27 @@ rsync -a \
 if [ -d .next/standalone/node_modules ]; then
   rsync -a .next/standalone/node_modules/ "${TMP_BUILD_DIR}/app/node_modules/"
 fi
-# Resolve any symlinks in .next/node_modules (Turbopack hashed module refs)
-if [ -d "${TMP_BUILD_DIR}/app/.next/node_modules" ]; then
-  find "${TMP_BUILD_DIR}/app/.next/node_modules" -type l | while read -r link; do
-    target="$(readlink -f "$link")"
-    if [ -e "$target" ]; then rm -f "$link" && cp -a "$target" "$link"; fi
-  done || true
-fi
+# Materialize any relocated symlinks in .next/node_modules (Turbopack hashed module refs)
+materialize_next_external_modules "${TMP_BUILD_DIR}/app" "${STANDALONE_APP_NAME}"
+prune_runtime_native_modules "${TMP_BUILD_DIR}/app"
 mkdir -p "${TMP_BUILD_DIR}/app/.next"
 rsync -a .next/static/ "${TMP_BUILD_DIR}/app/.next/static/"
+# Next 16 Turbopack standalone can miss runtime chunk files that server routes still require
+# from .next/server/chunks and .next/server/chunks/ssr at runtime.
+mkdir -p "${TMP_BUILD_DIR}/app/.next/server/chunks"
+rsync -a .next/server/chunks/ "${TMP_BUILD_DIR}/app/.next/server/chunks/"
 rsync -a public/ "${TMP_BUILD_DIR}/app/public/"
+cp "${ROOT_DIR}/scripts/migrateServerDB/docker.cjs" "${TMP_BUILD_DIR}/docker.cjs"
+cp "${ROOT_DIR}/scripts/migrateServerDB/errorHint.js" "${TMP_BUILD_DIR}/errorHint.js"
+rsync -a "${ROOT_DIR}/packages/database/migrations/" "${TMP_BUILD_DIR}/migrations/"
 
 echo "==> Building runtime image ${IMAGE_NAME} (base: ${CANARY_RUNTIME_NODE_IMAGE})"
-docker buildx build --platform linux/amd64 --load -t "${IMAGE_NAME}" "${TMP_BUILD_DIR}"
+build_runtime_image "${IMAGE_NAME}" "${TMP_BUILD_DIR}"
 
 echo "==> Packaging ${ARTIFACT_NAME}"
 docker save "${IMAGE_NAME}" | gzip > "${TMP_ARTIFACT_DIR}/${ARTIFACT_NAME}"
-shasum -a 256 "${TMP_ARTIFACT_DIR}/${ARTIFACT_NAME}"
+LOCAL_ARTIFACT_SHA="$(shasum -a 256 "${TMP_ARTIFACT_DIR}/${ARTIFACT_NAME}" | awk '{print $1}')"
+echo "${LOCAL_ARTIFACT_SHA}  ${TMP_ARTIFACT_DIR}/${ARTIFACT_NAME}"
 ls -lh "${TMP_ARTIFACT_DIR}/${ARTIFACT_NAME}"
 
 echo "==> Cleaning local build leftovers"
@@ -207,8 +377,8 @@ docker image prune -f >/dev/null 2>&1 || true
 ls -1t "${TMP_ARTIFACT_DIR}"/canary-runtime-*-amd64.tar.gz 2>/dev/null | tail -n +"${LOCAL_ARTIFACT_PRUNE_FROM}" | xargs -r rm -f
 
 echo "==> Ensuring remote directory structure"
-run_with_expect \
-  ssh -F "${SSH_CONFIG_FILE}" canary-deploy \
+ssh_expect \
+  canary-deploy \
   "mkdir -p ${REMOTE_ARTIFACT_DIR} ${REMOTE_DEPLOY_PATH}"
 
 echo "==> Uploading docker-compose config"
@@ -217,35 +387,41 @@ config_files=(
   "${ROOT_DIR}/docker-compose/canary/bucket.config.json"
   "${ROOT_DIR}/docker-compose/canary/searxng-settings.yml"
 )
-run_with_expect \
-  scp -F "${SSH_CONFIG_FILE}" \
+scp_expect \
   "${config_files[@]}" \
   "canary-deploy:${REMOTE_DEPLOY_PATH}/"
 echo "==> Uploading compose env from ${COMPOSE_ENV_FILE}"
-run_with_expect \
-  scp -F "${SSH_CONFIG_FILE}" \
+scp_expect \
   "${COMPOSE_ENV_FILE}" \
   "canary-deploy:${REMOTE_DEPLOY_PATH}/.env"
 
 echo "==> Patching remote .env: S3_ENDPOINT + INTERNAL_APP_URL (async /trpc/async must hit container :3210)"
 CANARY_INTERNAL_APP_URL="${CANARY_INTERNAL_APP_URL:-http://127.0.0.1:3210}"
-run_with_expect \
-  ssh -F "${SSH_CONFIG_FILE}" canary-deploy \
+ssh_expect canary-deploy \
   "f=${REMOTE_DEPLOY_PATH}/.env; test -f \"\$f\" || touch \"\$f\"; if grep -q '^S3_ENDPOINT=' \"\$f\"; then sed -i.bak \"s|^S3_ENDPOINT=.*|S3_ENDPOINT=${PUBLIC_S3_ENDPOINT}|\" \"\$f\"; else printf '\\nS3_ENDPOINT=%s\\n' \"${PUBLIC_S3_ENDPOINT}\" >> \"\$f\"; fi; if grep -q '^INTERNAL_APP_URL=' \"\$f\"; then sed -i.bak \"s|^INTERNAL_APP_URL=.*|INTERNAL_APP_URL=${CANARY_INTERNAL_APP_URL}|\" \"\$f\"; else printf '\\nINTERNAL_APP_URL=%s\\n' \"${CANARY_INTERNAL_APP_URL}\" >> \"\$f\"; fi"
 
 echo "==> Uploading artifact to ${DEPLOY_HOST}"
-run_with_expect \
-  scp -F "${SSH_CONFIG_FILE}" \
+scp_expect \
   "${TMP_ARTIFACT_DIR}/${ARTIFACT_NAME}" \
   "canary-deploy:${REMOTE_ARTIFACT_DIR}/"
 
-echo "==> Loading image and restarting ${REMOTE_RUNTIME_TAG} on remote"
-run_with_expect \
-  ssh -F "${SSH_CONFIG_FILE}" canary-deploy \
+echo "==> Verifying uploaded artifact checksum"
+ssh_expect canary-deploy \
   "bash -lc '
 set -euo pipefail
 cd ${REMOTE_ARTIFACT_DIR}
-sha256sum ${ARTIFACT_NAME}
+remote_sha=\$(sha256sum ${ARTIFACT_NAME} | awk \"{print \\\$1}\")
+if [ \"\${remote_sha}\" != \"${LOCAL_ARTIFACT_SHA}\" ]; then
+  echo \"Checksum mismatch for ${ARTIFACT_NAME}: expected ${LOCAL_ARTIFACT_SHA}, got \${remote_sha}\" >&2
+  exit 1
+fi
+'"
+
+echo "==> Loading image and restarting ${REMOTE_RUNTIME_TAG} on remote"
+ssh_expect canary-deploy \
+  "bash -lc '
+set -euo pipefail
+cd ${REMOTE_ARTIFACT_DIR}
 cd ${REMOTE_DEPLOY_PATH}
 docker load < ${REMOTE_ARTIFACT_DIR}/${ARTIFACT_NAME}
 docker tag ${IMAGE_NAME} ${REMOTE_RUNTIME_TAG}
@@ -258,8 +434,7 @@ docker logs --tail 50 canary-lobe
 '"
 
 echo "==> Verifying remote service on 127.0.0.1:3211${DEPLOY_VERIFY_PATH}"
-run_with_expect \
-  ssh -F "${SSH_CONFIG_FILE}" canary-deploy \
+ssh_expect canary-deploy \
   "bash -lc '
 set -euo pipefail
 curl -I -L --max-time 30 http://127.0.0.1:3211${DEPLOY_VERIFY_PATH}

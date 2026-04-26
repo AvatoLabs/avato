@@ -5,8 +5,11 @@ import { getTestDB } from '@lobechat/database/test-utils';
 import { and, eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { FileService } from '@/server/services/file';
+
 import { SkillImportError } from './errors';
 import { SkillImporter } from './importer';
+import { buildSkillZipStorageKey, getSkillZipStorageDirname } from './storage';
 
 // Mock external dependencies only (GitHub, S3, parser)
 const normalizeIdentifierPart = (part: string) =>
@@ -80,6 +83,8 @@ vi.mock('node:fs/promises', () => ({
   readFile: vi.fn().mockResolvedValue(Buffer.from('mock-zip-content')),
 }));
 
+const mockDownloadFileToLocal = vi.spyOn(FileService.prototype, 'downloadFileToLocal');
+
 describe('SkillImporter', () => {
   let db: LobeChatDatabase;
   let userId: string;
@@ -94,14 +99,25 @@ describe('SkillImporter', () => {
     // Create test user
     await db.insert(users).values({ id: userId });
 
+    mockDownloadFileToLocal.mockResolvedValue({
+      cleanup: vi.fn(),
+      file: {
+        fileType: 'application/zip',
+        id: 'mock-zip-file',
+        name: 'skill.zip',
+        url: 'mock/path/skill.zip',
+      } as any,
+      filePath: '/tmp/mock-skill.zip',
+    });
+
     importer = new SkillImporter(db, userId);
   });
 
   afterEach(async () => {
-    // Cleanup: delete user (cascade deletes agentSkills and files)
-    await db.delete(users).where(eq(users.id, userId));
-    // Clean up orphaned globalFiles
+    await db.delete(agentSkills);
+    await db.delete(files);
     await db.delete(globalFiles);
+    await db.delete(users).where(eq(users.id, userId));
   });
 
   describe('createUserSkill', () => {
@@ -550,7 +566,7 @@ describe('SkillImporter', () => {
 
       expect(result).toBeDefined();
       expect(result.status).toBe('created');
-      expect(result.skill.zipFileHash).toBe(zipHash);
+      expect(result.skill.zipSha256).toBe(zipHash);
 
       // Verify: globalFiles should have the record
       const globalFileRecord = await db.query.globalFiles.findFirst({
@@ -608,7 +624,7 @@ describe('SkillImporter', () => {
 
       // Verify uploadBuffer was called with correct path
       expect(mockUploadBuffer).toHaveBeenCalledWith(
-        `skills/zip/${zipHash}.zip`,
+        buildSkillZipStorageKey(zipHash),
         expect.any(Buffer),
         'application/zip',
       );
@@ -682,10 +698,45 @@ describe('SkillImporter', () => {
 
       // Verify uploadBuffer was called with skillZipBuffer, not the large repo ZIP
       expect(mockUploadBuffer).toHaveBeenCalledWith(
-        expect.stringContaining('skills/zip/'),
+        buildSkillZipStorageKey('skill-content-hash'),
         smallSkillZip, // Should be the small repacked ZIP
         'application/zip',
       );
+    });
+
+    it('should store ZIP metadata with opaque storage key instead of raw zip hash', async () => {
+      const zipHash = `opaque-hash-${Date.now()}`;
+
+      mockGitHubInstance.parseRepoUrl.mockReturnValue({
+        branch: 'main',
+        owner: 'lobehub',
+        repo: 'skill-opaque',
+      });
+      mockGitHubInstance.downloadRepoZip.mockResolvedValue(Buffer.from('mock-zip'));
+      mockParserInstance.parseZipPackage.mockResolvedValue({
+        content: '# Skill',
+        manifest: { name: 'Opaque Skill', description: 'Opaque ZIP key test' },
+        resources: new Map(),
+        zipHash,
+      });
+
+      const result = await importer.importFromGitHub({
+        gitUrl: 'https://github.com/lobehub/skill-opaque',
+      });
+
+      const record = await db.query.globalFiles.findFirst({
+        where: eq(globalFiles.hashId, result.skill.zipSha256!),
+      });
+
+      const storageKey = buildSkillZipStorageKey(zipHash);
+
+      expect(record?.url).toBe(storageKey);
+      expect(record?.metadata).toMatchObject({
+        dirname: getSkillZipStorageDirname(),
+        filename: storageKey.split('/').pop(),
+        path: storageKey,
+      });
+      expect(record?.url).not.toContain(zipHash);
     });
 
     it('should skip import when skill exists with same zipHash (deduplication)', async () => {
@@ -714,7 +765,7 @@ describe('SkillImporter', () => {
 
       expect(first).toBeDefined();
       expect(first.status).toBe('created');
-      expect(first.skill.zipFileHash).toBe(zipHash);
+      expect(first.skill.zipSha256).toBe(zipHash);
 
       // Record how many times parseZipPackage was called
       const parseCallCountAfterFirst = mockParserInstance.parseZipPackage.mock.calls.length;
@@ -727,7 +778,7 @@ describe('SkillImporter', () => {
       // Should return the existing skill with 'unchanged' status
       expect(second.status).toBe('unchanged');
       expect(second.skill.id).toBe(first.skill.id);
-      expect(second.skill.zipFileHash).toBe(zipHash);
+      expect(second.skill.zipSha256).toBe(zipHash);
 
       // parseZipPackage should be called again (to get the new hash)
       // but we should verify no resource storage happened
@@ -784,7 +835,7 @@ describe('SkillImporter', () => {
 
       expect(first.status).toBe('created');
       expect(first.skill.content).toBe('# Original Content');
-      expect(first.skill.zipFileHash).toBe('hash-v1');
+      expect(first.skill.zipSha256).toBe('hash-v1');
       const uploadCountAfterFirst = mockUploadBuffer.mock.calls.length;
 
       // Second import with different zipHash (content changed)
@@ -803,7 +854,7 @@ describe('SkillImporter', () => {
       expect(second.status).toBe('updated');
       expect(second.skill.id).toBe(first.skill.id);
       expect(second.skill.content).toBe('# Updated Content');
-      expect(second.skill.zipFileHash).toBe('hash-v2');
+      expect(second.skill.zipSha256).toBe('hash-v2');
 
       // uploadBuffer should be called again for the new ZIP
       expect(mockUploadBuffer.mock.calls.length).toBe(uploadCountAfterFirst + 1);

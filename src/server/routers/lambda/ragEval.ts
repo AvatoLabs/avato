@@ -10,7 +10,6 @@ import {
   insertEvalEvaluationSchema,
 } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
-import dayjs from 'dayjs';
 import JSONL from 'jsonl-parse-stringify';
 import pMap from 'p-map';
 import { z } from 'zod';
@@ -23,10 +22,14 @@ import {
   EvalEvaluationModel,
   EvaluationRecordModel,
 } from '@/database/models/ragEval';
+import { SourceSetModel } from '@/database/models/sourceSet';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { keyVaults, serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { createAsyncCaller } from '@/server/routers/async';
 import { FileService } from '@/server/services/file';
+
+const getEvaluationRecordsDownloadPath = (evaluationId: string) =>
+  `/eval/records/${encodeURIComponent(evaluationId)}`;
 
 const ragEvalProcedure = authedProcedure
   .use(serverDatabase)
@@ -42,6 +45,7 @@ const ragEvalProcedure = authedProcedure
         evaluationModel: new EvalEvaluationModel(ctx.serverDB, ctx.userId),
         evaluationRecordModel: new EvaluationRecordModel(ctx.serverDB, ctx.userId),
         fileService: new FileService(ctx.serverDB, ctx.userId),
+        sourceSetModel: new SourceSetModel(ctx.serverDB, ctx.userId),
       },
     });
   });
@@ -51,14 +55,14 @@ export const ragEvalRouter = router({
     .input(
       z.object({
         description: z.string().optional(),
-        knowledgeBaseId: z.string(),
+        sourceSetId: z.string(),
         name: z.string(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
       const data = await ctx.datasetModel.create({
         description: input.description,
-        knowledgeBaseId: input.knowledgeBaseId,
+        sourceSetId: input.sourceSetId,
         name: input.name,
       });
 
@@ -66,10 +70,10 @@ export const ragEvalRouter = router({
     }),
 
   getDatasets: ragEvalProcedure
-    .input(z.object({ knowledgeBaseId: z.string() }))
+    .input(z.object({ sourceSetId: z.string() }))
 
     .query(async ({ ctx, input }): Promise<RAGEvalDataSetItem[]> => {
-      return ctx.datasetModel.query(input.knowledgeBaseId);
+      return ctx.datasetModel.query(input.sourceSetId);
     }),
 
   removeDataset: ragEvalProcedure
@@ -260,16 +264,22 @@ export const ragEvalRouter = router({
           answer: record.answer,
           ground_truth: record.ideal,
         }));
-        const date = dayjs().format('YYYY-MM-DD-HH-mm');
-        const filename = `${date}-eval_${evaluation.id}-${evaluation.name}.jsonl`;
-        const path = `rag_eval_records/${filename}`;
+        const sourceSet = evaluation.sourceSetId
+          ? await ctx.sourceSetModel.findByIdAny(evaluation.sourceSetId)
+          : null;
+        const { key: path } = await ctx.fileService.createOpaqueUserBlobPath(
+          'rag-eval-records',
+          'jsonl',
+          sourceSet?.spaceId ?? undefined,
+        );
 
         await ctx.fileService.uploadContent(path, JSONL.stringify(evalRecords));
 
         // Save data
         await ctx.evaluationModel.update(input.id, {
           status: EvalEvaluationStatus.Success,
-          evalRecordsUrl: await ctx.fileService.getFullFileUrl(path),
+          // Persist the raw storage key and expose a stable download route from query surfaces.
+          evalRecordsUrl: path,
         });
       }
 
@@ -280,7 +290,7 @@ export const ragEvalRouter = router({
     .mutation(async ({ input, ctx }) => {
       const data = await ctx.evaluationModel.create({
         description: input.description,
-        knowledgeBaseId: input.knowledgeBaseId,
+        sourceSetId: input.sourceSetId,
         datasetId: input.datasetId,
         name: input.name,
       });
@@ -295,8 +305,15 @@ export const ragEvalRouter = router({
     }),
 
   getEvaluationList: ragEvalProcedure
-    .input(z.object({ knowledgeBaseId: z.string() }))
+    .input(z.object({ sourceSetId: z.string() }))
     .query(async ({ ctx, input }) => {
-      return ctx.evaluationModel.queryByKnowledgeBaseId(input.knowledgeBaseId);
+      const evaluations = await ctx.evaluationModel.queryBySourceSetId(input.sourceSetId);
+
+      return evaluations.map((evaluation) => ({
+        ...evaluation,
+        evalRecordsUrl: evaluation.evalRecordsUrl
+          ? getEvaluationRecordsDownloadPath(evaluation.id)
+          : evaluation.evalRecordsUrl,
+      }));
     }),
 });

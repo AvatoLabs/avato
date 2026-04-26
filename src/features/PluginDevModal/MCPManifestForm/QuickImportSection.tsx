@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { isDesktop } from '@/const/version';
-import { useToolStore } from '@/store/tool';
 import { pluginSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 import { electronStylish } from '@/styles/electron';
 
 import { parseMcpInput } from './utils';

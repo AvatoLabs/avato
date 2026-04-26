@@ -4,7 +4,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { getTestDB } from '../../../core/getTestDB';
-import { documents, files, knowledgeBaseFiles, knowledgeBases, users } from '../../../schemas';
+import { documents, files, sourceSetFiles, sourceSets, spaces, users } from '../../../schemas';
 import type { LobeChatDatabase } from '../../../type';
 import { KnowledgeRepo } from '../index';
 
@@ -17,6 +17,7 @@ let knowledgeRepo: KnowledgeRepo;
 
 beforeEach(async () => {
   // Clean up
+  await serverDB.delete(spaces);
   await serverDB.delete(users);
 
   // Create test users
@@ -30,7 +31,7 @@ describe('KnowledgeRepo', () => {
   describe('query', () => {
     beforeEach(async () => {
       // Create knowledge base
-      await serverDB.insert(knowledgeBases).values([
+      await serverDB.insert(sourceSets).values([
         { id: 'kb-1', userId, name: 'Test KB' },
         { id: 'kb-2', userId, name: 'Another KB' },
       ]);
@@ -70,7 +71,7 @@ describe('KnowledgeRepo', () => {
           fileType: 'custom/note',
           sourceType: 'topic',
           source: 'internal://note/doc-in-kb',
-          knowledgeBaseId: 'kb-1',
+          sourceSetId: 'kb-1',
           totalCharCount: 200,
           totalLineCount: 4,
           createdAt: new Date('2024-01-10T10:00:00Z'),
@@ -197,8 +198,8 @@ describe('KnowledgeRepo', () => {
 
       // Add file to knowledge base
       await serverDB
-        .insert(knowledgeBaseFiles)
-        .values([{ fileId: 'file-in-kb', knowledgeBaseId: 'kb-1', userId }]);
+        .insert(sourceSetFiles)
+        .values([{ fileId: 'file-in-kb', sourceSetId: 'kb-1', userId }]);
     });
 
     it('should return files and documents for current user', async () => {
@@ -279,8 +280,8 @@ describe('KnowledgeRepo', () => {
       expect(result1[0].id).not.toBe(result2[0].id);
     });
 
-    it('should filter by knowledgeBaseId', async () => {
-      const result = await knowledgeRepo.query({ knowledgeBaseId: 'kb-1' });
+    it('should filter by sourceSetId', async () => {
+      const result = await knowledgeRepo.query({ sourceSetId: 'kb-1' });
 
       // Should include files and documents in the knowledge base
       expect(result.some((item) => item.id === 'file-in-kb' || item.id === 'doc-in-kb')).toBe(true);
@@ -314,14 +315,80 @@ describe('KnowledgeRepo', () => {
       expect(result.some((item) => item.id === 'child-of-folder')).toBe(true);
     });
 
+    it('should resolve folder slugs within the active space', async () => {
+      await serverDB.insert(spaces).values([
+        { createdBy: userId, id: 'spc_knowledge_a', kind: 'team', name: 'Knowledge A' },
+        { createdBy: userId, id: 'spc_knowledge_b', kind: 'team', name: 'Knowledge B' },
+      ]);
+
+      await serverDB.insert(documents).values([
+        {
+          id: 'team-folder-a',
+          slug: 'shared-folder',
+          source: 'internal://folder/team-folder-a',
+          sourceType: 'topic',
+          spaceId: 'spc_knowledge_a',
+          title: 'Team Folder A',
+          totalCharCount: 0,
+          totalLineCount: 0,
+          userId,
+          fileType: 'custom/folder',
+        },
+        {
+          id: 'team-folder-b',
+          slug: 'shared-folder',
+          source: 'internal://folder/team-folder-b',
+          sourceType: 'topic',
+          spaceId: 'spc_knowledge_b',
+          title: 'Team Folder B',
+          totalCharCount: 0,
+          totalLineCount: 0,
+          userId: otherUserId,
+          fileType: 'custom/folder',
+        },
+        {
+          id: 'team-child-a',
+          parentId: 'team-folder-a',
+          source: 'internal://note/team-child-a',
+          sourceType: 'topic',
+          spaceId: 'spc_knowledge_a',
+          title: 'Team Child A',
+          totalCharCount: 120,
+          totalLineCount: 3,
+          userId,
+          fileType: 'custom/note',
+        },
+        {
+          id: 'team-child-b',
+          parentId: 'team-folder-b',
+          source: 'internal://note/team-child-b',
+          sourceType: 'topic',
+          spaceId: 'spc_knowledge_b',
+          title: 'Team Child B',
+          totalCharCount: 120,
+          totalLineCount: 3,
+          userId: otherUserId,
+          fileType: 'custom/note',
+        },
+      ]);
+
+      const result = await knowledgeRepo.query({
+        parentId: 'shared-folder',
+        spaceId: 'spc_knowledge_b',
+      });
+
+      expect(result.some((item) => item.id === 'team-child-b')).toBe(true);
+      expect(result.some((item) => item.id === 'team-child-a')).toBe(false);
+    });
+
     it('should exclude files in knowledge base by default', async () => {
       const result = await knowledgeRepo.query();
 
       expect(result.some((item) => item.id === 'file-in-kb')).toBe(false);
     });
 
-    it('should include files in knowledge base when showFilesInKnowledgeBase is true', async () => {
-      const result = await knowledgeRepo.query({ showFilesInKnowledgeBase: true });
+    it('should include files in knowledge base when showFilesInSourceSet is true', async () => {
+      const result = await knowledgeRepo.query({ showFilesInSourceSet: true });
 
       expect(result.some((item) => item.id === 'file-in-kb')).toBe(true);
     });
@@ -623,11 +690,9 @@ describe('KnowledgeRepo', () => {
     });
   });
 
-  describe('query with knowledgeBaseId + filters', () => {
+  describe('query with sourceSetId + filters', () => {
     beforeEach(async () => {
-      await serverDB
-        .insert(knowledgeBases)
-        .values([{ id: 'kb-filter', name: 'Filter KB', userId }]);
+      await serverDB.insert(sourceSets).values([{ id: 'kb-filter', name: 'Filter KB', userId }]);
 
       // Create a folder doc in KB
       await serverDB.insert(documents).values([
@@ -639,7 +704,7 @@ describe('KnowledgeRepo', () => {
           sourceType: 'topic',
           source: 'internal://folder/kb-folder-doc',
           slug: 'kb-folder',
-          knowledgeBaseId: 'kb-filter',
+          sourceSetId: 'kb-filter',
           totalCharCount: 0,
           totalLineCount: 0,
         },
@@ -650,7 +715,7 @@ describe('KnowledgeRepo', () => {
           fileType: 'custom/note',
           sourceType: 'topic',
           source: 'internal://note/kb-standalone-doc',
-          knowledgeBaseId: 'kb-filter',
+          sourceSetId: 'kb-filter',
           totalCharCount: 200,
           totalLineCount: 4,
         },
@@ -661,7 +726,7 @@ describe('KnowledgeRepo', () => {
           fileType: 'custom/note',
           sourceType: 'topic',
           source: 'internal://note/kb-standalone-doc-searchable',
-          knowledgeBaseId: 'kb-filter',
+          sourceSetId: 'kb-filter',
           totalCharCount: 100,
           totalLineCount: 2,
         },
@@ -672,7 +737,7 @@ describe('KnowledgeRepo', () => {
           fileType: 'application/pdf',
           sourceType: 'topic',
           source: 'internal://doc/kb-app-doc',
-          knowledgeBaseId: 'kb-filter',
+          sourceSetId: 'kb-filter',
           totalCharCount: 300,
           totalLineCount: 6,
         },
@@ -707,16 +772,16 @@ describe('KnowledgeRepo', () => {
         },
       ]);
 
-      await serverDB.insert(knowledgeBaseFiles).values([
-        { fileId: 'kb-f-image', knowledgeBaseId: 'kb-filter', userId },
-        { fileId: 'kb-f-pdf', knowledgeBaseId: 'kb-filter', userId },
-        { fileId: 'kb-f-searchable', knowledgeBaseId: 'kb-filter', userId },
+      await serverDB.insert(sourceSetFiles).values([
+        { fileId: 'kb-f-image', sourceSetId: 'kb-filter', userId },
+        { fileId: 'kb-f-pdf', sourceSetId: 'kb-filter', userId },
+        { fileId: 'kb-f-searchable', sourceSetId: 'kb-filter', userId },
       ]);
     });
 
     it('should filter KB files by parentId', async () => {
       const result = await knowledgeRepo.query({
-        knowledgeBaseId: 'kb-filter',
+        sourceSetId: 'kb-filter',
         parentId: 'kb-folder-doc',
       });
 
@@ -726,7 +791,7 @@ describe('KnowledgeRepo', () => {
 
     it('should filter KB files by null parentId', async () => {
       const result = await knowledgeRepo.query({
-        knowledgeBaseId: 'kb-filter',
+        sourceSetId: 'kb-filter',
         parentId: null,
       });
 
@@ -736,7 +801,7 @@ describe('KnowledgeRepo', () => {
 
     it('should filter KB files by search query', async () => {
       const result = await knowledgeRepo.query({
-        knowledgeBaseId: 'kb-filter',
+        sourceSetId: 'kb-filter',
         q: 'searchable',
       });
 
@@ -745,7 +810,7 @@ describe('KnowledgeRepo', () => {
 
     it('should filter KB files by category (Images)', async () => {
       const result = await knowledgeRepo.query({
-        knowledgeBaseId: 'kb-filter',
+        sourceSetId: 'kb-filter',
         category: FilesTabs.Images,
       });
 
@@ -756,7 +821,7 @@ describe('KnowledgeRepo', () => {
 
     it('should filter KB files by category (Documents) and exclude custom/document', async () => {
       const result = await knowledgeRepo.query({
-        knowledgeBaseId: 'kb-filter',
+        sourceSetId: 'kb-filter',
         category: FilesTabs.Documents,
       });
 
@@ -773,7 +838,7 @@ describe('KnowledgeRepo', () => {
 
     it('should return KB standalone documents (no fileId) with search', async () => {
       const result = await knowledgeRepo.query({
-        knowledgeBaseId: 'kb-filter',
+        sourceSetId: 'kb-filter',
         q: 'Searchable KB',
       });
 
@@ -790,7 +855,7 @@ describe('KnowledgeRepo', () => {
           fileType: 'custom/note',
           sourceType: 'topic',
           source: 'internal://note/kb-child-doc',
-          knowledgeBaseId: 'kb-filter',
+          sourceSetId: 'kb-filter',
           parentId: 'kb-folder-doc',
           totalCharCount: 50,
           totalLineCount: 1,
@@ -798,7 +863,7 @@ describe('KnowledgeRepo', () => {
       ]);
 
       const result = await knowledgeRepo.query({
-        knowledgeBaseId: 'kb-filter',
+        sourceSetId: 'kb-filter',
         parentId: 'kb-folder-doc',
       });
 
@@ -807,7 +872,7 @@ describe('KnowledgeRepo', () => {
 
     it('should handle KB with null parentId for documents', async () => {
       const result = await knowledgeRepo.query({
-        knowledgeBaseId: 'kb-filter',
+        sourceSetId: 'kb-filter',
         parentId: null,
       });
 
@@ -845,7 +910,7 @@ describe('KnowledgeRepo', () => {
           name: 'webpage.html',
           fileType: 'text/html',
           size: 500,
-          url: 'https://example.com/page.html',
+          url: 'https://example.com/docs.html',
         },
         {
           id: 'text-file',

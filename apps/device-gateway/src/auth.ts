@@ -1,36 +1,44 @@
-import { importJWK, jwtVerify } from 'jose';
+import type { JSONWebKeySet } from 'jose';
+import { createLocalJWKSet, jwtVerify } from 'jose';
 
 import type { Env } from './types';
 
-let cachedKey: CryptoKey | null = null;
+let cachedJwksVerifier: ReturnType<typeof createLocalJWKSet> | null = null;
+let cachedJwks = '';
+const DESKTOP_CLIENT_ID = 'lobehub-desktop';
 
-async function getPublicKey(env: Env): Promise<CryptoKey> {
-  if (cachedKey) return cachedKey;
+function getJwksVerifier(env: Env): ReturnType<typeof createLocalJWKSet> {
+  if (cachedJwksVerifier && cachedJwks === env.JWKS_PUBLIC_KEY) return cachedJwksVerifier;
 
-  const jwks = JSON.parse(env.JWKS_PUBLIC_KEY);
-  const rsaKey = jwks.keys.find((k: any) => k.alg === 'RS256');
+  const jwks = JSON.parse(env.JWKS_PUBLIC_KEY) as Partial<JSONWebKeySet>;
 
-  if (!rsaKey) {
+  if (!Array.isArray(jwks.keys) || !jwks.keys.some((key) => key.alg === 'RS256')) {
     throw new Error('No RS256 key found in JWKS_PUBLIC_KEY');
   }
 
-  cachedKey = (await importJWK(rsaKey, 'RS256')) as CryptoKey;
-  return cachedKey;
+  cachedJwksVerifier = createLocalJWKSet({ keys: jwks.keys });
+  cachedJwks = env.JWKS_PUBLIC_KEY;
+  return cachedJwksVerifier;
 }
 
 export async function verifyDesktopToken(
   env: Env,
   token: string,
-): Promise<{ clientId: string; userId: string }> {
-  const publicKey = await getPublicKey(env);
-  const { payload } = await jwtVerify(token, publicKey, {
+): Promise<{ clientId: string; expiresAt: number; userId: string }> {
+  const jwksVerifier = getJwksVerifier(env);
+  const { payload } = await jwtVerify(token, jwksVerifier, {
     algorithms: ['RS256'],
   });
 
-  if (!payload.sub) throw new Error('Missing sub claim');
+  if (typeof payload.sub !== 'string' || payload.sub.length === 0) {
+    throw new Error('Missing sub claim');
+  }
+  if (typeof payload.exp !== 'number') throw new Error('Missing exp claim');
+  if (payload.client_id !== DESKTOP_CLIENT_ID) throw new Error('Invalid client_id claim');
 
   return {
-    clientId: payload.client_id as string,
+    clientId: payload.client_id,
+    expiresAt: payload.exp * 1000,
     userId: payload.sub,
   };
 }

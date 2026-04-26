@@ -39,6 +39,10 @@ export interface EditorContentState {
    */
   lastSavedEditorData?: any;
   /**
+   * Latest persistence error message for this document, if any.
+   */
+  lastSaveError?: string;
+  /**
    * Last updated time
    */
   lastUpdatedTime: Date | null;
@@ -50,6 +54,10 @@ export interface EditorContentState {
    * Document source type - determines which service to call for persistence
    */
   sourceType: DocumentSourceType;
+  /**
+   * Owning space for this document.
+   */
+  spaceId?: string | null;
   /**
    * Topic ID (for notebook documents, used for save routing)
    */
@@ -89,9 +97,11 @@ export const createInitialEditorContentState = (
   editorData: null,
   isDirty: false,
   lastSavedContent: '',
+  lastSaveError: undefined,
   lastSavedEditorData: null,
   lastUpdatedTime: null,
   saveStatus: 'idle',
+  spaceId: null,
   sourceType,
   ...overrides,
 });

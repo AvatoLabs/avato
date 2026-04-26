@@ -16,6 +16,10 @@ import HighlightedContent from '@/routes/(main)/memory/features/HighlightedConte
 import ProgressIcon from '@/routes/(main)/memory/features/ProgressIcon';
 import SourceLink from '@/routes/(main)/memory/features/SourceLink';
 import Time from '@/routes/(main)/memory/features/Time';
+import {
+  useClearDetailSelection,
+  useCloseInvalidDetailSelection,
+} from '@/routes/(main)/memory/features/useResetDetailSelection';
 import { useUserMemoryStore } from '@/store/userMemory';
 import { LayersEnum } from '@/types/userMemory';
 
@@ -45,6 +49,8 @@ const ExperienceRightPanel = memo(() => {
   const useFetchMemoryDetail = useUserMemoryStore((s) => s.useFetchMemoryDetail);
 
   const { data: experience, isLoading } = useFetchMemoryDetail(experienceId, LayersEnum.Experience);
+  useCloseInvalidDetailSelection('experienceId', experienceId, isLoading, Boolean(experience));
+  const clearSelection = useClearDetailSelection('experienceId');
 
   if (!experienceId) return null;
 
@@ -179,6 +185,9 @@ const ExperienceRightPanel = memo(() => {
         right: experienceId ? (
           <ExperienceDropdown id={experienceId} size={DESKTOP_HEADER_ICON_SIZE} />
         ) : undefined,
+      }}
+      onExpandChange={(expand) => {
+        if (!expand) clearSelection();
       }}
     >
       {content}

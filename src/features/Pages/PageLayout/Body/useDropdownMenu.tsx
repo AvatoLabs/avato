@@ -2,23 +2,71 @@
 
 import { type MenuProps } from '@lobehub/ui';
 import { Icon } from '@lobehub/ui';
-import { Hash, LucideCheck } from 'lucide-react';
-import { useMemo } from 'react';
+import { App } from 'antd';
+import { FileText, Filter, FolderOpen, Hash, LucideCheck, Table2 } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { usePageKind } from '@/features/Pages/usePageKind';
+import { createSourceSetPageScope, usePageScope } from '@/features/Pages/usePageScope';
+import { usePageSpaceId } from '@/features/Pages/usePageSpaceId';
+import { usePageStore } from '@/store/docs';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
-import { usePageStore } from '@/store/page';
+import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
+import { TABLE_PAGE_KIND } from '@/utils/docs';
 
 export const useDropdownMenu = (): MenuProps['items'] => {
   const { t } = useTranslation();
-  const showOnlyPagesNotInLibrary = usePageStore((s) => s.showOnlyPagesNotInLibrary);
-  const setShowOnlyPagesNotInLibrary = usePageStore((s) => s.setShowOnlyPagesNotInLibrary);
+  const { message } = App.useApp();
+  const pageKind = usePageKind();
+  const pageSpaceId = usePageSpaceId();
+  const { scope, setScope, sourceSetId: currentSourceSetScopeId } = usePageScope();
+  const showOnlyPagesWithoutSourceSet = scope === 'unassigned';
+  const [createNewPage, createNewTable] = usePageStore((s) => [s.createNewPage, s.createNewTable]);
+  const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
+  const currentSourceSet = useSourceSetStore(
+    sourceSetSelectors.getSourceSetById(currentSourceSetScopeId || ''),
+  );
+  const currentSourceSetName = useSourceSetStore(
+    sourceSetSelectors.getSourceSetNameById(currentSourceSetScopeId || ''),
+  );
+  const { data: sourceSets = [] } = useFetchSourceSetList(pageSpaceId);
 
   const [pagePageSize, updateSystemStatus] = useGlobalStore((s) => [
     systemStatusSelectors.pagePageSize(s),
     s.updateSystemStatus,
   ]);
+
+  const handleCreateError = useCallback(
+    (error: unknown) => {
+      console.error('Failed to create page:', error);
+      message.error(t('pageList.createFailed', { ns: 'file' }));
+    },
+    [message, t],
+  );
+
+  const handleCreateInSourceSet = useCallback(
+    (sourceSetId: string) => {
+      if (pageKind === TABLE_PAGE_KIND) {
+        const targetSourceSet = sourceSets.find((item) => item.id === sourceSetId);
+
+        void createNewTable(t('pageList.tableUntitled', { ns: 'file' }), {
+          sourceSetId,
+          spaceId: targetSourceSet?.spaceId ?? undefined,
+        }).catch(handleCreateError);
+        return;
+      }
+
+      const targetSourceSet = sourceSets.find((item) => item.id === sourceSetId);
+
+      void createNewPage(t('pageList.untitled', { ns: 'file' }), {
+        sourceSetId,
+        spaceId: targetSourceSet?.spaceId ?? undefined,
+      }).catch(handleCreateError);
+    },
+    [createNewPage, createNewTable, handleCreateError, pageKind, sourceSets, t],
+  );
 
   return useMemo(() => {
     const pageSizeOptions = [20, 40, 60, 100];
@@ -31,7 +79,51 @@ export const useDropdownMenu = (): MenuProps['items'] => {
       },
     }));
 
-    return [
+    const items: MenuProps['items'] = [
+      ...(sourceSets.length > 0
+        ? [
+            {
+              children: sourceSets.map((item) => ({
+                key: `create-in-${item.id}`,
+                label: item.name,
+                onClick: () => handleCreateInSourceSet(item.id),
+              })),
+              icon: <Icon icon={FolderOpen} />,
+              key: 'create-in-source-set',
+              label: t('pageList.createInSourceSet', { ns: 'file' }),
+            },
+            { type: 'divider' as const },
+          ]
+        : []),
+      ...(sourceSets.length > 0
+        ? [
+            {
+              children: sourceSets.map((item) => ({
+                icon: currentSourceSetScopeId === item.id ? <Icon icon={LucideCheck} /> : <div />,
+                key: `scope-source-set-${item.id}`,
+                label: item.name,
+                onClick: () =>
+                  setScope(createSourceSetPageScope(item.id), {
+                    spaceId: item.spaceId,
+                  }),
+              })),
+              icon: <Icon icon={FolderOpen} />,
+              key: 'scope-by-source-set',
+              label: t('pageList.scope.bySourceSet', { ns: 'file' }),
+            },
+          ]
+        : []),
+      {
+        icon: showOnlyPagesWithoutSourceSet ? <Icon icon={LucideCheck} /> : <Icon icon={Filter} />,
+        key: 'only-unassigned',
+        label: t('pageList.filter.onlyUnassigned', { ns: 'file' }),
+        onClick: () => {
+          setScope(showOnlyPagesWithoutSourceSet ? 'all' : 'unassigned');
+        },
+      },
+      {
+        type: 'divider',
+      },
       {
         children: pageSizeItems,
         icon: <Icon icon={Hash} />,
@@ -39,11 +131,49 @@ export const useDropdownMenu = (): MenuProps['items'] => {
         label: t('common:navPanel.displayItems'),
       },
     ];
+
+    if (sourceSets.length > 0) {
+      const createDefaultLabel = currentSourceSetScopeId
+        ? `${t(pageKind === TABLE_PAGE_KIND ? 'header.newTableButton' : 'header.newPageButton', { ns: 'file' })} · ${currentSourceSetName || t('pageList.sourceSet.assigned', { ns: 'file' })}`
+        : `${t(pageKind === TABLE_PAGE_KIND ? 'header.newTableButton' : 'header.newPageButton', { ns: 'file' })} · ${t('pageList.sourceSet.unassigned', { ns: 'file' })}`;
+
+      items.unshift({
+        icon: <Icon icon={pageKind === TABLE_PAGE_KIND ? Table2 : FileText} />,
+        key: 'create-default',
+        label: createDefaultLabel,
+        onClick: () => {
+          if (pageKind === TABLE_PAGE_KIND) {
+            void createNewTable(t('pageList.tableUntitled', { ns: 'file' }), {
+              sourceSetId: currentSourceSetScopeId || undefined,
+              spaceId: currentSourceSet?.spaceId ?? pageSpaceId,
+            }).catch(handleCreateError);
+            return;
+          }
+
+          void createNewPage(t('pageList.untitled', { ns: 'file' }), {
+            sourceSetId: currentSourceSetScopeId || undefined,
+            spaceId: currentSourceSet?.spaceId ?? pageSpaceId,
+          }).catch(handleCreateError);
+        },
+      });
+    }
+
+    return items;
   }, [
+    createNewPage,
+    createNewTable,
+    handleCreateInSourceSet,
+    currentSourceSet,
+    currentSourceSetName,
+    currentSourceSetScopeId,
+    handleCreateError,
+    pageSpaceId,
+    pageKind,
+    sourceSets,
     t,
-    setShowOnlyPagesNotInLibrary,
-    showOnlyPagesNotInLibrary,
+    showOnlyPagesWithoutSourceSet,
     pagePageSize,
+    setScope,
     updateSystemStatus,
   ]);
 };

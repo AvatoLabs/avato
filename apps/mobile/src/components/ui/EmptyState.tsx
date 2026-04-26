@@ -18,7 +18,7 @@ import {
   Server,
 } from 'lucide-react-native';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { withAlpha } from '../../constants/tags';
@@ -49,8 +49,6 @@ const VARIANT_ICONS: Record<string, LucideIcon> = {
 interface EmptyStateProps {
   /** Optional CTA element (button, link) */
   action?: React.ReactNode;
-  /** Additional padding */
-  className?: string;
   /** Tighter layout for hero-style home screens */
   compact?: boolean;
   /** Optional secondary description */
@@ -59,6 +57,8 @@ interface EmptyStateProps {
   icon?: string;
   /** Theme-colored logo variant: chat | resource | store | topic | agent | memory | model | artwork | discover | provider | logs | warning | default */
   iconVariant?: keyof typeof VARIANT_ICONS;
+  /** Additional container styles */
+  style?: StyleProp<ViewStyle>;
   /** Primary title shown above description */
   title: string;
 }
@@ -69,8 +69,8 @@ export default function EmptyState({
   icon = '📭',
   iconVariant,
   action,
-  className = '',
   compact = false,
+  style,
 }: EmptyStateProps) {
   const colors = useThemeColors();
   const IconComponent = iconVariant ? (VARIANT_ICONS[iconVariant] ?? VARIANT_ICONS.default) : null;
@@ -91,9 +91,17 @@ export default function EmptyState({
   return (
     <Animated.View
       accessibilityLabel={`${title}${description ? `. ${description}` : ''}`}
-      className={`items-center justify-center px-8 ${compact ? 'py-8' : 'py-12'} ${className}`}
       entering={enteringEmptyState()}
-      style={{ minHeight: compact ? 156 : 184 }}
+      style={[
+        {
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: compact ? 156 : 184,
+          paddingHorizontal: 32,
+          paddingVertical: compact ? 32 : 48,
+        },
+        style,
+      ]}
     >
       <View
         className="items-center px-6"

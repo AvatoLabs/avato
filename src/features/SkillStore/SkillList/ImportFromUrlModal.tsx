@@ -6,7 +6,7 @@ import { ArrowLeftRight, Link, Sparkles } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 
 interface ImportFromUrlModalProps {
   onOpenChange: (open: boolean) => void;
@@ -46,7 +46,14 @@ const ImportFromUrlModal = memo<ImportFromUrlModalProps>(({ open, onOpenChange }
   };
 
   return (
-    <Modal destroyOnClose footer={null} open={open} title={null} width={480} onCancel={handleClose}>
+    <Modal
+      destroyOnHidden
+      footer={null}
+      open={open}
+      title={null}
+      width={480}
+      onCancel={handleClose}
+    >
       <Flexbox align="center" gap={16} padding={'16px 0'}>
         <Flexbox horizontal align="center" gap={8}>
           <Icon icon={Link} size={28} />

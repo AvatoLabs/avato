@@ -18,7 +18,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const tokens = getThemeTokens(effectiveTheme, colorScheme);
   const isDark = effectiveTheme === 'dark';
 
-  // Sync NativeWind's colorScheme so dark: variants update instantly without restart
   useEffect(() => {
     nativeWindColorScheme.set(effectiveTheme);
   }, [effectiveTheme]);

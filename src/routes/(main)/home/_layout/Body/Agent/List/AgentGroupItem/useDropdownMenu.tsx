@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { openEditingPopover } from '@/features/EditingPopover/store';
 import { useGlobalStore } from '@/store/global';
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
 
 interface UseGroupDropdownMenuParams {
   anchor: HTMLElement | null;
@@ -96,8 +96,13 @@ export const useGroupDropdownMenu = ({
               centered: true,
               okButtonProps: { danger: true },
               onOk: async () => {
-                await removeAgentGroup(id);
-                message.success(t('confirmRemoveGroupSuccess'));
+                try {
+                  await removeAgentGroup(id);
+                  message.success(t('confirmRemoveGroupSuccess'));
+                } catch (error) {
+                  console.error('Failed to delete agent group:', error);
+                  message.error(t('confirmRemoveGroupError'));
+                }
               },
               title: t('confirmRemoveChatGroupItemAlert'),
             });

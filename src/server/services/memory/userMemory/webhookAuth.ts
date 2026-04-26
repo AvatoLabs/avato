@@ -1,4 +1,7 @@
+import { isValidInternalServiceAuth } from '@/server/utils/internalServiceAuth';
+
 export interface ValidateWebhookRequestAuthParams {
+  allowInsecureDev?: boolean;
   expectedHeaders?: Record<string, string>;
   nodeEnv?: string;
   requestHeaders: Headers;
@@ -10,21 +13,29 @@ export interface WebhookAuthFailure {
 }
 
 export const validateWebhookRequestAuth = ({
+  allowInsecureDev = false,
   expectedHeaders,
   nodeEnv = process.env.NODE_ENV,
   requestHeaders,
 }: ValidateWebhookRequestAuthParams): WebhookAuthFailure | undefined => {
+  if (isValidInternalServiceAuth(requestHeaders.get('authorization'))) {
+    return undefined;
+  }
+
   const hasConfiguredHeaders = !!expectedHeaders && Object.keys(expectedHeaders).length > 0;
 
   if (!hasConfiguredHeaders) {
-    if (nodeEnv === 'production') {
-      return {
-        error: 'Webhook authentication headers must be configured in production.',
-        status: 503,
-      };
+    if (nodeEnv !== 'production' && allowInsecureDev) {
+      return undefined;
     }
 
-    return undefined;
+    return {
+      error:
+        nodeEnv === 'production'
+          ? 'Webhook authentication must be configured in production.'
+          : 'Webhook authentication must be configured, or MEMORY_USER_MEMORY_WEBHOOK_ALLOW_INSECURE_DEV=true must be set for local development.',
+      status: 503,
+    };
   }
 
   for (const [key, value] of Object.entries(expectedHeaders)) {

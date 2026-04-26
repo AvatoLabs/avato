@@ -1,5 +1,11 @@
-import type { QueryFileListParams } from '@lobechat/types';
-import { FilesTabs, SortType } from '@lobechat/types';
+import {
+  FileAssetClassification,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+  FilesTabs,
+  type QueryFileListParams,
+  SortType,
+} from '@lobechat/types';
 import {
   and,
   asc,
@@ -8,6 +14,7 @@ import {
   eq,
   ilike,
   inArray,
+  isNull,
   like,
   notExists,
   or,
@@ -16,18 +23,43 @@ import {
 } from 'drizzle-orm';
 import type { PgTransaction } from 'drizzle-orm/pg-core';
 
-import type { FileItem, NewFile, NewGlobalFile } from '../schemas';
-import { agentSkills } from '../schemas/agentSkill';
 import {
   chunks,
   documentChunks,
+  documents,
   embeddings,
+  fileAssets,
   fileChunks,
+  type FileItem,
   files,
+  filesToSessions,
   globalFiles,
-  knowledgeBaseFiles,
+  type NewFile,
+  type NewGlobalFile,
+  sourceSetFiles,
 } from '../schemas';
+import { agentSkills } from '../schemas/agentSkill';
 import type { LobeChatDatabase, Transaction } from '../type';
+
+interface FileListRow {
+  chunkTaskId?: string | null;
+  createdAt: Date;
+  embeddingTaskId?: string | null;
+  fileType: string;
+  id: string;
+  name: string;
+  size: number;
+  spaceId?: string | null;
+  updatedAt: Date;
+  url: string;
+}
+
+interface FileGovernanceRow {
+  assetClassification?: FileAssetClassification | null;
+  assetReviewStatus?: FileAssetReviewStatus | null;
+  assetUsagePolicy?: FileAssetUsagePolicy | null;
+  id: string;
+}
 
 export class FileModel {
   private readonly userId: string;
@@ -52,10 +84,16 @@ export class FileModel {
     });
   }
 
+  static async getFileByUrl(db: LobeChatDatabase, url: string): Promise<FileItem | undefined> {
+    return db.query.files.findFirst({
+      where: eq(files.url, url),
+    });
+  }
+
   create = async (
     params: Omit<NewFile, 'id' | 'userId'> & {
       id?: string;
-      knowledgeBaseId?: string;
+      sourceSetId?: string;
       parentId?: string;
     },
     insertToGlobalFiles?: boolean,
@@ -83,10 +121,10 @@ export class FileModel {
 
       const item = result[0]!;
 
-      if (params.knowledgeBaseId) {
-        await tx.insert(knowledgeBaseFiles).values({
+      if (params.sourceSetId) {
+        await tx.insert(sourceSetFiles).values({
           fileId: item.id,
-          knowledgeBaseId: params.knowledgeBaseId,
+          sourceSetId: params.sourceSetId,
           userId: this.userId,
         });
       }
@@ -101,7 +139,7 @@ export class FileModel {
   };
 
   createGlobalFile = async (file: Omit<NewGlobalFile, 'id' | 'userId'>) => {
-    return this.db.insert(globalFiles).values(file).returning();
+    return this.db.insert(globalFiles).values(file).onConflictDoNothing().returning();
   };
 
   checkHash = async (hash: string) => {
@@ -119,16 +157,146 @@ export class FileModel {
     };
   };
 
+  hasFilesForBlob = async (blobId: string) => {
+    const [result] = await this.db
+      .select({ count: count() })
+      .from(files)
+      .where(eq(files.blobId, blobId));
+
+    return Number(result?.count ?? 0) > 0;
+  };
+
+  private buildFileListWhereClause = ({
+    assetClassification,
+    assetRightsOwner,
+    assetReviewStatus,
+    assetUsagePolicy,
+    category,
+    q,
+    sortType,
+    sorter,
+    sourceSetId,
+    showFilesInSourceSet,
+    spaceId,
+  }: QueryFileListParams = {}) => {
+    let whereClause = and(
+      q ? ilike(files.name, `%${q}%`) : undefined,
+      spaceId ? eq(files.spaceId, spaceId) : eq(files.userId, this.userId),
+    );
+    if (category && category !== FilesTabs.All && category !== FilesTabs.Home) {
+      const fileTypePrefix = this.getFileTypePrefix(category as FilesTabs);
+      if (Array.isArray(fileTypePrefix)) {
+        whereClause = and(
+          whereClause,
+          or(...fileTypePrefix.map((prefix) => ilike(files.fileType, `${prefix}%`))),
+        );
+      } else {
+        whereClause = and(whereClause, ilike(files.fileType, `${fileTypePrefix}%`));
+      }
+    }
+
+    let orderByClause = desc(files.createdAt);
+    const sortableFields = {
+      createdAt: files.createdAt,
+      name: files.name,
+      size: files.size,
+      updatedAt: files.updatedAt,
+    } as const;
+    type SortableField = keyof typeof sortableFields;
+
+    if (sorter && sortType && sorter in sortableFields) {
+      const sortFunction = sortType.toLowerCase() === SortType.Asc ? asc : desc;
+      orderByClause = sortFunction(sortableFields[sorter as SortableField]);
+    }
+
+    const shouldJoinFileAssets = Boolean(
+      assetClassification || assetRightsOwner || assetReviewStatus || assetUsagePolicy,
+    );
+
+    if (assetClassification) {
+      whereClause =
+        assetClassification === FileAssetClassification.General
+          ? and(
+              whereClause,
+              or(eq(fileAssets.classification, assetClassification), isNull(fileAssets.fileId)),
+            )
+          : and(whereClause, eq(fileAssets.classification, assetClassification));
+    }
+
+    if (assetReviewStatus) {
+      whereClause =
+        assetReviewStatus === FileAssetReviewStatus.Draft
+          ? and(
+              whereClause,
+              or(eq(fileAssets.reviewStatus, assetReviewStatus), isNull(fileAssets.fileId)),
+            )
+          : and(whereClause, eq(fileAssets.reviewStatus, assetReviewStatus));
+    }
+
+    if (assetUsagePolicy) {
+      whereClause =
+        assetUsagePolicy === FileAssetUsagePolicy.Internal
+          ? and(
+              whereClause,
+              or(eq(fileAssets.usagePolicy, assetUsagePolicy), isNull(fileAssets.fileId)),
+            )
+          : and(whereClause, eq(fileAssets.usagePolicy, assetUsagePolicy));
+    }
+
+    if (assetRightsOwner) {
+      whereClause = and(whereClause, ilike(fileAssets.rightsOwner, `%${assetRightsOwner}%`));
+    }
+
+    return {
+      orderByClause,
+      shouldJoinFileAssets,
+      showFilesInSourceSet,
+      sourceSetId,
+      whereClause,
+    };
+  };
+
+  private applyFileListScope = (
+    queryBuilder: { innerJoin: (...args: any[]) => any; where: (clause: unknown) => any },
+    {
+      showFilesInSourceSet,
+      sourceSetId,
+      whereClause,
+    }: {
+      showFilesInSourceSet?: boolean;
+      sourceSetId?: string;
+      whereClause: unknown;
+    },
+  ) => {
+    let query = queryBuilder;
+
+    if (sourceSetId) {
+      query = query.innerJoin(
+        sourceSetFiles,
+        and(eq(files.id, sourceSetFiles.fileId), eq(sourceSetFiles.sourceSetId, sourceSetId)),
+      );
+    } else if (!showFilesInSourceSet) {
+      const nextWhereClause = and(
+        whereClause as any,
+        notExists(this.db.select().from(sourceSetFiles).where(eq(sourceSetFiles.fileId, files.id))),
+      );
+
+      return query.where(nextWhereClause);
+    }
+
+    return query.where(whereClause as any);
+  };
+
   /**
    * Whether this user may read bytes for a global_files row (CAS by hash).
    * Allows: creator, a `files` row owned by this user pointing at the hash, or a skill
    * owned by this user whose zip or embedded resources reference the hash.
    */
-  canAccessGlobalFileByHash = async (hash: string): Promise<boolean> => {
+  canAccessGlobalFileBySha256 = async (sha256: string): Promise<boolean> => {
     const [globalFile] = await this.db
       .select({ creator: globalFiles.creator })
       .from(globalFiles)
-      .where(eq(globalFiles.hashId, hash))
+      .where(eq(globalFiles.hashId, sha256))
       .limit(1);
 
     if (!globalFile) return false;
@@ -137,7 +305,7 @@ export class FileModel {
     const [ownedFile] = await this.db
       .select({ id: files.id })
       .from(files)
-      .where(and(eq(files.fileHash, hash), eq(files.userId, this.userId)))
+      .where(and(eq(files.fileHash, sha256), eq(files.userId, this.userId)))
       .limit(1);
 
     if (ownedFile) return true;
@@ -149,10 +317,10 @@ export class FileModel {
         and(
           eq(agentSkills.userId, this.userId),
           or(
-            eq(agentSkills.zipFileHash, hash),
+            eq(agentSkills.zipFileHash, sha256),
             sql`exists (
               select 1 from jsonb_each(${agentSkills.resources}) as _je
-              where _je.value->>'fileHash' = ${hash}
+              where coalesce(_je.value->>'sha256', _je.value->>'fileHash') = ${sha256}
             )`,
           ),
         ),
@@ -337,55 +505,185 @@ export class FileModel {
     });
   };
 
-  clear = async () => {
-    return this.db.delete(files).where(eq(files.userId, this.userId));
+  /**
+   * Soft delete by id only. Caller must enforce authorization first.
+   */
+  softDeleteAny = async (id: string) => {
+    const file = await this.findByIdAny(id);
+    if (!file) return;
+
+    const now = new Date();
+    await this.db.update(files).set({ deletedAt: now, updatedAt: now }).where(eq(files.id, id));
+
+    return file;
+  };
+
+  /**
+   * Batch soft delete by ids only. Caller must enforce authorization first.
+   */
+  softDeleteManyAny = async (ids: string[]) => {
+    if (ids.length === 0) return [];
+
+    const now = new Date();
+    const CHUNK = 200;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      await this.db
+        .update(files)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(inArray(files.id, chunk));
+    }
+
+    return ids;
+  };
+
+  clear = async (
+    removeGlobalFile: boolean = true,
+    options?: { includeUnscoped?: boolean; spaceId?: string },
+  ) => {
+    return this.db.transaction(async (trx) => {
+      const scopedWhereClause = and(
+        eq(files.userId, this.userId),
+        options?.spaceId
+          ? or(
+              eq(files.spaceId, options.spaceId),
+              options.includeUnscoped ? isNull(files.spaceId) : undefined,
+            )
+          : undefined,
+      );
+      const fileList = await trx.query.files.findMany({
+        where: scopedWhereClause,
+      });
+
+      if (fileList.length === 0) return [];
+
+      const fileIds = fileList.map((file) => file.id);
+      const hashList = Array.from(new Set(fileList.map((file) => file.fileHash!).filter(Boolean)));
+
+      await this.deleteFileChunks(trx as any, fileIds);
+      await trx.delete(files).where(scopedWhereClause);
+
+      if (!removeGlobalFile || hashList.length === 0) return fileList;
+
+      const remainingFiles = await trx
+        .select({
+          fileHash: files.fileHash,
+        })
+        .from(files)
+        .where(inArray(files.fileHash, hashList));
+
+      const usedHashes = new Set(remainingFiles.map((file) => file.fileHash));
+      const hashesToDelete = hashList.filter((hash) => !usedHashes.has(hash));
+
+      if (hashesToDelete.length > 0) {
+        await trx.delete(globalFiles).where(inArray(globalFiles.hashId, hashesToDelete));
+      }
+
+      return fileList;
+    });
+  };
+
+  clearFileChunks = async (fileIds: string[]) => {
+    if (fileIds.length === 0) return [];
+
+    return this.db.transaction(async (trx) => this.deleteFileChunks(trx as any, fileIds));
+  };
+
+  findExistingByBlobAndContext = async ({
+    blobId,
+    fileType,
+    sourceSetId,
+    name,
+    parentId,
+    source,
+    spaceId,
+  }: {
+    blobId: string;
+    fileType: string;
+    sourceSetId?: string;
+    name: string;
+    parentId?: string | null;
+    source?: string | null;
+    spaceId?: string | null;
+  }) => {
+    const baseWhere = and(
+      eq(files.userId, this.userId),
+      eq(files.blobId, blobId),
+      eq(files.fileType, fileType),
+      eq(files.name, name),
+      sql`${files.parentId} is not distinct from ${parentId ?? null}`,
+      sql`${files.source} is not distinct from ${source ?? null}`,
+      sql`${files.spaceId} is not distinct from ${spaceId ?? null}`,
+      sql`${files.deletedAt} is null`,
+    );
+
+    if (sourceSetId) {
+      const [result] = await this.db
+        .select({ file: files })
+        .from(files)
+        .innerJoin(
+          sourceSetFiles,
+          and(eq(files.id, sourceSetFiles.fileId), eq(sourceSetFiles.sourceSetId, sourceSetId)),
+        )
+        .where(baseWhere)
+        .limit(1);
+
+      return result?.file;
+    }
+
+    const [result] = await this.db
+      .select()
+      .from(files)
+      .where(
+        and(
+          baseWhere,
+          notExists(
+            this.db
+              .select({ fileId: sourceSetFiles.fileId })
+              .from(sourceSetFiles)
+              .where(eq(sourceSetFiles.fileId, files.id)),
+          ),
+        ),
+      )
+      .limit(1);
+
+    return result;
   };
 
   query = async ({
+    assetClassification,
+    assetRightsOwner,
+    assetReviewStatus,
+    assetUsagePolicy,
     category,
     q,
     sortType,
     sorter,
-    knowledgeBaseId,
-    showFilesInKnowledgeBase,
-  }: QueryFileListParams = {}) => {
-    // 1. Build where clause
-    let whereClause = and(
-      q ? ilike(files.name, `%${q}%`) : undefined,
-      eq(files.userId, this.userId),
-    );
-    if (category && category !== FilesTabs.All && category !== FilesTabs.Home) {
-      const fileTypePrefix = this.getFileTypePrefix(category as FilesTabs);
-      if (Array.isArray(fileTypePrefix)) {
-        // For multiple file types (e.g., Documents includes 'application' and 'custom')
-        whereClause = and(
-          whereClause,
-          or(...fileTypePrefix.map((prefix) => ilike(files.fileType, `${prefix}%`))),
-        );
-      } else {
-        whereClause = and(whereClause, ilike(files.fileType, `${fileTypePrefix}%`));
-      }
-    }
+    sourceSetId,
+    showFilesInSourceSet,
+    spaceId,
+  }: QueryFileListParams = {}): Promise<FileListRow[]> => {
+    const {
+      orderByClause,
+      shouldJoinFileAssets,
+      showFilesInSourceSet: scopedShowFilesInSourceSet,
+      sourceSetId: scopedSourceSetId,
+      whereClause,
+    } = this.buildFileListWhereClause({
+      assetClassification,
+      assetRightsOwner,
+      assetReviewStatus,
+      assetUsagePolicy,
+      category,
+      q,
+      sortType,
+      sorter,
+      sourceSetId,
+      showFilesInSourceSet,
+      spaceId,
+    });
 
-    // 2. Build order clause
-
-    let orderByClause = desc(files.createdAt);
-    // create a map for sortable fields
-    const sortableFields = {
-      createdAt: files.createdAt,
-      name: files.name,
-      size: files.size,
-      updatedAt: files.updatedAt,
-    } as const;
-    type SortableField = keyof typeof sortableFields;
-
-    if (sorter && sortType && sorter in sortableFields) {
-      const sortFunction = sortType.toLowerCase() === SortType.Asc ? asc : desc;
-      orderByClause = sortFunction(sortableFields[sorter as SortableField]);
-    }
-
-    // 3. Build base query
-    let query = this.db
+    let query: any = this.db
       .select({
         chunkTaskId: files.chunkTaskId,
         createdAt: files.createdAt,
@@ -394,42 +692,197 @@ export class FileModel {
         id: files.id,
         name: files.name,
         size: files.size,
+        spaceId: files.spaceId,
         updatedAt: files.updatedAt,
         url: files.url,
       })
       .from(files);
 
-    // 4. Add knowledge base query if needed
-    if (knowledgeBaseId) {
-      // if knowledgeBaseId is provided, it means we are querying files in a knowledge-base
-
-      // @ts-ignore
-      query = query.innerJoin(
-        knowledgeBaseFiles,
-        and(
-          eq(files.id, knowledgeBaseFiles.fileId),
-          eq(knowledgeBaseFiles.knowledgeBaseId, knowledgeBaseId),
-        ),
-      );
-    }
-    // 5. If we don't show files in knowledge base, exclude them
-    else if (!showFilesInKnowledgeBase) {
-      whereClause = and(
-        whereClause,
-        notExists(
-          this.db.select().from(knowledgeBaseFiles).where(eq(knowledgeBaseFiles.fileId, files.id)),
-        ),
-      );
+    if (shouldJoinFileAssets) {
+      query = query.leftJoin(fileAssets, eq(files.id, fileAssets.fileId));
     }
 
-    // Otherwise, we are just filtering in the global files
-    return query.where(whereClause).orderBy(orderByClause);
+    return this.applyFileListScope(query, {
+      showFilesInSourceSet: scopedShowFilesInSourceSet,
+      sourceSetId: scopedSourceSetId,
+      whereClause,
+    }).orderBy(orderByClause) as Promise<FileListRow[]>;
+  };
+
+  queryGovernanceRows = async (params: QueryFileListParams = {}): Promise<FileGovernanceRow[]> => {
+    const { showFilesInSourceSet, sourceSetId, whereClause } =
+      this.buildFileListWhereClause(params);
+
+    const query: any = this.db
+      .select({
+        assetClassification: fileAssets.classification,
+        assetReviewStatus: fileAssets.reviewStatus,
+        assetUsagePolicy: fileAssets.usagePolicy,
+        id: files.id,
+      })
+      .from(files)
+      .leftJoin(fileAssets, eq(files.id, fileAssets.fileId));
+
+    return this.applyFileListScope(query, {
+      showFilesInSourceSet,
+      sourceSetId,
+      whereClause,
+    }) as Promise<FileGovernanceRow[]>;
   };
 
   findByIds = async (ids: string[]) => {
     return this.db.query.files.findMany({
       where: and(inArray(files.id, ids), eq(files.userId, this.userId)),
     });
+  };
+
+  findByUrls = async (urls: string[]) => {
+    const uniqueUrls = Array.from(new Set(urls.filter(Boolean)));
+
+    if (uniqueUrls.length === 0) return [];
+
+    return this.db.query.files.findMany({
+      where: and(inArray(files.url, uniqueUrls), eq(files.userId, this.userId)),
+    });
+  };
+
+  getConversationAttachableFileIds = async (fileIds: string[]) => {
+    if (fileIds.length === 0) return [];
+
+    const validFiles = await this.findByIds(fileIds);
+    const candidateFileIds = validFiles
+      .filter((file) => !file.fileType.startsWith('image'))
+      .map((file) => file.id);
+
+    if (candidateFileIds.length === 0) return [];
+
+    const rows = await this.db
+      .select({ fileId: documents.fileId })
+      .from(documents)
+      .where(
+        and(
+          eq(documents.userId, this.userId),
+          inArray(documents.fileId, candidateFileIds),
+          isNull(documents.deletedAt),
+          sql`${documents.content} is not null`,
+          sql`${documents.content} <> ''`,
+        ),
+      );
+
+    return Array.from(
+      new Set(rows.map((row) => row.fileId).filter((id): id is string => Boolean(id))),
+    );
+  };
+
+  getConversationAvailableFiles = async () => {
+    const allFiles = await this.query({ showFilesInSourceSet: true });
+    const candidateFiles = allFiles.filter((file) => !file.fileType.startsWith('image'));
+
+    if (candidateFiles.length === 0) return [];
+
+    const attachableIds = new Set(
+      await this.getConversationAttachableFileIds(candidateFiles.map((file) => file.id)),
+    );
+
+    return candidateFiles.filter((file) => attachableIds.has(file.id));
+  };
+
+  createSessionFiles = async (sessionId: string, fileIds: string[]) => {
+    if (fileIds.length === 0) return;
+
+    const validFileIds = await this.getConversationAttachableFileIds(fileIds);
+
+    if (validFileIds.length === 0) return;
+
+    const existingFiles = await this.db
+      .select({ id: filesToSessions.fileId })
+      .from(filesToSessions)
+      .where(
+        and(
+          eq(filesToSessions.sessionId, sessionId),
+          eq(filesToSessions.userId, this.userId),
+          inArray(filesToSessions.fileId, validFileIds),
+        ),
+      );
+
+    const existingFileIds = new Set(existingFiles.map((item) => item.id));
+    const needToInsertFileIds = validFileIds.filter((fileId) => !existingFileIds.has(fileId));
+
+    if (needToInsertFileIds.length === 0) return;
+
+    return this.db.insert(filesToSessions).values(
+      needToInsertFileIds.map((fileId) => ({
+        fileId,
+        sessionId,
+        userId: this.userId,
+      })),
+    );
+  };
+
+  deleteSessionFile = async (sessionId: string, fileId: string) => {
+    return this.db
+      .delete(filesToSessions)
+      .where(
+        and(
+          eq(filesToSessions.sessionId, sessionId),
+          eq(filesToSessions.fileId, fileId),
+          eq(filesToSessions.userId, this.userId),
+        ),
+      );
+  };
+
+  getSessionAssignedFiles = async (sessionId: string) => {
+    const result = await this.db
+      .select({ file: files })
+      .from(filesToSessions)
+      .leftJoin(files, eq(files.id, filesToSessions.fileId))
+      .where(and(eq(filesToSessions.sessionId, sessionId), eq(filesToSessions.userId, this.userId)))
+      .orderBy(desc(files.updatedAt));
+
+    return result.map((item) => item.file).filter((item): item is FileItem => Boolean(item));
+  };
+
+  getSessionAssignedFileContents = async (sessionId: string) => {
+    const assignedFiles = await this.getSessionAssignedFiles(sessionId);
+
+    const validFiles = assignedFiles.filter((file) => !file.fileType.startsWith('image'));
+    if (validFiles.length === 0) return [];
+
+    const fileIds = validFiles.map((file) => file.id);
+    const documentsData = await this.db.query.documents.findMany({
+      where: and(
+        eq(documents.userId, this.userId),
+        inArray(documents.fileId, fileIds),
+        isNull(documents.deletedAt),
+      ),
+    });
+
+    const documentMap = new Map(documentsData.map((doc) => [doc.fileId, doc.content]));
+
+    return validFiles
+      .map((file) => ({
+        content: documentMap.get(file.id),
+        fileId: file.id,
+        filename: file.name,
+      }))
+      .filter(
+        (
+          item,
+        ): item is {
+          content: string;
+          fileId: string;
+          filename: string;
+        } => Boolean(item.content),
+      );
+  };
+
+  toggleSessionFile = async (sessionId: string, fileId: string, enabled: boolean = true) => {
+    if (!enabled) {
+      await this.deleteSessionFile(sessionId, fileId);
+      return;
+    }
+
+    await this.createSessionFiles(sessionId, [fileId]);
   };
 
   findById = async (id: string, trx?: Transaction) => {

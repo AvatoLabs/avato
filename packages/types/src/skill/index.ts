@@ -77,7 +77,7 @@ export interface ParsedZipSkill {
 
 export interface SkillResourceMeta {
   documentId?: string;
-  fileHash: string;
+  sha256: string;
   size: number;
 }
 
@@ -92,10 +92,10 @@ export interface SkillResourceTreeNode {
 export interface SkillResourceContent {
   content: string;
   encoding: 'utf8' | 'base64';
-  fileHash: string;
   fileType: string;
   fullPath?: string;
   path: string;
+  sha256: string;
   size: number;
 }
 
@@ -113,7 +113,7 @@ export interface SkillItem {
   resources?: Record<string, SkillResourceMeta> | null;
   source: SkillSource;
   updatedAt: Date;
-  zipFileHash?: string | null;
+  zipSha256?: string | null;
 }
 
 // ===== Skill List Item (精简结构，用于列表查询) =====
@@ -127,7 +127,7 @@ export interface SkillListItem {
   name: string;
   source: SkillSource;
   updatedAt: Date;
-  zipFileHash?: string | null;
+  zipSha256?: string | null;
 }
 
 // ===== Service Input Types =====

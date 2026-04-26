@@ -166,7 +166,7 @@ const RunEditModal = memo<RunEditModalProps>(({ open, onClose, run }) => {
 
   return (
     <Modal
-      destroyOnClose
+      destroyOnHidden
       confirmLoading={loading}
       okText={t('benchmark.edit.confirm')}
       open={open}

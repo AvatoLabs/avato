@@ -6,9 +6,9 @@ import { type ReactNode } from 'react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
 import { klavisStoreSelectors } from '@/store/tool/selectors';
 import { KlavisServerStatus } from '@/store/tool/slices/klavisStore';
+import { useToolStore } from '@/store/tool/store';
 
 import { type DetailContextValue } from './DetailContext';
 import { DetailContext } from './DetailContext';

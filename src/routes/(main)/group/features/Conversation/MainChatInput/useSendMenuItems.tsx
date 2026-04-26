@@ -2,10 +2,11 @@
 
 import { type MenuProps } from '@lobehub/ui';
 import { Flexbox, Hotkey, Icon } from '@lobehub/ui';
-import { BotMessageSquare, LucideCheck, MessageSquarePlus } from 'lucide-react';
+import { LucideCheck } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
+import { ACTION_ENTRY_ICONS, APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { useConversationStore, useConversationStoreApi } from '@/features/Conversation';
 import { useUserStore } from '@/store/user';
 import { preferenceSelectors, settingsSelectors } from '@/store/user/selectors';
@@ -94,13 +95,13 @@ export const useSendMenuItems = (): MenuProps['items'] => {
       },
       { type: 'divider' },
       {
-        icon: <Icon icon={BotMessageSquare} />,
+        icon: <Icon icon={ACTION_ENTRY_ICONS.createAgent} />,
         key: 'addAi',
         label: t('input.addAi'),
         onClick: handleAddAIMessage,
       },
       {
-        icon: <Icon icon={MessageSquarePlus} />,
+        icon: <Icon icon={APP_ENTRY_ICONS.chat} />,
         key: 'addUser',
         label: (
           <Flexbox horizontal align={'center'} gap={24}>
@@ -111,6 +112,6 @@ export const useSendMenuItems = (): MenuProps['items'] => {
         onClick: handleAddUserMessage,
       },
     ],
-    [useCmdEnterToSend, updatePreference, hotkey, handleAddAIMessage, handleAddUserMessage],
+    [useCmdEnterToSend, updatePreference, hotkey, handleAddAIMessage, handleAddUserMessage, t],
   );
 };

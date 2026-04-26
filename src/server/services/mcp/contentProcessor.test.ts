@@ -79,18 +79,23 @@ describe('contentProcessor', () => {
 
   describe('processContentBlocks', () => {
     const mockFileService = {
+      createOpaqueUserBlobPath: vi.fn(),
       uploadBase64: vi.fn(),
     } as any;
 
     beforeEach(() => {
       vi.clearAllMocks();
+      mockFileService.createOpaqueUserBlobPath.mockResolvedValue({
+        key: 'v2/spaces/spc_personal/blobs/mcp-content/images/opq_1.png',
+        spaceId: 'spc_personal',
+      });
     });
 
     it('should upload image and replace base64 data with URL', async () => {
       mockFileService.uploadBase64.mockResolvedValue({
         url: 'https://example.com/f/uploaded-img',
         fileId: 'file-1',
-        key: 'mcp/images/2025-01-01/abc.png',
+        key: 'v2/spaces/spc_personal/blobs/mcp-content/images/opq_1.png',
       });
 
       const blocks: ToolCallContent[] = [
@@ -105,17 +110,25 @@ describe('contentProcessor', () => {
 
       expect(result[0].type).toBe('image');
       expect((result[0] as any).data).toBe('https://example.com/f/uploaded-img');
+      expect(mockFileService.createOpaqueUserBlobPath).toHaveBeenCalledWith(
+        'mcp-content/images',
+        'png',
+      );
       expect(mockFileService.uploadBase64).toHaveBeenCalledWith(
         'iVBORw0KGgoAAAANSUhEUg==',
-        expect.stringContaining('mcp/images/'),
+        'v2/spaces/spc_personal/blobs/mcp-content/images/opq_1.png',
       );
     });
 
     it('should upload audio and replace base64 data with URL', async () => {
+      mockFileService.createOpaqueUserBlobPath.mockResolvedValue({
+        key: 'v2/spaces/spc_personal/blobs/mcp-content/audio/opq_2.mp3',
+        spaceId: 'spc_personal',
+      });
       mockFileService.uploadBase64.mockResolvedValue({
         url: 'https://example.com/f/uploaded-audio',
         fileId: 'file-2',
-        key: 'mcp/audio/2025-01-01/abc.mp3',
+        key: 'v2/spaces/spc_personal/blobs/mcp-content/audio/opq_2.mp3',
       });
 
       const blocks: ToolCallContent[] = [
@@ -130,6 +143,14 @@ describe('contentProcessor', () => {
 
       expect(result[0].type).toBe('audio');
       expect((result[0] as any).data).toBe('https://example.com/f/uploaded-audio');
+      expect(mockFileService.createOpaqueUserBlobPath).toHaveBeenCalledWith(
+        'mcp-content/audio',
+        'mp3',
+      );
+      expect(mockFileService.uploadBase64).toHaveBeenCalledWith(
+        'base64audiodata==',
+        'v2/spaces/spc_personal/blobs/mcp-content/audio/opq_2.mp3',
+      );
     });
 
     it('should pass through text content unchanged', async () => {
@@ -142,7 +163,7 @@ describe('contentProcessor', () => {
       mockFileService.uploadBase64.mockResolvedValue({
         url: 'https://myapp.com/f/img-uuid',
         fileId: 'file-3',
-        key: 'mcp/images/2025-01-01/xyz.png',
+        key: 'v2/spaces/spc_personal/blobs/mcp-content/images/opq_3.png',
       });
 
       const blocks: ToolCallContent[] = [

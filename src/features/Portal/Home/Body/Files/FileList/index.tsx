@@ -33,7 +33,7 @@ const FileList = () => {
         size={48}
       />
       <Balancer>
-        <Text type={'secondary'}>{t('emptyKnowledgeList')}</Text>
+        <Text type={'secondary'}>{t('emptyFileList')}</Text>
       </Balancer>
     </Center>
   ) : (

@@ -5,7 +5,7 @@ import { PencilLine, Trash } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
 import type { SessionGroupItemBase } from '@/types/session';
 
 const styles = createStaticStyles(({ css }) => ({
@@ -47,7 +47,12 @@ const GroupItem = memo<SessionGroupItemBase>(({ id, name }) => {
                   type: 'primary',
                 },
                 onOk: async () => {
-                  await removeGroup(id);
+                  try {
+                    await removeGroup(id);
+                  } catch (error) {
+                    console.error('Failed to delete session group from config modal:', error);
+                    message.error(t('confirmRemoveGroupError'));
+                  }
                 },
                 title: t('sessionGroup.confirmRemoveGroupAlert'),
               });
@@ -67,8 +72,14 @@ const GroupItem = memo<SessionGroupItemBase>(({ id, name }) => {
               if (input.length === 0 || input.length > 20 || input.trim() === '')
                 return message.warning(t('sessionGroup.tooLong'));
 
-              await updateGroupName(id, input);
-              message.success(t('sessionGroup.renameSuccess'));
+              try {
+                await updateGroupName(id, input);
+                message.success(t('sessionGroup.renameSuccess'));
+              } catch (error) {
+                console.error('Failed to rename session group:', error);
+                message.error(t('sessionGroup.renameError'));
+                return;
+              }
             }
             setEditing(false);
           }}

@@ -59,7 +59,6 @@ const SkillItem = memo<DiscoverSkillItem>(
     updatedAt,
     installCount,
     github,
-    homepage,
     ratingAvg,
     commentCount,
     resourcesCount = 0,
@@ -127,7 +126,11 @@ const SkillItem = memo<DiscoverSkillItem>(
                   overflow: 'hidden',
                 }}
               >
-                <Link style={{ color: 'inherit', overflow: 'hidden' }} to={link}>
+                <Link
+                  style={{ color: 'inherit', overflow: 'hidden' }}
+                  to={link}
+                  onClick={stopPropagation}
+                >
                   <Text ellipsis as={'h2'} className={styles.title}>
                     {name}
                   </Text>

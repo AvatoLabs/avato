@@ -1,8 +1,8 @@
 import { type MetaData } from '@lobechat/types';
 import { useMemo } from 'react';
 
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 import { contextSelectors, useConversationStore } from '../store';
 
@@ -10,7 +10,7 @@ const LOBE_AI_TITLE = 'Avato';
 
 /**
  * Hook to get agent meta data for a specific agent or the current conversation.
- * Handles special cases for builtin agents (inbox, page agent, agent builder)
+ * Handles special cases for builtin agents (inbox, Docs Agent, agent builder)
  * by showing Avato title instead of the agent's own meta.
  * Avatar is now returned from the backend (merged from builtin-agents package).
  *

@@ -1,5 +1,5 @@
 import { Button, Modal } from '@lobehub/ui';
-import { type FormInstance } from 'antd';
+import { App, type FormInstance } from 'antd';
 import isEqual from 'fast-deep-equal';
 import { memo, use, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,7 @@ interface ModelConfigModalProps {
 
 const ModelConfigModal = memo<ModelConfigModalProps>(({ id, open, setOpen }) => {
   const { t } = useTranslation(['common', 'setting']);
+  const { message } = App.useApp();
   const [formInstance, setFormInstance] = useState<FormInstance>();
   const [loading, setLoading] = useState(false);
   const [editingProvider, updateAiModelsConfig] = useAiInfraStore((s) => [
@@ -33,7 +34,7 @@ const ModelConfigModal = memo<ModelConfigModalProps>(({ id, open, setOpen }) => 
   return (
     <Modal
       destroyOnHidden
-      maskClosable
+      mask={{ closable: true }}
       open={open}
       title={t('llm.customModelCards.modelConfig.modalTitle', { ns: 'setting' })}
       zIndex={1251} // Select is 1150
@@ -48,13 +49,19 @@ const ModelConfigModal = memo<ModelConfigModalProps>(({ id, open, setOpen }) => 
           type="primary"
           onClick={async () => {
             if (!editingProvider || !id || !formInstance) return;
-            const data = formInstance.getFieldsValue();
-
             setLoading(true);
-            await updateAiModelsConfig(id, editingProvider, data);
-            setLoading(false);
-
-            closeModal();
+            try {
+              await formInstance.validateFields();
+              const data = formInstance.getFieldsValue();
+              await updateAiModelsConfig(id, editingProvider, data);
+              closeModal();
+            } catch (error: any) {
+              if (!error?.errorFields) {
+                message.error(t('providerModels.item.modelConfig.updateError', { ns: 'modelProvider' }));
+              }
+            } finally {
+              setLoading(false);
+            }
           }}
         >
           {t('ok')}

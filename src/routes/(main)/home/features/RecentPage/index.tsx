@@ -7,11 +7,11 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useInitRecentPage } from '@/hooks/useInitRecentPage';
-import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
-import { useHomeStore } from '@/store/home';
 import { homeRecentSelectors } from '@/store/home/selectors';
-import { FilesTabs } from '@/types/files';
+import { useHomeStore } from '@/store/home/store';
+import { getPageRootPath } from '@/utils/docs';
 
 import GroupBlock from '../components/GroupBlock';
 import GroupSkeleton from '../components/GroupSkeleton';
@@ -22,10 +22,10 @@ import RecentPageList from './List';
 const RecentPage = memo(() => {
   const { t } = useTranslation('file');
   const navigate = useNavigate();
-  const setCategory = useResourceManagerStore((s) => s.setCategory);
   const recentPages = useHomeStore(homeRecentSelectors.recentPages);
   const isInit = useHomeStore(homeRecentSelectors.isRecentPagesInit);
   const { isRevalidating } = useInitRecentPage();
+  const resolvedSpaceId = resolveWorkspaceSpaceId();
 
   // After loaded, if no data, don't render
   if (isInit && (!recentPages || recentPages.length === 0)) {
@@ -35,7 +35,7 @@ const RecentPage = memo(() => {
   return (
     <GroupBlock
       icon={FileTextIcon}
-      title={t('home.recentPages')}
+      title={t('home.recentDocs', { defaultValue: 'Recent Docs' })}
       action={
         <>
           {isRevalidating && <NeuralNetworkLoading size={14} />}
@@ -43,10 +43,9 @@ const RecentPage = memo(() => {
             items={[
               {
                 key: 'all-documents',
-                label: t('menu.allPages'),
+                label: t('menu.openDocs', { defaultValue: 'Open Docs' }),
                 onClick: () => {
-                  setCategory(FilesTabs.Pages);
-                  navigate('/resource');
+                  navigate(getPageRootPath('doc', resolvedSpaceId));
                 },
               },
             ]}
@@ -61,6 +60,7 @@ const RecentPage = memo(() => {
           fallback={
             <GroupSkeleton
               height={RECENT_BLOCK_SIZE.PAGE.HEIGHT}
+              variant={'page'}
               width={RECENT_BLOCK_SIZE.PAGE.WIDTH}
             />
           }

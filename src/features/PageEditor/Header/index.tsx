@@ -1,7 +1,8 @@
 'use client';
 
-import { ActionIcon, Avatar, DropdownMenu, Icon, Segmented, Text } from '@lobehub/ui';
-import { ArrowLeftIcon, Code2, Eye, MoreHorizontal, SquarePen } from 'lucide-react';
+import { ActionIcon, DropdownMenu, Icon, Segmented } from '@lobehub/ui';
+import { cssVar } from 'antd-style';
+import { ArrowLeftIcon, Code2, Eye, MoreHorizontal, SquarePen, Table2Icon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -9,6 +10,7 @@ import { DESKTOP_HEADER_ICON_SIZE } from '@/const/layoutTokens';
 import { AutoSaveHint } from '@/features/EditorCanvas';
 import NavHeader from '@/features/NavHeader';
 import ToggleRightPanelButton from '@/features/RightPanel/ToggleRightPanelButton';
+import { TABLE_PAGE_KIND } from '@/utils/docs';
 
 import { usePageEditorStore } from '../store';
 import Breadcrumb from './Breadcrumb';
@@ -16,30 +18,22 @@ import { useMenu } from './useMenu';
 
 const Header = memo(() => {
   const { t } = useTranslation('file');
-  const [documentId, emoji, title, parentId, onBack, setViewMode, viewMode] = usePageEditorStore(
-    (s) => [s.documentId, s.emoji, s.title, s.parentId, s.onBack, s.setViewMode, s.viewMode],
-  );
+  const [documentId, onBack, pageKind, setViewMode, viewMode] = usePageEditorStore((s) => [
+    s.documentId,
+    s.onBack,
+    s.pageKind,
+    s.setViewMode,
+    s.viewMode,
+  ]);
   const { menuItems } = useMenu();
+  const isTablePage = pageKind === TABLE_PAGE_KIND;
 
   return (
     <NavHeader
       left={
         <>
           {onBack && <ActionIcon icon={ArrowLeftIcon} onClick={onBack} />}
-          {/* Breadcrumb - show when page has a parent folder */}
-          {parentId && <Breadcrumb />}
-          {/* Show icon and title only when there's no parent folder */}
-          {!parentId && (
-            <>
-              {/* Icon */}
-              {emoji && <Avatar avatar={emoji} shape={'square'} size={28} />}
-              {/* Title */}
-              <Text ellipsis style={{ marginLeft: 4 }} weight={500}>
-                {title || t('pageEditor.titlePlaceholder')}
-              </Text>
-            </>
-          )}
-          {/* Auto Save Status */}
+          {documentId && <Breadcrumb />}
           {documentId && <AutoSaveHint documentId={documentId} style={{ marginLeft: 6 }} />}
         </>
       }
@@ -50,18 +44,18 @@ const Header = memo(() => {
             value={viewMode}
             options={[
               {
-                icon: <Icon icon={SquarePen} />,
-                title: t('pageEditor.mode.rich'),
+                icon: <Icon icon={isTablePage ? Table2Icon : SquarePen} />,
+                title: t(isTablePage ? 'docEditor.mode.table' : 'docEditor.mode.rich'),
                 value: 'rich',
               },
               {
                 icon: <Icon icon={Code2} />,
-                title: t('pageEditor.mode.markdown'),
+                title: t('docEditor.mode.markdown'),
                 value: 'markdown',
               },
               {
                 icon: <Icon icon={Eye} />,
-                title: t('pageEditor.mode.preview'),
+                title: t('docEditor.mode.preview'),
                 value: 'preview',
               },
             ]}
@@ -71,6 +65,7 @@ const Header = memo(() => {
           <DropdownMenu
             iconSpaceMode="group"
             items={menuItems}
+            nativeButton={false}
             placement="bottomRight"
             popupProps={{
               style: {
@@ -83,6 +78,18 @@ const Header = memo(() => {
           <ToggleRightPanelButton hideWhenExpanded showActive={false} />
         </>
       }
+      style={{
+        background: cssVar.colorBgContainer,
+        borderBottom: `1px solid ${cssVar.colorBorderSecondary}`,
+        paddingInline: 12,
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+      }}
+      styles={{
+        left: { flex: 1, minWidth: 0 },
+        right: { flex: 'none' },
+      }}
     />
   );
 });

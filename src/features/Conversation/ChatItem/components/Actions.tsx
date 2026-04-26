@@ -13,9 +13,9 @@ const Actions = memo<ActionsProps>(({ placement, actions }) => {
   return (
     <Flexbox
       align={'center'}
+      data-message-actions=""
       direction={'horizontal'}
       gap={8}
-      role="menubar"
       style={{
         alignSelf: isUser ? 'flex-end' : 'flex-start',
       }}

@@ -90,12 +90,7 @@ export const UpdateAgentPromptInspector = memo<
       {agent && !isSupervisor && (
         <>
           <Avatar avatar={agent.avatar ?? undefined} size={18} title={agent.title ?? undefined} />
-          <Text
-            className={styles.agentName}
-            ellipsis={{
-              tooltipWhenOverflow: true,
-            }}
-          >
+          <Text className={styles.agentName} ellipsis title={agent.title ?? undefined}>
             {agent.title}
           </Text>
         </>

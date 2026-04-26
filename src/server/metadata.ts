@@ -5,14 +5,14 @@ import qs from 'query-string';
 import { DEFAULT_LANG } from '@/const/locale';
 import { OG_URL } from '@/const/url';
 import { isCustomORG } from '@/const/version';
-import { type Locales } from '@/locales/resources';
-import { locales } from '@/locales/resources';
+import { type Locales } from '@/locales/contents';
+import { locales } from '@/locales/contents';
 import { getCanonicalUrl } from '@/server/utils/url';
 import { formatDescLength, formatTitleLength } from '@/utils/genOG';
 
 export class Meta {
   public generate({
-    description = 'LobeChat offers you the best ChatGPT, OLLaMA, Gemini, Claude WebUI user experience',
+    description = 'Avato offers a modern AI agent workspace for chat, tools, skills, and local desktop automation',
     title,
     image = OG_URL,
     url,

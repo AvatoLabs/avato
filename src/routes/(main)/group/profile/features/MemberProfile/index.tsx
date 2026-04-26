@@ -1,25 +1,22 @@
 'use client';
 
-import { Alert, Button, Flexbox, Icon } from '@lobehub/ui';
-import { Divider } from 'antd';
+import { Alert, Flexbox, Icon } from '@lobehub/ui';
 import isEqual from 'fast-deep-equal';
-import { InfoIcon, PlayIcon } from 'lucide-react';
+import { InfoIcon } from 'lucide-react';
 import React, { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import urlJoin from 'url-join';
 
-import { EditorCanvas } from '@/features/EditorCanvas';
-import ModelSelect from '@/features/ModelSelect';
-import { useQueryRoute } from '@/hooks/useQueryRoute';
-import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useAgentGroupStore } from '@/store/agentGroup';
 import { agentGroupSelectors } from '@/store/agentGroup/selectors';
 import { useGroupProfileStore } from '@/store/groupProfile';
 
 import AutoSaveHint from '../Header/AutoSaveHint';
-import AgentHeader from './AgentHeader';
-import AgentTool from './AgentTool';
+import ActionBar from './ActionBar';
+import CapabilityCard from './CapabilityCard';
+import IdentityCard from './IdentityCard';
+import PromptSection from './PromptSection';
 
 const MemberProfile = memo(() => {
   const { t } = useTranslation(['setting', 'chat']);
@@ -35,10 +32,8 @@ const MemberProfile = memo(() => {
   const config = useAgentStore(agentByIdSelectors.getAgentConfigById(agentId), isEqual);
   const updateAgentConfigById = useAgentStore((s) => s.updateAgentConfigById);
 
-  const groupId = useAgentGroupStore(agentGroupSelectors.activeGroupId);
   const currentGroup = useAgentGroupStore(agentGroupSelectors.currentGroup, isEqual);
   const currentGroupAgents = useAgentGroupStore(agentGroupSelectors.currentGroupAgents, isEqual);
-  const router = useQueryRoute();
 
   // Check if the current agent is the supervisor
   const isSupervisor = currentGroup?.supervisorAgentId === agentId;
@@ -74,14 +69,6 @@ const MemberProfile = memo(() => {
     handleContentChange(updateContent);
   }, [handleContentChange, updateContent]);
 
-  // Wrap updateAgentConfigById for ModelSelect
-  const updateAgentConfig = useCallback(
-    async (config: { model?: string; provider?: string }) => {
-      await updateAgentConfigById(agentId, config);
-    },
-    [updateAgentConfigById, agentId],
-  );
-
   // Watch for agent builder content updates and apply them directly to the editor
   useEffect(() => {
     if (!editor || !agentBuilderContentUpdate) return;
@@ -95,7 +82,19 @@ const MemberProfile = memo(() => {
   }, [editor, agentBuilderContentUpdate, agentId, setAgentBuilderContent]);
 
   return (
-    <>
+    <Flexbox
+      flex={1}
+      gap={0}
+      style={{
+        cursor: 'default',
+        height: '100%',
+        overflow: 'auto',
+        padding: '0 0 24px',
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+      }}
+    >
       {/* External agent warning or AutoSaveHint */}
       <Flexbox height={66} width={'100%'}>
         {isExternal && !isSupervisor && (
@@ -111,54 +110,15 @@ const MemberProfile = memo(() => {
           <AutoSaveHint />
         </Flexbox>
       </Flexbox>
-      <Flexbox
-        style={{ cursor: 'default', marginBottom: 12 }}
-        onClick={(e) => {
-          e.stopPropagation();
-        }}
-      >
-        {/* Header: Avatar + Name */}
-        <AgentHeader readOnly={isSupervisor} />
-        {/* Config Bar: Model Selector */}
-        <Flexbox
-          horizontal
-          align={'center'}
-          gap={8}
-          justify={'flex-start'}
-          style={{ marginBottom: 12 }}
-        >
-          <ModelSelect
-            initialWidth
-            value={{
-              model: config?.model,
-              provider: config?.provider,
-            }}
-            onChange={updateAgentConfig}
-          />
-        </Flexbox>
-        <AgentTool />
-        <Flexbox
-          horizontal
-          align={'center'}
-          gap={8}
-          justify={'flex-start'}
-          style={{ marginTop: 16 }}
-        >
-          <Button
-            icon={PlayIcon}
-            type={'primary'}
-            onClick={() => {
-              if (!groupId) return;
-              router.push(urlJoin('/group', groupId));
-            }}
-          >
-            {t('startConversation')}
-          </Button>
-        </Flexbox>
-      </Flexbox>
-      <Divider />
-      {/* Main Content: Prompt Editor */}
-      <EditorCanvas
+
+      {/* Identity Section: Avatar + Name */}
+      <IdentityCard readOnly={isSupervisor} />
+
+      {/* Capability Section: Model + Tools */}
+      <CapabilityCard readOnly={isSupervisor} />
+
+      {/* Prompt Editor Section */}
+      <PromptSection
         editor={editor}
         editorData={editorData}
         entityId={agentId}
@@ -169,7 +129,10 @@ const MemberProfile = memo(() => {
         }
         onContentChange={onContentChange}
       />
-    </>
+
+      {/* Action Bar */}
+      <ActionBar />
+    </Flexbox>
   );
 });
 

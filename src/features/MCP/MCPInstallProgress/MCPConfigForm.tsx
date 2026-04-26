@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import ItemRender from '@/components/JSONSchemaConfig/ItemRender';
 import { transformPluginSettings } from '@/features/PluginSettings';
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 
 interface MCPConfigFormProps {
   configSchema: any;

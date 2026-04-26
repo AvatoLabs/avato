@@ -1,14 +1,26 @@
 import { type MenuProps } from '@lobehub/ui';
 import { Icon } from '@lobehub/ui';
 import { App } from 'antd';
-import { ExternalLink, LucideCopy, PanelTop, PencilLine, Star, Trash, Wand2 } from 'lucide-react';
+import {
+  ExternalLink,
+  LibraryBig,
+  LucideCopy,
+  PanelTop,
+  PencilLine,
+  Star,
+  Trash,
+  Wand2,
+} from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { isDesktop } from '@/const/version';
 import { pluginRegistry } from '@/features/Electron/titlebar/RecentlyViewed/plugins';
-import { useAgentStore } from '@/store/agent';
+import { useOpenCreateSpaceMemoryCandidateModal } from '@/features/ResourceSpaces/useOpenCreateSpaceMemoryCandidateModal';
+import { useSpaceMemoryCandidateTargets } from '@/features/ResourceSpaces/useSpaceMemoryCandidateTargets';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { useElectronStore } from '@/store/electron';
 import { useGlobalStore } from '@/store/global';
@@ -16,17 +28,23 @@ import { useGlobalStore } from '@/store/global';
 interface TopicItemDropdownMenuProps {
   fav?: boolean;
   id?: string;
+  title: string;
   toggleEditing: (visible?: boolean) => void;
 }
 
 export const useTopicItemDropdownMenu = ({
   fav,
   id,
+  title,
   toggleEditing,
 }: TopicItemDropdownMenuProps): (() => MenuProps['items']) => {
-  const { t } = useTranslation(['topic', 'common']);
+  const { t } = useTranslation(['topic', 'common', 'file']);
   const { modal } = App.useApp();
   const navigate = useNavigate();
+  const activeSpaceId = resolveWorkspaceSpaceId();
+  const { defaultSpaceId } = useSpaceMemoryCandidateTargets(activeSpaceId);
+  const canAddToSpaceMemory = Boolean(defaultSpaceId);
+  const openCreateSpaceMemoryCandidateModal = useOpenCreateSpaceMemoryCandidateModal();
 
   const openTopicInNewWindow = useGlobalStore((s) => s.openTopicInNewWindow);
   const activeAgentId = useAgentStore((s) => s.activeAgentId);
@@ -104,6 +122,21 @@ export const useTopicItemDropdownMenu = ({
           duplicateTopic(id);
         },
       },
+      ...(canAddToSpaceMemory
+        ? [
+            {
+              icon: <Icon icon={LibraryBig} />,
+              key: 'addToSpaceMemory',
+              label: t('space.memory.actions.addFromSource', { ns: 'file' }),
+              onClick: () =>
+                openCreateSpaceMemoryCandidateModal({
+                  defaultTitle: title,
+                  initialSpaceId: defaultSpaceId,
+                  sourceRefs: [{ id, kind: 'topic', title }],
+                }),
+            },
+          ]
+        : []),
       {
         type: 'divider' as const,
       },
@@ -129,12 +162,16 @@ export const useTopicItemDropdownMenu = ({
     fav,
     activeAgentId,
     autoRenameTopicTitle,
+    canAddToSpaceMemory,
+    defaultSpaceId,
     duplicateTopic,
     favoriteTopic,
     removeTopic,
+    openCreateSpaceMemoryCandidateModal,
     openTopicInNewWindow,
     addTab,
     navigate,
+    title,
     toggleEditing,
     t,
     modal,

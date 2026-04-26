@@ -3,20 +3,11 @@
 import { memo, type PropsWithChildren } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import SideBarHeaderLayout from '@/features/NavPanel/SideBarHeaderLayout';
+import SubSidebarTitleBar from '@/features/NavPanel/components/SubSidebarTitleBar';
 
 const Header = memo<PropsWithChildren>(() => {
   const { t } = useTranslation('common');
-  return (
-    <SideBarHeaderLayout
-      breadcrumb={[
-        {
-          href: '/eval',
-          title: t('tab.eval'),
-        },
-      ]}
-    />
-  );
+  return <SubSidebarTitleBar title={t('tab.eval')} titleTo="/eval" />;
 });
 
 export default Header;

@@ -1,3 +1,4 @@
+import { App } from 'antd';
 import { ActionIcon, Center, Flexbox, Text, TooltipGroup } from '@lobehub/ui';
 import isEqual from 'fast-deep-equal';
 import { ArrowDownUpIcon, ToggleLeft } from 'lucide-react';
@@ -15,6 +16,7 @@ interface EnabledModelListProps {
 }
 
 const EnabledModelList = ({ activeTab }: EnabledModelListProps) => {
+  const { message } = App.useApp();
   const { t } = useTranslation('modelProvider');
 
   const enabledModels = useAiInfraStore(aiModelSelectors.enabledAiProviderModelList, isEqual);
@@ -47,11 +49,17 @@ const EnabledModelList = ({ activeTab }: EnabledModelListProps) => {
                 title={t('providerModels.list.enabledActions.disableAll')}
                 onClick={async () => {
                   setBatchLoading(true);
-                  await batchToggleAiModels(
-                    enabledModels.map((i) => i.id),
-                    false,
-                  );
-                  setBatchLoading(false);
+                  try {
+                    await batchToggleAiModels(
+                      enabledModels.map((i) => i.id),
+                      false,
+                    );
+                  } catch (error) {
+                    console.error('Failed to batch update model enabled states:', error);
+                    message.error(t('providerModels.list.enabledActions.toggleError'));
+                  } finally {
+                    setBatchLoading(false);
+                  }
                 }}
               />
 

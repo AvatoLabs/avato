@@ -2,6 +2,7 @@ import { type UIChatMessage } from '@lobechat/types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import * as isCanUseFCModule from '@/helpers/isCanUseFC';
+import { sessionService } from '@/services/session';
 
 import * as helpers from '../helper';
 import { contextEngineering } from './contextEngineering';
@@ -223,6 +224,32 @@ describe('contextEngineering', () => {
         role: 'assistant',
       },
     ]);
+  });
+
+  it('should resolve conversation-scoped files for group chat', async () => {
+    const getConversationFileContents = vi
+      .spyOn(sessionService, 'getConversationFileContents')
+      .mockResolvedValue([
+        {
+          content: 'Group shared notes',
+          fileId: 'file-1',
+          filename: 'group-notes.md',
+        },
+      ]);
+
+    await contextEngineering({
+      agentId: 'agent-1',
+      groupId: 'group-1',
+      messages: [{ content: 'hello', role: 'user' }] as UIChatMessage[],
+      model: 'gpt-4',
+      provider: 'openai',
+    });
+
+    expect(getConversationFileContents).toHaveBeenCalledWith({
+      agentId: 'agent-1',
+      groupId: 'group-1',
+      sessionId: undefined,
+    });
   });
 
   it('should handle assistant messages with reasoning correctly', async () => {

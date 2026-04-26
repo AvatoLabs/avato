@@ -1,13 +1,14 @@
-import { resourceRegistry } from '@lobechat/database/schemas';
-import bcrypt from 'bcryptjs';
+import { contentRegistry } from '@lobechat/database/schemas';
 import debug from 'debug';
 import { eq } from 'drizzle-orm';
 
 import { auth } from '@/auth';
+import { ContentModel } from '@/database/models/content';
 import { FileModel } from '@/database/models/file';
-import { ResourceModel } from '@/database/models/resource';
 import { getServerDB } from '@/database/server';
 import { serveAuthorizedFileDownload } from '@/server/modules/file-proxy/serveAuthorizedFileDownload';
+import { resolveContentShareAccess } from '@/server/services/content/sharePolicy';
+import { isRawFileContentId } from '@/types/content';
 
 const log = debug('lobe-file:share-f');
 
@@ -30,31 +31,34 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
     log('Share file proxy request (token-first)');
 
     const db = await getServerDB();
-    const resourceModel = new ResourceModel(db, 'anonymous');
-    const link = await resourceModel.resolveShareLinkByToken(token);
+    const contentModel = new ContentModel(db, 'anonymous');
+    const access = await resolveContentShareAccess({
+      contentModel,
+      password: sharePassword,
+      token,
+    });
 
-    if (!link) {
+    if (access.status === 'not_found') {
       return new Response('Not found', { status: 404 });
     }
 
-    if (link.passwordHash) {
-      if (!sharePassword) {
-        return new Response('Password required', { status: 401 });
-      }
-
-      const isValid = await bcrypt.compare(sharePassword, link.passwordHash);
-      if (!isValid) {
-        return new Response('Not found', { status: 404 });
-      }
+    if (access.status === 'missing_password') {
+      return new Response('Password required', { status: 401 });
     }
+
+    if (access.status !== 'ok') {
+      return new Response('Not found', { status: 404 });
+    }
+
+    const { link } = access;
 
     const [reg] = await db
       .select()
-      .from(resourceRegistry)
-      .where(eq(resourceRegistry.resourceUid, link.resourceUid))
+      .from(contentRegistry)
+      .where(eq(contentRegistry.contentUid, link.contentUid))
       .limit(1);
 
-    if (!reg || reg.kind !== 'file') {
+    if (!reg || reg.kind !== 'file' || !isRawFileContentId(reg.localId)) {
       return new Response('Not found', { status: 404 });
     }
 

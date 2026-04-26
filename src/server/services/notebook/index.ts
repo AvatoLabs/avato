@@ -1,6 +1,9 @@
 import { type LobeChatDatabase } from '@lobechat/database';
 
+import { ContentModel } from '@/database/models/content';
 import { DocumentModel } from '@/database/models/document';
+import { SpaceModel } from '@/database/models/space';
+import { TopicModel } from '@/database/models/topic';
 import { TopicDocumentModel } from '@/database/models/topicDocument';
 
 interface DocumentServiceResult {
@@ -47,10 +50,18 @@ const toServiceResult = (doc: {
 
 export class NotebookRuntimeService {
   private documentModel: DocumentModel;
+  private contentModel: ContentModel;
+  private spaceModel: SpaceModel;
+  private topicModel: TopicModel;
   private topicDocumentModel: TopicDocumentModel;
+  private userId: string;
 
   constructor(options: NotebookRuntimeServiceOptions) {
+    this.userId = options.userId;
     this.documentModel = new DocumentModel(options.serverDB, options.userId);
+    this.contentModel = new ContentModel(options.serverDB, options.userId);
+    this.spaceModel = new SpaceModel(options.serverDB, options.userId);
+    this.topicModel = new TopicModel(options.serverDB, options.userId);
     this.topicDocumentModel = new TopicDocumentModel(options.serverDB, options.userId);
   }
 
@@ -64,11 +75,54 @@ export class NotebookRuntimeService {
     source: string;
     sourceType: 'api' | 'file' | 'web';
     title: string;
+    topicId?: string;
     totalCharCount: number;
     totalLineCount: number;
   }): Promise<DocumentServiceResult> => {
-    const doc = await this.documentModel.create(params);
-    return toServiceResult(doc);
+    const { topicId, ...documentParams } = params;
+    const topic = topicId ? await this.topicModel.findById(topicId) : undefined;
+
+    if (topicId && !topic) {
+      throw new Error(`Topic not found: ${topicId}`);
+    }
+
+    let spaceId = topic?.spaceId;
+    if (spaceId) {
+      const space = await this.spaceModel.findAccessibleSpaceById(spaceId);
+      if (!space?.id) {
+        throw new Error('SPACE_ACCESS_DENIED');
+      }
+
+      if (space.membershipRole === 'viewer') {
+        throw new Error('SPACE_WRITE_DENIED');
+      }
+
+      spaceId = space.id;
+    } else {
+      spaceId = (await this.spaceModel.getOrCreatePersonalSpace()).id;
+    }
+
+    const doc = await this.documentModel.create({ ...documentParams, spaceId });
+    const registry = await this.contentModel.ensureContentRegistry({
+      createdBy: this.userId,
+      kind: 'document',
+      localId: doc.id,
+      spaceId,
+    });
+
+    await this.documentModel.update(doc.id, {
+      contentUid: registry.contentUid,
+      spaceId,
+    } as any);
+
+    await this.contentModel.ensureOwnerPermission({
+      contentUid: registry.contentUid,
+      spaceId,
+    });
+
+    const updatedDoc = await this.documentModel.findById(doc.id);
+
+    return toServiceResult(updatedDoc || { ...doc, contentUid: registry.contentUid, spaceId });
   };
 
   deleteDocument = async (id: string): Promise<void> => {

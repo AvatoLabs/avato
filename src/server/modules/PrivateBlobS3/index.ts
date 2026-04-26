@@ -1,17 +1,29 @@
+import { Readable } from 'node:stream';
+
 import {
   type BucketLocationConstraint,
   CreateBucketCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
+  type PutObjectCommandInput,
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import mime from 'mime';
 
 import { fileEnv } from '@/envs/file';
+import { YEAR } from '@/utils/units';
 
 const DEFAULT_S3_REGION = 'us-east-1';
+
+interface UploadBodyOptions {
+  cacheControl?: string;
+  contentLength?: number;
+  contentType?: string;
+}
 
 /**
  * PrivateBlobS3 - S3 client for private blob storage
@@ -193,6 +205,18 @@ export class PrivateBlobS3 {
   }
 
   /**
+   * Delete files from S3
+   */
+  public async deleteFiles(keys: string[]) {
+    const command = new DeleteObjectsCommand({
+      Bucket: this.bucket,
+      Delete: { Objects: keys.map((key) => ({ Key: key })) },
+    });
+
+    return this.client.send(command);
+  }
+
+  /**
    * Get file content from S3
    */
   public async getFileContent(key: string): Promise<string> {
@@ -211,6 +235,24 @@ export class PrivateBlobS3 {
   }
 
   /**
+   * Get file bytes from S3
+   */
+  public async getFileByteArray(key: string): Promise<Uint8Array> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    });
+
+    const response = await this.client.send(command);
+
+    if (!response.Body) {
+      throw new Error(`No body in response with ${key}`);
+    }
+
+    return response.Body.transformToByteArray();
+  }
+
+  /**
    * Upload buffer with specified content type
    */
   public async uploadBuffer(
@@ -219,17 +261,64 @@ export class PrivateBlobS3 {
     contentType?: string,
     cacheControl?: string,
   ) {
+    return this.uploadBody(path, buffer, {
+      cacheControl,
+      contentLength: buffer.length,
+      contentType,
+    });
+  }
+
+  public async uploadBody(
+    path: string,
+    body: NonNullable<PutObjectCommandInput['Body']>,
+    { cacheControl, contentLength, contentType }: UploadBodyOptions = {},
+  ) {
+    if (body instanceof Readable && contentLength === undefined) {
+      throw new Error('ContentLength is required when uploading a stream body to S3.');
+    }
+
     return this.withBucketAutoCreateRetry(async () => {
       const command = new PutObjectCommand({
         // No ACL - always private
-        Body: buffer,
+        Body: body,
         Bucket: this.bucket,
         CacheControl: cacheControl,
+        ContentLength: contentLength,
         ContentType: contentType,
         Key: path,
       });
 
       return this.client.send(command);
+    });
+  }
+
+  public async uploadContent(path: string, content: string) {
+    return this.withBucketAutoCreateRetry(async () => {
+      const command = new PutObjectCommand({
+        Body: content,
+        Bucket: this.bucket,
+        Key: path,
+      });
+
+      return this.client.send(command);
+    });
+  }
+
+  /**
+   * Upload media file with long-term cache while keeping the blob private.
+   */
+  public async uploadMedia(key: string, buffer: Buffer) {
+    await this.withBucketAutoCreateRetry(async () => {
+      const contentType = mime.getType(key) || 'application/octet-stream';
+      const command = new PutObjectCommand({
+        Body: buffer,
+        Bucket: this.bucket,
+        CacheControl: `public, max-age=${YEAR}`,
+        ContentType: contentType,
+        Key: key,
+      });
+
+      await this.client.send(command);
     });
   }
 }

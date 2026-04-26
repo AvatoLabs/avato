@@ -8,7 +8,7 @@ import useSWR from 'swr';
 
 import PageTitle from '@/components/PageTitle';
 import { lambdaClient } from '@/libs/trpc/client';
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 import { useAgentGroupStore } from '@/store/agentGroup';
 
 const Title = memo(() => {

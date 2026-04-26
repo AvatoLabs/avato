@@ -1,12 +1,12 @@
 import { BarList } from '@lobehub/charts';
 import { ActionIcon, Icon, Modal } from '@lobehub/ui';
-import { cssVar } from 'antd-style';
-import { MaximizeIcon, MessageSquareIcon } from 'lucide-react';
+import { MaximizeIcon } from 'lucide-react';
 import qs from 'query-string';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
+import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { INBOX_SESSION_ID } from '@/const/session';
 import Link from '@/libs/router/Link';
 import { useClientDataSWR } from '@/libs/swr';
@@ -35,7 +35,7 @@ export const TopicsRank = memo<{ mobile?: boolean }>(({ mobile }) => {
       url: '/agent',
     });
     return {
-      icon: <Icon color={cssVar.colorTextDescription} icon={MessageSquareIcon} size={16} />,
+      icon: <Icon icon={APP_ENTRY_ICONS.chat} size={16} />,
       link,
       name: (
         <Link href={link} style={{ color: 'inherit' }}>

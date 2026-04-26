@@ -2,18 +2,15 @@ import { type LobeChatDatabase } from '@lobechat/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MessageModel } from '@/database/models/message';
-import { FileService } from '@/server/services/file';
 
 import { MessageService } from '../index';
 
 vi.mock('@/database/models/message');
-vi.mock('@/server/services/file');
 
 describe('MessageService', () => {
   let messageService: MessageService;
   let mockDB: LobeChatDatabase;
   let mockMessageModel: MessageModel;
-  let mockFileService: FileService;
   const userId = 'test-user-id';
 
   beforeEach(() => {
@@ -30,13 +27,8 @@ describe('MessageService', () => {
       updatePluginState: vi.fn(),
     } as any;
 
-    mockFileService = {
-      getFullFileUrl: vi.fn().mockImplementation((path) => Promise.resolve(`/files${path}`)),
-    } as any;
-
     // Mock constructors
     vi.mocked(MessageModel).mockImplementation(() => mockMessageModel);
-    vi.mocked(FileService).mockImplementation(() => mockFileService);
 
     messageService = new MessageService(mockDB, userId);
   });
@@ -66,6 +58,14 @@ describe('MessageService', () => {
           groupAssistantMessages: false,
         }),
       );
+      const queryOptions = vi.mocked(mockMessageModel.query).mock.calls[0][1];
+      expect(queryOptions?.postProcessUrl).toBeDefined();
+      await expect(
+        queryOptions!.postProcessUrl!(
+          'internal://file',
+          { fileType: 'text/plain', id: 'file-1' },
+        ),
+      ).resolves.toBe('/f/file-1');
       expect(result).toEqual({ messages: mockMessages, success: true });
     });
 

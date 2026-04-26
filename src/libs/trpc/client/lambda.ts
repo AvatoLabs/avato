@@ -9,6 +9,9 @@ import superjson from 'superjson';
 import { withElectronProtocolIfElectron } from '@/const/protocol';
 import { isDesktop } from '@/const/version';
 import { type LambdaRouter } from '@/server/routers/lambda';
+import { getUserStoreState } from '@/store/user/store';
+
+import { shouldShowTRPCNetworkErrorNotification } from './errorNotification';
 
 const log = debug('lobe-image:lambda-client');
 
@@ -21,6 +24,7 @@ const MIN_INFRA_ERROR_INTERVAL = 3000;
 
 const isInfrastructureStatus = (status?: number) =>
   typeof status !== 'number' || status === 408 || status === 429 || status >= 500;
+const isRetryableClientStatus = (status?: number) => status === 408 || status === 429;
 
 // handle error
 const errorHandlingLink: TRPCLink<LambdaRouter> = () => {
@@ -36,11 +40,15 @@ const errorHandlingLink: TRPCLink<LambdaRouter> = () => {
             err.cause?.name === 'AbortError' ||
             err.message.includes('signal is aborted without reason');
 
-          const showError = (op.context?.showNotification as boolean) ?? true;
+          const showError = shouldShowTRPCNetworkErrorNotification({
+            explicitShowNotification: op.context?.showNotification as boolean | undefined,
+            isDesktopRuntime: isDesktop,
+            operationType: op.type,
+          });
           const status = err.data?.httpStatus as number;
 
           // Don't show notifications for abort errors
-          if (showError && !isAbortError) {
+          if (!isAbortError) {
             switch (status) {
               case 401: {
                 // Debounce: only show login notification once every 5 seconds
@@ -49,8 +57,7 @@ const errorHandlingLink: TRPCLink<LambdaRouter> = () => {
                   last401Time = now;
                   // Desktop app doesn't have the web auth routes like `/signin`,
                   // so skip the login redirect/notification there.
-                  if (!isDesktop) {
-                    const { getUserStoreState } = await import('@/store/user/store');
+                  if (showError && !isDesktop) {
                     const { isSignedIn, logout } = getUserStoreState();
                     // If user is still marked as signed in but got 401,
                     // session is invalid - clear client state first
@@ -68,7 +75,16 @@ const errorHandlingLink: TRPCLink<LambdaRouter> = () => {
               }
 
               default: {
-                if (isInfrastructureStatus(status)) {
+                if (
+                  typeof status === 'number' &&
+                  status >= 400 &&
+                  status < 500 &&
+                  !isRetryableClientStatus(status)
+                ) {
+                  err.meta = { ...err.meta, shouldRetry: false };
+                }
+
+                if (showError && isInfrastructureStatus(status)) {
                   const normalizedStatus = typeof status === 'number' ? status : 0;
                   const errorKey = `${normalizedStatus}:${err.message}`;
                   const now = Date.now();

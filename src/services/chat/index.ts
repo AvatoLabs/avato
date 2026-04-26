@@ -19,22 +19,22 @@ import { ModelProvider } from 'model-bank';
 
 import { DEFAULT_AGENT_CONFIG } from '@/const/settings';
 import { getSearchConfig } from '@/helpers/getSearchConfig';
-import { getAgentStoreState } from '@/store/agent';
 import {
   agentByIdSelectors,
   agentChatConfigSelectors,
   agentSelectors,
   chatConfigByIdSelectors,
 } from '@/store/agent/selectors';
+import { getAgentStoreState } from '@/store/agent/store';
 import { aiProviderSelectors, getAiInfraStoreState } from '@/store/aiInfra';
 import { getChatStoreState } from '@/store/chat';
-import { getToolStoreState } from '@/store/tool';
 import {
   builtinToolSelectors,
   klavisStoreSelectors,
   lobehubSkillStoreSelectors,
   pluginSelectors,
 } from '@/store/tool/selectors';
+import { getToolStoreState } from '@/store/tool/store';
 import { getUserStoreState, useUserStore } from '@/store/user';
 import {
   settingsSelectors,
@@ -91,10 +91,10 @@ interface FetchAITaskResultParams extends FetchSSEOptions {
 interface CreateAssistantMessageStream extends FetchSSEOptions {
   abortController?: AbortController;
   historySummary?: string;
-  /** Initial context for page editor (captured at operation start) */
+  /** Initial context for doc editor (captured at operation start) */
   initialContext?: RuntimeInitialContext;
   params: GetChatCompletionPayload;
-  /** Step context for page editor (updated each step) */
+  /** Step context for doc editor (updated each step) */
   stepContext?: RuntimeStepContext;
   trace?: TracePayload;
 }
@@ -200,7 +200,7 @@ class ChatService {
           const server = allKlavisServers.find((s) => s.identifier === klavisType.identifier);
 
           officialTools.push({
-            description: `LobeHub Mcp Server: ${klavisType.label}`,
+            description: `Avato MCP Server: ${klavisType.label}`,
             enabled: enabledPlugins.includes(klavisType.identifier),
             identifier: klavisType.identifier,
             installed: !!server,
@@ -222,7 +222,7 @@ class ChatService {
           const server = allLobehubSkillServers.find((s) => s.identifier === provider.id);
 
           officialTools.push({
-            description: `LobeHub Skill Provider: ${provider.label}`,
+            description: `Avato Skill Provider: ${provider.label}`,
             enabled: enabledPlugins.includes(provider.id),
             identifier: provider.id,
             installed: !!server,

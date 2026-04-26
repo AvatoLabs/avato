@@ -1,6 +1,6 @@
 import { type MCPToolCallResult } from '@/libs/mcp';
 import { truncateToolResult } from '@/server/utils/truncateToolResult';
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 import { type ChatToolPayload } from '@/types/message';
 import { safeParseJSON } from '@/utils/safeParseJSON';
 
@@ -78,7 +78,7 @@ export const lobehubSkillExecutor: RemoteToolExecutor = async (p: any) => {
 
   if (!result.success) {
     return createFailedResult(
-      result.error || `LobeHub Skill tool ${provider} ${p.apiName} execution failed`,
+      result.error || `Avato Skill tool ${provider} ${p.apiName} execution failed`,
     );
   }
 

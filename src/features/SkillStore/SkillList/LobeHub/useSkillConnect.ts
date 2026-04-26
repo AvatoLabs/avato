@@ -1,13 +1,15 @@
 'use client';
 
 import { getLobehubSkillProviderById } from '@lobechat/const';
+import { App } from 'antd';
 import { type Klavis } from 'klavis';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
 import { klavisStoreSelectors, lobehubSkillStoreSelectors } from '@/store/tool/selectors';
 import { KlavisServerStatus } from '@/store/tool/slices/klavisStore';
 import { LobehubSkillStatus } from '@/store/tool/slices/lobehubSkillStore/types';
+import { useToolStore } from '@/store/tool/store';
 import { useUserStore } from '@/store/user';
 import { userProfileSelectors } from '@/store/user/selectors';
 
@@ -21,6 +23,8 @@ interface UseSkillConnectOptions {
 }
 
 export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnectOptions) => {
+  const { t } = useTranslation('setting');
+  const { message } = App.useApp();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isWaitingAuth, setIsWaitingAuth] = useState(false);
 
@@ -29,7 +33,7 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // LobeHub skill hooks
+  // Avato skill hooks
   const checkLobehubStatus = useToolStore((s) => s.checkLobehubSkillStatus);
   const revokeLobehubConnect = useToolStore((s) => s.revokeLobehubSkill);
   const getAuthorizeUrl = useToolStore((s) => s.getLobehubSkillAuthorizeUrl);
@@ -76,7 +80,7 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
     }
   }, [type, lobehubServer?.status, klavisServer?.status, isWaitingAuth, cleanup]);
 
-  // Listen for OAuth success message from popup window (for LobeHub skills)
+  // Listen for OAuth success message from popup window (for Avato skills)
   useEffect(() => {
     if (type !== 'lobehub') return;
 
@@ -169,24 +173,28 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
     [cleanup, startWindowMonitor, startFallbackPolling],
   );
 
-  // Handle connect for LobeHub
+  // Handle connect for Avato
   const handleLobehubConnect = useCallback(async () => {
     if (lobehubServer?.isConnected) return;
 
     setIsConnecting(true);
     try {
       const provider = getLobehubSkillProviderById(identifier);
-      if (!provider) return;
+      if (!provider) {
+        message.error(t('tools.avatohubSkill.connectError'));
+        return;
+      }
 
       const redirectUri = `${window.location.origin}/oauth/callback/success?provider=${encodeURIComponent(identifier)}`;
       const { authorizeUrl } = await getAuthorizeUrl(identifier, { redirectUri });
       openOAuthWindow(authorizeUrl, identifier);
     } catch (error) {
       console.error('[SkillStore] Failed to get authorize URL:', error);
+      message.error(t('tools.avatohubSkill.connectError'));
     } finally {
       setIsConnecting(false);
     }
-  }, [identifier, lobehubServer?.isConnected, getAuthorizeUrl, openOAuthWindow]);
+  }, [getAuthorizeUrl, identifier, lobehubServer?.isConnected, message, openOAuthWindow, t]);
 
   // Handle connect for Klavis
   const handleKlavisConnect = useCallback(async () => {
@@ -201,37 +209,51 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
         userId,
       });
 
-      if (newServer) {
-        if (newServer.isAuthenticated) {
-          await refreshKlavisServerTools(newServer.identifier);
-        } else if (newServer.oauthUrl) {
-          openOAuthWindow(newServer.oauthUrl, newServer.identifier);
-        }
+      if (!newServer) {
+        message.error(t('tools.klavis.connectFailed'));
+        return;
+      }
+
+      if (newServer.isAuthenticated) {
+        await refreshKlavisServerTools(newServer.identifier);
+      } else if (newServer.oauthUrl) {
+        openOAuthWindow(newServer.oauthUrl, newServer.identifier);
+      } else {
+        message.error(t('tools.klavis.connectFailed'));
       }
     } catch (error) {
       console.error('[SkillStore] Failed to connect server:', error);
+      message.error(t('tools.klavis.connectFailed'));
     } finally {
       setIsConnecting(false);
     }
   }, [
-    userId,
-    serverName,
-    klavisServer,
-    identifier,
     createKlavisServer,
+    identifier,
     refreshKlavisServerTools,
+    klavisServer,
+    message,
     openOAuthWindow,
+    serverName,
+    t,
+    userId,
   ]);
 
   const handleConnect = type === 'lobehub' ? handleLobehubConnect : handleKlavisConnect;
 
   const handleDisconnect = useCallback(async () => {
     if (type === 'lobehub' && lobehubServer) {
-      await revokeLobehubConnect(lobehubServer.identifier);
+      const success = await revokeLobehubConnect(lobehubServer.identifier);
+      if (!success) {
+        message.error(t('tools.avatohubSkill.disconnectError'));
+      }
     } else if (type === 'klavis' && klavisServer) {
-      await removeKlavisServer(klavisServer.identifier);
+      const success = await removeKlavisServer(klavisServer.identifier);
+      if (!success) {
+        message.error(t('tools.klavis.disconnectFailed'));
+      }
     }
-  }, [type, lobehubServer, klavisServer, revokeLobehubConnect, removeKlavisServer]);
+  }, [klavisServer, lobehubServer, message, removeKlavisServer, revokeLobehubConnect, t, type]);
 
   const isConnected =
     type === 'lobehub'

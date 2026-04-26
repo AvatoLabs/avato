@@ -112,10 +112,19 @@ describe('ChunkService', () => {
     });
 
     it('should create task, update file, and trigger embedding successfully', async () => {
-      const taskId = await service.asyncEmbeddingFileChunks('file-1');
+      const taskId = await service.asyncEmbeddingFileChunks('file-1', {
+        contentGuardAuthzEpoch: 7,
+      });
 
       expect(taskId).toBe('task-1');
       expect(mockAsyncTaskModelCreate).toHaveBeenCalledWith({
+        metadata: {
+          contentGuard: {
+            authzEpoch: 7,
+            capability: 'preview_content',
+            fileId: 'file-1',
+          },
+        },
         status: AsyncTaskStatus.Pending,
         type: AsyncTaskType.Embedding,
       });
@@ -166,10 +175,19 @@ describe('ChunkService', () => {
     });
 
     it('should create task, update file, and trigger chunk parsing successfully', async () => {
-      const taskId = await service.asyncParseFileToChunks('file-1');
+      const taskId = await service.asyncParseFileToChunks('file-1', undefined, {
+        contentGuardAuthzEpoch: 9,
+      });
 
       expect(taskId).toBe('task-1');
       expect(mockAsyncTaskModelCreate).toHaveBeenCalledWith({
+        metadata: {
+          contentGuard: {
+            authzEpoch: 9,
+            capability: 'preview_content',
+            fileId: 'file-1',
+          },
+        },
         status: AsyncTaskStatus.Processing,
         type: AsyncTaskType.Chunking,
       });

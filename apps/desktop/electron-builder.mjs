@@ -32,6 +32,7 @@ console.info(`🏗️ Building for architecture: ${arch}`);
 // Channel identity derived solely from UPDATE_CHANNEL env var.
 // Supported channels: stable, nightly, canary
 const isStable = !channel || channel === 'stable';
+const isBeta = channel === 'beta';
 const isNightly = channel === 'nightly';
 const isCanary = channel === 'canary';
 
@@ -43,7 +44,13 @@ const stripChannelSuffix = (url) => url.replace(/\/(stable|nightly|canary|beta)\
 // - 所有渠道 + UPDATE_SERVER_URL: 使用 generic (S3)
 // - 无 UPDATE_SERVER_URL: 回退到 GitHub (本地开发)
 const getPublishConfig = () => {
-  const channelPath = isStable ? 'stable' : isNightly ? 'nightly' : channel || 'stable';
+  const channelPath = isStable
+    ? 'stable'
+    : isBeta
+      ? 'beta'
+      : isNightly
+        ? 'nightly'
+        : channel || 'stable';
 
   if (updateServerUrl) {
     const baseUrl = stripChannelSuffix(updateServerUrl);
@@ -61,9 +68,9 @@ const getPublishConfig = () => {
   console.info(`📦 ${channelPath} channel: No UPDATE_SERVER_URL, falling back to GitHub provider`);
   return [
     {
-      owner: 'lobehub',
+      owner: 'AvatoLabs',
       provider: 'github',
-      repo: 'lobehub',
+      repo: 'avatohub',
     },
   ];
 };
@@ -81,9 +88,10 @@ if (!hasAppleCertificate) {
 
 // 根据版本类型确定协议 scheme
 const getProtocolScheme = () => {
-  if (isCanary) return 'lobehub-canary';
-  if (isNightly) return 'lobehub-nightly';
-  return 'lobehub';
+  if (isCanary) return 'avato-canary';
+  if (isBeta) return 'avato-beta';
+  if (isNightly) return 'avato-nightly';
+  return 'avato';
 };
 
 const protocolScheme = getProtocolScheme();
@@ -91,6 +99,7 @@ const protocolScheme = getProtocolScheme();
 // Determine icon file based on version type
 const getIconFileName = () => {
   if (isStable || isCanary) return 'Icon';
+  if (isBeta) return 'Icon-beta';
   // nightly uses pre-release icon
   return 'Icon-nightly';
 };
@@ -188,7 +197,7 @@ const config = {
       console.info(`⏭️  Skipping Assets.car (not found or copy failed)`);
     }
   },
-  appId: 'com.lobehub.lobehub-desktop',
+  appId: 'com.turingmesh.avato.desktop',
   appImage: {
     artifactName: '${productName}-${version}.${ext}',
   },
@@ -245,7 +254,7 @@ const config = {
       CFBundleIconName: 'AppIcon',
       CFBundleURLTypes: [
         {
-          CFBundleURLName: 'LobeHub Protocol',
+          CFBundleURLName: 'Avato Protocol',
           CFBundleURLSchemes: [protocolScheme],
         },
       ],
@@ -283,7 +292,7 @@ const config = {
   },
   protocols: [
     {
-      name: 'LobeHub Protocol',
+      name: 'Avato Protocol',
       schemes: [protocolScheme],
     },
   ],
@@ -299,7 +308,7 @@ const config = {
   extraResources: [{ from: 'resources/bin', to: 'bin' }],
 
   win: {
-    executableName: 'LobeHub',
+    executableName: 'Avato',
   },
 };
 

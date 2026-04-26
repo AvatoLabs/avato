@@ -56,7 +56,7 @@ describe('UploadFileCtr', () => {
   describe('uploadFile', () => {
     it('should upload file successfully', async () => {
       const params = {
-        hash: 'abc123',
+        sha256: 'abc123',
         path: '/test/file.txt',
         content: new ArrayBuffer(16),
         filename: 'file.txt',
@@ -73,7 +73,7 @@ describe('UploadFileCtr', () => {
 
     it('should handle upload error', async () => {
       const params = {
-        hash: 'abc123',
+        sha256: 'abc123',
         path: '/test/file.txt',
         content: new ArrayBuffer(16),
         filename: 'file.txt',

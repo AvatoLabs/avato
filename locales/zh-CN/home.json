@@ -34,5 +34,21 @@
   "workspace.status.title": "工作台状态",
   "workspace.tabs.assistants": "我的助理",
   "workspace.tabs.community": "社区",
-  "workspace.tabs.documents": "文稿"
+  "workspace.tabs.documents": "文稿",
+  "workspace.quickActions.hint.agent": "把一句想法直接扩成可工作的智能体。",
+  "workspace.quickActions.hint.community": "从社区里的现成能力开始更快。",
+  "workspace.quickActions.hint.documents": "继续最近的文档与内容上下文。",
+  "workspace.quickActions.hint.documentsInWorkspace": "打开 {{name}} 中的文档，并继续沿用当前工作区上下文。",
+  "workspace.quickActions.hint.group": "为复杂任务快速拉起一个协作群组。",
+  "workspace.quickActions.hint.write": "把提示词直接送进文档工作流。",
+  "workspace.quickActions.hint.writeInWorkspace": "把提示词直接送进 {{name}} 的文档工作流。",
+  "workspace.sidebar.currentWorkspace": "当前：{{name}}",
+  "workspace.sidebar.groups": "群组",
+  "workspace.sidebar.groupsEmpty": "暂无群组，点击创建",
+  "workspace.sidebar.recentTopicUntitled": "未命名话题",
+  "workspace.sidebar.recentTopics": "最近话题",
+  "workspace.sidebar.recentTopicsEmpty": "暂无最近话题。开始一段对话后会出现在这里。",
+  "workspace.sidebar.section.navigation": "导航",
+  "workspace.sidebar.section.system": "系统",
+  "workspace.status.ready": "已就绪"
 }

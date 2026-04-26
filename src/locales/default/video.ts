@@ -12,6 +12,8 @@ export default {
   'config.seed.label': 'Seed',
   'config.seed.random': 'Random',
   'generation.actions.copyError': 'Copy Error Message',
+  'generation.actions.deleteFailed': 'Failed to delete video. Please try again.',
+  'generation.actions.downloadFailed': 'Failed to download video. Please try again.',
   'generation.actions.errorCopied': 'Error Message Copied to Clipboard',
   'generation.actions.errorCopyFailed': 'Failed to Copy Error Message',
   'generation.actions.generate': 'Generate',

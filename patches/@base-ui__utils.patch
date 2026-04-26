@@ -1,0 +1,22 @@
+diff --git a/esm/getReactElementRef.js b/esm/getReactElementRef.js
+index d5ba9b92..dfb3b613 100644
+--- a/esm/getReactElementRef.js
++++ b/esm/getReactElementRef.js
+@@ -10,5 +10,5 @@ export function getReactElementRef(element) {
+   }
+   const reactElement = element;
+   const propsWithRef = reactElement.props;
+-  return (isReactVersionAtLeast(19) ? propsWithRef?.ref : reactElement.ref) ?? null;
++  return propsWithRef?.ref ?? null;
+ }
+diff --git a/getReactElementRef.js b/getReactElementRef.js
+index f6ca4c54..896ff37f 100644
+--- a/getReactElementRef.js
++++ b/getReactElementRef.js
+@@ -16,5 +16,5 @@ function getReactElementRef(element) {
+   }
+   const reactElement = element;
+   const propsWithRef = reactElement.props;
+-  return ((0, _reactVersion.isReactVersionAtLeast)(19) ? propsWithRef?.ref : reactElement.ref) ?? null;
++  return propsWithRef?.ref ?? null;
+ }

@@ -1,23 +1,25 @@
 import { type FilesStoreState } from '@/store/file/initialState';
+import { type FileListItem } from '@/types/files';
 import { type FileUploadStatus } from '@/types/files/upload';
 
 const uploadStatusArray = new Set(['uploading', 'pending', 'processing']);
 
 const dockFileList = (s: FilesStoreState) => s.dockUploadFileList;
 const dockRawFileList = (s: FilesStoreState) => s.dockUploadFileList.map((item) => item.file);
-const getFileById = (id?: string | null) => (s: FilesStoreState) => {
+const getFileById = (id?: string | null) => (s: FilesStoreState): FileListItem | undefined => {
   if (!id) return;
 
   // Prefer resourceMap (Explorer's data) when fileList may be empty or stale
   const fromResourceMap = s.resourceMap?.get(id);
   if (fromResourceMap) {
-    return {
+    const mappedResource: FileListItem = {
       chunkCount: fromResourceMap.chunkCount ?? null,
       chunkingError: fromResourceMap.chunkingError ?? null,
-      chunkingStatus: fromResourceMap.chunkingStatus ?? null,
+      chunkingStatus: (fromResourceMap.chunkingStatus ?? null) as FileListItem['chunkingStatus'],
       createdAt: fromResourceMap.createdAt,
       embeddingError: fromResourceMap.embeddingError ?? null,
-      embeddingStatus: fromResourceMap.embeddingStatus ?? null,
+      embeddingStatus: (fromResourceMap.embeddingStatus ?? null) as FileListItem['embeddingStatus'],
+      fileId: fromResourceMap.fileId ?? null,
       fileType: fromResourceMap.fileType,
       finishEmbedding: fromResourceMap.finishEmbedding ?? false,
       id: fromResourceMap.id,
@@ -27,6 +29,8 @@ const getFileById = (id?: string | null) => (s: FilesStoreState) => {
       updatedAt: fromResourceMap.updatedAt,
       url: fromResourceMap.url ?? '',
     };
+
+    return mappedResource;
   }
 
   return s.fileList.find((item) => item.id === id);
@@ -37,8 +41,24 @@ const isUploadingFiles = (s: FilesStoreState) =>
 
 const overviewUploadingStatus = (s: FilesStoreState): FileUploadStatus => {
   if (s.dockUploadFileList.length === 0) return 'pending';
-  if (s.dockUploadFileList.some((file) => uploadStatusArray.has(file.status))) {
+
+  if (s.dockUploadFileList.some((file) => file.status === 'uploading' || file.status === 'pending')) {
     return 'uploading';
+  }
+
+  if (s.dockUploadFileList.some((file) => file.status === 'processing')) {
+    return 'processing';
+  }
+
+  if (s.dockUploadFileList.some((file) => file.status === 'error')) {
+    return 'error';
+  }
+
+  if (
+    s.dockUploadFileList.every((file) => file.status === 'cancelled') &&
+    s.dockUploadFileList.length > 0
+  ) {
+    return 'cancelled';
   }
 
   return 'success';

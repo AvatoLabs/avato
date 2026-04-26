@@ -1,25 +1,51 @@
 import { app } from 'electron';
 
-import { McpSchema, ProtocolUrlParsed } from '../types/protocol';
+import { getDesktopEnv } from '@/env';
 
-export type AppChannel = 'stable' | 'beta' | 'nightly';
+import type { McpSchema, ProtocolUrlParsed } from '../types/protocol';
+
+export type AppChannel = 'stable' | 'beta' | 'nightly' | 'canary' | 'dev';
+
+const AVATO_PROTOCOL_SCHEMES = [
+  'avato:',
+  'avato-dev:',
+  'avato-canary:',
+  'avato-nightly:',
+  'avato-beta:',
+];
+
+const LEGACY_LOBEHUB_PROTOCOL_SCHEMES = [
+  'lobehub:',
+  'lobehub-dev:',
+  'lobehub-canary:',
+  'lobehub-nightly:',
+  'lobehub-beta:',
+];
 
 export const getProtocolScheme = (): string => {
+  const updateChannel = getDesktopEnv().UPDATE_CHANNEL?.toLowerCase();
+
+  if (updateChannel === 'canary') return 'avato-canary';
+  if (updateChannel === 'nightly') return 'avato-nightly';
+  if (updateChannel === 'beta') return 'avato-beta';
+
   // In Electron environment, version can be determined in multiple ways
   const bundleId = app.name;
   const appPath = app.getPath('exe');
 
   // Determine by bundle identifier
-  if (bundleId?.toLowerCase().includes('nightly')) return 'lobehub-nightly';
-  if (bundleId?.toLowerCase().includes('beta')) return 'lobehub-beta';
-  if (bundleId?.includes('dev')) return 'lobehub-dev';
+  if (bundleId?.toLowerCase().includes('nightly')) return 'avato-nightly';
+  if (bundleId?.toLowerCase().includes('beta')) return 'avato-beta';
+  if (bundleId?.toLowerCase().includes('canary')) return 'avato-canary';
+  if (bundleId?.toLowerCase().includes('dev')) return 'avato-dev';
 
   // Determine by executable file path
-  if (appPath?.toLowerCase().includes('nightly')) return 'lobehub-nightly';
-  if (appPath?.toLowerCase().includes('beta')) return 'lobehub-beta';
-  if (appPath?.includes('dev')) return 'lobehub-dev';
+  if (appPath?.toLowerCase().includes('nightly')) return 'avato-nightly';
+  if (appPath?.toLowerCase().includes('beta')) return 'avato-beta';
+  if (appPath?.toLowerCase().includes('canary')) return 'avato-canary';
+  if (appPath?.toLowerCase().includes('dev')) return 'avato-dev';
 
-  return 'lobehub';
+  return 'avato';
 };
 
 export const getVersionInfo = (): { channel: AppChannel; protocolScheme: string } => {
@@ -30,6 +56,10 @@ export const getVersionInfo = (): { channel: AppChannel; protocolScheme: string 
     appChannel = 'nightly';
   } else if (protocolScheme.includes('beta')) {
     appChannel = 'beta';
+  } else if (protocolScheme.includes('canary')) {
+    appChannel = 'canary';
+  } else if (protocolScheme.includes('dev')) {
+    appChannel = 'dev';
   }
 
   return {
@@ -81,14 +111,14 @@ function validateMcpSchema(schema: any): schema is McpSchema {
 }
 
 /**
- * Parse lobehub:// protocol URL (supports multi-version protocols)
+ * Parse avato:// protocol URL (supports multi-version protocols and legacy lobehub:// links)
  *
  * Supported URL formats:
- * - lobehub://plugin/install?id=figma&schema=xxx&marketId=lobehub
- * - lobehub://plugin/configure?id=xxx&...
- * - lobehub-bet://plugin/install?id=figma&schema=xxx&marketId=lobehub
- * - lobehub-nightly://plugin/install?id=figma&schema=xxx&marketId=lobehub
- * - lobehub-dev://plugin/install?id=figma&schema=xxx&marketId=lobehub
+ * - avato://plugin/install?id=figma&schema=xxx&marketId=lobehub
+ * - avato://plugin/configure?id=xxx&...
+ * - avato-beta://plugin/install?id=figma&schema=xxx&marketId=lobehub
+ * - avato-nightly://plugin/install?id=figma&schema=xxx&marketId=lobehub
+ * - avato-dev://plugin/install?id=figma&schema=xxx&marketId=lobehub
  *
  * @param url Protocol URL
  * @returns Parse result, including basic structure and all query parameters
@@ -98,7 +128,7 @@ export const parseProtocolUrl = (url: string): ProtocolUrlParsed | null => {
     const parsedUrl = new URL(url);
 
     // Support multiple protocol schemes
-    const validProtocols = ['lobehub:', 'lobehub-dev:', 'lobehub-nightly:', 'lobehub-beta:'];
+    const validProtocols = [...AVATO_PROTOCOL_SCHEMES, ...LEGACY_LOBEHUB_PROTOCOL_SCHEMES];
     if (!validProtocols.includes(parsedUrl.protocol)) {
       return null;
     }
@@ -147,10 +177,10 @@ export function generateRFCProtocolUrl(params: {
   marketId?: string;
   /** MCP Schema object */
   schema: McpSchema;
-  /** Protocol scheme (default: lobehub) */
+  /** Protocol scheme (default: avato) */
   scheme?: string;
 }): string {
-  const { id, schema, marketId, scheme = 'lobehub' } = params;
+  const { id, schema, marketId, scheme = 'avato' } = params;
 
   // Validate schema.identifier matches id
   if (schema.identifier !== id) {
@@ -205,6 +235,6 @@ export function generateRFCProtocolUrl(params: {
  *   },
  *   marketId: 'higress'
  * });
- * // Result: lobehub://plugin/install?id=edgeone-mcp&schema=%7B%22identifier%22%3A...&marketId=higress
+ * // Result: avato://plugin/install?id=edgeone-mcp&schema=%7B%22identifier%22%3A...&marketId=higress
  * ```
  */

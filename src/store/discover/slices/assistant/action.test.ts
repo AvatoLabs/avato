@@ -74,8 +74,8 @@ describe('AssistantAction', () => {
     it('should respect locale changes', async () => {
       const mockDetail = {
         identifier: 'test-assistant',
-        name: '测试助理',
-        description: '一个测试助理',
+        name: '测试智能体',
+        description: '一个测试智能体',
       };
 
       vi.spyOn(discoverService, 'getAssistantDetail').mockResolvedValue(mockDetail as any);

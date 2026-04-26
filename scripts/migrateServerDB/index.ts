@@ -9,15 +9,14 @@ import { migrate as nodeMigrate } from 'drizzle-orm/node-postgres/migrator';
 // @ts-ignore tsgo handle esm import cjs and compatibility issues
 import { DB_FAIL_INIT_HINT, DUPLICATE_EMAIL_HINT, PGVECTOR_HINT } from './errorHint';
 
-// Load environment variables in priority order:
-// 1. .env (lowest priority)
-// 2. .env.[env] (medium priority, overrides .env)
-// 3. .env.[env].local (highest priority, overrides previous)
-// Use dotenv-expand to support ${var} variable expansion
+// Load environment variables (align with Next.js so `DATABASE_URL` in `.env.local` works):
+// .env → .env.[NODE_ENV] → .env.local → .env.[NODE_ENV].local (each step overrides)
+// https://nextjs.org/docs/app/building-your-application/configuring/environment-variables
 const env = process.env.NODE_ENV || 'development';
-dotenvExpand.expand(dotenv.config()); // Load .env
-dotenvExpand.expand(dotenv.config({ override: true, path: `.env.${env}` })); // Load .env.[env] and override
-dotenvExpand.expand(dotenv.config({ override: true, path: `.env.${env}.local` })); // Load .env.[env].local and override
+dotenvExpand.expand(dotenv.config());
+dotenvExpand.expand(dotenv.config({ override: true, path: `.env.${env}` }));
+dotenvExpand.expand(dotenv.config({ override: true, path: '.env.local' }));
+dotenvExpand.expand(dotenv.config({ override: true, path: `.env.${env}.local` }));
 
 // 若仍未设置 DATABASE_URL，回退加载 .env.dev（迁移脚本不默认读该文件）
 const envDevPath = join(process.cwd(), '.env.dev');

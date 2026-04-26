@@ -1,10 +1,11 @@
 import { Clapperboard, Palette, Settings2 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { SegmentedControl } from '../components/ui/ChoiceControls';
 import { HeaderIconButton, ScreenHeader } from '../components/ui/ScreenHeader';
 import { useI18n } from '../lib/i18n';
+import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import ArtworkScreen from './ArtworkScreen';
@@ -15,6 +16,9 @@ type CreateMode = 'artwork' | 'video';
 export default function CreateScreen() {
   const { t } = useI18n();
   const colors = useThemeColors();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const responsiveMetrics = getResponsiveLayoutMetrics(screenWidth, screenHeight);
+  const hasPersistentSidebar = responsiveMetrics.isWideTablet;
   const [mode, setMode] = useState<CreateMode>('artwork');
   const [configOpenVersion, setConfigOpenVersion] = useState(0);
 
@@ -40,15 +44,24 @@ export default function CreateScreen() {
         headerLevel="root"
         title={t.tabArtwork}
         rightActions={
-          <HeaderIconButton
-            accessibilityLabel={t.createOpenOptionsA11y}
-            onPress={() => setConfigOpenVersion((value) => value + 1)}
-          >
-            <Settings2 color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
-          </HeaderIconButton>
+          hasPersistentSidebar ? undefined : (
+            <HeaderIconButton
+              accessibilityLabel={t.createOpenOptionsA11y}
+              onPress={() => setConfigOpenVersion((value) => value + 1)}
+            >
+              <Settings2 color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+            </HeaderIconButton>
+          )
         }
       >
-        <View className="px-6 pb-2">
+        <View
+          className="px-6 pb-2"
+          style={{
+            alignSelf: 'center',
+            maxWidth: responsiveMetrics.createFeedMaxWidth + 48,
+            width: '100%',
+          }}
+        >
           <SegmentedControl items={switcherItems} value={mode} onChange={setMode} />
         </View>
       </ScreenHeader>

@@ -136,3 +136,9 @@ export const formatDate = (date?: Date) => {
 
   return dayjs(date).format('YYYY-MM-DD');
 };
+
+export const formatDateTime = (date?: Date | string | number | null) => {
+  if (!date && date !== 0) return '--';
+
+  return dayjs(date).format('YYYY-MM-DD HH:mm');
+};

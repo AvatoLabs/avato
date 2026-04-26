@@ -2,6 +2,7 @@
 
 import { type FormGroupItemType } from '@lobehub/ui';
 import { Form, HotkeyInput, Icon, Skeleton } from '@lobehub/ui';
+import { App } from 'antd';
 import isEqual from 'fast-deep-equal';
 import { Loader2Icon } from 'lucide-react';
 import { memo, useState } from 'react';
@@ -18,6 +19,7 @@ import { HotkeyGroupEnum } from '@/types/hotkey';
 const HotkeySetting = memo(() => {
   const { t } = useTranslation(['setting', 'hotkey']);
   const [form] = Form.useForm();
+  const { message } = App.useApp();
 
   const { hotkey } = useUserStore(settingsSelectors.currentSettings, isEqual);
   const [setSettings, isUserStateInit] = useUserStore((s) => [s.setSettings, s.isUserStateInit]);
@@ -33,6 +35,10 @@ const HotkeySetting = memo(() => {
 
     try {
       await setSettings({ hotkey: { [id]: '' } });
+    } catch (error) {
+      console.error('Failed to clear hotkey binding:', error);
+      form.setFieldValue(id, hotkey[id]);
+      message.error(t('settingHotkey.saveFailed'));
     } finally {
       setLoading(false);
     }
@@ -84,6 +90,10 @@ const HotkeySetting = memo(() => {
         setLoading(true);
         try {
           await setSettings({ hotkey: values });
+        } catch (error) {
+          console.error('Failed to save hotkey settings:', error);
+          form.setFieldsValue(hotkey);
+          message.error(t('settingHotkey.saveFailed'));
         } finally {
           setLoading(false);
         }

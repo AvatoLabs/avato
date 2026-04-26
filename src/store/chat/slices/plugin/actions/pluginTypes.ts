@@ -10,8 +10,8 @@ import { mcpService } from '@/services/mcp';
 import { messageService } from '@/services/message';
 import { AI_RUNTIME_OPERATION_TYPES } from '@/store/chat/slices/operation';
 import { type ChatStore } from '@/store/chat/store';
-import { useToolStore } from '@/store/tool';
 import { hasExecutor } from '@/store/tool/slices/builtin/executors';
+import { useToolStore } from '@/store/tool/store';
 import { type StoreSetter } from '@/store/types';
 import { safeParseJSON } from '@/utils/safeParseJSON';
 
@@ -85,7 +85,7 @@ export class PluginTypesActionImpl {
       // This is needed because AgentBuilderProvider uses a separate scope for messages
       // but still needs groupId for tool execution
       if (!groupId && payload.identifier === 'lobe-group-agent-builder') {
-        const { getChatGroupStoreState } = await import('@/store/agentGroup');
+        const { getChatGroupStoreState } = await import('@/store/agentGroup/store');
         groupId = getChatGroupStoreState().activeGroupId;
       }
 

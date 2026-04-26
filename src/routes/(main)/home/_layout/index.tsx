@@ -1,14 +1,13 @@
 import { Flexbox } from '@lobehub/ui';
 import { useTheme } from 'antd-style';
 import { type FC, type ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useIsDark } from '@/hooks/useIsDark';
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
 
 import HomeAgentIdSync from './HomeAgentIdSync';
-import RecentHydration from './RecentHydration';
 import Sidebar from './Sidebar';
 import { styles } from './style';
 
@@ -30,7 +29,7 @@ const Layout: FC<LayoutProps> = ({ children }) => {
     setNavigate(navigate);
   }, [navigate, setNavigate]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isHomeRoute) setHasActivated(true);
   }, [isHomeRoute]);
 
@@ -64,7 +63,6 @@ const Layout: FC<LayoutProps> = ({ children }) => {
       </Flexbox>
 
       {isHomeRoute && <HomeAgentIdSync />}
-      <RecentHydration />
     </Flexbox>
   );
 };

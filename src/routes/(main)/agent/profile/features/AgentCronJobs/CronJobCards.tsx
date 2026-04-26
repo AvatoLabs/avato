@@ -2,6 +2,7 @@
 
 import { ActionIcon, Flexbox, Icon } from '@lobehub/ui';
 import { Badge, Card, Col, Popconfirm, Row, Switch, Typography } from 'antd';
+import { cssVar } from 'antd-style';
 import dayjs from 'dayjs';
 import { Calendar, Clock, Edit, Trash2 } from 'lucide-react';
 import { memo } from 'react';
@@ -10,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { type AgentCronJob } from '@/database/schemas/agentCronJob';
 
 import { useAgentCronJobs } from './hooks/useAgentCronJobs';
+import { getCronJobIntervalText, getCronJobStatusInfo } from './shared';
 
 const { Text } = Typography;
 
@@ -20,45 +22,21 @@ interface CronJobCardsProps {
   onEdit: (jobId: string) => void;
 }
 
-const getIntervalText = (cronPattern: string) => {
-  const intervalMap: Record<string, string> = {
-    '*/30 * * * *': 'agentCronJobs.interval.30min',
-    '0 * * * *': 'agentCronJobs.interval.1hour',
-    '0 */12 * * *': 'agentCronJobs.interval.12hours',
-    '0 */2 * * *': 'agentCronJobs.interval.2hours',
-    '0 */6 * * *': 'agentCronJobs.interval.6hours',
-    '0 0 * * *': 'agentCronJobs.interval.daily',
-    '0 0 * * 0': 'agentCronJobs.interval.weekly',
-  };
-
-  return intervalMap[cronPattern] || cronPattern;
-};
-
-const getStatusInfo = (job: AgentCronJob) => {
-  if (!job.enabled) {
-    return { status: 'default' as const, text: 'agentCronJobs.status.disabled' };
-  }
-
-  if (job.remainingExecutions === 0) {
-    return { status: 'error' as const, text: 'agentCronJobs.status.depleted' };
-  }
-
-  return { status: 'success' as const, text: 'agentCronJobs.status.enabled' };
-};
-
 const CronJobCards = memo<CronJobCardsProps>(({ cronJobs, loading, onDelete, onEdit }) => {
   const { t } = useTranslation('setting');
   const { updateCronJob } = useAgentCronJobs();
 
   const handleToggleEnabled = async (job: AgentCronJob) => {
-    await updateCronJob(job.id, { enabled: !job.enabled });
+    try {
+      await updateCronJob(job.id, { enabled: !job.enabled });
+    } catch {}
   };
 
   return (
     <Row gutter={[12, 12]}>
       {cronJobs.map((job) => {
-        const statusInfo = getStatusInfo(job);
-        const intervalText = getIntervalText(job.cronPattern);
+        const statusInfo = getCronJobStatusInfo(job);
+        const intervalText = getCronJobIntervalText(job.cronPattern);
 
         return (
           <Col key={job.id} lg={8} md={12} xs={24}>
@@ -88,20 +66,26 @@ const CronJobCards = memo<CronJobCardsProps>(({ cronJobs, loading, onDelete, onE
                 header: { borderBottom: 'none', marginTop: '8px', minHeight: 0, paddingBottom: 0 },
               }}
               title={
-                <Flexbox horizontal align="center" justify="space-between">
-                  <Flexbox horizontal align="center" gap={8} style={{ flex: 1 }}>
-                    <span
+                <Flexbox horizontal align="flex-start" justify="space-between">
+                  <Flexbox gap={4} style={{ flex: 1, minWidth: 0 }}>
+                    <Text
+                      ellipsis
                       style={{
                         fontSize: '13px',
                         fontWeight: 500,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
+                        minWidth: 0,
                       }}
                     >
                       {job.name || t('agentCronJobs.unnamedTask')}
-                    </span>
-                    <Badge status={statusInfo.status} />
+                    </Text>
+                    <Badge
+                      status={statusInfo.status}
+                      text={
+                        <Text style={{ color: cssVar.colorTextSecondary, fontSize: '11px' }}>
+                          {t(statusInfo.text as any)}
+                        </Text>
+                      }
+                    />
                   </Flexbox>
                   <Switch
                     checked={job.enabled || false}
@@ -117,7 +101,7 @@ const CronJobCards = memo<CronJobCardsProps>(({ cronJobs, loading, onDelete, onE
                   style={{
                     WebkitBoxOrient: 'vertical',
                     WebkitLineClamp: 2,
-                    color: '#666',
+                    color: cssVar.colorTextSecondary,
                     display: '-webkit-box',
                     fontSize: '12px',
                     overflow: 'hidden',
@@ -129,12 +113,14 @@ const CronJobCards = memo<CronJobCardsProps>(({ cronJobs, loading, onDelete, onE
                 <Flexbox gap={8}>
                   <Flexbox horizontal align="center" gap={6}>
                     <Icon icon={Clock} size={12} />
-                    <Text style={{ fontSize: '11px' }}>{t(intervalText as any)}</Text>
+                    <Text style={{ color: cssVar.colorTextTertiary, fontSize: '11px' }}>
+                      {t(intervalText as any)}
+                    </Text>
                   </Flexbox>
 
                   {job.remainingExecutions !== null && (
                     <Flexbox horizontal align="center" gap={6}>
-                      <Text style={{ fontSize: '11px' }}>
+                      <Text style={{ color: cssVar.colorTextTertiary, fontSize: '11px' }}>
                         {t('agentCronJobs.remainingExecutions', { count: job.remainingExecutions })}
                       </Text>
                     </Flexbox>
@@ -143,7 +129,7 @@ const CronJobCards = memo<CronJobCardsProps>(({ cronJobs, loading, onDelete, onE
                   {job.lastExecutedAt && (
                     <Flexbox horizontal align="center" gap={6}>
                       <Icon icon={Calendar} size={12} />
-                      <Text style={{ fontSize: '11px' }}>
+                      <Text style={{ color: cssVar.colorTextTertiary, fontSize: '11px' }}>
                         {dayjs(job.lastExecutedAt).format('MM/DD HH:mm')}
                       </Text>
                     </Flexbox>

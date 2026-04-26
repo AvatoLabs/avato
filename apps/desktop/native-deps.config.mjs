@@ -39,6 +39,15 @@ export const nativeModules = [
 ];
 
 /**
+ * Optional native modules that are loaded dynamically by bundled dependencies.
+ *
+ * These should be externalized so Rollup does not turn a missing optional
+ * require into an empty namespace object. They are not copied with nativeModules
+ * because they are valid optional dependencies and may be absent.
+ */
+const optionalExternalModules = ['bufferutil', 'utf-8-validate'];
+
+/**
  * Recursively resolve all dependencies of a module
  * @param {string} moduleName - The module to resolve
  * @param {Set<string>} visited - Set of already visited modules (to avoid cycles)
@@ -138,7 +147,7 @@ export function getAsarUnpackPatterns() {
  * @returns {string[]} Array of dependency names
  */
 export function getExternalDependencies() {
-  return getAllDependencies();
+  return [...getAllDependencies(), ...optionalExternalModules];
 }
 
 /**
@@ -151,7 +160,7 @@ export async function copyNativeModulesToSource() {
   const deps = getAllDependencies();
   const sourceNodeModules = path.join(__dirname, 'node_modules');
 
-  console.log(`📦 Resolving ${deps.length} native module symlinks for packaging...`);
+  console.info(`📦 Resolving ${deps.length} native module symlinks for packaging...`);
 
   for (const dep of deps) {
     const modulePath = path.join(sourceNodeModules, dep);
@@ -162,7 +171,7 @@ export async function copyNativeModulesToSource() {
       if (stat.isSymbolicLink()) {
         // Resolve the symlink to get the real path
         const realPath = await fsPromises.realpath(modulePath);
-        console.log(`  📎 ${dep} (resolving symlink)`);
+        console.info(`  📎 ${dep} (resolving symlink)`);
 
         // Remove the symlink
         await fsPromises.rm(modulePath, { force: true, recursive: true });
@@ -175,11 +184,11 @@ export async function copyNativeModulesToSource() {
       }
     } catch (err) {
       // Module might not exist (optional dependency for different platform)
-      console.log(`  ⏭️  ${dep} (skipped: ${err.code || err.message})`);
+      console.info(`  ⏭️  ${dep} (skipped: ${err.code || err.message})`);
     }
   }
 
-  console.log(`✅ Native module symlinks resolved`);
+  console.info(`✅ Native module symlinks resolved`);
 }
 
 /**
@@ -192,7 +201,7 @@ export async function copyNativeModules(destNodeModules) {
   const deps = getAllDependencies();
   const sourceNodeModules = path.join(__dirname, 'node_modules');
 
-  console.log(`📦 Copying ${deps.length} native modules to unpacked directory...`);
+  console.info(`📦 Copying ${deps.length} native modules to unpacked directory...`);
 
   for (const dep of deps) {
     const sourcePath = path.join(sourceNodeModules, dep);
@@ -205,7 +214,7 @@ export async function copyNativeModules(destNodeModules) {
       if (stat.isSymbolicLink()) {
         // Resolve the symlink to get the real path
         const realPath = await fsPromises.realpath(sourcePath);
-        console.log(`  📎 ${dep} (symlink -> ${path.relative(sourceNodeModules, realPath)})`);
+        console.info(`  📎 ${dep} (symlink -> ${path.relative(sourceNodeModules, realPath)})`);
 
         // Create destination directory
         await fsPromises.mkdir(path.dirname(destPath), { recursive: true });
@@ -213,17 +222,17 @@ export async function copyNativeModules(destNodeModules) {
         // Copy the actual directory content (not the symlink)
         await copyDir(realPath, destPath);
       } else if (stat.isDirectory()) {
-        console.log(`  📁 ${dep}`);
+        console.info(`  📁 ${dep}`);
         await fsPromises.mkdir(path.dirname(destPath), { recursive: true });
         await copyDir(sourcePath, destPath);
       }
     } catch (err) {
       // Module might not exist (optional dependency for different platform)
-      console.log(`  ⏭️  ${dep} (skipped: ${err.code || err.message})`);
+      console.info(`  ⏭️  ${dep} (skipped: ${err.code || err.message})`);
     }
   }
 
-  console.log(`✅ Native modules copied successfully`);
+  console.info(`✅ Native modules copied successfully`);
 }
 
 /**

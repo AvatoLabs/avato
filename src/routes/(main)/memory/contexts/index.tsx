@@ -3,6 +3,7 @@ import { BrainCircuitIcon } from 'lucide-react';
 import { type FC } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Navigate, useSearchParams } from 'react-router-dom';
 
 import NavHeader from '@/features/NavHeader';
 import WideScreenContainer from '@/features/WideScreenContainer';
@@ -12,15 +13,14 @@ import MemoryAnalysis from '@/routes/(main)/memory/features/MemoryAnalysis';
 import { SCROLL_PARENT_ID } from '@/routes/(main)/memory/features/TimeLineView/useScrollParent';
 import { useUserMemoryStore } from '@/store/userMemory';
 
-import EditableModal from '../features/EditableModal';
 import FilterBar from '../features/FilterBar';
 import Loading from '../features/Loading';
+import { useResetDetailSelection } from '../features/useResetDetailSelection';
 import { type ViewMode } from '../features/ViewModeSwitcher';
 import ViewModeSwitcher from '../features/ViewModeSwitcher';
-import ContextRightPanel from './features/ContextRightPanel';
 import List from './features/List';
 
-const ContextsArea = memo(() => {
+export const ContextsArea = memo(() => {
   const { t } = useTranslation('memory');
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
   const [searchValueRaw, setSearchValueRaw] = useQueryState('q', { clearOnDefault: true });
@@ -43,16 +43,17 @@ const ContextsArea = memo(() => {
     { label: t('filter.sort.scoreUrgency'), value: 'scoreUrgency' },
   ];
 
+  useResetDetailSelection('contextId', [searchValue, sortValue]);
+
   // Convert sort: capturedAt becomes undefined (backend default)
   const apiSort =
     sortValue === 'capturedAt' ? undefined : (sortValue as 'scoreImpact' | 'scoreUrgency');
 
   // Reset list when search or sort changes
   useEffect(() => {
-    if (!apiSort) return;
     const sort = viewMode === 'grid' ? apiSort : undefined;
     resetContextsList({ q: searchValue || undefined, sort });
-  }, [searchValue, apiSort, viewMode]);
+  }, [searchValue, apiSort, viewMode, resetContextsList]);
 
   // Call SWR hook to fetch data
   const { isLoading } = useFetchContexts({
@@ -122,15 +123,11 @@ const ContextsArea = memo(() => {
 });
 
 const Contexts: FC = () => {
-  return (
-    <>
-      <Flexbox horizontal height={'100%'} width={'100%'}>
-        <ContextsArea />
-        <ContextRightPanel />
-      </Flexbox>
-      <EditableModal />
-    </>
-  );
+  const [searchParams] = useSearchParams();
+  const next = new URLSearchParams(searchParams);
+  next.set('focus', 'contexts');
+
+  return <Navigate replace to={{ pathname: '/memory', search: `?${next.toString()}` }} />;
 };
 
 export default Contexts;

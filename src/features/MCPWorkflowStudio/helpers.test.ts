@@ -289,6 +289,17 @@ describe('MCPWorkflowStudio helpers', () => {
     expect(directPath).toBe(path);
   });
 
+  it('uses a stable minimum size when a node seed is missing', () => {
+    const size = estimateNodeSize({
+      data: { mode: 'instruction', prompt: undefined, title: undefined },
+      id: 'transform_missing_seed',
+      position: { x: 0, y: 0 },
+      type: 'transform',
+    } as unknown as StudioCanvasNode);
+
+    expect(size).toEqual({ height: 152, width: 260 });
+  });
+
   it('guards allowed connections between battery types', () => {
     expect(canConnectNodes('input', 'mcp-tool')).toBe(true);
     expect(canConnectNodes('input', 'agent')).toBe(true);

@@ -4,7 +4,7 @@ import { MCP } from '@lobehub/icons';
 import { ActionIcon, DropdownMenu, Grid } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
 import { MoreHorizontal } from 'lucide-react';
-import { memo,Suspense } from 'react';
+import { memo, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -43,6 +43,7 @@ const FeaturedPlugins = memo(() => {
             <GroupSkeleton
               height={RECENT_BLOCK_SIZE.PLUGIN.HEIGHT}
               rows={6}
+              variant={'plugin'}
               width={RECENT_BLOCK_SIZE.PLUGIN.WIDTH}
             />
           }

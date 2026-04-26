@@ -9,8 +9,9 @@ import { useTranslation } from 'react-i18next';
 import PluginAvatar from '@/features/PluginAvatar';
 import { useYamlArguments } from '@/hooks/useYamlArguments';
 import { useChatStore } from '@/store/chat';
-import { pluginHelpers, useToolStore } from '@/store/tool';
+import { pluginHelpers } from '@/store/tool/helpers';
 import { toolSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import { styles } from './style';
 

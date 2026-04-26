@@ -174,8 +174,8 @@ export interface AgentDetailResponse extends AgentItem {
       size: number;
     };
   }>;
-  agentsKnowledgeBases?: Array<{
-    knowledgeBase: {
+  agentsSourceSets?: Array<{
+    sourceSet: {
       description: string | null;
       id: string;
       name: string;

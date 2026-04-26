@@ -14,7 +14,7 @@ export type MessageMapScope =
   | 'group'
   | 'group_agent'
   | 'group_agent_builder'
-  | 'page'
+  | 'doc'
   | 'agent_builder'
   | 'sub_agent';
 
@@ -136,6 +136,11 @@ export interface ConversationContext {
    */
   isSupervisor?: boolean;
   /**
+   * Optional contextual metadata for specialized conversation scopes.
+   * Examples include document ids for doc chat and source-set ids for scoped resources.
+   */
+  metadata?: Record<string, any>;
+  /**
    * Scope type for the conversation
    * - 'main': Agent main conversation (default)
    * - 'thread': Agent thread conversation
@@ -153,6 +158,11 @@ export interface ConversationContext {
    * Only used when creating a new thread (isNew=true, scope='thread')
    */
   sourceMessageId?: string;
+  /**
+   * Active resource Space (e.g. team library). Optional; callers may map to
+   * `ExecAgentAppContext.spaceId` or similar server payloads for tool/export scoping.
+   */
+  spaceId?: string | null;
   /**
    * Sub Agent ID for group orchestration scenarios
    * - Used to get Agent config (model, provider, plugins) instead of agentId
@@ -188,9 +198,4 @@ export interface ConversationContext {
    * When present, allows unauthenticated access to topic messages
    */
   topicShareId?: string;
-  /**
-   * Active resource Space (e.g. team library). Optional; callers may map to
-   * `ExecAgentAppContext.spaceId` or similar server payloads for tool/export scoping.
-   */
-  spaceId?: string | null;
 }

@@ -14,6 +14,8 @@ import { isDesktop } from '@/const/version';
 import { isModifierClick } from '@/utils/navigation';
 
 import BackButton from './components/BackButton';
+import { useGlassNavVisual } from './GlassNavVisualContext';
+import { glassSidebarStyles } from './glassSidebar.styles';
 import ToggleLeftPanelButton from './ToggleLeftPanelButton';
 
 const prefixCls = 'ant';
@@ -29,7 +31,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     .${prefixCls}-breadcrumb-link {
       display: flex !important;
       align-items: center !important;
-      font-size: 12px;
+      font-size: ${cssVar.fontSizeSM};
       color: ${cssVar.colorTextDescription};
     }
     a.${prefixCls}-breadcrumb-link {
@@ -62,6 +64,7 @@ const SideBarHeaderLayout = memo<SideBarHeaderLayoutProps>(
     breadcrumb = [],
     showTogglePanelButton = true,
   }) => {
+    const glass = useGlassNavVisual();
     const navigate = useNavigate();
     const leftContent = left ? (
       <Flexbox
@@ -83,7 +86,7 @@ const SideBarHeaderLayout = memo<SideBarHeaderLayoutProps>(
           />
         )}
         {left && typeof left === 'string' ? (
-          <Text ellipsis fontSize={16} weight={500}>
+          <Text ellipsis fontSize={16} weight={400}>
             {left}
           </Text>
         ) : (
@@ -118,14 +121,14 @@ const SideBarHeaderLayout = memo<SideBarHeaderLayoutProps>(
       </Flexbox>
     );
 
-    return (
+    const header = (
       <Flexbox
         horizontal
         align={'center'}
         className={styles.container}
         flex={'none'}
         justify={'space-between'}
-        padding={6}
+        padding={'8px 10px'}
       >
         {leftContent}
         <Flexbox
@@ -142,6 +145,8 @@ const SideBarHeaderLayout = memo<SideBarHeaderLayoutProps>(
         </Flexbox>
       </Flexbox>
     );
+
+    return glass ? <div className={glassSidebarStyles.identityCard}>{header}</div> : header;
   },
 );
 

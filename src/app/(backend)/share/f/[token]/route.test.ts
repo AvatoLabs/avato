@@ -20,8 +20,8 @@ vi.mock('@/database/server', () => ({
 }));
 
 const mockResolveShareLinkByToken = vi.fn();
-vi.mock('@/database/models/resource', () => ({
-  ResourceModel: vi.fn().mockImplementation(() => ({
+vi.mock('@/database/models/content', () => ({
+  ContentModel: vi.fn().mockImplementation(() => ({
     resolveShareLinkByToken: mockResolveShareLinkByToken,
   })),
 }));
@@ -57,7 +57,7 @@ describe('GET /share/f/[token]', () => {
     mockServeAuthorizedFileDownload.mockReset();
     mockDb.select.mockReset();
 
-    const registryRow = { kind: 'file' as const, localId: 'f1', resourceUid: 'ru1' };
+    const registryRow = { kind: 'file' as const, localId: 'f1', contentUid: 'ru1' };
     mockDb.select.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -70,7 +70,7 @@ describe('GET /share/f/[token]', () => {
       expiresAt: new Date(),
       id: 'lnk_1',
       passwordHash: null,
-      resourceUid: 'ru1',
+      contentUid: 'ru1',
     });
     mockGetFileById.mockResolvedValue({
       id: 'f1',
@@ -112,7 +112,7 @@ describe('GET /share/f/[token]', () => {
       expiresAt: new Date(),
       id: 'lnk_1',
       passwordHash: 'hashed',
-      resourceUid: 'ru1',
+      contentUid: 'ru1',
     });
     const req = new Request('https://app.example.com/share/f/tok');
     const res = await GET(req, { params: Promise.resolve({ token: 'tok' }) });
@@ -125,7 +125,7 @@ describe('GET /share/f/[token]', () => {
       expiresAt: new Date(),
       id: 'lnk_1',
       passwordHash: 'hashed',
-      resourceUid: 'ru1',
+      contentUid: 'ru1',
     });
     vi.mocked(bcrypt.compare).mockResolvedValue(false as any);
     const req = new Request('https://app.example.com/share/f/tok?password=wrong');
@@ -139,13 +139,31 @@ describe('GET /share/f/[token]', () => {
         where: vi.fn().mockReturnValue({
           limit: vi
             .fn()
-            .mockResolvedValue([{ kind: 'document', localId: 'd1', resourceUid: 'ru1' }]),
+            .mockResolvedValue([{ kind: 'document', localId: 'd1', contentUid: 'ru1' }]),
         }),
       }),
     });
     const req = new Request('https://app.example.com/share/f/tok');
     const res = await GET(req, { params: Promise.resolve({ token: 'tok' }) });
     expect(res.status).toBe(404);
+    expect(mockServeAuthorizedFileDownload).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when file share registry resolves to a document-shaped local id', async () => {
+    mockDb.select.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ kind: 'file', localId: 'docs_1', contentUid: 'ru1' }]),
+        }),
+      }),
+    });
+    const req = new Request('https://app.example.com/share/f/tok');
+    const res = await GET(req, { params: Promise.resolve({ token: 'tok' }) });
+
+    expect(res.status).toBe(404);
+    expect(mockGetFileById).not.toHaveBeenCalled();
     expect(mockServeAuthorizedFileDownload).not.toHaveBeenCalled();
   });
 
@@ -177,7 +195,7 @@ describe('GET /share/f/[token]', () => {
       expiresAt: new Date(),
       id: 'lnk_1',
       passwordHash: 'hashed',
-      resourceUid: 'ru1',
+      contentUid: 'ru1',
     });
     vi.mocked(bcrypt.compare).mockResolvedValue(true as any);
 

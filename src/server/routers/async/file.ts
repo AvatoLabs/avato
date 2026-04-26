@@ -1,34 +1,136 @@
 import { ASYNC_TASK_TIMEOUT } from '@lobechat/business-config/server';
+import { AgentRuntimeErrorType } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import { chunk } from 'es-toolkit/compat';
 import pMap from 'p-map';
 import { z } from 'zod';
 
 import { checkBudgetsUsage, checkEmbeddingUsage } from '@/business/server/trpc-middlewares/async';
-import { serverDBEnv } from '@/config/db';
 import { DEFAULT_FILE_EMBEDDING_MODEL_ITEM } from '@/const/settings/knowledge';
 import { AsyncTaskModel } from '@/database/models/asyncTask';
 import { ChunkModel } from '@/database/models/chunk';
+import { ContentModel } from '@/database/models/content';
 import { EmbeddingModel } from '@/database/models/embedding';
 import { FileModel } from '@/database/models/file';
-import { ResourceModel } from '@/database/models/resource';
 import { type NewChunkItem, type NewEmbeddingsItem } from '@/database/schemas';
 import { fileEnv } from '@/envs/file';
 import { asyncAuthedProcedure, asyncRouter as router } from '@/libs/trpc/async';
 import { getServerDefaultFilesConfig } from '@/server/globalConfig';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 import { ChunkService } from '@/server/services/chunk';
+import { ContentAuthorizer } from '@/server/services/content';
 import { FileService } from '@/server/services/file';
+import {
+  isStorageObjectMissingError,
+  STORAGE_OBJECT_MISSING_MESSAGE,
+} from '@/server/services/file/storageErrors';
 import {
   assertRagEmbeddingDimensions,
   RAG_EMBEDDING_DIMENSIONS,
 } from '@/server/services/rag/constants';
 import { getEffectiveEmbeddingBatchSize } from '@/server/services/rag/embeddingLimits';
-import { ResourceAuthorizer } from '@/server/services/resource';
 import { type IAsyncTaskError } from '@/types/asyncTask';
 import { AsyncTaskError, AsyncTaskErrorType, AsyncTaskStatus } from '@/types/asyncTask';
 import { safeParseJSON } from '@/utils/safeParseJSON';
 import { sanitizeUTF8 } from '@/utils/sanitizeUTF8';
+
+interface AsyncTaskContentGuardMetadata {
+  contentGuard?: {
+    authzEpoch?: number | null;
+    capability?: 'preview_content';
+    fileId?: string;
+  };
+}
+
+const getEmbeddingErrorMessage = (error: any) => {
+  const bodyMessage =
+    typeof error?.body === 'string'
+      ? error.body
+      : error?.body?.message || error?.body?.detail || error?.error?.message;
+
+  return bodyMessage || error?.message || error?.errorType || JSON.stringify(error);
+};
+
+const getAsyncTaskFailureMessage = (error: any) => {
+  const bodyMessage =
+    typeof error?.body === 'string' ? error.body : error?.body?.message || error?.body?.detail;
+
+  return bodyMessage || error?.message || error?.errorType || 'Unknown async task error';
+};
+
+const formatEmbeddingErrorMessage = (provider: string, model: string, error: any) =>
+  `${provider}/${model}: ${getEmbeddingErrorMessage(error)}`;
+
+const isPdfFile = (fileType: string, filename: string) =>
+  fileType.toLowerCase() === 'application/pdf' || filename.toLowerCase().endsWith('.pdf');
+
+const getChunkingEmptyResultError = (fileType: string, filename: string) => {
+  if (isPdfFile(fileType, filename)) {
+    return new AsyncTaskError(
+      AsyncTaskErrorType.NoExtractableText,
+      'No extractable text was found in this PDF. It is likely a scanned or image-only PDF. Please run OCR first and try again.',
+    );
+  }
+
+  return new AsyncTaskError(
+    AsyncTaskErrorType.NoChunkError,
+    'No chunk found in this file. it may due to current chunking method can not parse file accurately',
+  );
+};
+
+const categorizeEmbeddingError = (provider: string, model: string, error: any): AsyncTaskError => {
+  if (error instanceof AsyncTaskError) return error;
+
+  const message = formatEmbeddingErrorMessage(provider, model, error);
+
+  if (error?.errorType === AgentRuntimeErrorType.InvalidProviderAPIKey || error?.status === 401) {
+    return new AsyncTaskError(AsyncTaskErrorType.InvalidProviderAPIKey, message);
+  }
+
+  if (error?.errorType === AgentRuntimeErrorType.ModelNotFound) {
+    return new AsyncTaskError(AsyncTaskErrorType.ModelNotFound, message);
+  }
+
+  if (error?.errorType === AgentRuntimeErrorType.ProviderBizError) {
+    return new AsyncTaskError(AsyncTaskErrorType.ServerError, message);
+  }
+
+  return new AsyncTaskError(AsyncTaskErrorType.EmbeddingError, message);
+};
+
+const getTaskContentGuard = (task: { metadata?: unknown } | null | undefined) =>
+  (task?.metadata as AsyncTaskContentGuardMetadata | undefined)?.contentGuard;
+
+const validateTaskContentGuard = async (params: {
+  contentAuthorizer: ContentAuthorizer;
+  fileId: string;
+  task: { metadata?: unknown } | null | undefined;
+}) => {
+  const access = await params.contentAuthorizer.assertCapability({
+    capability: 'preview_content',
+    id: params.fileId,
+    kind: 'file',
+  });
+  const guard = getTaskContentGuard(params.task);
+
+  if (!guard || typeof guard.authzEpoch !== 'number') return access;
+
+  if (guard.fileId && guard.fileId !== params.fileId) {
+    throw new AsyncTaskError(
+      AsyncTaskErrorType.ServerError,
+      'Async task file binding is stale. Please retry from the latest file view.',
+    );
+  }
+
+  if (guard.authzEpoch !== access.authzEpoch) {
+    throw new AsyncTaskError(
+      AsyncTaskErrorType.ServerError,
+      'Resource access changed after task creation. Please retry from the latest file view.',
+    );
+  }
+
+  return access;
+};
 
 const fileProcedure = asyncAuthedProcedure.use(async (opts) => {
   const { ctx } = opts;
@@ -41,8 +143,8 @@ const fileProcedure = asyncAuthedProcedure.use(async (opts) => {
       embeddingModel: new EmbeddingModel(ctx.serverDB, ctx.userId),
       fileModel: new FileModel(ctx.serverDB, ctx.userId),
       fileService: new FileService(ctx.serverDB, ctx.userId),
-      resourceAuthorizer: new ResourceAuthorizer(ctx.serverDB, ctx.userId),
-      resourceModel: new ResourceModel(ctx.serverDB, ctx.userId),
+      contentAuthorizer: new ContentAuthorizer(ctx.serverDB, ctx.userId),
+      contentModel: new ContentModel(ctx.serverDB, ctx.userId),
     },
   });
 });
@@ -58,12 +160,6 @@ export const fileRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.resourceAuthorizer.assertCapability({
-        capability: 'preview_content',
-        id: input.fileId,
-        kind: 'file',
-      });
-
       const file = await ctx.fileModel.findByIdAny(input.fileId);
 
       if (!file) {
@@ -78,6 +174,12 @@ export const fileRouter = router({
       if (!asyncTask) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Async Task not found' });
 
       try {
+        await validateTaskContentGuard({
+          contentAuthorizer: ctx.contentAuthorizer,
+          fileId: input.fileId,
+          task: asyncTask,
+        });
+
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => {
             reject(
@@ -139,11 +241,8 @@ export const fileRouter = router({
               },
               { concurrency: CONCURRENCY },
             );
-          } catch (e: any) {
-            throw {
-              message: e.errorType ?? e.message ?? JSON.stringify(e),
-              name: AsyncTaskErrorType.EmbeddingError,
-            };
+          } catch (error) {
+            throw categorizeEmbeddingError(provider, model, error);
           }
 
           const duration = Date.now() - startAt;
@@ -162,12 +261,12 @@ export const fileRouter = router({
         console.error('embeddingChunks error', e);
 
         await ctx.asyncTaskModel.update(input.taskId, {
-          error: new AsyncTaskError((e as Error).name, (e as Error).message),
+          error: categorizeEmbeddingError(provider, model, e),
           status: AsyncTaskStatus.Error,
         });
 
         return {
-          message: `File ${file.name}(${input.taskId}) failed to embedding: ${(e as Error).message}`,
+          message: `File ${file.name}(${input.taskId}) failed to embedding: ${getAsyncTaskFailureMessage(e)}`,
           success: false,
         };
       }
@@ -181,39 +280,39 @@ export const fileRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.resourceAuthorizer.assertCapability({
-        capability: 'preview_content',
-        id: input.fileId,
-        kind: 'file',
-      });
-
       const file = await ctx.fileModel.findByIdAny(input.fileId);
       if (!file) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'File not found' });
       }
 
-      let content: Uint8Array | undefined;
-      try {
-        content = await ctx.fileService.getFileByteArray(file.url);
-      } catch (e) {
-        console.error(e);
-        // if file not found, delete it from db
-        if ((e as any).Code === 'NoSuchKey') {
-          await ctx.fileModel.deleteAny(input.fileId, serverDBEnv.REMOVE_GLOBAL_FILE);
-          await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval([
-            { resourceUid: file.resourceUid, spaceId: file.spaceId },
-          ]);
-          throw new TRPCError({ code: 'BAD_REQUEST', message: 'File not found' });
-        }
-      }
-
-      if (!content) return;
-
       const asyncTask = await ctx.asyncTaskModel.findById(input.taskId);
-
       if (!asyncTask) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Async Task not found' });
 
       try {
+        const access = await validateTaskContentGuard({
+          contentAuthorizer: ctx.contentAuthorizer,
+          fileId: input.fileId,
+          task: asyncTask,
+        });
+
+        let content: Uint8Array;
+        try {
+          content = await ctx.fileService.getFileByteArray(file.url);
+        } catch (error) {
+          if (isStorageObjectMissingError(error)) {
+            throw new AsyncTaskError(
+              AsyncTaskErrorType.ServerError,
+              STORAGE_OBJECT_MISSING_MESSAGE,
+            );
+          }
+
+          throw error;
+        }
+
+        if (!content) {
+          throw new AsyncTaskError(AsyncTaskErrorType.ServerError, 'File content is empty');
+        }
+
         const startAt = Date.now();
 
         const timeoutPromise = new Promise((_, reject) => {
@@ -252,11 +351,7 @@ export const fileRouter = router({
 
           // if no chunk found, throw error
           if (chunks.length === 0) {
-            throw {
-              message:
-                'No chunk found in this file. it may due to current chunking method can not parse file accurately',
-              name: AsyncTaskErrorType.NoChunkError,
-            };
+            throw getChunkingEmptyResultError(file.fileType, file.name);
           }
 
           await ctx.chunkModel.bulkCreate(chunks, input.fileId);
@@ -276,7 +371,9 @@ export const fileRouter = router({
 
           // if enable auto embedding, trigger the embedding task
           if (fileEnv.CHUNKS_AUTO_EMBEDDING) {
-            await chunkService.asyncEmbeddingFileChunks(input.fileId);
+            await chunkService.asyncEmbeddingFileChunks(input.fileId, {
+              contentGuardAuthzEpoch: access.authzEpoch,
+            });
           }
 
           return { success: true };
@@ -297,7 +394,7 @@ export const fileRouter = router({
         });
 
         return {
-          message: `File ${file.name}(${input.taskId}) failed to chunking: ${(e as Error).message}`,
+          message: `File ${file.name}(${input.taskId}) failed to chunking: ${getAsyncTaskFailureMessage(e)}`,
           success: false,
         };
       }

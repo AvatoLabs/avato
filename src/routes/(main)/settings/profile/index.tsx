@@ -9,8 +9,8 @@ import { useTranslation } from 'react-i18next';
 import SettingHeader from '@/routes/(main)/settings/features/SettingHeader';
 import { useServerConfigStore } from '@/store/serverConfig';
 import { serverConfigSelectors } from '@/store/serverConfig/selectors';
-import { useToolStore } from '@/store/tool';
 import { KlavisServerStatus } from '@/store/tool/slices/klavisStore';
+import { useToolStore } from '@/store/tool/store';
 import { useUserStore } from '@/store/user';
 import { authSelectors, userProfileSelectors } from '@/store/user/selectors';
 
@@ -36,7 +36,11 @@ const SkeletonRow = ({ mobile }: { mobile?: boolean }) => {
   return (
     <Flexbox horizontal align="center" gap={24} style={rowStyle}>
       <Skeleton.Button active size="small" style={{ ...labelStyle, height: 22 }} />
-      <Skeleton.Button active size="small" style={{ height: 22, marginInlineStart: 'auto', width: 120 }} />
+      <Skeleton.Button
+        active
+        size="small"
+        style={{ height: 22, marginInlineStart: 'auto', width: 120 }}
+      />
     </Flexbox>
   );
 };
@@ -54,6 +58,7 @@ const ProfileSetting = ({ mobile }: ProfileSettingProps) => {
   const isLoadedAuthProviders = useUserStore(authSelectors.isLoadedAuthProviders);
   const fetchAuthProviders = useUserStore((s) => s.fetchAuthProviders);
   const enableKlavis = useServerConfigStore(serverConfigSelectors.enableKlavis);
+  const enableNoAuth = useServerConfigStore(serverConfigSelectors.enableNoAuth);
   const disableEmailPassword = useServerConfigStore(serverConfigSelectors.disableEmailPassword);
   const [servers, isServersInit, useFetchUserKlavisServers] = useToolStore((s) => [
     s.servers,
@@ -61,18 +66,21 @@ const ProfileSetting = ({ mobile }: ProfileSettingProps) => {
     s.useFetchUserKlavisServers,
   ]);
   const connectedServers = servers.filter((s) => s.status === KlavisServerStatus.CONNECTED);
+  const canManageAuthProviders = isLogin && !enableNoAuth;
 
   // Fetch Klavis servers
   useFetchUserKlavisServers(enableKlavis);
 
   const isLoading =
-    !isUserLoaded || (isLogin && !isLoadedAuthProviders) || (enableKlavis && !isServersInit);
+    !isUserLoaded ||
+    (canManageAuthProviders && !isLoadedAuthProviders) ||
+    (enableKlavis && !isServersInit);
 
   useEffect(() => {
-    if (isLogin) {
+    if (canManageAuthProviders) {
       fetchAuthProviders();
     }
-  }, [isLogin, fetchAuthProviders]);
+  }, [canManageAuthProviders, fetchAuthProviders]);
 
   const { t } = useTranslation('auth');
 
@@ -109,7 +117,7 @@ const ProfileSetting = ({ mobile }: ProfileSettingProps) => {
           <InterestsRow mobile={mobile} />
 
           {/* Password Row - For logged in users to change or set password */}
-          {!isDesktop && isLogin && !disableEmailPassword && (
+          {!isDesktop && canManageAuthProviders && !disableEmailPassword && (
             <>
               <Divider style={{ margin: 0 }} />
               <PasswordRow mobile={mobile} />
@@ -125,7 +133,7 @@ const ProfileSetting = ({ mobile }: ProfileSettingProps) => {
           )}
 
           {/* SSO Providers Row */}
-          {isLogin && !isDesktop && (
+          {canManageAuthProviders && !isDesktop && (
             <>
               <Divider style={{ margin: 0 }} />
               <ProfileRow label={t('profile.sso.providers')} mobile={mobile}>

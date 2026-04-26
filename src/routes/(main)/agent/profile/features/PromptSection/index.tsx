@@ -1,0 +1,95 @@
+'use client';
+
+import { Flexbox, Icon } from '@lobehub/ui';
+import { useTheme } from 'antd-style';
+import { FileTextIcon, SparklesIcon } from 'lucide-react';
+import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import EditorCanvas from '../EditorCanvas';
+
+const PromptSection = memo(() => {
+    const { t } = useTranslation(['setting', 'file']);
+    const theme = useTheme();
+
+    return (
+        <div
+            style={{
+                background: theme.colorBgContainer,
+                borderRadius: theme.borderRadiusLG,
+                marginBottom: 16,
+                overflow: 'hidden',
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                border: `1px solid ${theme.colorBorderSecondary}`,
+            }}
+        >
+            {/* Header */}
+            <Flexbox
+                horizontal
+                align={'center'}
+                gap={12}
+                padding={'16px 24px'}
+                style={{
+                    borderBottom: `1px solid ${theme.colorBorderSecondary}`,
+                }}
+            >
+                <Icon
+                    icon={FileTextIcon}
+                    size={{ size: 20 }}
+                    style={{ color: theme.colorPrimary }}
+                />
+                <span
+                    style={{
+                        fontSize: 16,
+                        fontWeight: 600,
+                        color: theme.colorText,
+                    }}
+                >
+                    {t('settingAgent.prompt.title')}
+                </span>
+                <Flexbox
+                    horizontal
+                    align={'center'}
+                    gap={4}
+                    padding={'4px 8px'}
+                    style={{
+                        background: theme.colorPrimaryBg,
+                        borderRadius: theme.borderRadiusSM,
+                        marginLeft: 'auto',
+                    }}
+                >
+                    <Icon
+                        icon={SparklesIcon}
+                        size={{ size: 12 }}
+                        style={{ color: theme.colorPrimary }}
+                    />
+                    <span
+                        style={{
+                            fontSize: 12,
+                            color: theme.colorPrimary,
+                        }}
+                    >
+                        {t('docEditor.mode.markdown', { ns: 'file' })}
+                    </span>
+                </Flexbox>
+            </Flexbox>
+
+            {/* Editor Content */}
+            <Flexbox
+                flex={1}
+                style={{
+                    padding: '16px 24px',
+                    overflow: 'auto',
+                }}
+            >
+                <EditorCanvas />
+            </Flexbox>
+        </div>
+    );
+});
+
+PromptSection.displayName = 'PromptSection';
+
+export default PromptSection;

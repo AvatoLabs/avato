@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeLocale } from './resources';
+import { normalizeLocale } from './contents';
 
 describe('normalizeLocale', () => {
   it('should return "en-US" when locale is undefined', () => {

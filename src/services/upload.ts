@@ -11,6 +11,7 @@ import { type FileUploadState, type FileUploadStatus } from '@/types/files/uploa
 export const UPLOAD_NETWORK_ERROR = 'NetWorkError';
 
 const log = debug('lobe-client:upload');
+const UPLOAD_SESSION_ID_HEADER = 'x-lobe-upload-session-id';
 
 const fileMetadataFromStorageKey = (storageKey: string): FileMetadata => {
   const parts = storageKey.split('/');
@@ -30,7 +31,6 @@ interface UploadFileToS3Options {
   /** @deprecated Ignored; storage keys are server-generated from upload sessions. */
   directory?: string;
   filename?: string;
-  knowledgeBaseId?: string;
   onNotSupported?: () => void;
   onProgress?: (status: FileUploadStatus, state: FileUploadState) => void;
   parentId?: string;
@@ -39,6 +39,7 @@ interface UploadFileToS3Options {
   /** Precomputed SHA-256 (hex) to avoid re-reading the file buffer. */
   sha256?: string;
   skipCheckFileType?: boolean;
+  sourceSetId?: string;
   spaceId?: string;
 }
 
@@ -114,11 +115,11 @@ class UploadService {
     const file = new File([blob], fileName, { type: mimeType });
 
     const { data: metadata } = await this.uploadFileToS3(file, options);
-    const hash = sha256(await file.arrayBuffer());
+    const sha256Hex = sha256(await file.arrayBuffer());
 
     return {
       fileType: mimeType,
-      hash,
+      sha256: sha256Hex,
       metadata,
       size: file.size,
     };
@@ -135,7 +136,7 @@ class UploadService {
     {
       onProgress,
       abortController,
-      knowledgeBaseId,
+      sourceSetId,
       parentId,
       sha256: sha256Option,
       spaceId,
@@ -146,7 +147,7 @@ class UploadService {
     const prep = await lambdaClient.upload.prepareResourceUpload.mutate({
       filename: file.name,
       fileType: file.type || 'application/octet-stream',
-      knowledgeBaseId,
+      sourceSetId,
       parentId,
       sha256: sha256Hex,
       size: file.size,
@@ -190,7 +191,6 @@ class UploadService {
 
       xhr.open('PUT', prep.presignedUrl);
       xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-      const data = await file.arrayBuffer();
 
       await new Promise((resolve, reject) => {
         xhr.addEventListener('load', () => {
@@ -213,7 +213,7 @@ class UploadService {
           onProgress?.('cancelled', { progress: 0, restTime: 0, speed: 0 });
           reject(new Error('Upload cancelled by user'));
         });
-        xhr.send(data);
+        xhr.send(file);
       });
     }
 
@@ -238,10 +238,6 @@ class UploadService {
     },
   ): Promise<void> => {
     const xhr = new XMLHttpRequest();
-    const formData = new FormData();
-
-    formData.append('file', file, file.name);
-    formData.append('uploadSessionId', uploadSessionId);
 
     if (abortController) {
       abortController.signal.addEventListener('abort', () => {
@@ -263,6 +259,8 @@ class UploadService {
     });
 
     xhr.open('POST', API_ENDPOINTS.fileUploadSession);
+    xhr.setRequestHeader(UPLOAD_SESSION_ID_HEADER, uploadSessionId);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
 
     await new Promise<void>((resolve, reject) => {
       xhr.addEventListener('load', () => {
@@ -289,7 +287,7 @@ class UploadService {
         reject(new Error('Upload cancelled by user'));
       });
 
-      xhr.send(formData);
+      xhr.send(file);
     });
   };
 

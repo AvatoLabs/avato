@@ -12,7 +12,7 @@ import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { LOBE_LOCALE_COOKIE } from '@/const/locale';
-import { localeOptions, normalizeLocale } from '@/locales/resources';
+import { localeOptions, normalizeLocale } from '@/locales/contents';
 
 const setCookieSimple = (key: string, value: string, days: number) => {
   const expires = new Date(Date.now() + days * 86_400_000).toUTCString();

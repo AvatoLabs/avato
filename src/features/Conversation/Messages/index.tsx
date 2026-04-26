@@ -8,6 +8,7 @@ import { type MouseEvent, type ReactNode } from 'react';
 import { memo, Suspense, useCallback } from 'react';
 
 import BubblesLoading from '@/components/BubblesLoading';
+import { electronSystemService } from '@/services/electron/system';
 
 import History from '../components/History';
 import { useChatItemContextMenu } from '../hooks/useChatItemContextMenu';
@@ -85,8 +86,6 @@ const MessageItem = memo<MessageItemProps>(
         if (!message) return;
 
         if (isDesktop) {
-          const { electronSystemService } = await import('@/services/electron/system');
-
           // Get selected text for context menu features like Look Up and Search
           const selection = window.getSelection();
           const selectionText = selection?.toString() || '';

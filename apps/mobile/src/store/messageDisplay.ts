@@ -1,10 +1,32 @@
-import type { ChatMessage, ChatToolPayload } from '../types';
+import type { ChatFileItem, ChatImageItem, ChatMessage, ChatToolPayload } from '../types';
 import { mergeToolPayloadsCore } from './chatHelpers';
 
 const MOBILE_ASSISTANT_CHAIN_ACTION_MESSAGE_ID = 'mobileAssistantChainActionMessageId';
+const DISPLAY_MESSAGE_CACHE_LIMIT = 200;
+
+const assistantToolChainCache = new Map<
+  string,
+  { merged: ChatMessage; messages: ChatMessage[] }
+>();
+const groupTasksCache = new Map<string, { merged: ChatMessage; tasks: ChatMessage[] }>();
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const areMessageRefArraysEqual = (left: ChatMessage[], right: ChatMessage[]) =>
+  left.length === right.length && left.every((message, index) => message === right[index]);
+
+const setCachedDisplayMessage = <T>(
+  cache: Map<string, T>,
+  key: string,
+  value: T,
+) => {
+  if (cache.size >= DISPLAY_MESSAGE_CACHE_LIMIT) {
+    cache.clear();
+  }
+
+  cache.set(key, value);
+};
 
 const mergeToolPayloadLists = (
   previous: ChatToolPayload[] | null | undefined,
@@ -34,6 +56,46 @@ const buildToolPayloadFromMessage = (message: ChatMessage) => {
         ? ('builtin' as const)
         : undefined,
     type: message.plugin?.type || 'function',
+  };
+};
+
+const hasToolLinkId = (tool: ChatToolPayload) =>
+  (typeof tool.id === 'string' && tool.id.length > 0) ||
+  (typeof tool.result_msg_id === 'string' && tool.result_msg_id.length > 0);
+
+const getDisplayBuildPlan = (messages: ChatMessage[], isGroupSession: boolean) => {
+  let hasAssistantWithParent = false;
+  let hasAssistantWithToolLinks = false;
+  let hasStandaloneToolMessages = false;
+  let hasGroupTaskMessages = false;
+
+  for (const message of messages) {
+    if (message.role === 'assistant') {
+      if (message.parentId) hasAssistantWithParent = true;
+      if (!hasAssistantWithToolLinks && message.tools?.some(hasToolLinkId)) {
+        hasAssistantWithToolLinks = true;
+      }
+    } else if (message.role === 'tool' && message.parentId) {
+      hasStandaloneToolMessages = true;
+    } else if (isGroupSession && message.role === 'task' && message.parentId) {
+      hasGroupTaskMessages = true;
+    }
+
+    if (
+      hasStandaloneToolMessages &&
+      hasAssistantWithParent &&
+      (hasAssistantWithToolLinks || hasStandaloneToolMessages) &&
+      (!isGroupSession || hasGroupTaskMessages)
+    ) {
+      break;
+    }
+  }
+
+  return {
+    shouldCollapseAssistantToolChains:
+      hasAssistantWithParent && (hasAssistantWithToolLinks || hasStandaloneToolMessages),
+    shouldCollapseStandaloneToolMessages: hasStandaloneToolMessages,
+    shouldGroupTasks: isGroupSession && hasGroupTaskMessages,
   };
 };
 
@@ -77,11 +139,7 @@ const getToolLinkIds = (message: ChatMessage) =>
     ),
   );
 
-const mergeMessageAssets = <
-  T extends {
-    id: string;
-  },
->(
+const mergeMessageAssets = <T extends ChatFileItem | ChatImageItem>(
   messages: ChatMessage[],
   key: 'fileList' | 'imageList',
 ): T[] | undefined => {
@@ -102,6 +160,13 @@ const mergeMessageAssets = <
 };
 
 const mergeAssistantToolChain = (messages: ChatMessage[]): ChatMessage => {
+  const cacheKey = messages.map((message) => message.id).join('|');
+  const cached = assistantToolChainCache.get(cacheKey);
+
+  if (cached && areMessageRefArraysEqual(cached.messages, messages)) {
+    return cached.merged;
+  }
+
   const firstMessage = messages[0]!;
   const lastMessage = messages.at(-1) ?? firstMessage;
   const lastContentMessage =
@@ -115,14 +180,14 @@ const mergeAssistantToolChain = (messages: ChatMessage[]): ChatMessage => {
     return { ...metadata, ...message.metadata };
   }, {});
 
-  return {
+  const mergedMessage: ChatMessage = {
     ...firstMessage,
     agentId: lastMessage.agentId ?? firstMessage.agentId,
     children: messages,
     content: lastContentMessage.content,
     error: lastMessage.error ?? firstMessage.error,
-    fileList: mergeMessageAssets(messages, 'fileList'),
-    imageList: mergeMessageAssets(messages, 'imageList'),
+    fileList: mergeMessageAssets<ChatFileItem>(messages, 'fileList'),
+    imageList: mergeMessageAssets<ChatImageItem>(messages, 'imageList'),
     metadata: {
       ...mergedMetadata,
       [MOBILE_ASSISTANT_CHAIN_ACTION_MESSAGE_ID]: lastMessage.id,
@@ -136,6 +201,13 @@ const mergeAssistantToolChain = (messages: ChatMessage[]): ChatMessage => {
     updatedAt: lastMessage.updatedAt,
     usage: lastMessage.usage ?? firstMessage.usage,
   };
+
+  setCachedDisplayMessage(assistantToolChainCache, cacheKey, {
+    merged: mergedMessage,
+    messages: [...messages],
+  });
+
+  return mergedMessage;
 };
 
 const collapseAssistantToolChains = (messages: ChatMessage[]) => {
@@ -242,16 +314,28 @@ export function buildDisplayMessagesWithGroupTasks(messages: ChatMessage[]): Cha
       sortedTasks.length > 0
         ? sortedTasks.at(-1)?.updatedAt || sortedTasks[0].updatedAt
         : (parentMsg?.updatedAt ?? m.updatedAt);
+    const cached = groupTasksCache.get(groupTasksId);
 
-    result.push({
-      content: '',
-      createdAt,
-      id: groupTasksId,
-      role: 'groupTasks',
-      sessionId: m.sessionId,
-      tasks: sortedTasks,
-      updatedAt,
-    });
+    if (cached && areMessageRefArraysEqual(cached.tasks, sortedTasks)) {
+      result.push(cached.merged);
+    } else {
+      const mergedMessage: ChatMessage = {
+        content: '',
+        createdAt,
+        id: groupTasksId,
+        role: 'groupTasks',
+        sessionId: m.sessionId,
+        tasks: sortedTasks,
+        updatedAt,
+      };
+
+      setCachedDisplayMessage(groupTasksCache, groupTasksId, {
+        merged: mergedMessage,
+        tasks: [...sortedTasks],
+      });
+      result.push(mergedMessage);
+    }
+
     groupedParentIds.add(m.parentId);
   }
 
@@ -262,14 +346,37 @@ export function buildDisplayMessages(
   messages: ChatMessage[],
   isGroupSession = false,
 ): ChatMessage[] {
-  const toolCollapsedMessages = collapseStandaloneToolMessages(messages);
-  const assistantChainCollapsedMessages = collapseAssistantToolChains(toolCollapsedMessages);
+  if (messages.length === 0) return [];
 
-  if (!isGroupSession) {
-    return assistantChainCollapsedMessages;
+  const {
+    shouldCollapseAssistantToolChains,
+    shouldCollapseStandaloneToolMessages,
+    shouldGroupTasks,
+  } = getDisplayBuildPlan(messages, isGroupSession);
+
+  if (
+    !shouldCollapseStandaloneToolMessages &&
+    !shouldCollapseAssistantToolChains &&
+    !shouldGroupTasks
+  ) {
+    return messages;
   }
 
-  return buildDisplayMessagesWithGroupTasks(assistantChainCollapsedMessages);
+  let nextMessages = messages;
+
+  if (shouldCollapseStandaloneToolMessages) {
+    nextMessages = collapseStandaloneToolMessages(nextMessages);
+  }
+
+  if (shouldCollapseAssistantToolChains) {
+    nextMessages = collapseAssistantToolChains(nextMessages);
+  }
+
+  if (shouldGroupTasks) {
+    nextMessages = buildDisplayMessagesWithGroupTasks(nextMessages);
+  }
+
+  return nextMessages;
 }
 
 export const getAssistantChainActionMessageId = (message: ChatMessage) => {

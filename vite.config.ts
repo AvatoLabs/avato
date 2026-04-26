@@ -24,6 +24,7 @@ const platform = isMobile ? 'mobile' : 'web';
 export default defineConfig({
   base: isDev ? '/' : process.env.VITE_CDN_BASE || '/spa/',
   build: {
+    chunkSizeWarningLimit: 2500,
     outDir: isMobile ? 'dist/mobile' : 'dist/desktop',
     rollupOptions: {
       input: path.resolve(__dirname, isMobile ? 'index.mobile.html' : 'index.html'),
@@ -37,10 +38,21 @@ export default defineConfig({
     viteEnvRestartKeys(['APP_URL']),
     ...sharedRendererPlugins({ platform }),
 
+    /** Debug Proxy loads the doc on the configured cloud host while assets are localhost; manifest would be cross-origin and Chrome ignores start_url. */
+    isDev && {
+      name: 'spa-dev-strip-web-manifest-link',
+      transformIndexHtml(html: string) {
+        return html.replace(/\s*<link[^>]*rel=["']manifest["'][^>]*>\s*/i, '\n');
+      },
+    },
+
     isDev && {
       name: 'lobe-dev-proxy-print',
       configureServer(server: ViteDevServer) {
-        const ONLINE_HOST = 'https://app.lobehub.com';
+        const ONLINE_HOST =
+          process.env.NEXT_PUBLIC_OFFICIAL_URL ||
+          process.env.APP_URL ||
+          'https://avato.turingmesh.com';
         const c = {
           green: (s: string) => `\x1B[32m${s}\x1B[0m`,
           bold: (s: string) => `\x1B[1m${s}\x1B[0m`,
@@ -114,6 +126,7 @@ export default defineConfig({
       '/share/f': { changeOrigin: true, target: 'http://localhost:3010' },
       '/trpc': 'http://localhost:3010',
       '/webapi': 'http://localhost:3010',
+      // Served from `public/manifest.webmanifest` so `start_url` stays same-origin (Next metadataBase would absolutize)
     },
     warmup: {
       clientFiles: [

@@ -11,7 +11,7 @@
  *   </PressableScale>
  */
 import React, { memo } from 'react';
-import { type AccessibilityRole, type StyleProp, type ViewStyle } from 'react-native';
+import { type AccessibilityRole, type StyleProp, View, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -32,6 +32,8 @@ interface PressableScaleProps {
   children: React.ReactNode;
   /** Additional NativeWind class names */
   className?: string;
+  /** Layout style for the outer animated gesture container */
+  containerStyle?: StyleProp<ViewStyle>;
   /** Spring damping. Higher = less bounce. Default: 15 */
   damping?: number;
   /** Disable interaction */
@@ -52,6 +54,7 @@ const PressableScale = memo<PressableScaleProps>(
   ({
     children,
     className,
+    containerStyle,
     disabled = false,
     onPress,
     onLongPress,
@@ -117,15 +120,17 @@ const PressableScale = memo<PressableScaleProps>(
 
     return (
       <GestureDetector gesture={composed}>
-        <Animated.View
-          accessible
-          accessibilityHint={accessibilityHint}
-          accessibilityLabel={accessibilityLabel}
-          accessibilityRole={accessibilityRole}
-          className={className}
-          style={[animatedStyle, style]}
-        >
-          {children}
+        <Animated.View style={[animatedStyle, containerStyle]}>
+          <View
+            accessible
+            accessibilityHint={accessibilityHint}
+            accessibilityLabel={accessibilityLabel}
+            accessibilityRole={accessibilityRole}
+            className={className}
+            style={style}
+          >
+            {children}
+          </View>
         </Animated.View>
       </GestureDetector>
     );

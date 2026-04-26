@@ -91,14 +91,14 @@ describe('file command', () => {
       expect(consoleSpy).toHaveBeenCalledWith('No files found.');
     });
 
-    it('should filter by knowledge base ID', async () => {
+    it('should filter by source set ID', async () => {
       mockTrpcClient.file.getFiles.query.mockResolvedValue([]);
 
       const program = createProgram();
-      await program.parseAsync(['node', 'test', 'file', 'list', '--kb-id', 'kb1']);
+      await program.parseAsync(['node', 'test', 'file', 'list', '--source-set-id', 'kb1']);
 
       expect(mockTrpcClient.file.getFiles.query).toHaveBeenCalledWith(
-        expect.objectContaining({ knowledgeBaseId: 'kb1' }),
+        expect.objectContaining({ sourceSetId: 'kb1' }),
       );
     });
   });

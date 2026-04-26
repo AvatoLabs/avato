@@ -208,6 +208,37 @@ describe('AgentSkillModel', () => {
       });
       expect(updated?.name).toBe('Updated Name');
     });
+
+    it('should deep-merge partial manifest updates', async () => {
+      const { id } = await serverDB
+        .insert(agentSkills)
+        .values({
+          description: 'Original description',
+          identifier: 'manifest.partial',
+          manifest: createManifest({
+            author: 'Original Author',
+            homepage: 'https://example.com/original',
+          }),
+          name: 'Original Name',
+          source: 'user',
+          userId,
+        })
+        .returning()
+        .then((res) => res[0]);
+
+      const updated = await agentSkillModel.update(id, {
+        manifest: {
+          description: 'Updated description only',
+        } as SkillManifest,
+      });
+
+      expect(updated.manifest).toMatchObject({
+        author: 'Original Author',
+        description: 'Updated description only',
+        homepage: 'https://example.com/original',
+        name: 'Test Skill',
+      });
+    });
   });
 
   describe('listBySource', () => {

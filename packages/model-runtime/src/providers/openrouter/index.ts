@@ -47,8 +47,8 @@ export const params = {
   },
   constructorOptions: {
     defaultHeaders: {
-      'HTTP-Referer': 'https://lobehub.com',
-      'X-Title': 'LobeHub',
+      'HTTP-Referer': process.env.APP_URL || 'https://avato.turingmesh.com',
+      'X-Title': 'Avato',
     },
   },
   debug: {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { FileItem, KnowledgeBaseItem } from '@/database/schemas';
+import type { FileItem as DbFileItem, SourceSetItem } from '@/database/schemas';
 
 import type { IPaginationQuery, PaginationQueryResponse } from './common.type';
 import { PaginationQuerySchema } from './common.type';
@@ -17,8 +17,6 @@ export interface FileUploadRequest {
   directory?: string;
   /** 文件对象 */
   file: File;
-  /** 知识库ID（可选） */
-  knowledgeBaseId?: string;
   /** 自定义路径（可选） */
   pathname?: string;
   /** 会话ID（可选） */
@@ -27,6 +25,8 @@ export interface FileUploadRequest {
   skipCheckFileType?: boolean;
   /** 是否跳过去重检查 */
   skipDeduplication?: boolean;
+  /** 来源集 ID（可选） */
+  sourceSetId?: string;
 }
 
 /**
@@ -45,14 +45,14 @@ export interface PublicFileUploadRequest {
   agentId?: string;
   /** 文件目录（可选） */
   directory?: string;
-  /** 知识库ID（可选） */
-  knowledgeBaseId?: string;
   /** 会话ID（可选） */
   sessionId?: string;
   /** 是否跳过文件类型检查 */
   skipCheckFileType?: boolean;
   /** 是否跳过去重检查 */
   skipDeduplication?: boolean;
+  /** 来源集 ID（可选） */
+  sourceSetId?: string;
 }
 
 // ==================== File Management Types ====================
@@ -63,10 +63,10 @@ export interface PublicFileUploadRequest {
 export interface FileListQuery extends IPaginationQuery {
   /** 文件类型过滤 */
   fileType?: string;
-  /** 知识库ID过滤 */
-  knowledgeBaseId?: string;
   /** 是否查询全量数据（需要 ALL 权限） */
   queryAll?: boolean;
+  /** 来源集 ID 过滤 */
+  sourceSetId?: string;
   /** 更新时间结束 */
   updatedAtEnd?: string;
   /** 更新时间起始 */
@@ -77,7 +77,7 @@ export interface FileListQuery extends IPaginationQuery {
 
 export const FileListQuerySchema = PaginationQuerySchema.extend({
   fileType: z.string().optional(),
-  knowledgeBaseId: z.string().optional(),
+  sourceSetId: z.string().optional(),
   queryAll: z
     .string()
     .transform((val) => val === 'true')
@@ -144,12 +144,12 @@ export interface BatchFileUploadRequest {
   directory?: string;
   /** 文件列表 */
   files: File[];
-  /** 知识库ID（可选） */
-  knowledgeBaseId?: string;
   /** 会话ID（可选） */
   sessionId?: string;
   /** 是否跳过文件类型检查 */
   skipCheckFileType?: boolean;
+  /** 来源集 ID（可选） */
+  sourceSetId?: string;
 }
 
 /**
@@ -296,14 +296,14 @@ export interface FileUserItem {
 /**
  * 文件列表项（包含可选的分块状态信息）
  */
-export interface FileListItem extends Partial<FileItem> {
+export interface FileListItem extends Partial<Omit<DbFileItem, 'fileHash'>> {
   /** 分块任务信息（包含基础异步任务信息与分块数量） */
   chunking?: FileAsyncTaskResponse | null;
   /** 嵌入任务信息（包含基础异步任务信息） */
   embedding?: FileAsyncTaskResponse | null;
-  /** 关联的知识库列表 */
-  knowledgeBases?: Array<KnowledgeBaseItem>;
-  /** 关联的用户列表（相同 fileHash 的所有用户） */
+  /** 关联的来源集列表 */
+  sourceSets?: Array<SourceSetItem>;
+  /** 关联的用户列表（相同 blob/file artifact 的所有用户） */
   users?: Array<FileUserItem>;
 }
 
@@ -365,10 +365,10 @@ export const FileIdParamSchema = z.object({
  * 文件更新请求类型
  */
 export interface UpdateFileRequest {
-  /** 知识库ID（可选） */
-  knowledgeBaseId?: string | null;
+  /** 来源集 ID（可选） */
+  sourceSetId?: string | null;
 }
 
 export const UpdateFileSchema = z.object({
-  knowledgeBaseId: z.string().nullable().optional(),
+  sourceSetId: z.string().nullable().optional(),
 });

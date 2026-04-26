@@ -1,6 +1,6 @@
 import { expo } from '@better-auth/expo';
 import { passkey } from '@better-auth/passkey';
-import { ENABLE_BUSINESS_FEATURES } from '@lobechat/business-const';
+import { BRANDING_NAME, ENABLE_BUSINESS_FEATURES } from '@lobechat/business-const';
 import { createNanoId, idGenerator, serverDB } from '@lobechat/database';
 import * as schema from '@lobechat/database/schemas';
 import bcrypt from 'bcryptjs';
@@ -12,7 +12,6 @@ import { admin, emailOTP, genericOAuth, magicLink } from 'better-auth/plugins';
 import { type BetterAuthPlugin } from 'better-auth/types';
 import { emailHarmony } from 'better-auth-harmony';
 import { validateEmail } from 'better-auth-harmony/email';
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
 
 import { businessEmailValidator } from '@/business/server/better-auth';
 import { appEnv } from '@/envs/app';
@@ -31,6 +30,17 @@ import { parseSSOProviders } from '@/libs/better-auth/utils/server';
 import { EmailService } from '@/server/services/email';
 import { UserService } from '@/server/services/user';
 
+const loadUndici = async () => {
+  const dynamicImport = new Function('specifier', 'return import(specifier)') as (
+    specifier: string,
+  ) => Promise<{
+    ProxyAgent: new (uri: string) => { close?: () => Promise<void> };
+    setGlobalDispatcher: (dispatcher: unknown) => void;
+  }>;
+
+  return dynamicImport('undici');
+};
+
 // Configure HTTP proxy for OAuth provider requests in development (e.g., Google token exchange)
 // Node.js native fetch doesn't respect system proxy settings
 // Ref: https://github.com/better-auth/better-auth/issues/7396
@@ -42,8 +52,10 @@ if (process.env.NODE_ENV === 'development') {
     process.env.http_proxy;
 
   if (proxyUrl) {
-    const proxyAgent = new ProxyAgent(proxyUrl);
-    setGlobalDispatcher(proxyAgent);
+    void loadUndici().then(({ ProxyAgent, setGlobalDispatcher }) => {
+      const proxyAgent = new ProxyAgent(proxyUrl);
+      setGlobalDispatcher(proxyAgent);
+    });
   }
 }
 
@@ -290,7 +302,7 @@ export function defineConfig(customOptions: CustomBetterAuthOptions) {
         },
       }),
       passkey({
-        rpName: 'LobeHub',
+        rpName: BRANDING_NAME,
         // Extract rpID from auth URL (e.g., 'lobehub.com' from 'https://lobehub.com')
         // Returns undefined if AUTH_URL is not set (e.g., in e2e tests)
         rpID: getPasskeyRpID(),

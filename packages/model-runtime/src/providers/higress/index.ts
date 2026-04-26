@@ -18,9 +18,9 @@ export interface HigressModelCard {
 export const params = {
   constructorOptions: {
     defaultHeaders: {
-      'HTTP-Referer': 'https://lobehub.com',
-      'X-Title': 'LobeHub',
-      'x-Request-Id': uniqueId('lobe-chat-'),
+      'HTTP-Referer': process.env.APP_URL || 'https://avato.turingmesh.com',
+      'X-Title': 'Avato',
+      'x-Request-Id': uniqueId('avato-'),
     },
   },
   debug: {

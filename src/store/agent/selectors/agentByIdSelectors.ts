@@ -39,8 +39,8 @@ const getAgentTTSById =
 const getAgentFilesById = (agentId: string) => (s: AgentStoreState) =>
   agentSelectors.getAgentConfigById(agentId)(s)?.files || [];
 
-const getAgentKnowledgeBasesById = (agentId: string) => (s: AgentStoreState) =>
-  agentSelectors.getAgentConfigById(agentId)(s)?.knowledgeBases || [];
+const getAgentSourceSetsById = (agentId: string) => (s: AgentStoreState) =>
+  agentSelectors.getAgentConfigById(agentId)(s)?.sourceSets || [];
 
 const isAgentConfigLoadingById = (agentId: string) => (s: AgentStoreState) =>
   !agentId || !s.agentMap[agentId];
@@ -127,7 +127,7 @@ export const agentByIdSelectors = {
   getAgentConfigById: agentSelectors.getAgentConfigById,
   getAgentEnableModeById,
   getAgentFilesById,
-  getAgentKnowledgeBasesById,
+  getAgentSourceSetsById,
   getAgentLocalSystemConfigById,
   getAgentModeById,
   getAgentModelById,

@@ -1,7 +1,9 @@
+import { App } from 'antd';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
 import { type KlavisServer } from '@/store/tool/slices/klavisStore';
+import { useToolStore } from '@/store/tool/store';
 import { useUserStore } from '@/store/user';
 import { userProfileSelectors } from '@/store/user/selectors';
 
@@ -18,6 +20,8 @@ export const useKlavisServerActions = ({
   server,
   onAuthRequired,
 }: UseKlavisServerActionsProps) => {
+  const { t } = useTranslation('setting');
+  const { message } = App.useApp();
   const [isConnecting, setIsConnecting] = useState(false);
 
   const userId = useUserStore(userProfileSelectors.userId);
@@ -36,18 +40,24 @@ export const useKlavisServerActions = ({
         userId,
       });
 
-      if (newServer) {
-        const newPluginId = newServer.identifier;
-        await toggleDefaultPlugin(newPluginId);
+      if (!newServer) {
+        message.error(t('tools.klavis.connectFailed'));
+        return;
+      }
 
-        if (newServer.isAuthenticated) {
-          await refreshKlavisServerTools(newServer.identifier);
-        } else if (newServer.oauthUrl) {
-          onAuthRequired?.(newServer.oauthUrl, newServer.identifier);
-        }
+      const newPluginId = newServer.identifier;
+      await toggleDefaultPlugin(newPluginId);
+
+      if (newServer.isAuthenticated) {
+        await refreshKlavisServerTools(newServer.identifier);
+      } else if (newServer.oauthUrl) {
+        onAuthRequired?.(newServer.oauthUrl, newServer.identifier);
+      } else {
+        message.error(t('tools.klavis.connectFailed'));
       }
     } catch (error) {
       console.error('[Klavis] Failed to connect server:', error);
+      message.error(t('tools.klavis.connectFailed'));
     } finally {
       setIsConnecting(false);
     }

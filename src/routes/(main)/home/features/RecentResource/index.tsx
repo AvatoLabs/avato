@@ -7,10 +7,12 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
+import { buildFilesRootPath } from '@/features/ResourceSpaces';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useInitRecentResource } from '@/hooks/useInitRecentResource';
-import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
-import { useHomeStore } from '@/store/home';
+import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { homeRecentSelectors } from '@/store/home/selectors';
+import { useHomeStore } from '@/store/home/store';
 import { FilesTabs } from '@/types/files';
 
 import GroupBlock from '../components/GroupBlock';
@@ -22,10 +24,11 @@ import RecentResourceList from './List';
 const RecentResource = memo(() => {
   const { t } = useTranslation('file');
   const navigate = useNavigate();
-  const setCategory = useResourceManagerStore((s) => s.setCategory);
+  const setCategory = useContentManagerStore((s) => s.setCategory);
   const recentResources = useHomeStore(homeRecentSelectors.recentResources);
   const isInit = useHomeStore(homeRecentSelectors.isRecentResourcesInit);
   const { isRevalidating } = useInitRecentResource();
+  const resolvedSpaceId = resolveWorkspaceSpaceId();
 
   // After loaded, if no data, don't render
   if (isInit && (!recentResources || recentResources.length === 0)) {
@@ -43,10 +46,10 @@ const RecentResource = memo(() => {
             items={[
               {
                 key: 'all-files',
-                label: t('menu.allFiles'),
+                label: t('menu.openHome', { defaultValue: 'Open Home' }),
                 onClick: () => {
-                  setCategory(FilesTabs.All);
-                  navigate('/resource');
+                  setCategory(FilesTabs.Home);
+                  navigate(buildFilesRootPath(resolvedSpaceId));
                 },
               },
             ]}
@@ -61,6 +64,7 @@ const RecentResource = memo(() => {
           fallback={
             <GroupSkeleton
               height={RECENT_BLOCK_SIZE.RESOURCE.HEIGHT}
+              variant={'resource'}
               width={RECENT_BLOCK_SIZE.RESOURCE.WIDTH}
             />
           }

@@ -24,6 +24,7 @@ import { AgentRuntimeError } from '../../utils/createError';
 import { debugStream } from '../../utils/debugStream';
 import { getModelPricing } from '../../utils/getModelPricing';
 import { parseGoogleErrorMessage } from '../../utils/googleErrorParser';
+import { MODEL_LIST_CONFIGS, processModelList } from '../../utils/modelParse';
 import { StreamingResponse } from '../../utils/response';
 import { createGoogleImage } from './createImage';
 import { createGoogleGenerateObject, createGoogleGenerateObjectWithTools } from './generateObject';
@@ -44,9 +45,7 @@ const modelsWithModalities = new Set([
   'nano-banana-pro-preview',
 ]);
 
-const modelsWithImageSearch = new Set([
-  'gemini-3.1-flash-image-preview',
-]);
+const modelsWithImageSearch = new Set(['gemini-3.1-flash-image-preview']);
 
 const modelsDisableInstuction = new Set([
   'gemini-2.0-flash-exp',
@@ -432,8 +431,6 @@ export class LobeGoogleAI implements LobeRuntimeAI {
           maxOutput: model.outputTokenLimit || undefined,
         };
       });
-
-      const { MODEL_LIST_CONFIGS, processModelList } = await import('../../utils/modelParse');
 
       return processModelList(processedModels, MODEL_LIST_CONFIGS.google, 'google');
     } catch (error) {

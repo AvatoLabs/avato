@@ -6,6 +6,8 @@ import { type KeyboardEvent, type MouseEvent } from 'react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useQueryState } from '@/hooks/useQueryParam';
+import { useGlobalStore } from '@/store/global';
 import { useUserMemoryStore } from '@/store/userMemory';
 
 interface ActivityDropdownProps {
@@ -15,7 +17,9 @@ interface ActivityDropdownProps {
 
 const ActivityDropdown = memo<ActivityDropdownProps>(({ id, size = 'small' }) => {
   const { t } = useTranslation(['memory', 'common']);
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
+  const [activityId, setActivityId] = useQueryState('activityId', { clearOnDefault: true });
+  const toggleRightPanel = useGlobalStore((s) => s.toggleRightPanel);
 
   const activities = useUserMemoryStore((s) => s.activities);
   const deleteActivity = useUserMemoryStore((s) => s.deleteActivity);
@@ -36,7 +40,16 @@ const ActivityDropdown = memo<ActivityDropdownProps>(({ id, size = 'small' }) =>
         okButtonProps: { danger: true },
         okText: t('confirm', { ns: 'common' }),
         onOk: async () => {
-          await deleteActivity(id);
+          try {
+            await deleteActivity(id);
+            if (activityId === id) {
+              setActivityId(null);
+              toggleRightPanel(false);
+            }
+          } catch (error) {
+            console.error('Failed to delete activity memory:', error);
+            message.error(t('activity.deleteError'));
+          }
         },
         title: t('activity.deleteTitle'),
         type: 'warning',

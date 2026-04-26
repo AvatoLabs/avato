@@ -33,6 +33,10 @@ export enum AsyncTaskErrorType {
    * the chunk parse result it empty
    */
   NoChunkError = 'NoChunkError',
+  /**
+   * File contains no extractable text, typically scanned or image-only PDF
+   */
+  NoExtractableText = 'NoExtractableText',
   ServerError = 'ServerError',
   /**
    * Subscription plan limit reached (paid users run out of credits)

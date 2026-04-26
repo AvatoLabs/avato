@@ -1,18 +1,21 @@
-import {
+import crypto from 'node:crypto';
+import querystring from 'node:querystring';
+import { URL } from 'node:url';
+
+import type {
   AuthorizationProgress,
   DataSyncConfig,
   MarketAuthorizationParams,
 } from '@lobechat/electron-client-ipc';
 import { BrowserWindow, shell } from 'electron';
-import crypto from 'node:crypto';
-import querystring from 'node:querystring';
-import { URL } from 'node:url';
 
+import { DESKTOP_CLOUD_SSO_PROVIDER } from '@/const/env';
 import { appendVercelCookie } from '@/utils/http-headers';
 import { createLogger } from '@/utils/logger';
 
-import RemoteServerConfigCtr from './RemoteServerConfigCtr';
+import DeviceGatewayCtr from './DeviceGatewayCtr';
 import { ControllerModule, IpcMethod } from './index';
+import RemoteServerConfigCtr from './RemoteServerConfigCtr';
 
 const logger = createLogger('controllers:AuthCtr');
 
@@ -42,14 +45,14 @@ export default class AuthCtr extends ControllerModule {
   /**
    * Polling related parameters
    */
-  // eslint-disable-next-line no-undef
+
   private pollingInterval: NodeJS.Timeout | null = null;
   private cachedRemoteUrl: string | null = null;
 
   /**
    * Auto-refresh timer
    */
-  // eslint-disable-next-line no-undef
+
   private autoRefreshTimer: NodeJS.Timeout | null = null;
 
   /**
@@ -60,6 +63,19 @@ export default class AuthCtr extends ControllerModule {
     const callbackUrl = new URL('/oidc/callback/desktop', remoteUrl);
 
     return callbackUrl.toString();
+  }
+
+  private getAuthorizationLaunchUrl(authUrl: URL, config: DataSyncConfig, remoteUrl: string) {
+    if (config.storageMode !== 'cloud') return authUrl.toString();
+
+    const provider = DESKTOP_CLOUD_SSO_PROVIDER?.trim();
+    if (!provider) return authUrl.toString();
+
+    const signInUrl = new URL('/signin', remoteUrl);
+    signInUrl.searchParams.set('sso', provider);
+    signInUrl.searchParams.set('callbackUrl', authUrl.toString());
+
+    return signInUrl.toString();
   }
 
   /**
@@ -111,8 +127,10 @@ export default class AuthCtr extends ControllerModule {
 
       logger.info(`Constructed authorization URL: ${authUrl.toString()}`);
 
-      // Open authorization URL in the default browser
-      await shell.openExternal(authUrl.toString());
+      const launchUrl = this.getAuthorizationLaunchUrl(authUrl, config, remoteUrl);
+
+      // Open sign-in/authorization URL in the default browser.
+      await shell.openExternal(launchUrl);
       logger.debug('Opening authorization URL in default browser');
 
       this.broadcastAuthorizationProgress({
@@ -529,6 +547,14 @@ export default class AuthCtr extends ControllerModule {
 
       // Start auto-refresh timer
       this.startAutoRefresh();
+
+      const deviceGatewayCtr = this.app.getController(DeviceGatewayCtr);
+      const deviceGatewayStatus = await deviceGatewayCtr?.getAgentStatus();
+      if (deviceGatewayStatus?.enabled) {
+        deviceGatewayCtr?.startAgent().catch((error) => {
+          logger.warn('Failed to start device gateway after authorization:', error);
+        });
+      }
 
       return { success: true };
     } catch (error) {

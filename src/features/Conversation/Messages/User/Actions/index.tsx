@@ -86,7 +86,13 @@ export const UserActionsBar = memo<UserActionsProps>(({ actionsConfig, id, data 
       defaultActions.copy,
     ];
     return [...base, ...extraBarItems];
-  }, [actionsConfig?.bar, defaultActions.regenerate, defaultActions.edit, extraBarItems]);
+  }, [
+    actionsConfig?.bar,
+    defaultActions.regenerate,
+    defaultActions.edit,
+    defaultActions.copy,
+    extraBarItems,
+  ]);
 
   const menuItems = useMemo(() => {
     const base = actionsConfig?.menu ?? [
@@ -96,10 +102,12 @@ export const UserActionsBar = memo<UserActionsProps>(({ actionsConfig, id, data 
       defaultActions.tts,
       defaultActions.translate,
       defaultActions.divider,
+      defaultActions.addToSpaceMemory,
+      defaultActions.divider,
       defaultActions.regenerate,
       defaultActions.del,
     ];
-    return [...base, ...extraMenuItems];
+    return [...base, ...extraMenuItems].filter(Boolean) as MessageActionItemOrDivider[];
   }, [
     actionsConfig?.menu,
     defaultActions.edit,
@@ -107,6 +115,7 @@ export const UserActionsBar = memo<UserActionsProps>(({ actionsConfig, id, data 
     defaultActions.divider,
     defaultActions.tts,
     defaultActions.translate,
+    defaultActions.addToSpaceMemory,
     defaultActions.regenerate,
     defaultActions.del,
     extraMenuItems,
@@ -164,11 +173,7 @@ const Actions = memo<ActionsProps>(({ id, data, disableEditing }) => {
 
   return (
     <Flexbox horizontal align={'center'}>
-      {!disableEditing && (
-        <Flexbox align={'flex-start'} role="menubar">
-          {actionBarHolder}
-        </Flexbox>
-      )}
+      {!disableEditing && <Flexbox align={'flex-start'}>{actionBarHolder}</Flexbox>}
       {branch && (
         <MessageBranch
           activeBranchIndex={branch.activeBranchIndex}

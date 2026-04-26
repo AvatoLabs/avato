@@ -1,9 +1,9 @@
-import { SlidersHorizontal } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useAgentStore } from '@/store/agent';
+import { CHAT_INPUT_ACTION_ICONS } from '@/config/entryIcons';
 import { agentByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 import { useAgentId } from '../../hooks/useAgentId';
 import Action from '../components/Action';
@@ -17,11 +17,11 @@ const Params = memo(() => {
   const [updating, setUpdating] = useState(false);
   const { t } = useTranslation('setting');
 
-  if (isLoading) return <Action disabled icon={SlidersHorizontal} />;
+  if (isLoading) return <Action disabled icon={CHAT_INPUT_ACTION_ICONS.params} />;
 
   return (
     <Action
-      icon={SlidersHorizontal}
+      icon={CHAT_INPUT_ACTION_ICONS.params}
       loading={updating}
       showTooltip={false}
       title={t('settingModel.params.title')}

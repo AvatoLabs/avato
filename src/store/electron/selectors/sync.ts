@@ -12,7 +12,9 @@ const storageMode = (s: ElectronState) => s.dataSyncConfig.storageMode;
  * - SelfHost mode: returns the configured remoteServerUrl
  */
 const remoteServerUrl = (s: ElectronState) =>
-  s.dataSyncConfig.storageMode === 'cloud' ? OFFICIAL_URL : s.dataSyncConfig.remoteServerUrl || '';
+  s.dataSyncConfig.storageMode === 'cloud'
+    ? s.dataSyncConfig.remoteServerUrl || OFFICIAL_URL
+    : s.dataSyncConfig.remoteServerUrl || '';
 
 /**
  * Returns the raw remoteServerUrl from config without transformation.

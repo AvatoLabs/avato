@@ -1,13 +1,15 @@
+import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
 import { ChunkModel } from '@/database/models/chunk';
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
 import { MessageModel } from '@/database/models/message';
+import { SpaceModel } from '@/database/models/space';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
+import { AuthorizedResourceResolver, ContentAuthorizer } from '@/server/services/content';
 import { DocumentService } from '@/server/services/document';
-import { ResourceAuthorizer } from '@/server/services/resource';
 
 const documentProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
@@ -19,10 +21,41 @@ const documentProcedure = authedProcedure.use(serverDatabase).use(async (opts) =
       documentService: new DocumentService(ctx.serverDB, ctx.userId),
       fileModel: new FileModel(ctx.serverDB, ctx.userId),
       messageModel: new MessageModel(ctx.serverDB, ctx.userId),
-      resourceAuthorizer: new ResourceAuthorizer(ctx.serverDB, ctx.userId),
+      resolver: new AuthorizedResourceResolver(ctx.serverDB, ctx.userId),
+      contentAuthorizer: new ContentAuthorizer(ctx.serverDB, ctx.userId),
+      spaceModel: new SpaceModel(ctx.serverDB, ctx.userId),
     },
   });
 });
+
+const resolveParentDocumentId = async (
+  ctx: {
+    documentModel: DocumentModel;
+    resolver: AuthorizedResourceResolver;
+    spaceModel: SpaceModel;
+  },
+  params: {
+    sourceSetId?: string;
+    parentId?: string | null;
+    spaceId?: string;
+  },
+) => {
+  if (!params.parentId) return params.parentId ?? undefined;
+
+  let scopedSpaceId = params.spaceId;
+  if (!scopedSpaceId && params.sourceSetId) {
+    const sourceSet = await ctx.resolver.requireSourceSet(params.sourceSetId, 'create_child');
+    scopedSpaceId = sourceSet.spaceId || (await ctx.spaceModel.getOrCreatePersonalSpace()).id;
+  }
+
+  if (scopedSpaceId) {
+    const scopedFolder = await ctx.documentModel.findBySlugInSpace(params.parentId, scopedSpaceId);
+    if (scopedFolder) return scopedFolder.id;
+  }
+
+  const docBySlug = await ctx.documentModel.findBySlug(params.parentId);
+  return docBySlug?.id || params.parentId;
+};
 
 export const documentRouter = router({
   createDocument: documentProcedure
@@ -31,7 +64,7 @@ export const documentRouter = router({
         content: z.string().optional(),
         editorData: z.string(),
         fileType: z.string().optional(),
-        knowledgeBaseId: z.string().optional(),
+        sourceSetId: z.string().optional(),
         metadata: z.record(z.any()).optional(),
         parentId: z.string().optional(),
         spaceId: z.string().optional(),
@@ -40,21 +73,14 @@ export const documentRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Resolve parentId if it's a slug
-      let resolvedParentId = input.parentId;
-      if (input.parentId) {
-        const docBySlug = await ctx.documentModel.findBySlug(input.parentId);
-        if (docBySlug) {
-          resolvedParentId = docBySlug.id;
-        }
-      }
+      const resolvedParentId = await resolveParentDocumentId(ctx, input);
 
       // Parse editorData from JSON string to object
       const editorData = JSON.parse(input.editorData);
       return ctx.documentService.createDocument({
         ...input,
         editorData,
-        parentId: resolvedParentId,
+        parentId: resolvedParentId ?? undefined,
       });
     }),
 
@@ -66,7 +92,7 @@ export const documentRouter = router({
             content: z.string().optional(),
             editorData: z.string(),
             fileType: z.string().optional(),
-            knowledgeBaseId: z.string().optional(),
+            sourceSetId: z.string().optional(),
             metadata: z.record(z.any()).optional(),
             parentId: z.string().optional(),
             spaceId: z.string().optional(),
@@ -80,14 +106,7 @@ export const documentRouter = router({
       // Process each document: resolve parentId and parse editorData
       const processedDocuments = await Promise.all(
         input.documents.map(async (doc) => {
-          // Resolve parentId if it's a slug
-          let resolvedParentId = doc.parentId;
-          if (doc.parentId) {
-            const docBySlug = await ctx.documentModel.findBySlug(doc.parentId);
-            if (docBySlug) {
-              resolvedParentId = docBySlug.id;
-            }
-          }
+          const resolvedParentId = await resolveParentDocumentId(ctx, doc);
 
           // Parse editorData from JSON string to object
           const editorData = JSON.parse(doc.editorData);
@@ -95,7 +114,7 @@ export const documentRouter = router({
           return {
             ...doc,
             editorData,
-            parentId: resolvedParentId,
+            parentId: resolvedParentId ?? undefined,
           };
         }),
       );
@@ -104,21 +123,31 @@ export const documentRouter = router({
     }),
 
   deleteDocument: documentProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string(), trash: z.boolean().optional() }))
     .mutation(async ({ ctx, input }) => {
-      return ctx.documentService.deleteDocument(input.id);
+      return ctx.documentService.deleteDocument(input.id, input.trash !== false);
     }),
 
   deleteDocuments: documentProcedure
-    .input(z.object({ ids: z.array(z.string()) }))
+    .input(z.object({ ids: z.array(z.string()), trash: z.boolean().optional() }))
     .mutation(async ({ ctx, input }) => {
-      return ctx.documentService.deleteDocuments(input.ids);
+      return ctx.documentService.deleteDocuments(input.ids, input.trash !== false);
     }),
+
+  ensureFileDocument: documentProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => ctx.documentService.ensureFileDocument(input.id)),
 
   restoreDocument: documentProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return ctx.documentService.restoreDocument(input.id);
+    }),
+
+  restoreDocuments: documentProcedure
+    .input(z.object({ ids: z.array(z.string()) }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.documentService.restoreDocuments(input.ids);
     }),
 
   getDocumentById: documentProcedure
@@ -128,17 +157,28 @@ export const documentRouter = router({
     }),
 
   getFolderBreadcrumb: documentProcedure
-    .input(z.object({ slug: z.string() }))
+    .input(
+      z.object({
+        slug: z.string(),
+        spaceId: z.string().optional(),
+      }),
+    )
     .query(async ({ ctx, input }) => {
-      let candidates = await ctx.documentModel.findManyBySlug(input.slug);
+      const scopedCandidate = input.spaceId
+        ? await ctx.documentModel.findBySlugInSpace(input.slug, input.spaceId)
+        : undefined;
+      let candidates = scopedCandidate
+        ? [scopedCandidate]
+        : await ctx.documentModel.findManyBySlug(input.slug);
+
       if (candidates.length === 0) {
         const byId = await ctx.documentModel.findByIdAny(input.slug);
-        if (byId) candidates = [byId];
+        if (byId && (!input.spaceId || byId.spaceId === input.spaceId)) candidates = [byId];
       }
 
       let start = undefined as (typeof candidates)[number] | undefined;
       for (const doc of candidates) {
-        const m = await ctx.resourceAuthorizer.getAccessMatch({
+        const m = await ctx.contentAuthorizer.getAccessMatch({
           capability: 'read_metadata',
           id: doc.id,
           kind: 'document',
@@ -166,7 +206,7 @@ export const documentRouter = router({
         const parent = await ctx.documentModel.findByIdAny(current.parentId);
         if (!parent) break;
 
-        const parentAccess = await ctx.resourceAuthorizer.getAccessMatch({
+        const parentAccess = await ctx.contentAuthorizer.getAccessMatch({
           capability: 'read_metadata',
           id: parent.id,
           kind: 'document',
@@ -186,7 +226,7 @@ export const documentRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.resourceAuthorizer.assertCapability({
+      await ctx.contentAuthorizer.assertCapability({
         capability: 'preview_content',
         id: input.id,
         kind: 'file',
@@ -205,7 +245,7 @@ export const documentRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.resourceAuthorizer.assertCapability({
+      await ctx.contentAuthorizer.assertCapability({
         capability: 'preview_content',
         id: input.id,
         kind: 'file',
@@ -216,20 +256,36 @@ export const documentRouter = router({
       return lobeDocument;
     }),
 
+  previewFileContent: documentProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      }),
+    )
+    .query(async ({ ctx, input }) => ctx.documentService.previewFileContent(input.id)),
+
   queryDocuments: documentProcedure
     .input(
       z
         .object({
           current: z.number().optional(),
           fileTypes: z.array(z.string()).optional(),
-          knowledgeBaseId: z.string().optional(),
+          sourceSetId: z.string().optional(),
           pageSize: z.number().optional(),
+          spaceId: z.string().optional(),
           sourceTypes: z.array(z.string()).optional(),
           trash: z.boolean().optional(),
         })
         .optional(),
     )
     .query(async ({ ctx, input }) => {
+      if (input?.spaceId) {
+        const space = await ctx.spaceModel.findAccessibleSpaceById(input.spaceId);
+        if (!space?.id) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_ACCESS_DENIED' });
+        }
+      }
+
       return ctx.documentService.queryDocuments(input);
     }),
 

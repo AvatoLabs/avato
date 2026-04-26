@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { SearchRepo } from '@/database/repositories/search';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
+import { ContentAuthorizer } from '@/server/services/content';
 import { DiscoverService } from '@/server/services/discover';
+import { getCanonicalContentKind } from '@/types/content';
 
 /**
  * Calculate relevance score for marketplace items
@@ -25,6 +27,7 @@ const searchProcedure = authedProcedure.use(serverDatabase).use(async (opts) => 
   return opts.next({
     ctx: {
       discoverService: new DiscoverService({ accessToken: ctx.marketAccessToken }),
+      contentAuthorizer: new ContentAuthorizer(ctx.serverDB, ctx.userId),
       searchRepo: new SearchRepo(ctx.serverDB, ctx.userId),
     },
   });
@@ -56,7 +59,7 @@ export const searchRouter = router({
             'mcp',
             'plugin',
             'communityAgent',
-            'knowledgeBase',
+            'sourceSet',
           ])
           .optional(),
       }),
@@ -71,7 +74,12 @@ export const searchRouter = router({
       const searchPromises: Promise<any>[] = [];
 
       // Database searches (agent, topic, file, folder, message, page, memory)
-      if (!type || ['agent', 'topic', 'file', 'folder', 'message', 'page', 'memory', 'knowledgeBase'].includes(type)) {
+      if (
+        !type ||
+        ['agent', 'topic', 'file', 'folder', 'message', 'page', 'memory', 'sourceSet'].includes(
+          type,
+        )
+      ) {
         searchPromises.push(ctx.searchRepo.search(input));
       }
 
@@ -180,9 +188,42 @@ export const searchRouter = router({
       // Execute searches in parallel and merge results
       const results = await Promise.all(searchPromises);
       const mergedResults = results.flat();
+      const accessChecks = await Promise.all(
+        mergedResults.map((result) => {
+          switch (result.type) {
+            case 'file': {
+              return ctx.contentAuthorizer.getAccessMatch({
+                capability: 'read_metadata',
+                id: result.id,
+                kind: getCanonicalContentKind({ id: result.id, sourceType: 'file' }),
+              });
+            }
+            case 'folder':
+            case 'page':
+            case 'pageContent': {
+              return ctx.contentAuthorizer.getAccessMatch({
+                capability: 'read_metadata',
+                id: result.id,
+                kind: 'document',
+              });
+            }
+            case 'sourceSet': {
+              return ctx.contentAuthorizer.getAccessMatch({
+                capability: 'read_metadata',
+                id: result.id,
+                kind: 'source_set',
+              });
+            }
+            default: {
+              return Promise.resolve({ canAccess: true });
+            }
+          }
+        }),
+      );
+      const visibleResults = mergedResults.filter((_, index) => accessChecks[index]?.canAccess);
 
       // Sort by relevance and limit total results
-      return mergedResults.sort((a, b) => {
+      return visibleResults.sort((a, b) => {
         if (a.relevance !== b.relevance) return a.relevance - b.relevance;
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       });

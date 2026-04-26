@@ -54,24 +54,33 @@ export function toParamsPatch(state: ParamsState): Record<string, number> {
 }
 
 interface ParamsSectionProps {
+  contentWidth?: number;
   delay?: number;
   onParamsChange: (next: ParamsState) => void;
   params: ParamsState;
 }
 
-export function ParamsSection({ delay = 0, params, onParamsChange }: ParamsSectionProps) {
+export function ParamsSection({
+  contentWidth,
+  delay = 0,
+  params,
+  onParamsChange,
+}: ParamsSectionProps) {
   const { t } = useI18n();
   const colors = useThemeColors();
 
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
-      <View className="mb-5 px-5">
+      <View className="mb-5 self-center" style={contentWidth ? { width: contentWidth } : undefined}>
         <Text className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
           {t.chatSettingsModelParams}
         </Text>
         <View className="rounded-2xl bg-foreground/[0.02] p-4">
           <View className="mb-4 flex-row items-center">
-            <View className="mr-3 h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
+            <View
+              className="mr-3 h-10 w-10 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: colors.primarySubtle }}
+            >
               <Sliders color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
             </View>
             <Text className="text-[15px] font-semibold text-foreground">

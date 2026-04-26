@@ -26,12 +26,26 @@ import {
   messageApi,
   topicApi,
 } from '../lib/api';
+import {
+  buildDocContextDisplayText,
+  buildDocContextPromptText,
+  toDocSelections,
+} from '../lib/chatContext';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
 import { navigateToLogin } from '../lib/navigation';
+import { isRawFileResourceId } from '../lib/resourceList';
 import { isGroupSessionLike, resolveSessionTypeWithFallback } from '../lib/session';
 import { generateBestTitle } from '../lib/titleGeneration';
-import type { ChatMessage, ChatToolPayload, MobileMemoryEffort, Topic } from '../types';
+import type {
+  ChatContextSelection,
+  ChatMessage,
+  ChatToolPayload,
+  DocSelection,
+  FileAttachment,
+  MobileMemoryEffort,
+  Topic,
+} from '../types';
 import {
   getSessionChatOptions,
   mergeResolvedToolPayloads,
@@ -60,7 +74,7 @@ interface UploadedAttachment {
   url: string;
 }
 
-const buildAssistantMessageMetadata = (
+export const buildAssistantMessageMetadata = (
   performance?: Record<string, any>,
   usage?: Record<string, any>,
   contentMetadata?: ChatMessage['metadata'],
@@ -73,7 +87,7 @@ const buildAssistantMessageMetadata = (
       }
     : undefined;
 
-const mergeMessageMetadata = (
+export const mergeMessageMetadata = (
   existing: ChatMessage['metadata'],
   contentState?: Pick<StreamContentState, 'isMultimodal' | 'tempDisplayContent'>,
 ) => {
@@ -88,7 +102,7 @@ const mergeMessageMetadata = (
   };
 };
 
-const buildReasoningState = (
+export const buildReasoningState = (
   reasoning: StreamReasoningState,
   duration?: number,
 ): NonNullable<ChatMessage['reasoning']> => ({
@@ -98,7 +112,7 @@ const buildReasoningState = (
   ...(reasoning.tempDisplayContent ? { tempDisplayContent: reasoning.tempDisplayContent } : {}),
 });
 
-const buildPersistedReasoning = (
+export const buildPersistedReasoning = (
   reasoning: ChatMessage['reasoning'],
 ): NonNullable<ChatMessage['reasoning']> | undefined => {
   if (!reasoning) return undefined;
@@ -142,6 +156,56 @@ const FILE_CONTENT_EXTRACTION_RETRY_DELAYS = [0, 600, 1500];
 const buildAttachmentDisplayContent = (attachments: UploadedAttachment[]) =>
   attachments.map((f) => `[${f.name}]`).join('\n');
 
+const getMessageDocSelections = (
+  message?: Pick<ChatMessage, 'metadata'> | null,
+): DocSelection[] => {
+  const rawSelections = message?.metadata?.docSelections;
+  if (!Array.isArray(rawSelections)) return [];
+
+  return rawSelections.filter(
+    (selection): selection is DocSelection =>
+      !!selection &&
+      typeof selection === 'object' &&
+      typeof (selection as DocSelection).content === 'string' &&
+      typeof (selection as DocSelection).docId === 'string' &&
+      typeof (selection as DocSelection).id === 'string',
+  );
+};
+
+const hasMessageDocSelections = (message?: Pick<ChatMessage, 'metadata'> | null) =>
+  getMessageDocSelections(message).length > 0;
+
+const buildDocContextSummarySection = (contexts: Array<ChatContextSelection | DocSelection>) => {
+  if (contexts.length === 0) return '';
+
+  return `Document context:\n${buildDocContextDisplayText(contexts)}`;
+};
+
+const buildDocContextPromptSection = (contexts: Array<ChatContextSelection | DocSelection>) => {
+  if (contexts.length === 0) return '';
+
+  return `Document context:\n${buildDocContextPromptText(contexts)}`;
+};
+
+const buildUserDisplayContent = (
+  text: string,
+  attachments: UploadedAttachment[],
+  docContexts: ChatContextSelection[],
+) => {
+  const blocks: string[] = [];
+
+  if (text) blocks.push(text);
+  if (!text && docContexts.length > 0) {
+    blocks.push(buildDocContextSummarySection(docContexts));
+  }
+
+  if (blocks.length === 0 && attachments.length > 0) {
+    blocks.push(buildAttachmentDisplayContent(attachments));
+  }
+
+  return blocks.join('\n\n').trim();
+};
+
 const buildAttachmentContextLine = (attachment: UploadedAttachment) => {
   const extractedContent = attachment.content?.trim();
 
@@ -162,10 +226,16 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const GROUP_LOADING_CONTENT = '...';
 const GROUP_POLL_INTERVAL_MS = 1200;
 const GROUP_POLL_MAX_ATTEMPTS = 45;
+const isAttachableFileId = (fileId?: string | null) => isRawFileResourceId(fileId);
 
 const hydrateAttachmentContents = async (attachments: UploadedAttachment[]) => {
   const pendingFileIds = attachments
-    .filter((attachment) => !isImageAttachment(attachment.type) && !attachment.content?.trim())
+    .filter(
+      (attachment) =>
+        !isImageAttachment(attachment.type) &&
+        !attachment.content?.trim() &&
+        isAttachableFileId(attachment.fileId),
+    )
     .map((attachment) => attachment.fileId);
 
   if (pendingFileIds.length === 0) return;
@@ -218,8 +288,25 @@ const buildAttachmentPromptText = (text: string, attachments: UploadedAttachment
   return textBlocks.join('\n\n');
 };
 
-const isAttachableFileId = (fileId?: string | null) =>
-  typeof fileId === 'string' && fileId.trim().length > 0 && !fileId.startsWith('docs_');
+const buildUserPromptText = (
+  text: string,
+  attachments: UploadedAttachment[],
+  docContexts: Array<ChatContextSelection | DocSelection>,
+) => {
+  const textBlocks: string[] = [];
+  const attachmentText = buildAttachmentPromptText(text, attachments).trim();
+  const docContextText = buildDocContextPromptSection(docContexts);
+
+  if (attachmentText) {
+    textBlocks.push(attachmentText);
+  }
+
+  if (docContextText) {
+    textBlocks.push(docContextText);
+  }
+
+  return textBlocks.join('\n\n').trim();
+};
 
 const normalizeTopicItem = (topic: any, sessionId: string): Topic => ({
   createdAt:
@@ -271,31 +358,6 @@ const syncTopicsForSession = (
 };
 
 /** 占位话题标题（对话=Topic）。 */
-const DEFAULT_TOPIC_TITLES = [
-  '',
-  'New Chat',
-  'New Conversation',
-  'New conversation',
-  '新对话',
-  '新對話',
-  'Topics',
-  '话题',
-  '話題',
-  'Untitled',
-];
-
-const isDefaultTopicTitle = (title?: string | null) => {
-  const trimmedTitle = title?.trim() ?? '';
-  if (!trimmedTitle) return true;
-
-  const { t } = useI18n.getState();
-  return (
-    DEFAULT_TOPIC_TITLES.includes(trimmedTitle) ||
-    trimmedTitle === t.topicTitle ||
-    trimmedTitle === t.chatListNewConversation
-  );
-};
-
 const extractPersistedMessageIds = (messages: ChatMessage[]) =>
   messages
     .map((message) => message.id)
@@ -317,11 +379,6 @@ const buildMessageContainerParams = (sessionId: string, sessionType: 'agent' | '
 
 const triggerTopicTitleGeneration = (sessionId: string, topicId?: string | null) => {
   if (!topicId) return;
-  const topic = (useTopicStore.getState().topicsBySession[sessionId] ?? []).find(
-    (item) => item.id === topicId,
-  );
-
-  if (!isDefaultTopicTitle(topic?.title)) return;
 
   void generateBestTitle({ force: false, sessionId, topicId })
     .then(() => undefined)
@@ -692,15 +749,15 @@ const toToolCalls = (message: ChatMessage): MobileMessageToolCall[] | undefined 
   }));
 };
 
-const buildContextMessage = (message: ChatMessage): MobileChatMessage | null => {
+export const buildContextMessage = (message: ChatMessage): MobileChatMessage | null => {
   if (message.role === 'user') {
     const attachments = toUploadedAttachment(message);
+    const docSelections = getMessageDocSelections(message);
+    const promptText = buildUserPromptText(message.content, attachments, docSelections);
 
     return {
       content:
-        attachments.length > 0
-          ? buildUserStreamContent(message.content, attachments)
-          : message.content,
+        attachments.length > 0 ? buildUserStreamContent(promptText, attachments) : promptText,
       role: 'user',
     };
   }
@@ -737,7 +794,7 @@ const mergePersistedMessageWithLocal = (
   const shouldPreferLocalUserCaption =
     persisted.role === 'user' &&
     local.role === 'user' &&
-    hasMessageAttachments(local) &&
+    (hasMessageAttachments(local) || hasMessageDocSelections(local)) &&
     !!local.content?.trim();
   const shouldPreferLocalAssistantContent =
     persisted.role === 'assistant' &&
@@ -786,6 +843,49 @@ const mergePersistedMessagesWithLocal = (
   return persistedMessages.map((message) =>
     mergePersistedMessageWithLocal(message, localById.get(message.id)),
   );
+};
+
+const findMessageIndexFromEnd = (messages: ChatMessage[], messageId: string) => {
+  const lastIndex = messages.length - 1;
+  if (lastIndex >= 0 && messages[lastIndex]?.id === messageId) return lastIndex;
+
+  for (let index = lastIndex - 1; index >= 0; index -= 1) {
+    if (messages[index]?.id === messageId) return index;
+  }
+
+  return -1;
+};
+
+const getSessionMessageById = (
+  messagesBySession: Record<string, ChatMessage[]>,
+  sessionId: string,
+  messageId: string,
+) => {
+  const messages = messagesBySession[sessionId] || [];
+  const index = findMessageIndexFromEnd(messages, messageId);
+  return index >= 0 ? messages[index] : undefined;
+};
+
+const updateSessionMessageRecord = (
+  messagesBySession: Record<string, ChatMessage[]>,
+  sessionId: string,
+  messageId: string,
+  updater: (message: ChatMessage) => ChatMessage,
+) => {
+  const messages = messagesBySession[sessionId] || [];
+  const index = findMessageIndexFromEnd(messages, messageId);
+
+  if (index < 0) return messagesBySession;
+
+  const current = messages[index]!;
+  const next = updater(current);
+
+  if (next === current) return messagesBySession;
+
+  const nextMessages = messages.slice();
+  nextMessages[index] = next;
+
+  return { ...messagesBySession, [sessionId]: nextMessages };
 };
 
 interface ChatState {
@@ -849,8 +949,12 @@ interface ChatState {
     content: string,
     topicId?: string,
     options?: {
+      chatContextSelections?: ChatContextSelection[];
       memoryEffort?: MobileMemoryEffort;
       memoryEnabled?: boolean;
+      pendingFileSessionId?: string;
+      pendingFiles?: FileAttachment[];
+      preserveChatContextSelections?: boolean;
       plugins?: string[];
       searchEnabled?: boolean;
     },
@@ -1073,8 +1177,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     content: string,
     topicId?: string,
     options?: {
+      chatContextSelections?: ChatContextSelection[];
       memoryEffort?: MobileMemoryEffort;
       memoryEnabled?: boolean;
+      pendingFileSessionId?: string;
+      pendingFiles?: FileAttachment[];
+      preserveChatContextSelections?: boolean;
       plugins?: string[];
       searchEnabled?: boolean;
     },
@@ -1083,18 +1191,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const textContent = content.trim();
     const fileState = useFileStore.getState();
-    const attachments = fileState.pendingFiles.filter((f) => f.status !== 'error');
+    const attachments = (options?.pendingFiles ?? fileState.pendingFiles).filter(
+      (file) => file.status !== 'error',
+    );
+    const chatContextSelections = options?.chatContextSelections ?? fileState.chatContextSelections;
+    const docSelections = toDocSelections(chatContextSelections);
     if (attachments.some((f) => f.status === 'uploading')) {
       return false;
     }
 
-    if (!textContent && attachments.length === 0) return false;
+    if (!textContent && attachments.length === 0 && chatContextSelections.length === 0)
+      return false;
 
     const uploadedAttachments: UploadedAttachment[] = [];
     if (attachments.length > 0) {
       const uploaded = await Promise.all(
         attachments.map(async (file) => {
-          const result = await useFileStore.getState().uploadFile(file.id, { sessionId });
+          const result = await useFileStore.getState().uploadFile(file.id, {
+            sessionId: options?.pendingFileSessionId,
+          });
           if (!result) return null;
 
           let streamUrl = result.url;
@@ -1129,7 +1244,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return false;
     }
 
-    const displayContent = textContent || buildAttachmentDisplayContent(uploadedAttachments);
+    const displayContent = buildUserDisplayContent(
+      textContent,
+      uploadedAttachments,
+      chatContextSelections,
+    );
+    const promptContent = buildUserPromptText(
+      textContent,
+      uploadedAttachments,
+      chatContextSelections,
+    );
     const attachedFileIds = uploadedAttachments
       .map((f) => f.fileId)
       .filter((fileId): fileId is string => isAttachableFileId(fileId));
@@ -1157,6 +1281,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           url: f.url,
         })),
       createdAt: new Date().toISOString(),
+      ...(docSelections.length > 0 ? { metadata: { docSelections } } : {}),
       updatedAt: new Date().toISOString(),
     };
 
@@ -1221,13 +1346,32 @@ export const useChatStore = create<ChatState>((set, get) => ({
           agentId: supervisorAgentId,
           ...(attachedFileIds.length > 0 ? { files: attachedFileIds } : {}),
           groupId: sessionId,
-          message: buildAttachmentPromptText(textContent, uploadedAttachments),
+          message: promptContent,
           targetId,
           topicId,
         });
 
+        if (result.userMessageId) {
+          if (promptContent !== displayContent) {
+            void messageApi.update(result.userMessageId, displayContent).catch((error) => {
+              console.warn('[ChatStore] Failed to normalize group user message content:', error);
+            });
+          }
+
+          if (docSelections.length > 0) {
+            void messageApi
+              .updateMetadata(result.userMessageId, { docSelections })
+              .catch((error) => {
+                console.warn('[ChatStore] Failed to persist group doc selections:', error);
+              });
+          }
+        }
+
         if (uploadedAttachments.length > 0) {
-          useFileStore.getState().clearPending();
+          useFileStore.getState().clearPending({ sessionId: options?.pendingFileSessionId });
+        }
+        if (chatContextSelections.length > 0 && !options?.preserveChatContextSelections) {
+          useFileStore.getState().clearChatContextSelections();
         }
 
         const resolvedTopicId = result.topicId ?? topicId ?? null;
@@ -1627,6 +1771,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ...messageContainerParams,
         content: displayContent,
         ...(attachedFileIds.length > 0 ? { files: attachedFileIds } : {}),
+        ...(docSelections.length > 0 ? { metadata: { docSelections } } : {}),
         role: 'user',
         topicId: resolvedTopicId,
       } as any);
@@ -1666,9 +1811,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const lastCtx = contextMessages.at(-1);
       if (!lastCtx) return false;
       if (lastCtx.role === 'user') {
-        const lastTextContent =
-          typeof lastCtx.content === 'string' ? lastCtx.content : textContent || displayContent;
-        const multimodalContent = buildUserStreamContent(lastTextContent, uploadedAttachments);
+        const multimodalContent = buildUserStreamContent(promptContent, uploadedAttachments);
         contextMessages[lastIndex] = {
           ...lastCtx,
           content: multimodalContent,
@@ -1706,7 +1849,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
     if (uploadedAttachments.length > 0) {
-      useFileStore.getState().clearPending();
+      useFileStore.getState().clearPending({ sessionId: options?.pendingFileSessionId });
+    }
+    if (chatContextSelections.length > 0 && !options?.preserveChatContextSelections) {
+      useFileStore.getState().clearChatContextSelections();
     }
 
     // Stream AI response via XHR (RN fetch lacks ReadableStream support)
@@ -1721,12 +1867,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       // Set model/provider on the assistant message for immediate UI display
       set((s) => ({
-        messagesBySession: {
-          ...s.messagesBySession,
-          [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-            m.id === assistantMsgId ? { ...m, model: chatOptions.model, provider } : m,
-          ),
-        },
+        messagesBySession: updateSessionMessageRecord(
+          s.messagesBySession,
+          sessionId,
+          assistantMsgId,
+          (message) => ({ ...message, model: chatOptions.model, provider }),
+        ),
       }));
 
       // Memory: prefer explicit options, else use session/agent chatConfig (for regenerateMessage etc.)
@@ -1759,12 +1905,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         if (reasoning !== null && contentState === null) {
           set((s) => ({
-            messagesBySession: {
-              ...s.messagesBySession,
-              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMsgId ? { ...m, reasoning: buildReasoningState(reasoning) } : m,
-              ),
-            },
+            messagesBySession: updateSessionMessageRecord(
+              s.messagesBySession,
+              sessionId,
+              assistantMsgId,
+              (message) => ({ ...message, reasoning: buildReasoningState(reasoning) }),
+            ),
           }));
         } else if (contentState !== null) {
           const wasReasoning = get().isReasoning;
@@ -1775,47 +1921,47 @@ export const useChatStore = create<ChatState>((set, get) => ({
             set((s) => ({
               isReasoning: false,
               streamBuffer: contentState.content,
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? {
-                        ...m,
-                        content: contentState.content,
-                        ...(mergeMessageMetadata(m.metadata, contentState)
-                          ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
-                          : {}),
-                        reasoning: finalReasoning
-                          ? {
-                              ...buildReasoningState(finalReasoning),
-                              ...(duration !== undefined ? { duration } : {}),
-                            }
-                          : m.reasoning
-                            ? { ...m.reasoning, ...(duration !== undefined ? { duration } : {}) }
-                            : m.reasoning,
-                      }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => {
+                  const nextMetadata = mergeMessageMetadata(message.metadata, contentState);
+
+                  return {
+                    ...message,
+                    content: contentState.content,
+                    ...(nextMetadata ? { metadata: nextMetadata } : {}),
+                    reasoning: finalReasoning
+                      ? {
+                          ...buildReasoningState(finalReasoning),
+                          ...(duration !== undefined ? { duration } : {}),
+                        }
+                      : message.reasoning
+                        ? { ...message.reasoning, ...(duration !== undefined ? { duration } : {}) }
+                        : message.reasoning,
+                  };
+                },
+              ),
             }));
           } else {
             set((s) => ({
               streamBuffer: contentState.content,
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? {
-                        ...m,
-                        content: contentState.content,
-                        ...(mergeMessageMetadata(m.metadata, contentState)
-                          ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
-                          : {}),
-                        ...(reasoning ? { reasoning: buildReasoningState(reasoning) } : {}),
-                      }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => {
+                  const nextMetadata = mergeMessageMetadata(message.metadata, contentState);
+
+                  return {
+                    ...message,
+                    content: contentState.content,
+                    ...(nextMetadata ? { metadata: nextMetadata } : {}),
+                    ...(reasoning ? { reasoning: buildReasoningState(reasoning) } : {}),
+                  };
+                },
+              ),
             }));
           }
         }
@@ -1834,12 +1980,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         {
           onImages: (images) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId ? { ...m, imageList: images } : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({ ...message, imageList: images }),
+              ),
             }));
           },
           onReasoning: (accReasoning) => {
@@ -1855,37 +2001,39 @@ export const useChatStore = create<ChatState>((set, get) => ({
           },
           onSearch: (search) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId ? { ...m, search } : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({ ...message, search }),
+              ),
             }));
           },
           onToolExecutions: (executions) => {
             const toolPayloads = toolExecutionsToPayloads(executions);
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, tools: mergeToolPayloads(m.tools ?? undefined, toolPayloads) }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({
+                  ...message,
+                  tools: mergeToolPayloads(message.tools ?? undefined, toolPayloads),
+                }),
+              ),
             }));
           },
           onTools: (tools) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, tools: mergeToolPayloads(m.tools ?? undefined, tools) }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({
+                  ...message,
+                  tools: mergeToolPayloads(message.tools ?? undefined, tools),
+                }),
+              ),
             }));
           },
         },
@@ -1909,21 +2057,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const duration = startedAt ? Date.now() - startedAt : undefined;
         set((s) => ({
           isReasoning: false,
-          messagesBySession: {
-            ...s.messagesBySession,
-            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-              m.id === assistantMsgId && m.reasoning
+          messagesBySession: updateSessionMessageRecord(
+            s.messagesBySession,
+            sessionId,
+            assistantMsgId,
+            (message) =>
+              message.reasoning
                 ? {
-                    ...m,
+                    ...message,
                     content: result.text,
                     reasoning: {
-                      ...m.reasoning,
+                      ...message.reasoning,
                       ...(duration !== undefined ? { duration } : {}),
                     },
                   }
-                : m,
-            ),
-          },
+                : message,
+          ),
         }));
       }
 
@@ -1931,25 +2080,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       if (result.images || result.search || resolvedTools || result.usage || result.performance) {
         set((s) => ({
-          messagesBySession: {
-            ...s.messagesBySession,
-            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-              m.id === assistantMsgId
-                ? {
-                    ...m,
-                    ...(result.images ? { imageList: result.images } : {}),
-                    ...(result.search ? { search: result.search } : {}),
-                    ...(resolvedTools ? { tools: resolvedTools } : {}),
-                    ...(result.usage ? { usage: result.usage as any } : {}),
-                    ...(result.performance ? { performance: result.performance as any } : {}),
-                    ...(mergeMessageMetadata(m.metadata, result.contentMetadata)
-                      ? { metadata: mergeMessageMetadata(m.metadata, result.contentMetadata) }
-                      : {}),
-                    provider,
-                  }
-                : m,
-            ),
-          },
+          messagesBySession: updateSessionMessageRecord(
+            s.messagesBySession,
+            sessionId,
+            assistantMsgId,
+            (message) => {
+              const nextMetadata = mergeMessageMetadata(message.metadata, result.contentMetadata);
+
+              return {
+                ...message,
+                ...(result.images ? { imageList: result.images } : {}),
+                ...(result.search ? { search: result.search } : {}),
+                ...(resolvedTools ? { tools: resolvedTools } : {}),
+                ...(result.usage ? { usage: result.usage as any } : {}),
+                ...(result.performance ? { performance: result.performance as any } : {}),
+                ...(nextMetadata ? { metadata: nextMetadata } : {}),
+                provider,
+              };
+            },
+          ),
         }));
       }
 
@@ -2479,12 +2628,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       // Set model/provider on the assistant message for immediate display
       set((s) => ({
-        messagesBySession: {
-          ...s.messagesBySession,
-          [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-            m.id === assistantMsgId ? { ...m, model: chatOptions.model, provider } : m,
-          ),
-        },
+        messagesBySession: updateSessionMessageRecord(
+          s.messagesBySession,
+          sessionId,
+          assistantMsgId,
+          (message) => ({ ...message, model: chatOptions.model, provider }),
+        ),
       }));
 
       const THROTTLE_MS = 100;
@@ -2501,12 +2650,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         if (reasoning !== null && contentState === null) {
           set((s) => ({
-            messagesBySession: {
-              ...s.messagesBySession,
-              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMsgId ? { ...m, reasoning: buildReasoningState(reasoning) } : m,
-              ),
-            },
+            messagesBySession: updateSessionMessageRecord(
+              s.messagesBySession,
+              sessionId,
+              assistantMsgId,
+              (message) => ({ ...message, reasoning: buildReasoningState(reasoning) }),
+            ),
           }));
         } else if (contentState !== null) {
           const wasReasoning = get().isReasoning;
@@ -2517,47 +2666,47 @@ export const useChatStore = create<ChatState>((set, get) => ({
             set((s) => ({
               isReasoning: false,
               streamBuffer: contentState.content,
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? {
-                        ...m,
-                        content: contentState.content,
-                        ...(mergeMessageMetadata(m.metadata, contentState)
-                          ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
-                          : {}),
-                        reasoning: finalReasoning
-                          ? {
-                              ...buildReasoningState(finalReasoning),
-                              ...(duration !== undefined ? { duration } : {}),
-                            }
-                          : m.reasoning
-                            ? { ...m.reasoning, ...(duration !== undefined ? { duration } : {}) }
-                            : m.reasoning,
-                      }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => {
+                  const nextMetadata = mergeMessageMetadata(message.metadata, contentState);
+
+                  return {
+                    ...message,
+                    content: contentState.content,
+                    ...(nextMetadata ? { metadata: nextMetadata } : {}),
+                    reasoning: finalReasoning
+                      ? {
+                          ...buildReasoningState(finalReasoning),
+                          ...(duration !== undefined ? { duration } : {}),
+                        }
+                      : message.reasoning
+                        ? { ...message.reasoning, ...(duration !== undefined ? { duration } : {}) }
+                        : message.reasoning,
+                  };
+                },
+              ),
             }));
           } else {
             set((s) => ({
               streamBuffer: contentState.content,
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? {
-                        ...m,
-                        content: contentState.content,
-                        ...(mergeMessageMetadata(m.metadata, contentState)
-                          ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
-                          : {}),
-                        ...(reasoning ? { reasoning: buildReasoningState(reasoning) } : {}),
-                      }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => {
+                  const nextMetadata = mergeMessageMetadata(message.metadata, contentState);
+
+                  return {
+                    ...message,
+                    content: contentState.content,
+                    ...(nextMetadata ? { metadata: nextMetadata } : {}),
+                    ...(reasoning ? { reasoning: buildReasoningState(reasoning) } : {}),
+                  };
+                },
+              ),
             }));
           }
         }
@@ -2576,12 +2725,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         {
           onImages: (images) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId ? { ...m, imageList: images } : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({ ...message, imageList: images }),
+              ),
             }));
           },
           onReasoning: (accReasoning) => {
@@ -2597,37 +2746,39 @@ export const useChatStore = create<ChatState>((set, get) => ({
           },
           onSearch: (search) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId ? { ...m, search } : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({ ...message, search }),
+              ),
             }));
           },
           onToolExecutions: (executions) => {
             const toolPayloads = toolExecutionsToPayloads(executions);
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, tools: mergeToolPayloads(m.tools ?? undefined, toolPayloads) }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({
+                  ...message,
+                  tools: mergeToolPayloads(message.tools ?? undefined, toolPayloads),
+                }),
+              ),
             }));
           },
           onTools: (tools) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, tools: mergeToolPayloads(m.tools ?? undefined, tools) }
-                    : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMsgId,
+                (message) => ({
+                  ...message,
+                  tools: mergeToolPayloads(message.tools ?? undefined, tools),
+                }),
+              ),
             }));
           },
         },
@@ -2649,21 +2800,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const duration = startedAt ? Date.now() - startedAt : undefined;
         set((s) => ({
           isReasoning: false,
-          messagesBySession: {
-            ...s.messagesBySession,
-            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-              m.id === assistantMsgId && m.reasoning
+          messagesBySession: updateSessionMessageRecord(
+            s.messagesBySession,
+            sessionId,
+            assistantMsgId,
+            (message) =>
+              message.reasoning
                 ? {
-                    ...m,
+                    ...message,
                     content: result.text,
                     reasoning: {
-                      ...m.reasoning,
+                      ...message.reasoning,
                       ...(duration !== undefined ? { duration } : {}),
                     },
                   }
-                : m,
-            ),
-          },
+                : message,
+          ),
         }));
       }
 
@@ -2677,25 +2829,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
         result.performance
       ) {
         set((s) => ({
-          messagesBySession: {
-            ...s.messagesBySession,
-            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-              m.id === assistantMsgId
-                ? {
-                    ...m,
-                    ...(result.images ? { imageList: result.images } : {}),
-                    ...(result.search ? { search: result.search } : {}),
-                    ...(resolvedToolsRegen ? { tools: resolvedToolsRegen } : {}),
-                    ...(result.usage ? { usage: result.usage as any } : {}),
-                    ...(result.performance ? { performance: result.performance as any } : {}),
-                    ...(mergeMessageMetadata(m.metadata, result.contentMetadata)
-                      ? { metadata: mergeMessageMetadata(m.metadata, result.contentMetadata) }
-                      : {}),
-                    provider,
-                  }
-                : m,
-            ),
-          },
+          messagesBySession: updateSessionMessageRecord(
+            s.messagesBySession,
+            sessionId,
+            assistantMsgId,
+            (message) => {
+              const nextMetadata = mergeMessageMetadata(message.metadata, result.contentMetadata);
+
+              return {
+                ...message,
+                ...(result.images ? { imageList: result.images } : {}),
+                ...(result.search ? { search: result.search } : {}),
+                ...(resolvedToolsRegen ? { tools: resolvedToolsRegen } : {}),
+                ...(result.usage ? { usage: result.usage as any } : {}),
+                ...(result.performance ? { performance: result.performance as any } : {}),
+                ...(nextMetadata ? { metadata: nextMetadata } : {}),
+                provider,
+              };
+            },
+          ),
         }));
       }
 
@@ -2821,38 +2973,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
         {
           onContent: (state) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMessageId ? { ...m, content: state.content } : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMessageId,
+                (message) => ({ ...message, content: state.content }),
+              ),
             }));
           },
           onTools: (tools) => {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMessageId ? { ...m, tools } : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMessageId,
+                (message) => ({ ...message, tools }),
+              ),
             }));
           },
           onToolExecutions: (executions) => {
             const resolved = mergeResolvedToolPayloads(
-              (get().messagesBySession[sessionId] || []).find((m) => m.id === assistantMessageId)
+              getSessionMessageById(get().messagesBySession, sessionId, assistantMessageId)
                 ?.tools ?? undefined,
               executions,
             );
             if (resolved) {
               set((s) => ({
-                messagesBySession: {
-                  ...s.messagesBySession,
-                  [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                    m.id === assistantMessageId ? { ...m, tools: resolved } : m,
-                  ),
-                },
+                messagesBySession: updateSessionMessageRecord(
+                  s.messagesBySession,
+                  sessionId,
+                  assistantMessageId,
+                  (message) => ({ ...message, tools: resolved }),
+                ),
               }));
             }
           },
@@ -2863,23 +3015,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const resolved = mergeResolvedToolPayloads(result.tools, result.toolExecutions);
         if (resolved) {
           set((s) => ({
-            messagesBySession: {
-              ...s.messagesBySession,
-              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMessageId ? { ...m, tools: resolved } : m,
-              ),
-            },
+            messagesBySession: updateSessionMessageRecord(
+              s.messagesBySession,
+              sessionId,
+              assistantMessageId,
+              (message) => ({ ...message, tools: resolved }),
+            ),
           }));
         }
       }
       if (result.text) {
         set((s) => ({
-          messagesBySession: {
-            ...s.messagesBySession,
-            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-              m.id === assistantMessageId ? { ...m, content: result.text } : m,
-            ),
-          },
+          messagesBySession: updateSessionMessageRecord(
+            s.messagesBySession,
+            sessionId,
+            assistantMessageId,
+            (message) => ({ ...message, content: result.text }),
+          ),
         }));
       }
     } catch (err) {
@@ -2904,38 +3056,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const streamCallbacks = {
         onContent: (state: { content: string }) => {
           set((s) => ({
-            messagesBySession: {
-              ...s.messagesBySession,
-              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMessageId ? { ...m, content: state.content } : m,
-              ),
-            },
+            messagesBySession: updateSessionMessageRecord(
+              s.messagesBySession,
+              sessionId,
+              assistantMessageId,
+              (message) => ({ ...message, content: state.content }),
+            ),
           }));
         },
         onTools: (tools: ChatToolPayload[]) => {
           set((s) => ({
-            messagesBySession: {
-              ...s.messagesBySession,
-              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMessageId ? { ...m, tools } : m,
-              ),
-            },
+            messagesBySession: updateSessionMessageRecord(
+              s.messagesBySession,
+              sessionId,
+              assistantMessageId,
+              (message) => ({ ...message, tools }),
+            ),
           }));
         },
         onToolExecutions: (executions: ToolExecutionItem[]) => {
           const resolved = mergeResolvedToolPayloads(
-            (get().messagesBySession[sessionId] || []).find((m) => m.id === assistantMessageId)
-              ?.tools ?? undefined,
+            getSessionMessageById(get().messagesBySession, sessionId, assistantMessageId)?.tools ??
+              undefined,
             executions,
           );
           if (resolved) {
             set((s) => ({
-              messagesBySession: {
-                ...s.messagesBySession,
-                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMessageId ? { ...m, tools: resolved } : m,
-                ),
-              },
+              messagesBySession: updateSessionMessageRecord(
+                s.messagesBySession,
+                sessionId,
+                assistantMessageId,
+                (message) => ({ ...message, tools: resolved }),
+              ),
             }));
           }
         },
@@ -2951,23 +3103,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const resolved = mergeResolvedToolPayloads(result.tools, result.toolExecutions);
         if (resolved) {
           set((s) => ({
-            messagesBySession: {
-              ...s.messagesBySession,
-              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMessageId ? { ...m, tools: resolved } : m,
-              ),
-            },
+            messagesBySession: updateSessionMessageRecord(
+              s.messagesBySession,
+              sessionId,
+              assistantMessageId,
+              (message) => ({ ...message, tools: resolved }),
+            ),
           }));
         }
       }
       if (result.text) {
         set((s) => ({
-          messagesBySession: {
-            ...s.messagesBySession,
-            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-              m.id === assistantMessageId ? { ...m, content: result.text } : m,
-            ),
-          },
+          messagesBySession: updateSessionMessageRecord(
+            s.messagesBySession,
+            sessionId,
+            assistantMessageId,
+            (message) => ({ ...message, content: result.text }),
+          ),
         }));
       }
     } catch (err) {

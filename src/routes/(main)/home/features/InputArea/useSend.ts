@@ -2,11 +2,12 @@ import { SESSION_CHAT_URL } from '@lobechat/const';
 import { useCallback } from 'react';
 
 import { useQueryRoute } from '@/hooks/useQueryRoute';
-import { useAgentStore } from '@/store/agent';
 import { builtinAgentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { fileChatSelectors, useFileStore } from '@/store/file';
-import { useHomeStore } from '@/store/home';
+import { toDocSelections } from '@/store/file/utils/toDocSelections';
+import { useHomeStore } from '@/store/home/store';
 
 export const useSend = () => {
   const router = useQueryRoute();
@@ -55,7 +56,7 @@ export const useSend = () => {
 
           sendMessage({
             context: { agentId: inboxAgentId },
-            contexts: contextList,
+            docSelections: toDocSelections(contextList),
             files: fileList,
             message: inputMessage,
           });

@@ -11,9 +11,11 @@ import {
   conversationSelectors,
   useConversationStore,
 } from '@/features/Conversation';
-import { useAgentStore } from '@/store/agent';
-import { agentByIdSelectors } from '@/store/agent/selectors';
+import { usePageEditorStore } from '@/features/PageEditor/store';
+import { agentByIdSelectors, builtinAgentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
+import { TABLE_PAGE_KIND } from '@/utils/docs';
 
 import AgentSelectorAction from './AgentSelector/AgentSelectorAction';
 import CopilotModelSelector from './CopilotModelSelector';
@@ -35,6 +37,9 @@ const Conversation = memo(() => {
     s.useFetchAgentConfig,
   ]);
   const currentAgentId = useConversationStore(conversationSelectors.agentId);
+  const docsAgentId = useAgentStore(builtinAgentSelectors.docsAgentId);
+  const pageKind = usePageEditorStore((s) => s.pageKind);
+  const isTablePage = pageKind === TABLE_PAGE_KIND;
 
   useEffect(() => {
     if (!currentAgentId) return;
@@ -51,9 +56,14 @@ const Conversation = memo(() => {
 
     // Reset topic on agent/context switch to avoid reusing old topic scope.
     if (activeAgentId !== currentAgentId || !!activeTopicId) {
-      void switchTopic(null, { scope: 'page', skipRefreshMessage: true });
+      void switchTopic(null, { scope: 'doc', skipRefreshMessage: true });
     }
   }, [currentAgentId, setActiveAgentId]);
+
+  useEffect(() => {
+    if (!isTablePage || !docsAgentId || currentAgentId === docsAgentId) return;
+    setActiveAgentId(docsAgentId);
+  }, [currentAgentId, isTablePage, docsAgentId, setActiveAgentId]);
 
   useFetchAgentConfig(true, currentAgentId);
 
@@ -75,12 +85,12 @@ const Conversation = memo(() => {
     () => (
       <ActionBarContext value={COMPACT_CONTEXT_VALUE}>
         <Flexbox horizontal align={'center'} gap={2}>
-          <AgentSelectorAction onAgentChange={handleAgentChange} />
+          {!isTablePage && <AgentSelectorAction onAgentChange={handleAgentChange} />}
           <Search />
         </Flexbox>
       </ActionBarContext>
     ),
-    [handleAgentChange],
+    [handleAgentChange, isTablePage],
   );
 
   const modelSelector = useMemo(() => <CopilotModelSelector />, []);

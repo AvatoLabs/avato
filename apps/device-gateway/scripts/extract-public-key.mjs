@@ -18,24 +18,22 @@ if (!jwksString) {
 }
 
 const jwks = JSON.parse(jwksString);
-const privateKey = jwks.keys?.find((k) => k.alg === 'RS256' && k.kty === 'RSA');
+const privateKeys = jwks.keys?.filter((k) => k.alg === 'RS256' && k.kty === 'RSA') ?? [];
 
-if (!privateKey) {
+if (privateKeys.length === 0) {
   console.error('Error: No RS256 RSA key found in JWKS_KEY.');
   process.exit(1);
 }
 
 const publicJwks = {
-  keys: [
-    {
-      alg: privateKey.alg,
-      e: privateKey.e,
-      kid: privateKey.kid,
-      kty: privateKey.kty,
-      n: privateKey.n,
-      use: privateKey.use,
-    },
-  ],
+  keys: privateKeys.map((privateKey) => ({
+    alg: privateKey.alg,
+    e: privateKey.e,
+    kid: privateKey.kid,
+    kty: privateKey.kty,
+    n: privateKey.n,
+    use: privateKey.use,
+  })),
 };
 
 // Remove undefined fields

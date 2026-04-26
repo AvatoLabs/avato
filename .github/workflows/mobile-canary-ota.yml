@@ -1,0 +1,110 @@
+name: Mobile Canary Release
+
+on:
+  push:
+    branches:
+      - canary
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/mobile-canary-ota.yml'
+  workflow_dispatch: {}
+
+jobs:
+  publish-canary:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;27.1.12297006" \
+            "cmake;3.22.1"
+
+      - name: Install mobile dependencies
+        working-directory: apps/mobile
+        run: npm ci
+
+      - name: Restore Android release keystore
+        env:
+          AVATO_ANDROID_KEYSTORE_BASE64: ${{ secrets.AVATO_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/avato-mobile"
+          echo "$AVATO_ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/avato-mobile/avato-release.jks"
+          echo "AVATO_RELEASE_STORE_FILE=$RUNNER_TEMP/avato-mobile/avato-release.jks" >> "$GITHUB_ENV"
+
+      - name: Restore APK upload SSH key
+        if: ${{ secrets.AVATO_SERVER_SSH_PRIVATE_KEY != '' }}
+        env:
+          AVATO_SERVER_SSH_PRIVATE_KEY: ${{ secrets.AVATO_SERVER_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/avato-mobile"
+          printf '%s\n' "$AVATO_SERVER_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/avato-mobile/release-upload.key"
+          chmod 600 "$RUNNER_TEMP/avato-mobile/release-upload.key"
+          echo "AVATO_SERVER_SSH_KEY_PATH=$RUNNER_TEMP/avato-mobile/release-upload.key" >> "$GITHUB_ENV"
+
+      - name: Build canary APK
+        id: build_apk
+        working-directory: apps/mobile
+        env:
+          AVATO_OTA_SERVER_URL: ${{ secrets.AVATO_OTA_SERVER_URL }}
+          AVATO_RELEASE_CHANNEL: canary
+          AVATO_UPDATES_ENABLED: '1'
+          AVATO_RELEASE_STORE_PASSWORD: ${{ secrets.AVATO_RELEASE_STORE_PASSWORD }}
+          AVATO_RELEASE_KEY_ALIAS: ${{ secrets.AVATO_RELEASE_KEY_ALIAS }}
+          AVATO_RELEASE_KEY_PASSWORD: ${{ secrets.AVATO_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          npm run build:android:canary | tee "$RUNNER_TEMP/build-apk.log"
+          runtime_version="$(grep '^runtimeVersion=' "$RUNNER_TEMP/build-apk.log" | tail -n 1 | cut -d= -f2-)"
+          apk_path="$(grep '^apk=' "$RUNNER_TEMP/build-apk.log" | tail -n 1 | cut -d= -f2-)"
+          echo "runtime_version=$runtime_version" >> "$GITHUB_OUTPUT"
+          echo "apk_path=$apk_path" >> "$GITHUB_OUTPUT"
+
+      - name: Publish canary OTA
+        id: publish_ota
+        working-directory: apps/mobile
+        env:
+          AVATO_OTA_SERVER_URL: ${{ secrets.AVATO_OTA_SERVER_URL }}
+          AVATO_OTA_UPLOAD_KEY: ${{ secrets.AVATO_OTA_UPLOAD_KEY }}
+          AVATO_RELEASE_CHANNEL: canary
+          AVATO_UPDATES_ENABLED: '1'
+        run: |
+          set -euo pipefail
+          npm run publish:ota:canary | tee "$RUNNER_TEMP/publish-ota.log"
+          runtime_version="$(grep '^runtimeVersion=' "$RUNNER_TEMP/publish-ota.log" | tail -n 1 | cut -d= -f2-)"
+          echo "runtime_version=$runtime_version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify runtimeVersion alignment
+        run: |
+          set -euo pipefail
+          test "${{ steps.build_apk.outputs.runtime_version }}" = "${{ steps.publish_ota.outputs.runtime_version }}"
+
+      - name: Upload canary APK
+        working-directory: apps/mobile
+        env:
+          AVATO_SERVER_HOST: ${{ secrets.AVATO_SERVER_HOST }}
+          AVATO_SERVER_PORT: ${{ secrets.AVATO_SERVER_PORT }}
+          AVATO_SERVER_USER: ${{ secrets.AVATO_SERVER_USER }}
+          AVATO_SERVER_PASSWORD: ${{ secrets.AVATO_SERVER_PASSWORD }}
+          AVATO_SERVER_SSH_KEY_PATH: ${{ env.AVATO_SERVER_SSH_KEY_PATH }}
+          AVATO_RELEASE_PUBLIC_BASE_URL: ${{ secrets.AVATO_RELEASE_PUBLIC_BASE_URL }}
+          AVATO_RELEASE_SERVER_DIR: ${{ secrets.AVATO_RELEASE_SERVER_DIR }}
+        run: npm run upload:apk:canary -- "${{ steps.build_apk.outputs.apk_path }}"

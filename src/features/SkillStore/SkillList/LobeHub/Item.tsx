@@ -68,7 +68,7 @@ const Item = memo<ItemProps>(
       if (isConnected) {
         return (
           <DropdownMenu
-            nativeButton={false}
+            nativeButton
             placement="bottomRight"
             items={[
               {

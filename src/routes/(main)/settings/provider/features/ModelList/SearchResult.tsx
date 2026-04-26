@@ -1,5 +1,6 @@
 'use client';
 
+import { App } from 'antd';
 import { ActionIcon, Flexbox, Text, TooltipGroup } from '@lobehub/ui';
 import isEqual from 'fast-deep-equal';
 import { ToggleRightIcon } from 'lucide-react';
@@ -11,6 +12,7 @@ import { aiModelSelectors, useAiInfraStore } from '@/store/aiInfra';
 import ModelItem from './ModelItem';
 
 const SearchResult = memo(() => {
+  const { message } = App.useApp();
   const { t } = useTranslation('modelProvider');
 
   const searchKeyword = useAiInfraStore((s) => s.modelSearchKeyword);
@@ -36,11 +38,17 @@ const SearchResult = memo(() => {
               title={t('providerModels.list.enabledActions.enableAll')}
               onClick={async () => {
                 setBatchLoading(true);
-                await batchToggleAiModels(
-                  filteredModels.map((i) => i.id),
-                  true,
-                );
-                setBatchLoading(false);
+                try {
+                  await batchToggleAiModels(
+                    filteredModels.map((i) => i.id),
+                    true,
+                  );
+                } catch (error) {
+                  console.error('Failed to batch update model enabled states:', error);
+                  message.error(t('providerModels.list.enabledActions.toggleError'));
+                } finally {
+                  setBatchLoading(false);
+                }
               }}
             />
           </Flexbox>

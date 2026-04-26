@@ -3,14 +3,14 @@ import { ModelIcon } from '@lobehub/icons';
 import { Center, Flexbox } from '@lobehub/ui';
 import { Spin } from 'antd';
 import { createStaticStyles, cx } from 'antd-style';
-import { Settings2Icon } from 'lucide-react';
 import { memo, Suspense, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CHAT_INPUT_ACTION_ICONS } from '@/config/entryIcons';
 import ModelSwitchPanel from '@/features/ModelSwitchPanel';
 import ModelDetailPanel from '@/features/ModelSwitchPanel/components/ModelDetailPanel';
-import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { aiModelSelectors, useAiInfraStore } from '@/store/aiInfra';
 
 import { useAgentId } from '../../hooks/useAgentId';
@@ -94,7 +94,7 @@ const ModelSwitch = memo(() => {
 
       {isModelHasExtendParams && (
         <Action
-          icon={Settings2Icon}
+          icon={CHAT_INPUT_ACTION_ICONS.modelExtendParams}
           showTooltip={false}
           style={{ borderRadius: 24, marginInlineStart: -4 }}
           title={t('extendParams.title')}

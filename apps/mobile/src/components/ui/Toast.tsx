@@ -28,31 +28,49 @@ interface ToastItem {
   type: ToastType;
 }
 
+interface ToastOptions {
+  duration?: number;
+  onRetry?: () => void;
+  retryLabel?: string;
+}
+
 interface ToastStore {
   current: ToastItem | null;
   dismiss: () => void;
   mute: (durationMs: number) => void;
   mutedUntil: number;
-  show: (
-    type: ToastType,
-    message: string,
-    options?: { duration?: number; onRetry?: () => void; retryLabel?: string },
-  ) => void;
+  show: (type: ToastType, message: string, options?: ToastOptions) => void;
 }
 
 let _toastId = 0;
+
+const DEFAULT_DURATION = 1600;
+const ERROR_DURATION_MAX = 4500;
+const ERROR_DURATION_MIN = 2600;
+const ERROR_DURATION_PER_CHARACTER = 40;
+const RETRIABLE_ERROR_DURATION = 4200;
+
+const getToastDuration = (type: ToastType, message: string, options?: ToastOptions) => {
+  if (options?.duration !== undefined) return options.duration;
+  if (type !== 'error') return DEFAULT_DURATION;
+  if (options?.onRetry) return RETRIABLE_ERROR_DURATION;
+
+  return Math.max(
+    ERROR_DURATION_MIN,
+    Math.min(message.length * ERROR_DURATION_PER_CHARACTER, ERROR_DURATION_MAX),
+  );
+};
 
 export const useToast = create<ToastStore>((set, get) => ({
   current: null,
   mutedUntil: 0,
   mute: (durationMs) => set({ mutedUntil: Date.now() + Math.max(durationMs, 0) }),
   show: (type, message, options) => {
-    if (get().mutedUntil > Date.now()) return;
+    const now = Date.now();
+    if (get().mutedUntil > now) return;
     const safeMessage = (typeof message === 'string' && message.trim()) || 'Something went wrong.';
     _toastId += 1;
-    const duration =
-      options?.duration ??
-      (type === 'error' ? Math.max(4000, Math.min(safeMessage.length * 60, 8000)) : DURATION);
+    const duration = getToastDuration(type, safeMessage, options);
     set({
       current: {
         id: _toastId,
@@ -73,8 +91,6 @@ const ICON_MAP: Record<ToastType, React.ComponentType<any>> = {
   success: Check,
 };
 
-const DURATION = 2200;
-
 const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDone }) => {
   const { t } = useI18n();
   const colors = useThemeColors();
@@ -82,7 +98,7 @@ const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDon
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.92)).current;
 
-  const displayDuration = item.duration ?? DURATION;
+  const displayDuration = item.duration ?? DEFAULT_DURATION;
 
   useEffect(() => {
     Animated.parallel([
@@ -145,13 +161,14 @@ const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDon
           numberOfLines={isError ? 6 : 1}
           style={{
             color: colors.iconOnPrimary,
-            flex: 1,
+            flexShrink: 1,
             fontSize: isError ? 13 : 14,
             fontWeight: '600',
             letterSpacing: -0.2,
             lineHeight: isError ? 18 : undefined,
             marginLeft: 7,
             maxWidth: showRetry ? 220 : 300,
+            minWidth: 0,
           }}
         >
           {item.message}
@@ -165,7 +182,9 @@ const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDon
             className="ml-2 py-1 px-2"
             onPress={handleRetry}
           >
-            <Text style={{ color: colors.iconOnPrimary, fontSize: 13, fontWeight: '700' }}>{retryLabel}</Text>
+            <Text style={{ color: colors.iconOnPrimary, fontSize: 13, fontWeight: '700' }}>
+              {retryLabel}
+            </Text>
           </TouchableOpacity>
         ) : null}
       </View>

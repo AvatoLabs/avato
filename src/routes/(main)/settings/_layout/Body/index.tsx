@@ -5,6 +5,7 @@ import { memo, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 import NavItem from '@/features/NavPanel/components/NavItem';
+import { glassSidebarStyles } from '@/features/NavPanel/glassSidebar.styles';
 import { SettingsTabs } from '@/store/global/initialState';
 
 import { SettingsGroupKey, useCategory } from '../../hooks/useCategory';
@@ -43,7 +44,7 @@ const Body = memo(() => {
             paddingBlock={4}
             paddingInline={'8px 4px'}
             title={
-              <Text ellipsis fontSize={12} type={'secondary'} weight={500}>
+              <Text ellipsis className={glassSidebarStyles.groupHeader}>
                 {group.title}
               </Text>
             }

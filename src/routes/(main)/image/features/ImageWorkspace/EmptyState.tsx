@@ -16,7 +16,13 @@ const EmptyState = memo<EmptyStateProps>(({ emptyHint }) => {
 
   return (
     <Center height={'min(calc(100vh - 180px), 100%)'} width={'100%'}>
-      <Flexbox vertical align={'center'} gap={16} style={{ maxWidth: 560 }} width={'100%'}>
+      <Flexbox
+        align={'center'}
+        direction={'vertical'}
+        gap={16}
+        style={{ maxWidth: 560 }}
+        width={'100%'}
+      >
         <PromptTitle />
         {emptyHint === 'workspace' && (
           <>
@@ -24,7 +30,7 @@ const EmptyState = memo<EmptyStateProps>(({ emptyHint }) => {
               {t('empty.workspace.desc')}
             </Text>
             <Text
-              size={'small'}
+              fontSize={12}
               style={{ lineHeight: 1.5, textAlign: 'center' }}
               type={'secondary'}
             >

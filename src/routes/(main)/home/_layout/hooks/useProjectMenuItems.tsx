@@ -3,29 +3,23 @@ import { type ItemType } from 'antd/es/menu/interface';
 import { BoxIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
-import { useCreateNewModal } from '@/features/LibraryModal';
+import { useCreateSourceSetModal } from '@/features/SourceSetModal';
 
 /**
  * Hook for generating menu items/buttons for knowledge base actions
  * Used in Body/Project/Actions.tsx
  */
 export const useProjectMenuItems = () => {
-  const { t } = useTranslation('knowledgeBase');
-  const navigate = useNavigate();
-  const { open } = useCreateNewModal();
+  const { t } = useTranslation('sourceSet');
+  const { open } = useCreateSourceSetModal();
 
   /**
    * Create knowledge base action
    */
   const createProject = useCallback(() => {
-    open({
-      onSuccess: (id) => {
-        navigate(`/knowledge/bases/${id}`);
-      },
-    });
-  }, [open, navigate]);
+    open();
+  }, [open]);
 
   const createProjectMenuItem = useCallback(
     (): ItemType => ({

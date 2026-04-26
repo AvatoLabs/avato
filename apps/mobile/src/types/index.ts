@@ -160,6 +160,7 @@ export interface ChatToolPayload {
 
 export interface ChatMessageMetadata {
   [key: string]: unknown;
+  docSelections?: DocSelection[];
   finishType?: string;
   isMultimodal?: boolean;
   performance?: ModelPerformance | null;
@@ -180,6 +181,14 @@ export interface ChatFileItem {
   name: string;
   size: number;
   url: string;
+}
+
+export interface ConversationFileItem {
+  enabled?: boolean;
+  fileType: string;
+  id: string;
+  name: string;
+  type?: string;
 }
 
 export interface ChatMessage {
@@ -226,12 +235,28 @@ export interface ChatMessage {
   };
   /** For groupTasks: aggregated task messages from multiple agents */
   tasks?: ChatMessage[];
+  threadId?: string | null;
   toolCallId?: string | null;
   tools?: ChatToolPayload[] | null;
   traceId?: string | null;
   updatedAt: string;
   /** Token usage stats */
   usage?: ModelTokenUsage | null;
+}
+
+export interface MobileThreadItem {
+  agentId?: string | null;
+  createdAt?: string;
+  groupId?: string | null;
+  id: string;
+  metadata?: Record<string, unknown> | null;
+  parentThreadId?: string | null;
+  sourceMessageId?: string | null;
+  status?: string | null;
+  title?: string | null;
+  topicId: string;
+  type?: string | null;
+  updatedAt?: string;
 }
 
 // ---- Agent ----
@@ -351,6 +376,23 @@ export interface FileAttachment {
   uri: string;
   /** Remote URL after upload */
   url?: string;
+}
+
+export interface DocSelection {
+  content: string;
+  docId: string;
+  id: string;
+  xml?: string;
+}
+
+export interface ChatContextSelection {
+  content: string;
+  docId: string;
+  format?: 'markdown' | 'text' | 'xml';
+  id: string;
+  preview?: string;
+  title?: string;
+  type: 'text';
 }
 
 // ---- Discover / Market (extended) ----
@@ -940,11 +982,50 @@ export interface ImageProviderWithModels {
 
 // ---- Resource / File ----
 
+export type MobileFileAssetReviewStatus = 'approved' | 'archived' | 'draft';
+export type MobileFileAssetUsagePolicy = 'internal' | 'public' | 'restricted';
+export type MobileFileAssetClassification =
+  | 'brand'
+  | 'finance'
+  | 'general'
+  | 'hr'
+  | 'legal'
+  | 'product';
+export type MobileFileAssetRenditionKind =
+  | 'caption'
+  | 'embedding'
+  | 'preview'
+  | 'print'
+  | 'thumbnail'
+  | 'transcript'
+  | 'web';
+
+export interface FileAssetCapabilities {
+  canApprove: boolean;
+  canArchive: boolean;
+  canEditGovernance: boolean;
+}
+
 export interface FileListItem {
+  assetClassification?: MobileFileAssetClassification | null;
+  assetLatestGovernanceAuditAction?: string | null;
+  assetLatestGovernanceAuditActorDisplayName?: string | null;
+  assetLatestGovernanceAuditAt?: string | null;
+  assetLatestGovernanceAuditChangedFields?: string[] | null;
+  assetPrimaryRenditionKind?: MobileFileAssetRenditionKind | null;
+  assetPrimaryRenditionLabel?: string | null;
+  assetRenditionCount?: number | null;
+  assetReviewStatus?: MobileFileAssetReviewStatus | null;
+  assetRightsOwner?: string | null;
+  assetUsagePolicy?: MobileFileAssetUsagePolicy | null;
+  assetVersionLabel?: string | null;
+  attachable?: boolean;
   chunkCount: number | null;
   chunkingError: any | null;
   chunkingStatus?: string | null;
   content?: string | null;
+  contentRole?: 'owner' | 'editor' | 'viewer' | null;
+  contentUid?: string | null;
   createdAt: string;
   editorData?: Record<string, any> | null;
   embeddingError: any | null;
@@ -956,8 +1037,6 @@ export interface FileListItem {
   metadata?: Record<string, any> | null;
   name: string;
   parentId?: string | null;
-  resourceRole?: 'owner' | 'editor' | 'viewer' | null;
-  resourceUid?: string | null;
   size: number;
   slug?: string | null;
   sourceType: 'file' | 'document';
@@ -967,12 +1046,191 @@ export interface FileListItem {
   userId?: string;
 }
 
-export interface KnowledgeBaseItem {
+export interface SourceSetItem {
   avatar?: string | null;
+  contentUid?: string | null;
   description?: string | null;
   id: string;
   name: string;
-  resourceUid?: string | null;
   spaceId?: string | null;
   type?: string | null;
+}
+
+export type MobileSpaceKind = 'personal' | 'team';
+export type MobileSpaceRole = 'admin' | 'editor' | 'owner' | 'viewer';
+
+export interface MobileSpaceItem {
+  authzEpoch?: number;
+  createdAt?: string;
+  description?: string | null;
+  id: string;
+  kind: MobileSpaceKind;
+  membershipRole?: MobileSpaceRole;
+  name: string;
+  updatedAt?: string;
+}
+
+export type MobileSpaceMemorySection = 'inbox' | 'published' | 'playbooks' | 'policies';
+export type MobileSpaceMemorySurface = 'personal' | 'reviewer' | 'viewer';
+export type MobileSpaceMemoryCategory = 'general' | 'playbook' | 'policy';
+export type MobileSpaceMemoryRecallFilter = 'active' | 'all' | 'disabled' | 'expired' | 'stale';
+export type MobileSpaceMemorySourceKind = 'document' | 'file' | 'message' | 'source_set' | 'topic';
+
+export interface MobileSpaceMemorySurfaceContract {
+  canAccessAudit: boolean;
+  canCreate: boolean;
+  canManageRecall: boolean;
+  canViewInbox: boolean;
+  detailViews: Array<'audit' | 'overview'>;
+  recallFilters: MobileSpaceMemoryRecallFilter[];
+  sections: MobileSpaceMemorySection[];
+}
+
+export interface MobileSpaceMemorySectionSummary {
+  count: number;
+  recall: {
+    active: number;
+    disabled: number;
+    expired: number;
+    stale: number;
+  };
+}
+
+export interface MobileSpaceMemorySummary {
+  canCreate: boolean;
+  canPublish: boolean;
+  canReview: boolean;
+  contract: MobileSpaceMemorySurfaceContract;
+  id: string;
+  kind?: MobileSpaceKind | string | null;
+  membershipRole?: MobileSpaceRole | string | null;
+  name?: string | null;
+  sections: Record<MobileSpaceMemorySection, MobileSpaceMemorySectionSummary>;
+  surface: MobileSpaceMemorySurface;
+}
+
+export interface MobileSpaceMemorySourceRefPreview {
+  id: string;
+  kind: MobileSpaceMemorySourceKind;
+  title?: string;
+}
+
+export interface MobileSpaceMemoryIntakePreview {
+  origin?: 'automation' | 'harness' | 'manual';
+  producer?: string | null;
+  traceId?: string | null;
+}
+
+export interface MobileSpaceMemoryRecallPolicyPreview {
+  expiresAt?: string | null;
+  lastVerifiedAt?: string | null;
+  recallBlockedReason?: 'disabled' | 'expired' | 'stale';
+  recallEnabled: boolean;
+  staleAt?: string | null;
+}
+
+export interface MobileSpaceMemoryGovernanceHistoryPreview {
+  action: 'merged' | 'policy_updated' | 'published';
+  actor?: {
+    id?: string | null;
+    name?: string | null;
+    username?: string | null;
+  };
+  at: string;
+  changes?: {
+    content?: { after?: string | null; before?: string | null };
+    expiresAt?: { after?: string | null; before?: string | null };
+    lastVerifiedAt?: { after?: string | null; before?: string | null };
+    recallEnabled?: { after?: boolean | null; before?: boolean | null };
+    staleAt?: { after?: string | null; before?: string | null };
+    summary?: { after?: string | null; before?: string | null };
+    title?: { after?: string | null; before?: string | null };
+  };
+  resolution?: {
+    appendSources?: boolean;
+    applyContent?: boolean;
+    applySummary?: boolean;
+    applyTitle?: boolean;
+  };
+  sourceTitle?: string | null;
+}
+
+export interface MobileSpaceMemoryReviewHintPreview {
+  kind: 'duplicate_published';
+  match: {
+    content?: string | null;
+    id: string;
+    publishedAt?: string | null;
+    summary?: string | null;
+    title: string;
+  };
+  mergePreview: {
+    addedSourceCount: number;
+    updatesContent: boolean;
+    updatesSummary: boolean;
+    updatesTitle: boolean;
+  };
+}
+
+export interface MobileSpaceMemoryEntryPreview {
+  actor?: {
+    id?: string | null;
+    name?: string | null;
+    username?: string | null;
+  };
+  category: MobileSpaceMemoryCategory;
+  content?: string | null;
+  history?: MobileSpaceMemoryGovernanceHistoryPreview[];
+  id: string;
+  intake?: MobileSpaceMemoryIntakePreview;
+  kind: 'candidate' | 'memory';
+  publishedAt?: string | null;
+  recall?: MobileSpaceMemoryRecallPolicyPreview;
+  reviewHint?: MobileSpaceMemoryReviewHintPreview;
+  sourceCount: number;
+  sourceRefs: MobileSpaceMemorySourceRefPreview[];
+  summary?: string | null;
+  title: string;
+  updatedAt: string;
+}
+
+export interface MobileSpaceMemorySectionResult {
+  contract: MobileSpaceMemorySurfaceContract;
+  items: MobileSpaceMemoryEntryPreview[];
+  section: MobileSpaceMemorySection;
+  surface: MobileSpaceMemorySurface;
+}
+
+export interface MobileSpaceMemoryEntryResult {
+  contract: MobileSpaceMemorySurfaceContract;
+  entry: MobileSpaceMemoryEntryPreview;
+  surface: MobileSpaceMemorySurface;
+}
+
+export interface MobileSpaceMemoryAuditBundle {
+  auditPath: string;
+  detailView: 'audit';
+  entry: MobileSpaceMemoryEntryPreview;
+  exportedAt: string;
+  recallFilter: MobileSpaceMemoryRecallFilter;
+  section: MobileSpaceMemorySection;
+  space: {
+    id: string;
+    kind?: MobileSpaceKind | string | null;
+    membershipRole?: MobileSpaceRole | string | null;
+    name?: string | null;
+  };
+}
+
+export interface MobileSpaceMemoryAuditBatchBundle {
+  count: number;
+  exportedAt: string;
+  items: MobileSpaceMemoryAuditBundle[];
+  recallFilter: MobileSpaceMemoryRecallFilter;
+  space: {
+    id: string;
+    kind?: MobileSpaceKind | string | null;
+    membershipRole?: MobileSpaceRole | string | null;
+    name?: string | null;
+  };
 }

@@ -30,13 +30,23 @@ export class ChunkService {
     return this.chunkClient.chunkContent(params);
   }
 
-  async asyncEmbeddingFileChunks(fileId: string) {
+  async asyncEmbeddingFileChunks(fileId: string, options?: { contentGuardAuthzEpoch?: number }) {
     const result = await this.fileModel.findByIdAny(fileId);
 
     if (!result) return;
 
     // 1. create a asyncTaskId
     const asyncTaskId = await this.asyncTaskModel.create({
+      metadata:
+        typeof options?.contentGuardAuthzEpoch === 'number'
+          ? {
+              contentGuard: {
+                authzEpoch: options.contentGuardAuthzEpoch,
+                capability: 'preview_content',
+                fileId,
+              },
+            }
+          : undefined,
       status: AsyncTaskStatus.Pending,
       type: AsyncTaskType.Embedding,
     });
@@ -69,7 +79,11 @@ export class ChunkService {
   /**
    * parse file to chunks with async task
    */
-  async asyncParseFileToChunks(fileId: string, skipExist?: boolean) {
+  async asyncParseFileToChunks(
+    fileId: string,
+    skipExist?: boolean,
+    options?: { contentGuardAuthzEpoch?: number },
+  ) {
     const result = await this.fileModel.findByIdAny(fileId);
 
     if (!result) return;
@@ -79,6 +93,16 @@ export class ChunkService {
 
     // 1. create a asyncTaskId
     const asyncTaskId = await this.asyncTaskModel.create({
+      metadata:
+        typeof options?.contentGuardAuthzEpoch === 'number'
+          ? {
+              contentGuard: {
+                authzEpoch: options.contentGuardAuthzEpoch,
+                capability: 'preview_content',
+                fileId,
+              },
+            }
+          : undefined,
       status: AsyncTaskStatus.Processing,
       type: AsyncTaskType.Chunking,
     });

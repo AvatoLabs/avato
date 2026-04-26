@@ -3,7 +3,7 @@ import { Switch } from 'antd';
 import isEqual from 'fast-deep-equal';
 import { memo } from 'react';
 
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 
 import { useStore } from '../store';
 

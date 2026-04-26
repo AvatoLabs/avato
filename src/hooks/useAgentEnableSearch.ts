@@ -1,5 +1,5 @@
-import { useAgentStore } from '@/store/agent';
 import { agentChatConfigSelectors, agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { aiModelSelectors, useAiInfraStore } from '@/store/aiInfra';
 
 export const useAgentEnableSearch = () => {

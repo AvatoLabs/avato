@@ -1,8 +1,8 @@
 /**
  * Tools Engineering - Unified tools processing using ToolsEngine
  */
-import { KnowledgeBaseManifest } from '@lobechat/builtin-tool-knowledge-base';
 import { MemoryManifest } from '@lobechat/builtin-tool-memory';
+import { SourceSetManifest } from '@lobechat/builtin-tool-source-set';
 import { WebBrowsingManifest } from '@lobechat/builtin-tool-web-browsing';
 import { defaultToolIds } from '@lobechat/builtin-tools';
 import { isDesktop } from '@lobechat/const';
@@ -11,14 +11,14 @@ import { ToolsEngine } from '@lobechat/context-engine';
 import { type ChatCompletionTool, type WorkingModel } from '@lobechat/types';
 import { type LobeChatPluginManifest } from '@lobehub/chat-plugin-sdk';
 
-import { getAgentStoreState } from '@/store/agent';
 import { agentChatConfigSelectors, agentSelectors } from '@/store/agent/selectors';
-import { getToolStoreState } from '@/store/tool';
+import { getAgentStoreState } from '@/store/agent/store';
 import {
   klavisStoreSelectors,
   lobehubSkillStoreSelectors,
   pluginSelectors,
 } from '@/store/tool/selectors';
+import { getToolStoreState } from '@/store/tool/store';
 
 import { getSearchConfig } from '../getSearchConfig';
 import { isCanUseFC } from '../isCanUseFC';
@@ -102,7 +102,7 @@ export const createAgentToolsEngine = (workingModel: WorkingModel) => {
         return undefined; // fall through to rules
       },
       rules: {
-        [KnowledgeBaseManifest.identifier]: agentSelectors.hasEnabledKnowledgeBases(agentState),
+        [SourceSetManifest.identifier]: agentSelectors.hasEnabledSourceSets(agentState),
         [MemoryManifest.identifier]: agentChatConfigSelectors.isMemoryToolEnabled(agentState),
         [WebBrowsingManifest.identifier]: searchConfig.useApplicationBuiltinSearchTool,
       },

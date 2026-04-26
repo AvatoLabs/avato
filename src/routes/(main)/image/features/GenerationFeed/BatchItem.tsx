@@ -99,6 +99,7 @@ export const GenerationBatchItem = memo<GenerationBatchItemProps>(({ batch }) =>
       await removeGenerationBatch(batch.id, activeTopicId);
     } catch (error) {
       console.error('Failed to delete batch:', error);
+      message.error(t('generation.actions.deleteBatchFailed'));
     }
   };
 

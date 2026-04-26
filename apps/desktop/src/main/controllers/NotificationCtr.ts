@@ -1,8 +1,8 @@
-import {
+import type {
   DesktopNotificationResult,
   ShowDesktopNotificationParams,
 } from '@lobechat/electron-client-ipc';
-import { Notification, app, systemPreferences } from 'electron';
+import { app, Notification } from 'electron';
 import { macOS, windows } from 'electron-is';
 
 import { getIpcContext } from '@/utils/ipc';
@@ -56,7 +56,7 @@ export default class NotificationCtr extends ControllerModule {
     }
 
     const notification = new Notification({
-      body: 'LobeHub can now send you notifications.',
+      body: 'Avato can now send you notifications.',
       title: 'Notification Permission',
     });
 
@@ -89,7 +89,7 @@ export default class NotificationCtr extends ControllerModule {
 
       // Set app user model ID on Windows
       if (windows()) {
-        app.setAppUserModelId('com.lobehub.chat');
+        app.setAppUserModelId('com.turingmesh.avato');
         logger.debug('Set Windows App User Model ID for notifications');
       }
 

@@ -30,7 +30,7 @@ const AssistantDetailPage = memo<AssistantDetailPageProps>(({ mobile }) => {
   if (isLoading) return <Loading />;
   if (!data) return <NotFound />;
 
-  // 检查助理状态
+  // 检查智能体状态
   const status = (data as any)?.status;
   if (status === 'unpublished' || status === 'archived' || status === 'deprecated') {
     return <StatusPage status={status} />;

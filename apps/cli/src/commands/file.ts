@@ -13,13 +13,13 @@ export function registerFileCommand(program: Command) {
   file
     .command('list')
     .description('List files')
-    .option('--kb-id <id>', 'Filter by knowledge base ID')
+    .option('--source-set-id <id>', 'Filter by source set ID')
     .option('-L, --limit <n>', 'Maximum number of items', '30')
     .option('--json [fields]', 'Output JSON, optionally specify fields (comma-separated)')
-    .action(async (options: { json?: string | boolean; kbId?: string; limit?: string }) => {
+    .action(async (options: { json?: string | boolean; limit?: string; sourceSetId?: string }) => {
       const client = await getTrpcClient();
       const input: any = {};
-      if (options.kbId) input.knowledgeBaseId = options.kbId;
+      if (options.sourceSetId) input.sourceSetId = options.sourceSetId;
       if (options.limit) input.limit = Number.parseInt(options.limit, 10);
 
       const result = await client.file.getFiles.query(input);

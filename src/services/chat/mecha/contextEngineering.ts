@@ -29,19 +29,20 @@ import debug from 'debug';
 import { isCanUseFC } from '@/helpers/isCanUseFC';
 import { VARIABLE_GENERATORS } from '@/helpers/parserPlaceholder';
 import { notebookService } from '@/services/notebook';
-import { getAgentStoreState } from '@/store/agent';
+import { sessionService } from '@/services/session';
 import { agentSelectors } from '@/store/agent/selectors';
+import { getAgentStoreState } from '@/store/agent/store';
 import { getChatGroupStoreState } from '@/store/agentGroup';
 import { agentGroupSelectors } from '@/store/agentGroup/selectors';
 import { getAiInfraStoreState } from '@/store/aiInfra';
 import { getChatStoreState } from '@/store/chat';
-import { getToolStoreState } from '@/store/tool';
 import {
   builtinToolSelectors,
   klavisStoreSelectors,
   lobehubSkillStoreSelectors,
   toolSelectors,
 } from '@/store/tool/selectors';
+import { getToolStoreState } from '@/store/tool/store';
 
 import { isCanUseVideo, isCanUseVision } from '../helper';
 import {
@@ -110,6 +111,7 @@ export const contextEngineering = async ({
   groupId,
   initialContext,
   plugins,
+  sessionId,
   stepContext,
   topicId,
   memoryContext,
@@ -231,7 +233,7 @@ export const contextEngineering = async ({
             const server = allKlavisServers.find((s) => s.identifier === klavisType.identifier);
 
             officialTools.push({
-              description: `LobeHub Mcp Server: ${klavisType.label}`,
+              description: `Avato MCP Server: ${klavisType.label}`,
               enabled: enabledPlugins.includes(klavisType.identifier),
               identifier: klavisType.identifier,
               installed: !!server,
@@ -253,7 +255,7 @@ export const contextEngineering = async ({
             const server = allLobehubSkillServers.find((s) => s.identifier === provider.id);
 
             officialTools.push({
-              description: `LobeHub Skill Provider: ${provider.label}`,
+              description: `Avato Skill Provider: ${provider.label}`,
               enabled: enabledPlugins.includes(provider.id),
               identifier: provider.id,
               installed: !!server,
@@ -287,15 +289,35 @@ export const contextEngineering = async ({
 
   // Get enabled agent files with content and knowledge bases from agent store
   const agentFiles = agentSelectors.currentAgentFiles(agentStoreState);
-  const agentKnowledgeBases = agentSelectors.currentAgentKnowledgeBases(agentStoreState);
+  const agentSourceSets = agentSelectors.currentAgentSourceSets(agentStoreState);
 
   const fileContents = agentFiles
     .filter((file) => file.enabled && file.content)
     .map((file) => ({ content: file.content!, fileId: file.id, filename: file.name }));
 
-  const knowledgeBases = agentKnowledgeBases
-    .filter((kb) => kb.enabled)
-    .map((kb) => ({ description: kb.description, id: kb.id, name: kb.name }));
+  let conversationFileContents:
+    | Array<{
+        content: string;
+        fileId: string;
+        filename: string;
+      }>
+    | undefined;
+
+  if (groupId || agentId || sessionId) {
+    try {
+      conversationFileContents = await sessionService.getConversationFileContents({
+        agentId,
+        groupId,
+        sessionId,
+      });
+    } catch (error) {
+      log('Failed to resolve conversation-scoped files: %O', error);
+    }
+  }
+
+  const sourceSets = agentSourceSets
+    .filter((item) => item.enabled)
+    .map((item) => ({ description: item.description, id: item.id, name: item.name }));
 
   // Resolve user memories from cache only (no network requests) to avoid blocking sendMessage
   let userMemoryData: UserMemoryData | undefined;
@@ -402,14 +424,14 @@ export const contextEngineering = async ({
     const availablePlugins = [];
 
     // Builtin tools (use allMetaList to include hidden tools like web-browsing, cloud-sandbox, etc.)
-    // Exclude only truly internal tools (agent-management itself, agent-builder, page-agent)
+    // Exclude only truly internal tools (agent-management itself, agent-builder, docs-agent)
     const allBuiltinTools = builtinToolSelectors.allMetaList(toolState);
     const klavisIdentifiers = new Set(KLAVIS_SERVER_TYPES.map((t) => t.identifier));
     const INTERNAL_TOOLS = new Set([
       'lobe-agent-management', // Don't show agent-management in its own context
       'lobe-agent-builder', // Used for editing current agent, not for creating new agents
       'lobe-group-agent-builder', // Used for editing current group, not for creating new agents
-      'lobe-page-agent', // Page-editor specific tool
+      'lobe-docs-agent', // Page-editor specific tool
     ]);
 
     for (const tool of allBuiltinTools) {
@@ -492,8 +514,9 @@ export const contextEngineering = async ({
 
     // Knowledge injection
     knowledge: {
+      conversationFileContents,
       fileContents,
-      knowledgeBases,
+      sourceSets,
     },
 
     // Messages

@@ -10,6 +10,8 @@ import { useNavigate } from 'react-router-dom';
 
 import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { MOBILE_TABBAR_HEIGHT } from '@/const/layoutTokens';
+import { buildFilesRootPath } from '@/features/ResourceSpaces';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useActiveTabKey } from '@/hooks/useActiveTabKey';
 import { SidebarTabKey } from '@/store/global/initialState';
 import { featureFlagsSelectors, useServerConfigStore } from '@/store/serverConfig';
@@ -47,7 +49,7 @@ const NavBar = memo(() => {
           icon: (active: boolean) => (
             <Icon className={active ? styles.active : undefined} icon={APP_ENTRY_ICONS.chat} />
           ),
-          key: SidebarTabKey.Chat,
+          key: 'agent',
           onClick: () => {
             navigate('/agent');
           },
@@ -67,9 +69,9 @@ const NavBar = memo(() => {
           icon: (active: boolean) => (
             <Icon className={active ? styles.active : undefined} icon={APP_ENTRY_ICONS.resource} />
           ),
-          key: SidebarTabKey.Resource,
+          key: 'content',
           onClick: () => {
-            navigate('/resource');
+            navigate(buildFilesRootPath(resolveWorkspaceSpaceId()));
           },
           title: t('tab.resource'),
         },

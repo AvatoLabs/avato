@@ -78,7 +78,7 @@ export interface FileDocument {
 }
 
 /**
- * Represents a logical unit/page/chunk in a file.
+ * Represents a logical unit/docs/chunk in a file.
  */
 export interface DocumentPage {
   /**

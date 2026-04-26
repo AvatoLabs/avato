@@ -5,7 +5,7 @@ import { createStaticStyles, cssVar } from 'antd-style';
 import { LucidePencil, TrashIcon } from 'lucide-react';
 import { type AiProviderModelListItem } from 'model-bank';
 import { AiModelSourceEnum } from 'model-bank';
-import React, { memo, use, useState } from 'react';
+import React, { memo, use, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ModelInfoTags } from '@/components/ModelSelect';
@@ -93,6 +93,10 @@ const ModelItem = memo<ModelItemProps>(
     const [checked, setChecked] = useState(enabled);
     const [showConfig, setShowConfig] = useState(false);
 
+    useEffect(() => {
+      setChecked(enabled);
+    }, [enabled]);
+
     const formatPricing = (): string[] => {
       if (!pricing) return [];
 
@@ -156,8 +160,13 @@ const ModelItem = memo<ModelItemProps>(
 
     const { message, modal } = App.useApp();
     const copyModelId = async () => {
-      await copyToClipboard(id);
-      message.success({ content: t('copySuccess', { ns: 'common' }) });
+      try {
+        await copyToClipboard(id);
+        message.success({ content: t('copySuccess', { ns: 'common' }) });
+      } catch (error) {
+        console.error('Failed to copy model id:', error);
+        message.error({ content: t('copyFail', { ns: 'common' }) });
+      }
     };
 
     const isMobile = useIsMobile();
@@ -176,8 +185,15 @@ const ModelItem = memo<ModelItemProps>(
         loading={isModelLoading}
         size={'small'}
         onChange={async (e) => {
+          const previousChecked = checked;
           setChecked(e);
-          await toggleModelEnabled({ enabled: e, id, source, type });
+          try {
+            await toggleModelEnabled({ enabled: e, id, source, type });
+          } catch (error) {
+            console.error('Failed to update model enabled state:', error);
+            setChecked(previousChecked);
+            message.error(t('providerModels.item.toggleError'));
+          }
         }}
       />
     );
@@ -208,8 +224,13 @@ const ModelItem = memo<ModelItemProps>(
                     type: 'primary',
                   },
                   onOk: async () => {
-                    await removeAiModel(id, activeAiProvider!);
-                    message.success(t('providerModels.item.delete.success'));
+                    try {
+                      await removeAiModel(id, activeAiProvider!);
+                      message.success(t('providerModels.item.delete.success'));
+                    } catch (error) {
+                      console.error('Failed to delete model:', error);
+                      message.error(t('providerModels.item.delete.error'));
+                    }
                   },
                   title: t('providerModels.item.delete.confirm', {
                     displayName: displayName || id,

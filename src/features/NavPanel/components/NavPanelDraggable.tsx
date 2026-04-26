@@ -1,12 +1,17 @@
 'use client';
 
-import { DraggablePanel, Freeze } from '@lobehub/ui';
-import { createStaticStyles, cssVar } from 'antd-style';
+import { DraggablePanel, type DraggablePanelProps, Freeze } from '@lobehub/ui';
+import { createStaticStyles, cx } from 'antd-style';
 import { AnimatePresence, motion, useIsPresent } from 'motion/react';
 import { type ReactNode } from 'react';
-import { memo, useLayoutEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 
 import { isDesktop } from '@/const/version';
+import {
+  WORKSPACE_DURATION_NORMAL_MS,
+  WORKSPACE_LEFT_PANEL_MINI_WIDTH_PX,
+  WORKSPACE_SHELL_RAIL_MIN_WIDTH,
+} from '@/const/workspaceVisualTokens';
 import { TOGGLE_BUTTON_ID } from '@/features/NavPanel/ToggleLeftPanelButton';
 import { USER_DROPDOWN_ICON_ID } from '@/routes/(main)/home/_layout/Header/components/User';
 import { useGlobalStore } from '@/store/global';
@@ -15,12 +20,18 @@ import { useUserStore } from '@/store/user';
 import { userGeneralSettingsSelectors } from '@/store/user/selectors';
 import { isMacOS } from '@/utils/platform';
 
+import { GlassNavVisualProvider } from '../GlassNavVisualContext';
+import { glassSidebarStyles } from '../glassSidebar.styles';
 import { useNavPanelSizeChangeHandler } from '../hooks/useNavPanel';
+import MiniWorkspaceRail from '../MiniWorkspaceRail';
 import { BACK_BUTTON_ID } from './BackButton';
 
 type MotionDirection = -1 | 0 | 1;
 
 const MOTION_OFFSET = 8;
+
+/** Same control points as {@link WORKSPACE_EASE_STANDARD} (`cubic-bezier(0.4, 0, 0.2, 1)`) */
+const MOTION_EASE = [0.4, 0, 0.2, 1] as const;
 
 const isMotionDisabled = (mode?: string) => mode === 'disabled';
 
@@ -42,8 +53,8 @@ const motionVariants = {
     x: direction * MOTION_OFFSET,
   }),
   transition: {
-    duration: 0.28,
-    ease: [0.4, 0, 0.2, 1],
+    duration: WORKSPACE_DURATION_NORMAL_MS / 1000,
+    ease: MOTION_EASE,
   },
 } as const;
 
@@ -64,7 +75,7 @@ const draggableStyles = createStaticStyles(({ css, cssVar }) => ({
     overflow: hidden;
     flex: 1;
 
-    min-width: 240px;
+    min-width: ${WORKSPACE_SHELL_RAIL_MIN_WIDTH}px;
     max-width: 100%;
     min-height: 100%;
     max-height: 100%;
@@ -79,20 +90,26 @@ const draggableStyles = createStaticStyles(({ css, cssVar }) => ({
     display: flex;
     flex-direction: column;
 
-    min-width: 240px;
+    min-width: ${WORKSPACE_SHELL_RAIL_MIN_WIDTH}px;
     max-width: 100%;
     min-height: 100%;
     max-height: 100%;
   `,
+  innerMini: css`
+    min-width: ${WORKSPACE_LEFT_PANEL_MINI_WIDTH_PX}px !important;
+    max-width: ${WORKSPACE_LEFT_PANEL_MINI_WIDTH_PX}px !important;
+  `,
+  layerMini: css`
+    min-width: ${WORKSPACE_LEFT_PANEL_MINI_WIDTH_PX}px !important;
+    max-width: ${WORKSPACE_LEFT_PANEL_MINI_WIDTH_PX}px !important;
+  `,
   panel: css`
-    user-select: none;
     height: 100%;
-    color: ${cssVar.colorTextSecondary};
-    background: ${isDesktop && isMacOS() ? 'transparent' : cssVar.colorBgLayout};
 
-    * {
-      user-select: none;
-    }
+    color: ${cssVar.colorText};
+
+    background: ${isDesktop && isMacOS() ? 'transparent' : cssVar.colorBgLayout};
+    box-shadow: inset -1px 0 0 ${cssVar.colorBorderSecondary};
 
     #${TOGGLE_BUTTON_ID} {
       width: 32px !important;
@@ -120,7 +137,7 @@ const draggableStyles = createStaticStyles(({ css, cssVar }) => ({
       }
 
       #${USER_DROPDOWN_ICON_ID} {
-        width: 14px !important;
+        width: 16px !important;
         opacity: 1;
       }
     }
@@ -138,7 +155,7 @@ interface ExitingFrozenContentProps {
   children: ReactNode;
 }
 
-const classNames = {
+const draggablePanelClassNames = {
   content: draggableStyles.content,
 };
 
@@ -151,13 +168,26 @@ const ExitingFrozenContent = memo<ExitingFrozenContentProps>(({ children }) => {
 ExitingFrozenContent.displayName = 'ExitingFrozenContent';
 
 export const NavPanelDraggable = memo<NavPanelDraggableProps>(({ activeContent }) => {
-  const [expand, togglePanel] = useGlobalStore((s) => [
+  const [expand, leftPanelCollapsed, leftPanelWidth] = useGlobalStore((s) => [
     systemStatusSelectors.showLeftPanel(s),
-    s.toggleLeftPanel,
+    s.status.leftPanelCollapsed ?? false,
+    systemStatusSelectors.leftPanelWidth(s),
   ]);
   const animationMode = useUserStore(userGeneralSettingsSelectors.animationMode);
   const shouldUseMotion = !isMotionDisabled(animationMode);
-  const handleSizeChange = useNavPanelSizeChangeHandler();
+  const persistNavWidth = useNavPanelSizeChangeHandler();
+  const handleSizeChange = useCallback<NonNullable<DraggablePanelProps['onSizeDragging']>>(
+    (delta, size) => {
+      if (useGlobalStore.getState().status.leftPanelCollapsed) return;
+      persistNavWidth(delta, size);
+    },
+    [persistNavWidth],
+  );
+
+  const panelWidth = useMemo(() => {
+    if (!expand) return 0;
+    return leftPanelCollapsed ? WORKSPACE_LEFT_PANEL_MINI_WIDTH_PX : leftPanelWidth;
+  }, [expand, leftPanelCollapsed, leftPanelWidth]);
 
   const defaultWidthRef = useRef(0);
   if (defaultWidthRef.current === 0) {
@@ -173,7 +203,7 @@ export const NavPanelDraggable = memo<NavPanelDraggableProps>(({ activeContent }
   );
   const styles = useMemo(
     () => ({
-      background: isDesktop && isMacOS() ? 'transparent' : cssVar.colorBgLayout,
+      transition: `width ${WORKSPACE_DURATION_NORMAL_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`,
       zIndex: 11,
     }),
     [],
@@ -210,22 +240,31 @@ export const NavPanelDraggable = memo<NavPanelDraggableProps>(({ activeContent }
 
   return (
     <DraggablePanel
-      className={draggableStyles.panel}
-      classNames={classNames}
+      className={cx(draggableStyles.panel, glassSidebarStyles.draggablePanelGlass)}
+      classNames={draggablePanelClassNames}
       defaultSize={defaultSize}
       expand={expand}
       expandable={false}
-      maxWidth={400}
-      minWidth={240}
+      maxWidth={leftPanelCollapsed ? WORKSPACE_LEFT_PANEL_MINI_WIDTH_PX : 400}
       placement="left"
+      resize={!expand || leftPanelCollapsed ? false : undefined}
       showBorder={false}
+      size={expand ? { height: '100%', width: panelWidth } : undefined}
       style={styles}
-      onExpandChange={togglePanel}
+      minWidth={
+        leftPanelCollapsed ? WORKSPACE_LEFT_PANEL_MINI_WIDTH_PX : WORKSPACE_SHELL_RAIL_MIN_WIDTH
+      }
       onSizeDragging={handleSizeChange}
     >
-      <div className={draggableStyles.inner}>
-        {shouldUseMotion ? (
-          <AnimatePresence custom={motionDirection} initial={false} mode="sync">
+      <div className={cx(draggableStyles.inner, leftPanelCollapsed && draggableStyles.innerMini)}>
+        {leftPanelCollapsed ? (
+          <div className={cx(draggableStyles.layer, draggableStyles.layerMini)}>
+            <GlassNavVisualProvider>
+              <MiniWorkspaceRail />
+            </GlassNavVisualProvider>
+          </div>
+        ) : shouldUseMotion ? (
+          <AnimatePresence custom={motionDirection} initial={false} mode="wait">
             <motion.div
               animate="animate"
               className={draggableStyles.layer}
@@ -236,12 +275,14 @@ export const NavPanelDraggable = memo<NavPanelDraggableProps>(({ activeContent }
               transition={motionVariants.transition}
               variants={motionVariants}
             >
-              <ExitingFrozenContent>{activeContent.node}</ExitingFrozenContent>
+              <ExitingFrozenContent>
+                <GlassNavVisualProvider>{activeContent.node}</GlassNavVisualProvider>
+              </ExitingFrozenContent>
             </motion.div>
           </AnimatePresence>
         ) : (
           <div className={draggableStyles.layer} key={activeContent.key}>
-            {activeContent.node}
+            <GlassNavVisualProvider>{activeContent.node}</GlassNavVisualProvider>
           </div>
         )}
       </div>

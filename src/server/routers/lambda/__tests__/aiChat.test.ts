@@ -1,9 +1,11 @@
 // @vitest-environment node
 import { ThreadType } from '@lobechat/types';
-import { describe, expect, it, vi } from 'vitest';
+import { TRPCError } from '@trpc/server';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AgentModel } from '@/database/models/agent';
 import { MessageModel } from '@/database/models/message';
+import { SpaceModel } from '@/database/models/space';
 import { ThreadModel } from '@/database/models/thread';
 import { TopicModel } from '@/database/models/topic';
 import { AiChatService } from '@/server/services/aiChat';
@@ -12,6 +14,7 @@ import { aiChatRouter } from '../aiChat';
 
 vi.mock('@/database/models/agent');
 vi.mock('@/database/models/message');
+vi.mock('@/database/models/space');
 vi.mock('@/database/models/thread');
 vi.mock('@/database/models/topic');
 vi.mock('@/server/services/aiChat');
@@ -22,8 +25,24 @@ vi.mock('@/server/modules/ModelRuntime', () => ({
   initModelRuntimeFromDB: vi.fn(),
 }));
 
+const mockFindAccessibleSpaceById = vi.hoisted(() => vi.fn());
+
 describe('aiChatRouter', () => {
   const mockCtx = { userId: 'u1' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFindAccessibleSpaceById.mockResolvedValue({
+      id: 'spc_topic',
+      membershipRole: 'editor',
+    });
+    vi.mocked(SpaceModel).mockImplementation(
+      () =>
+        ({
+          findAccessibleSpaceById: mockFindAccessibleSpaceById,
+        }) as any,
+    );
+  });
 
   it('should create topic optionally, create user/assistant messages, and return payload', async () => {
     const mockCreateTopic = vi.fn().mockResolvedValue({ id: 't1' });
@@ -54,6 +73,7 @@ describe('aiChatRouter', () => {
     expect(mockCreateTopic).toHaveBeenCalledWith({
       messages: ['a', 'b'],
       sessionId: 's1',
+      spaceId: undefined,
       title: 'T',
     });
 
@@ -259,6 +279,7 @@ describe('aiChatRouter', () => {
     expect(mockCreateTopic).toHaveBeenCalledWith({
       messages: undefined,
       sessionId: 's1',
+      spaceId: undefined,
       title: 'New Topic',
     });
 
@@ -308,6 +329,54 @@ describe('aiChatRouter', () => {
     } as any);
 
     expect(res.createdThreadId).toBeUndefined();
+  });
+
+  it('should pass spaceId to topic creation when provided', async () => {
+    const mockCreateTopic = vi.fn().mockResolvedValue({ id: 't1' });
+    const mockCreateMessage = vi
+      .fn()
+      .mockResolvedValueOnce({ id: 'm-user' })
+      .mockResolvedValueOnce({ id: 'm-assistant' });
+    const mockGet = vi.fn().mockResolvedValue({ messages: [], topics: [{}] });
+
+    vi.mocked(TopicModel).mockImplementation(() => ({ create: mockCreateTopic }) as any);
+    vi.mocked(MessageModel).mockImplementation(() => ({ create: mockCreateMessage }) as any);
+    vi.mocked(AiChatService).mockImplementation(() => ({ getMessagesAndTopics: mockGet }) as any);
+
+    const caller = aiChatRouter.createCaller(mockCtx as any);
+
+    await caller.sendMessageInServer({
+      newAssistantMessage: { model: 'gpt-4o', provider: 'openai' },
+      newTopic: { title: 'T' },
+      newUserMessage: { content: 'hi' },
+      sessionId: 's1',
+      spaceId: 'spc_topic',
+    } as any);
+
+    expect(mockCreateTopic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 's1',
+        spaceId: 'spc_topic',
+        title: 'T',
+      }),
+    );
+    expect(mockFindAccessibleSpaceById).toHaveBeenCalledWith('spc_topic');
+  });
+
+  it('should reject inaccessible spaceId before creating a new topic', async () => {
+    mockFindAccessibleSpaceById.mockResolvedValue(undefined);
+
+    const caller = aiChatRouter.createCaller(mockCtx as any);
+
+    await expect(
+      caller.sendMessageInServer({
+        newAssistantMessage: { model: 'gpt-4o', provider: 'openai' },
+        newTopic: { title: 'Blocked Topic' },
+        newUserMessage: { content: 'hi' },
+        sessionId: 's1',
+        spaceId: 'spc_blocked',
+      } as any),
+    ).rejects.toThrow(new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_ACCESS_DENIED' }));
   });
 
   describe('groupId support', () => {

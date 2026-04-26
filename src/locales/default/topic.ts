@@ -5,6 +5,7 @@ export default {
   'actions.confirmRemoveTopic': 'You are about to delete this topic. This action cannot be undone.',
   'actions.confirmRemoveUnstarred':
     'You are about to delete unstarred topics. This action cannot be undone.',
+  'actions.removeError': 'Failed to delete topic',
   'actions.duplicate': 'Duplicate',
   'actions.favorite': 'Favorite',
   'actions.unfavorite': 'Unfavorite',

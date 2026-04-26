@@ -2,17 +2,16 @@ import { type LobeChatDatabase } from '@lobechat/database';
 import { type FileItem } from '@lobechat/database/schemas';
 import debug from 'debug';
 
-import { ResourceModel } from '@/database/models/resource';
+import { ContentModel } from '@/database/models/content';
 import { getRedisConfig } from '@/envs/redis';
 import { initializeRedis, isRedisEnabled } from '@/libs/redis';
+import { ContentAuthorizer } from '@/server/services/content';
+import { resolveFileDownloadPolicy } from '@/server/services/content/downloadPolicy';
 import { FileService } from '@/server/services/file';
-import { ResourceAuthorizer } from '@/server/services/resource';
 
 const log = debug('lobe-file:proxy');
 
 const FILE_PROXY_KEY_PREFIX = 'file-proxy:';
-const PRESIGNED_URL_CACHE_TTL = 240;
-
 const buildCacheKey = (id: string, identity: string, authzEpoch: number) =>
   `${FILE_PROXY_KEY_PREFIX}${id}:${identity}:${authzEpoch}`;
 
@@ -49,9 +48,20 @@ export const clientIpFromRequest = (req: Request): string | undefined => {
 
 export type FileDownloadVia = 'session' | 'share_query' | 'share_path';
 
+interface AuthorizedDownloadAccess {
+  authzEpoch: number;
+  canAccess: true;
+  contentUid: string;
+  matchedBy?: string;
+  spaceId: string;
+}
+
 export interface ServeAuthorizedFileDownloadParams {
+  accessOverride?: AuthorizedDownloadAccess;
+  cacheIdentity?: string | null;
   db: LobeChatDatabase;
   downloadVia: FileDownloadVia;
+  eventVia?: string;
   file: FileItem;
   fileId: string;
   req: Request;
@@ -66,17 +76,33 @@ export interface ServeAuthorizedFileDownloadParams {
 export async function serveAuthorizedFileDownload(
   params: ServeAuthorizedFileDownloadParams,
 ): Promise<Response> {
-  const { db, downloadVia, file, fileId, req, shareLinkId, shareToken, userId } = params;
+  const {
+    accessOverride,
+    cacheIdentity,
+    db,
+    downloadVia,
+    eventVia,
+    file,
+    fileId,
+    req,
+    shareLinkId,
+    shareToken,
+    userId,
+  } = params;
+  const downloadPolicy = resolveFileDownloadPolicy(downloadVia);
 
   const principalId = userId || 'anonymous';
-  const cacheIdentity = shareToken ? `share:${shareToken}` : `user:${principalId}`;
-  const authorizer = new ResourceAuthorizer(db, principalId);
-  const access = await authorizer.getAccessMatch({
-    capability: 'download_blob',
-    id: fileId,
-    kind: 'file',
-    shareToken,
-  });
+  const resolvedCacheIdentity =
+    cacheIdentity || (shareToken ? `share:${shareToken}` : `user:${principalId}`);
+  const authorizer = new ContentAuthorizer(db, principalId);
+  const access =
+    accessOverride ||
+    (await authorizer.getAccessMatch({
+      capability: 'download_blob',
+      id: fileId,
+      kind: 'file',
+      shareToken,
+    }));
 
   if (!access?.canAccess) {
     log('Access denied for file: %s user: %s', fileId, principalId);
@@ -87,35 +113,38 @@ export async function serveAuthorizedFileDownload(
     return new Response('Forbidden', { status: 403 });
   }
 
-  try {
-    const accessEventModel = new ResourceModel(db, principalId);
-    await accessEventModel.createAccessEvent({
-      accessType: 'file_download',
-      metadata: {
-        downloadVia,
-        fileId,
-        matchedBy: access.matchedBy,
-        via: shareToken ? 'share_link' : 'session',
-      },
-      resourceUid: access.resourceUid,
-      shareLinkId,
-      spaceId: access.spaceId,
-      sourceIp: clientIpFromRequest(req) ?? null,
-      userAgent: req.headers.get('user-agent') ?? null,
-    });
-  } catch (eventError) {
-    log('Failed to record file download access event: %O', eventError);
-  }
+  const recordDownloadAccessEvent = async () => {
+    try {
+      const accessEventModel = new ContentModel(db, principalId);
+      await accessEventModel.createAccessEvent({
+        accessType: shareToken ? 'share_download' : 'file_download',
+        metadata: {
+          downloadVia,
+          fileId,
+          matchedBy: access.matchedBy,
+          via: eventVia || (shareToken ? 'share_link' : 'session'),
+        },
+        contentUid: access.contentUid,
+        shareLinkId,
+        spaceId: access.spaceId,
+        sourceIp: clientIpFromRequest(req) ?? null,
+        userAgent: req.headers.get('user-agent') ?? null,
+      });
+    } catch (eventError) {
+      log('Failed to record file download access event: %O', eventError);
+    }
+  };
 
   const redisConfig = getRedisConfig();
   const redisClient = isRedisEnabled(redisConfig) ? await initializeRedis(redisConfig) : null;
 
-  const cacheKey = buildCacheKey(fileId, cacheIdentity, access.authzEpoch);
+  const cacheKey = buildCacheKey(fileId, resolvedCacheIdentity, access.authzEpoch);
   if (redisClient) {
     const cachedStr = await redisClient.get(cacheKey);
     const cached = cachedStr ? (JSON.parse(cachedStr) as CachedFileData) : null;
     if (cached?.redirectUrl) {
       log('Cache hit for file: %s', fileId);
+      await recordDownloadAccessEvent();
       return Response.redirect(cached.redirectUrl, 302);
     }
     log('Cache miss for file: %s', fileId);
@@ -123,8 +152,11 @@ export async function serveAuthorizedFileDownload(
 
   const fileService = new FileService(db, userId || 'anonymous');
 
-  const redirectUrl = await fileService.createPreSignedUrlForPreview(file.url, 300);
-  log('Web S3 presigned URL generated (expires in 5 min)');
+  const redirectUrl = await fileService.createPreSignedUrlForPreview(
+    file.url,
+    downloadPolicy.signedUrlExpiresIn,
+  );
+  log('Web S3 presigned URL generated (expires in %ds)', downloadPolicy.signedUrlExpiresIn);
 
   if (shouldProxyFileResponse(redirectUrl)) {
     log('Proxying file content to avoid mixed content: %s', fileId);
@@ -159,6 +191,8 @@ export async function serveAuthorizedFileDownload(
     const acceptRanges = upstreamResponse.headers.get('accept-ranges');
     if (acceptRanges) headers.set('Accept-Ranges', acceptRanges);
 
+    await recordDownloadAccessEvent();
+
     return new Response(upstreamResponse.body, {
       headers,
       status: upstreamResponse.status,
@@ -167,10 +201,12 @@ export async function serveAuthorizedFileDownload(
 
   if (redisClient) {
     await redisClient.set(cacheKey, JSON.stringify({ redirectUrl }), {
-      ex: PRESIGNED_URL_CACHE_TTL,
+      ex: downloadPolicy.cacheTtlSeconds,
     });
-    log('Cached presigned URL for file: %s (TTL: %ds)', fileId, PRESIGNED_URL_CACHE_TTL);
+    log('Cached presigned URL for file: %s (TTL: %ds)', fileId, downloadPolicy.cacheTtlSeconds);
   }
+
+  await recordDownloadAccessEvent();
 
   return Response.redirect(redirectUrl, 302);
 }

@@ -5,6 +5,35 @@ import type { Context } from 'hono';
 import urlJoin from 'url-join';
 
 import { fileEnv } from '@/envs/file';
+import {
+  isSameOriginAppUrl,
+  isStableAppFileProxyUrl,
+  toAbsoluteStableAppFileProxyUrl,
+} from '@/server/services/file/stableAppFileProxy';
+
+export { isSameOriginAppUrl, isStableAppFileProxyUrl, toAbsoluteStableAppFileProxyUrl };
+
+export async function ensureFileResponseUrl(params: {
+  expiresIn?: number;
+  getFullFileUrl: (url: string, expiresIn?: number) => Promise<string>;
+  url?: string;
+}): Promise<string> {
+  const { expiresIn, getFullFileUrl, url } = params;
+
+  if (!url) {
+    return '';
+  }
+
+  if ((url.startsWith('http://') || url.startsWith('https://')) && !isSameOriginAppUrl(url)) {
+    return url;
+  }
+
+  if (isStableAppFileProxyUrl(url)) {
+    return toAbsoluteStableAppFileProxyUrl(url);
+  }
+
+  return getFullFileUrl(url, expiresIn);
+}
 
 const DEFAULT_S3_USER_FILES_PREFIX = 'files';
 

@@ -29,10 +29,13 @@ import { AiModelModel } from '@/database/models/aiModel';
 import { FileModel } from '@/database/models/file';
 import { MessageModel } from '@/database/models/message';
 import { PluginModel } from '@/database/models/plugin';
+import { SpaceModel } from '@/database/models/space';
+import { SpaceMemoryModel } from '@/database/models/spaceMemory';
 import { ThreadModel } from '@/database/models/thread';
 import { TopicModel } from '@/database/models/topic';
 import { UserModel } from '@/database/models/user';
 import { UserPersonaModel } from '@/database/models/userMemory/persona';
+import { UserMemoryTopicRepository } from '@/database/repositories/userMemory';
 import {
   createServerAgentToolsEngine,
   type EvalContext,
@@ -43,11 +46,18 @@ import { AgentService } from '@/server/services/agent';
 import { AgentRuntimeService } from '@/server/services/agentRuntime';
 import { type StepLifecycleCallbacks } from '@/server/services/agentRuntime/types';
 import { FileService } from '@/server/services/file';
+import { resolveRuntimeFileInput } from '@/server/services/file/resolveRuntimeFileInput';
 import { KlavisService } from '@/server/services/klavis';
 import { MarketService } from '@/server/services/market';
+import {
+  buildUserMemoryDataFromSpaceMemory,
+  hasInjectedSpaceMemory,
+  mergeServerUserMemoryConfig,
+} from '@/server/services/spaceMemory/recall';
 import { deviceProxy } from '@/server/services/toolExecution/deviceProxy';
 
 const log = debug('lobe-server:ai-agent-service');
+const MAX_SPACE_MEMORY_RECALL_QUERY_LENGTH = 7000;
 
 const LEGACY_BUILTIN_ROLE_PATTERNS: Partial<Record<string, RegExp>> = {
   [BUILTIN_AGENT_SLUGS.agentBuilder]: /You are Lobe,\s+an Agent Builder integrated into LobeHub\./,
@@ -63,6 +73,15 @@ const isLegacyBuiltinSystemRole = (slug: string, systemRole?: string | null) => 
 
   return pattern ? pattern.test(systemRole) : false;
 };
+
+const buildSpaceMemoryRecallQuery = (parts: Array<string | null | undefined>) =>
+  parts
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .join('\n')
+    .slice(-MAX_SPACE_MEMORY_RECALL_QUERY_LENGTH);
+
+const AI_AGENT_INPUT_STORAGE_SCOPE = 'ai-agent-inputs';
 
 /**
  * Format error for storage in thread metadata
@@ -188,6 +207,22 @@ export class AiAgentService {
     this.agentRuntimeService = new AgentRuntimeService(db, userId);
     this.marketService = new MarketService({ userInfo: { userId } });
     this.klavisService = new KlavisService({ db, userId });
+  }
+
+  private async resolveTargetSpaceIdForAgentInput(params: { spaceId?: string; topicId?: string }) {
+    if (params.spaceId) {
+      const explicitSpace = await new SpaceModel(this.db, this.userId).findAccessibleSpaceById(
+        params.spaceId,
+      );
+      if (explicitSpace?.id) return explicitSpace.id;
+    }
+
+    if (params.topicId) {
+      const topicSpaceId = (await this.topicModel.findById(params.topicId))?.spaceId;
+      if (topicSpaceId) return topicSpaceId;
+    }
+
+    return (await new SpaceModel(this.db, this.userId).getOrCreatePersonalSpace()).id;
   }
 
   /**
@@ -362,8 +397,8 @@ export class AiAgentService {
     );
 
     // 9. Create tools using Server AgentToolsEngine
-    const hasEnabledKnowledgeBases =
-      agentConfig.knowledgeBases?.some((kb: { enabled?: boolean | null }) => kb.enabled === true) ??
+    const hasEnabledSourceSets =
+      agentConfig.sourceSets?.some((item: { enabled?: boolean | null }) => item.enabled === true) ??
       false;
 
     // Build device context for ToolsEngine enableChecker
@@ -378,7 +413,24 @@ export class AiAgentService {
         log('execAgent: failed to query device list: %O', error);
       }
     }
-    const deviceOnline = onlineDevices.length > 0;
+    const activeOnlineDevices = onlineDevices.filter(
+      (device) => device.online && device.allowRemoteTools,
+    );
+    const deviceOnline = activeOnlineDevices.length > 0;
+
+    // Derive activeDeviceId before tool generation:
+    // 1. If agent has a bound device and it's online, use it
+    // 2. In IM/Bot scenarios, auto-activate when exactly one device is online
+    const boundDeviceOnline = boundDeviceId
+      ? activeOnlineDevices.some((device) => device.deviceId === boundDeviceId)
+      : false;
+    const activeDeviceId = boundDeviceId
+      ? boundDeviceOnline
+        ? boundDeviceId
+        : undefined
+      : (discordContext || botContext) && activeOnlineDevices.length === 1
+        ? activeOnlineDevices[0].deviceId
+        : undefined;
 
     const toolsContext: ServerAgentToolsContext = {
       installedPlugins,
@@ -392,10 +444,15 @@ export class AiAgentService {
         plugins: agentConfig?.plugins ?? undefined,
       },
       deviceContext: gatewayConfigured
-        ? { boundDeviceId, deviceOnline, gatewayConfigured: true }
+        ? {
+            activeDeviceReady: !!activeDeviceId,
+            boundDeviceId,
+            deviceOnline,
+            gatewayConfigured: true,
+          }
         : undefined,
       globalMemoryEnabled,
-      hasEnabledKnowledgeBases,
+      hasEnabledSourceSets,
       model,
       provider,
     });
@@ -454,17 +511,6 @@ export class AiAgentService {
         systemRole: generateSystemPrompt(onlineDevices),
       };
     }
-
-    // Derive activeDeviceId from device context:
-    // 1. If agent has a bound device and it's online, use it
-    // 2. In IM/Bot scenarios, auto-activate when exactly one device is online
-    const activeDeviceId = boundDeviceId
-      ? deviceOnline
-        ? boundDeviceId
-        : undefined
-      : (discordContext || botContext) && onlineDevices.length === 1
-        ? onlineDevices[0].deviceId
-        : undefined;
 
     // 9.4. Fetch device system info for placeholder variable replacement
     let deviceSystemInfo: Record<string, string> = {};
@@ -538,12 +584,12 @@ export class AiAgentService {
       }
 
       // Build availablePlugins from all plugin sources
-      // Exclude only truly internal tools (agent-management itself, agent-builder, page-agent)
+      // Exclude only truly internal tools (agent-management itself, agent-builder, docs-agent)
       const INTERNAL_TOOLS = new Set([
         'lobe-agent-management', // Don't show agent-management in its own context
         'lobe-agent-builder', // Used for editing current agent, not for creating new agents
         'lobe-group-agent-builder', // Used for editing current group, not for creating new agents
-        'lobe-page-agent', // Page-editor specific tool
+        'lobe-docs-agent', // Page-editor specific tool
       ]);
 
       const availablePlugins = [
@@ -611,6 +657,52 @@ export class AiAgentService {
       } catch (error) {
         log('execAgent: failed to fetch user persona: %O', error);
       }
+
+      try {
+        const recallSpaceId =
+          appContext?.spaceId ??
+          (topicId ? ((await this.topicModel.findById(topicId))?.spaceId ?? undefined) : undefined);
+
+        if (recallSpaceId) {
+          const space = await new SpaceModel(this.db, this.userId).findAccessibleSpaceById(
+            recallSpaceId,
+          );
+
+          if (space?.kind === 'team') {
+            const topicQuery = topicId
+              ? await new UserMemoryTopicRepository(
+                  this.db,
+                  this.userId,
+                ).getUserMessagesQueryForTopic(topicId)
+              : null;
+            const recallQuery = buildSpaceMemoryRecallQuery([topicQuery, prompt]);
+            const recallEntries = await new SpaceMemoryModel(
+              this.db,
+              this.userId,
+            ).listPublishedRecallEntries({
+              query: recallQuery,
+              spaceId: recallSpaceId,
+            });
+            const spaceMemoryData = buildUserMemoryDataFromSpaceMemory(recallEntries, {
+              query: recallQuery,
+            });
+
+            if (hasInjectedSpaceMemory(spaceMemoryData)) {
+              userMemory = mergeServerUserMemoryConfig(userMemory, spaceMemoryData);
+
+              log(
+                'execAgent: attached team space memory (space=%s, contexts=%d, experiences=%d, preferences=%d)',
+                recallSpaceId,
+                spaceMemoryData.contexts.length,
+                spaceMemoryData.experiences.length,
+                spaceMemoryData.preferences.length,
+              );
+            }
+          }
+        }
+      } catch (error) {
+        log('execAgent: failed to fetch team space memory: %O', error);
+      }
     }
 
     // 11. Get existing messages if provided
@@ -655,33 +747,80 @@ export class AiAgentService {
           fileIds.push(fileId);
 
           if (storedFile.fileType?.startsWith('image/')) {
-            const fileProxyBaseUrl = process.env.INTERNAL_APP_URL || process.env.APP_URL;
-            const fileUrl = fileProxyBaseUrl
-              ? new URL(`/f/${storedFile.id}`, fileProxyBaseUrl).toString()
-              : storedFile.url;
+            try {
+              const providerReadable = await resolveRuntimeFileInput({
+                db: this.db,
+                fileService,
+                url: `/f/${storedFile.id}`,
+                userId: this.userId,
+                via: 'ai_agent_input_image',
+              });
 
-            imageList.push({
-              alt: storedFile.name || 'image',
-              id: storedFile.id,
-              url: fileUrl,
-            });
+              if (providerReadable?.url) {
+                imageList.push({
+                  alt: storedFile.name || 'image',
+                  id: storedFile.id,
+                  url: providerReadable.url,
+                });
+              }
+            } catch (error) {
+              log(
+                'execAgent: failed to issue provider-readable url for existing image file %s: %O',
+                storedFile.id,
+                error,
+              );
+            }
           }
         }
       }
 
       if (files && files.length > 0) {
+        const uploadSpaceId = await this.resolveTargetSpaceIdForAgentInput({
+          spaceId: appContext?.spaceId ?? undefined,
+          topicId,
+        });
+
         for (const file of files) {
           const ext = file.name?.split('.').pop() || 'bin';
-          const pathname = `files/${this.userId}/${nanoid()}/${file.name || `file.${ext}`}`;
+          const { key: pathname } = await fileService.createOpaqueUserBlobPath(
+            AI_AGENT_INPUT_STORAGE_SCOPE,
+            ext,
+            uploadSpaceId,
+          );
 
           try {
-            const result = await fileService.uploadFromUrl(file.url, pathname);
+            const result = await fileService.uploadFromUrl(file.url, pathname, {
+              name: file.name || `file.${ext}`,
+              spaceId: uploadSpaceId,
+            });
             fileIds.push(result.fileId);
 
             // Build imageList for vision-capable models
             const mimeType = file.mimeType || '';
             if (mimeType.startsWith('image/')) {
-              imageList.push({ alt: file.name || 'image', id: result.fileId, url: result.url });
+              try {
+                const providerReadable = await resolveRuntimeFileInput({
+                  db: this.db,
+                  fileService,
+                  url: result.url,
+                  userId: this.userId,
+                  via: 'ai_agent_input_image',
+                });
+
+                if (providerReadable?.url) {
+                  imageList.push({
+                    alt: file.name || 'image',
+                    id: result.fileId,
+                    url: providerReadable.url,
+                  });
+                }
+              } catch (error) {
+                log(
+                  'execAgent: failed to issue provider-readable url for uploaded image file %s: %O',
+                  result.fileId,
+                  error,
+                );
+              }
             }
           } catch (error) {
             log('execAgent: failed to upload file %s: %O', file.url, error);

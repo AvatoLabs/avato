@@ -1,11 +1,12 @@
 import { ActionIcon, Flexbox, Popover, Text } from '@lobehub/ui';
 import { Clock3Icon, PanelRightCloseIcon, PlusIcon } from 'lucide-react';
-import { memo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { DESKTOP_HEADER_ICON_SIZE } from '@/const/layoutTokens';
 import { conversationSelectors, useConversationStore } from '@/features/Conversation';
 import NavHeader from '@/features/NavHeader';
+import { usePageEditorStore } from '@/features/PageEditor/store';
 import { useChatStore } from '@/store/chat';
 import { topicSelectors } from '@/store/chat/slices/topic/selectors';
 import { useGlobalStore } from '@/store/global';
@@ -16,6 +17,7 @@ const CopilotToolbar = memo(() => {
   const { t } = useTranslation('topic');
   const [topicPopoverOpen, setTopicPopoverOpen] = useState(false);
   const agentId = useConversationStore(conversationSelectors.agentId);
+  const documentId = usePageEditorStore((s) => s.documentId);
 
   useChatStore((s) => s.useFetchTopics)(true, { agentId });
 
@@ -25,12 +27,22 @@ const CopilotToolbar = memo(() => {
     topicSelectors.currentTopics(s),
   ]);
 
-  const currentTopic = useChatStore(topicSelectors.currentActiveTopic);
+  const topicsInCurrentDocument = useMemo(
+    () =>
+      (topics || []).filter((topic) =>
+        documentId ? topic.metadata?.docContext?.documentId === documentId : false,
+      ),
+    [documentId, topics],
+  );
+  const currentTopic = useMemo(
+    () => topicsInCurrentDocument.find((topic) => topic.id === activeTopicId),
+    [activeTopicId, topicsInCurrentDocument],
+  );
 
   const [toggleRightPanel] = useGlobalStore((s) => [s.toggleRightPanel]);
 
   const isLoadingTopics = topics === undefined;
-  const hideHistory = !isLoadingTopics && topics.length === 0;
+  const hideHistory = !isLoadingTopics && topicsInCurrentDocument.length === 0;
 
   const topicTitle = currentTopic?.title || t('title');
 
@@ -39,11 +51,10 @@ const CopilotToolbar = memo(() => {
       showTogglePanelButton={false}
       left={
         <Text
+          ellipsis
           style={{ fontSize: 13, fontWeight: 500, marginLeft: 8 }}
+          title={topicTitle}
           type={'secondary'}
-          ellipsis={{
-            tooltipWhenOverflow: true,
-          }}
         >
           {topicTitle}
         </Text>
@@ -54,10 +65,11 @@ const CopilotToolbar = memo(() => {
             icon={PlusIcon}
             size={DESKTOP_HEADER_ICON_SIZE}
             title={t('actions.addNewTopic')}
-            onClick={() => switchTopic(null, { scope: 'page' })}
+            onClick={() => switchTopic(null, { scope: 'doc' })}
           />
           {!hideHistory && (
             <Popover
+              nativeButton={false}
               open={isLoadingTopics ? false : topicPopoverOpen}
               placement="bottomRight"
               trigger="click"
@@ -71,14 +83,14 @@ const CopilotToolbar = memo(() => {
                     width: '100%',
                   }}
                 >
-                  {(topics || []).map((topic) => (
+                  {topicsInCurrentDocument.map((topic) => (
                     <TopicItem
                       active={topic.id === activeTopicId}
                       key={topic.id}
                       topicId={topic.id}
                       topicTitle={topic.title}
                       onClose={() => setTopicPopoverOpen(false)}
-                      onTopicChange={(id) => switchTopic(id)}
+                      onTopicChange={(id) => switchTopic(id, { scope: 'doc' })}
                     />
                   ))}
                 </Flexbox>

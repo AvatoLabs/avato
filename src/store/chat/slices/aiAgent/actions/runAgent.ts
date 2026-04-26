@@ -5,8 +5,8 @@ import i18n from 'i18next';
 
 import { type StreamEvent } from '@/services/agentRuntime';
 import { agentRuntimeService } from '@/services/agentRuntime';
-import { getAgentStoreState } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { getAgentStoreState } from '@/store/agent/store';
 import { type ChatStore } from '@/store/chat/store';
 import { topicMapKey } from '@/store/chat/utils/topicMapKey';
 import { type StoreSetter } from '@/store/types';
@@ -267,7 +267,11 @@ export class AgentActionImpl {
             });
             const opCtx = operation.context;
             if (opCtx.topicId && opCtx.agentId) {
-              const key = topicMapKey({ agentId: opCtx.agentId, groupId: opCtx.groupId });
+              const key = topicMapKey({
+                agentId: opCtx.agentId,
+                groupId: opCtx.groupId,
+                spaceId: opCtx.spaceId,
+              });
               const topicData = this.#get().topicDataMap[key];
               const topic = topicData?.items?.find((item) => item.id === opCtx.topicId);
               if (topic?.title) notificationTitle = topic.title;

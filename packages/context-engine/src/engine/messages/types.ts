@@ -1,5 +1,5 @@
 /* eslint-disable perfectionist/sort-interfaces */
-import type { FileContent, KnowledgeBaseInfo, PageContentContext } from '@lobechat/prompts';
+import type { DocContentContext, FileContent, SourceSetInfo } from '@lobechat/prompts';
 import type { RuntimeInitialContext, RuntimeStepContext } from '@lobechat/types';
 
 import type { OpenAIChatMessage, UIChatMessage } from '@/types/index';
@@ -34,10 +34,12 @@ export interface ModelCapabilityChecker {
  * Knowledge configuration
  */
 export interface KnowledgeConfig {
+  /** Conversation-scoped file contents to inject */
+  conversationFileContents?: FileContent[];
   /** File contents to inject */
   fileContents?: FileContent[];
-  /** Knowledge base metadata to inject */
-  knowledgeBases?: KnowledgeBaseInfo[];
+  /** Source-set metadata to inject */
+  sourceSets?: SourceSetInfo[];
 }
 
 /**
@@ -274,17 +276,17 @@ export interface MessagesEngineParams {
   /** User memory configuration */
   userMemory?: UserMemoryConfig;
 
-  // ========== Page Editor context ==========
+  // ========== Doc Editor context ==========
   /**
    * Initial context captured at operation start (frontend runtime usage)
-   * Contains static state like initial page content that doesn't change during execution
+   * Contains static state like initial doc content that doesn't change during execution
    */
   initialContext?: RuntimeInitialContext;
   /**
-   * Page content context for direct injection (server-side usage)
+   * Doc content context for direct injection (server-side usage)
    * When provided, takes precedence over initialContext/stepContext
    */
-  pageContentContext?: PageContentContext;
+  docContentContext?: DocContentContext;
   /**
    * Step context computed at the beginning of each step (frontend runtime usage)
    * Contains dynamic state like latest XML that changes between steps
@@ -324,4 +326,4 @@ export { type GTDTodoItem, type GTDTodoList } from '../../providers/GTDTodoInjec
 export { type SkillMeta } from '../../providers/SkillContextProvider';
 export { type ToolDiscoveryMeta } from '../../providers/ToolDiscoveryProvider';
 export { type OpenAIChatMessage, type UIChatMessage } from '@/types/index';
-export { type FileContent, type KnowledgeBaseInfo } from '@lobechat/prompts';
+export { type FileContent, type SourceSetInfo } from '@lobechat/prompts';

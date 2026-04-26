@@ -6,6 +6,7 @@ import {
   Copy,
   Edit,
   LanguagesIcon,
+  LibraryBig,
   ListChevronsDownUp,
   ListChevronsUpDown,
   ListRestart,
@@ -17,10 +18,14 @@ import {
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { localeOptions } from '@/locales/resources';
+import { useOpenCreateSpaceMemoryCandidateModal } from '@/features/ResourceSpaces/useOpenCreateSpaceMemoryCandidateModal';
+import { useSpaceMemoryCandidateTargets } from '@/features/ResourceSpaces/useSpaceMemoryCandidateTargets';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { localeOptions } from '@/locales/contents';
 import { type UIChatMessage } from '@/types/index';
 
 import { messageStateSelectors, useConversationStore } from '../../../store';
+import { buildSpaceMemoryMessageSourceTitle } from '../../Actions/spaceMemorySourcePreview';
 
 const translateStyle = css`
   .ant-dropdown-menu-sub {
@@ -35,6 +40,7 @@ export interface ActionItem extends ActionIconGroupItemType {
 }
 
 export interface AssistantActions {
+  addToSpaceMemory?: ActionItem;
   collapse: ActionItem;
   copy: ActionItem;
   del: ActionItem;
@@ -60,8 +66,12 @@ export const useAssistantActions = ({
   data,
   onOpenShareModal,
 }: UseAssistantActionsParams): AssistantActions => {
-  const { t } = useTranslation(['common', 'chat']);
+  const { t } = useTranslation(['common', 'chat', 'file']);
   const { message } = App.useApp();
+  const activeSpaceId = resolveWorkspaceSpaceId();
+  const { defaultSpaceId, teamSpaces } = useSpaceMemoryCandidateTargets(activeSpaceId);
+  const openCreateSpaceMemoryCandidateModal = useOpenCreateSpaceMemoryCandidateModal();
+  const sourceTitle = buildSpaceMemoryMessageSourceTitle(data.content);
 
   // Get state from ConversationStore
   const isCollapsed = useConversationStore(messageStateSelectors.isMessageCollapsed(id));
@@ -88,6 +98,21 @@ export const useAssistantActions = ({
 
   return useMemo<AssistantActions>(
     () => ({
+      addToSpaceMemory:
+        teamSpaces.length > 0
+          ? {
+              handleClick: () =>
+                openCreateSpaceMemoryCandidateModal({
+                  defaultSummary: data.content,
+                  defaultTitle: sourceTitle,
+                  initialSpaceId: defaultSpaceId,
+                  sourceRefs: [{ id, kind: 'message', title: sourceTitle }],
+                }),
+              icon: LibraryBig,
+              key: 'addToSpaceMemory',
+              label: t('space.memory.actions.addFromSource', { ns: 'file' }),
+            }
+          : undefined,
       collapse: {
         handleClick: () => toggleMessageCollapsed(id),
         icon: ListChevronsDownUp,
@@ -172,10 +197,12 @@ export const useAssistantActions = ({
     [
       t,
       id,
+      defaultSpaceId,
       data.content,
       data.error,
       isRegenerating,
       isCollapsed,
+      teamSpaces.length,
       toggleMessageEditing,
       deleteMessage,
       regenerateAssistantMessage,
@@ -184,6 +211,8 @@ export const useAssistantActions = ({
       delAndRegenerateMessage,
       toggleMessageCollapsed,
       onOpenShareModal,
+      openCreateSpaceMemoryCandidateModal,
+      sourceTitle,
       message,
     ],
   );

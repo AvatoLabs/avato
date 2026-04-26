@@ -17,6 +17,7 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     );
 
     background: ${cssVar.colorBgContainer};
+    box-shadow: ${cssVar.boxShadowTertiary};
   `,
 
   // 外层容器

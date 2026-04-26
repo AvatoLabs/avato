@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 import ContentViewer from '@/features/AgentSkillDetail/ContentViewer';
 import FileTree from '@/features/AgentSkillDetail/FileTree';
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 
 import SkillEditForm, { type SkillEditFormValues } from './SkillEditForm';
 

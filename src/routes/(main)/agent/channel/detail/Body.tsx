@@ -85,6 +85,7 @@ interface BodyProps {
   form: FormInstance<ChannelFormValues>;
   hasConfig: boolean;
   onCopied: () => void;
+  onCopyFailed?: () => void;
   onDelete: () => void;
   onSave: () => void;
   onTestConnection: () => void;
@@ -111,6 +112,7 @@ const Body = memo<BodyProps>(
     onTestConnection,
     onToggleEnable,
     onCopied,
+    onCopyFailed,
   }) => {
     const { t } = useTranslation('agent');
     const origin = useAppOrigin();
@@ -217,9 +219,14 @@ const Body = memo<BodyProps>(
               <Flexbox horizontal gap={8}>
                 <div className={styles.webhookBox}>{webhookUrl}</div>
                 <Button
-                  onClick={() => {
-                    navigator.clipboard.writeText(webhookUrl);
-                    onCopied();
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(webhookUrl);
+                      onCopied();
+                    } catch (error) {
+                      console.error('Failed to copy webhook URL:', error);
+                      onCopyFailed?.();
+                    }
                   }}
                 >
                   {t('channel.copy')}

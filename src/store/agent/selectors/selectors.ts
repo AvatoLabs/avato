@@ -9,13 +9,13 @@ import {
 } from '@lobechat/const';
 import {
   type AgentMode,
-  type KnowledgeItem,
+  type AgentSourceItem,
   type LobeAgentConfig,
   type LobeAgentTTSConfig,
   type LocalSystemConfig,
   type MetaData,
 } from '@lobechat/types';
-import { KnowledgeType } from '@lobechat/types';
+import { AgentSourceKind } from '@lobechat/types';
 import { VoiceList } from '@lobehub/tts';
 
 import { DEFAULT_OPENING_QUESTIONS } from '@/features/AgentSetting/store/selectors';
@@ -33,7 +33,9 @@ const isCurrentInboxAgent = (s: AgentStoreState) => {
   const data = currentAgentData(s);
   if (!data) return false;
 
-  return s.activeAgentId === builtinAgentSelectors.inboxAgentId(s) || data.slug === INBOX_SESSION_ID;
+  return (
+    s.activeAgentId === builtinAgentSelectors.inboxAgentId(s) || data.slug === INBOX_SESSION_ID
+  );
 };
 
 const currentAgentTitle = (s: AgentStoreState) =>
@@ -134,10 +136,10 @@ const displayableAgentPlugins = (s: AgentStoreState) => {
   return filterToolIds(plugins);
 };
 
-const currentAgentKnowledgeBases = (s: AgentStoreState) => {
+const currentAgentSourceSets = (s: AgentStoreState) => {
   const config = currentAgentConfig(s);
 
-  return config?.knowledgeBases || [];
+  return config?.sourceSets || [];
 };
 
 const currentAgentFiles = (s: AgentStoreState) => {
@@ -175,18 +177,29 @@ const currentAgentTTSVoice =
     return currentVoice || 'alloy';
   };
 
-const currentEnabledKnowledge = (s: AgentStoreState) => {
-  const knowledgeBases = currentAgentKnowledgeBases(s);
+const currentEnabledSources = (s: AgentStoreState) => {
+  const sourceSets = currentAgentSourceSets(s);
   const files = currentAgentFiles(s);
 
   return [
     ...files
       .filter((f) => f.enabled)
-      .map((f) => ({ fileType: f.type, id: f.id, name: f.name, type: KnowledgeType.File })),
-    ...knowledgeBases
+      .map((f) => ({
+        fileType: f.type,
+        id: f.id,
+        name: f.name,
+        spaceId: f.spaceId,
+        type: AgentSourceKind.File,
+      })),
+    ...sourceSets
       .filter((k) => k.enabled)
-      .map((k) => ({ id: k.id, name: k.name, type: KnowledgeType.KnowledgeBase })),
-  ] as KnowledgeItem[];
+      .map((k) => ({
+        id: k.id,
+        name: k.name,
+        spaceId: k.spaceId,
+        type: AgentSourceKind.SourceSet,
+      })),
+  ] as AgentSourceItem[];
 };
 
 const hasSystemRole = (s: AgentStoreState) => {
@@ -195,10 +208,10 @@ const hasSystemRole = (s: AgentStoreState) => {
   return !!config?.systemRole;
 };
 
-const hasKnowledgeBases = (s: AgentStoreState) => {
-  const knowledgeBases = currentAgentKnowledgeBases(s);
+const hasSourceSets = (s: AgentStoreState) => {
+  const sourceSets = currentAgentSourceSets(s);
 
-  return knowledgeBases.length > 0;
+  return sourceSets.length > 0;
 };
 
 const hasFiles = (s: AgentStoreState) => {
@@ -207,17 +220,17 @@ const hasFiles = (s: AgentStoreState) => {
   return files.length > 0;
 };
 
-const hasKnowledge = (s: AgentStoreState) => hasKnowledgeBases(s) || hasFiles(s);
-const hasEnabledKnowledge = (s: AgentStoreState) => currentEnabledKnowledge(s).length > 0;
-const hasEnabledKnowledgeBases = (s: AgentStoreState) =>
-  currentAgentKnowledgeBases(s).some((s) => s.enabled);
+const hasSources = (s: AgentStoreState) => hasSourceSets(s) || hasFiles(s);
+const hasEnabledSources = (s: AgentStoreState) => currentEnabledSources(s).length > 0;
+const hasEnabledSourceSets = (s: AgentStoreState) =>
+  currentAgentSourceSets(s).some((s) => s.enabled);
 
-const currentKnowledgeIds = (s: AgentStoreState) => {
+const currentSourceIds = (s: AgentStoreState) => {
   return {
     fileIds: currentAgentFiles(s)
       .filter((item) => item.enabled)
       .map((f) => f.id),
-    knowledgeBaseIds: currentAgentKnowledgeBases(s)
+    sourceSetIds: currentAgentSourceSets(s)
       .filter((item) => item.enabled)
       .map((k) => k.id),
   };
@@ -278,7 +291,7 @@ export const agentSelectors = {
   currentAgentConfig,
   currentAgentDescription,
   currentAgentFiles,
-  currentAgentKnowledgeBases,
+  currentAgentSourceSets,
   currentAgentLocalSystemConfig,
   currentAgentMeta,
   currentAgentMode,
@@ -291,16 +304,17 @@ export const agentSelectors = {
   currentAgentTags,
   currentAgentTitle,
   currentAgentWorkingDirectory,
-  currentEnabledKnowledge,
-  currentKnowledgeIds,
+  currentEnabledSources,
+  currentSourceIds,
   displayableAgentPlugins,
   getAgentConfigById,
   getAgentMetaById,
   getAgentSlugById,
-  hasEnabledKnowledge,
-  hasEnabledKnowledgeBases,
-  hasKnowledge,
+  hasEnabledSourceSets,
+  hasEnabledSources,
+  hasSources,
   hasSystemRole,
+  hasSourceSets,
   inboxAgentConfig,
   inboxAgentModel,
   isAgentConfigLoading,
