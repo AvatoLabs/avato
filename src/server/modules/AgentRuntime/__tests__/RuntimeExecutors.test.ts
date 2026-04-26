@@ -902,6 +902,7 @@ describe('RuntimeExecutors', () => {
         executionTime: 100,
         state: {
           metadata: {
+            activeDeviceComputerUseReady: true,
             activeDeviceId: 'device-new',
             devicePlatform: 'darwin',
             deviceSystemInfo: {
@@ -942,6 +943,7 @@ describe('RuntimeExecutors', () => {
       const result = await executors.call_tool!(instruction, state);
 
       expect(result.newState.metadata).toMatchObject({
+        activeDeviceComputerUseReady: true,
         activeDeviceId: 'device-new',
         devicePlatform: 'darwin',
         deviceSystemInfo: {

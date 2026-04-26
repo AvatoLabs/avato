@@ -209,6 +209,7 @@ describe('AiAgentService.execAgent - device tool pipeline (LOBE-5636)', () => {
       expect(mockCreateServerAgentToolsEngine).toHaveBeenCalledTimes(1);
       const params = mockCreateServerAgentToolsEngine.mock.calls[0][1];
       expect(params.deviceContext).toEqual({
+        activeDeviceComputerUseReady: false,
         activeDeviceReady: false,
         boundDeviceId: undefined,
         deviceOnline: true,
@@ -236,6 +237,7 @@ describe('AiAgentService.execAgent - device tool pipeline (LOBE-5636)', () => {
       expect(mockCreateServerAgentToolsEngine).toHaveBeenCalledTimes(1);
       const params = mockCreateServerAgentToolsEngine.mock.calls[0][1];
       expect(params.deviceContext).toEqual({
+        activeDeviceComputerUseReady: false,
         activeDeviceReady: false,
         boundDeviceId: undefined,
         deviceOnline: false,
@@ -248,6 +250,7 @@ describe('AiAgentService.execAgent - device tool pipeline (LOBE-5636)', () => {
       vi.spyOn(deviceProxy, 'isConfigured', 'get').mockReturnValue(true);
       mockQueryDeviceList.mockResolvedValue([
         {
+          allowRemoteComputerUse: true,
           allowRemoteTools: true,
           deviceId: 'dev-1',
           deviceName: 'My PC',
@@ -267,6 +270,7 @@ describe('AiAgentService.execAgent - device tool pipeline (LOBE-5636)', () => {
       expect(mockCreateServerAgentToolsEngine).toHaveBeenCalledTimes(1);
       const params = mockCreateServerAgentToolsEngine.mock.calls[0][1];
       expect(params.deviceContext).toEqual({
+        activeDeviceComputerUseReady: true,
         activeDeviceReady: true,
         boundDeviceId: undefined,
         deviceOnline: true,

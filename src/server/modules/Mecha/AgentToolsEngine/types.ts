@@ -45,6 +45,7 @@ export interface ServerCreateAgentToolsEngineParams {
   };
   /** Device gateway context for remote tool calling */
   deviceContext?: {
+    activeDeviceComputerUseReady?: boolean;
     activeDeviceReady?: boolean;
     boundDeviceId?: string;
     deviceOnline?: boolean;

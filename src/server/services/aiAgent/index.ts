@@ -432,6 +432,9 @@ export class AiAgentService {
       : (discordContext || botContext) && activeOnlineDevices.length === 1
         ? activeOnlineDevices[0].deviceId
         : undefined;
+    const activeDevice = activeDeviceId
+      ? activeOnlineDevices.find((device) => device.deviceId === activeDeviceId)
+      : undefined;
 
     const toolsContext: ServerAgentToolsContext = {
       installedPlugins,
@@ -446,6 +449,7 @@ export class AiAgentService {
       },
       deviceContext: gatewayConfigured
         ? {
+            activeDeviceComputerUseReady: activeDevice?.allowRemoteComputerUse === true,
             activeDeviceReady: !!activeDeviceId,
             boundDeviceId,
             deviceOnline,
@@ -520,7 +524,6 @@ export class AiAgentService {
       try {
         const systemInfo = await deviceProxy.queryDeviceSystemInfo(this.userId, activeDeviceId);
         if (systemInfo) {
-          const activeDevice = onlineDevices.find((d) => d.deviceId === activeDeviceId);
           deviceSystemInfo = {
             arch: systemInfo.arch,
             desktopPath: systemInfo.desktopPath,
@@ -917,6 +920,7 @@ export class AiAgentService {
     // If createOperation fails, we still have valid messages that need error info
     try {
       const result = await this.agentRuntimeService.createOperation({
+        activeDeviceComputerUseReady: activeDevice?.allowRemoteComputerUse === true,
         activeDeviceId,
         agentConfig,
         deviceSystemInfo: Object.keys(deviceSystemInfo).length > 0 ? deviceSystemInfo : undefined,

@@ -31,7 +31,7 @@ const buildScreenshotState = async (
 ) => {
   if (typeof payload.base64 !== 'string' || typeof payload.mediaType !== 'string') return payload;
 
-  let imageUrl = `data:${payload.mediaType};base64,${payload.base64}`;
+  let imageUrl: string | undefined;
 
   if (processContentBlocks) {
     const processed = await processContentBlocks([
@@ -50,7 +50,7 @@ const buildScreenshotState = async (
   const { base64, ...state } = payload;
   void base64;
 
-  return { ...state, imageUrl };
+  return imageUrl ? { ...state, imageUrl } : state;
 };
 
 const formatComputerUseResult = async (

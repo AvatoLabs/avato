@@ -85,6 +85,7 @@ export class RemoteDeviceExecutionRuntime {
           activatedDevice: target,
           metadata: {
             activeDeviceId: args.deviceId,
+            activeDeviceComputerUseReady: target.allowRemoteComputerUse === true,
             devicePlatform: target.platform,
             deviceSystemInfo,
           },

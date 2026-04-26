@@ -128,6 +128,7 @@ export interface AgentExecutionResult {
 }
 
 export interface OperationCreationParams {
+  activeDeviceComputerUseReady?: boolean;
   activeDeviceId?: string;
   agentConfig?: any;
   appContext: {

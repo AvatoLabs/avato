@@ -18,7 +18,9 @@ import { type RuntimeExecutorContext } from '@/server/modules/AgentRuntime/Runti
 import { createRuntimeExecutors } from '@/server/modules/AgentRuntime/RuntimeExecutors';
 import { type StreamEvent } from '@/server/modules/AgentRuntime/StreamEventManager';
 import { type IStreamEventManager } from '@/server/modules/AgentRuntime/types';
+import { FileService } from '@/server/services/file';
 import { mcpService } from '@/server/services/mcp';
+import { processContentBlocks } from '@/server/services/mcp/contentProcessor';
 import { PluginGatewayService } from '@/server/services/pluginGateway';
 import { QueueService } from '@/server/services/queue';
 import { ToolExecutionService } from '@/server/services/toolExecution';
@@ -233,6 +235,7 @@ export class AgentRuntimeService {
    */
   async createOperation(params: OperationCreationParams): Promise<OperationCreationResult> {
     const {
+      activeDeviceComputerUseReady,
       activeDeviceId,
       operationId,
       initialContext,
@@ -285,6 +288,7 @@ export class AgentRuntimeService {
         messages: initialMessages,
         metadata: {
           activeDeviceId,
+          activeDeviceComputerUseReady,
           agentConfig,
           completionWebhook,
           deviceSystemInfo,
@@ -500,6 +504,8 @@ export class AgentRuntimeService {
       const deviceContext = await this.computeDeviceContext(currentState);
       if (deviceContext && currentState.metadata) {
         currentState.metadata.activeDeviceId = deviceContext.activeDeviceId;
+        currentState.metadata.activeDeviceComputerUseReady =
+          deviceContext.activeDeviceComputerUseReady === true;
         currentState.metadata.devicePlatform = deviceContext.devicePlatform;
         currentState.metadata.deviceSystemInfo = deviceContext.deviceSystemInfo;
         log(
@@ -1411,6 +1417,10 @@ export class AgentRuntimeService {
       userId: metadata?.userId,
     });
 
+    const fileService = metadata?.userId
+      ? new FileService(this.serverDB, metadata.userId)
+      : undefined;
+
     // Create streaming executor context
     const executorContext: RuntimeExecutorContext = {
       agentConfig: metadata?.agentConfig,
@@ -1420,6 +1430,9 @@ export class AgentRuntimeService {
       evalContext: metadata?.evalContext,
       messageModel: this.messageModel,
       operationId,
+      processContentBlocks: fileService
+        ? (blocks) => processContentBlocks(blocks, fileService)
+        : undefined,
       serverDB: this.serverDB,
       stepIndex,
       spaceId: metadata?.spaceId ?? undefined,
@@ -1457,6 +1470,8 @@ export class AgentRuntimeService {
           if (activeDeviceId) {
             return {
               activeDeviceId,
+              activeDeviceComputerUseReady:
+                msg.pluginState?.metadata?.activeDeviceComputerUseReady === true,
               devicePlatform: msg.pluginState?.metadata?.devicePlatform as string | undefined,
               deviceSystemInfo: msg.pluginState?.metadata?.deviceSystemInfo as
                 | Record<string, string>

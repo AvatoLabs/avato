@@ -59,6 +59,7 @@ describe('remoteDeviceRuntime', () => {
 
       const mockDevices = [
         {
+          allowRemoteComputerUse: true,
           allowRemoteTools: true,
           deviceId: 'd1',
           hostname: 'host1',
@@ -113,6 +114,7 @@ describe('remoteDeviceRuntime', () => {
 
       mockQueryDeviceList.mockResolvedValue([
         {
+          allowRemoteComputerUse: true,
           allowRemoteTools: true,
           deviceId: 'd1',
           hostname: 'host1',
@@ -142,6 +144,7 @@ describe('remoteDeviceRuntime', () => {
         state: {
           metadata: {
             activeDeviceId: 'd1',
+            activeDeviceComputerUseReady: true,
             devicePlatform: 'darwin',
             deviceSystemInfo: {
               desktopPath: '/Users/test/Desktop',
@@ -180,6 +183,7 @@ describe('remoteDeviceRuntime', () => {
         state: {
           metadata: {
             activeDeviceId: 'd1',
+            activeDeviceComputerUseReady: false,
             devicePlatform: 'linux',
             deviceSystemInfo: undefined,
           },

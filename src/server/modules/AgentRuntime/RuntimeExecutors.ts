@@ -7,7 +7,11 @@ import {
   type InstructionExecutor,
   UsageCounter,
 } from '@lobechat/agent-runtime';
-import { ComputerUseApiName, ComputerUseIdentifier } from '@lobechat/builtin-tool-computer-use';
+import {
+  ComputerUseApiName,
+  ComputerUseIdentifier,
+  ComputerUseManifest,
+} from '@lobechat/builtin-tool-computer-use';
 import { LocalSystemManifest } from '@lobechat/builtin-tool-local-system';
 import { RemoteDeviceIdentifier } from '@lobechat/builtin-tool-remote-device';
 import {
@@ -30,6 +34,7 @@ import { serverMessagesEngine } from '@/server/modules/Mecha/ContextEngineering'
 import { type EvalContext } from '@/server/modules/Mecha/ContextEngineering/types';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 import { type ToolExecutionService } from '@/server/services/toolExecution';
+import { type ToolExecutionContext } from '@/server/services/toolExecution/types';
 import { TopicTitleService } from '@/server/services/topicTitle';
 
 import { type IStreamEventManager } from './types';
@@ -57,6 +62,10 @@ const pickStringRecord = (value: unknown): Record<string, string> | undefined =>
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 };
 
+const shouldProcessToolContentBlocks = (toolCall: ChatToolPayload) =>
+  toolCall.identifier === ComputerUseIdentifier &&
+  toolCall.apiName === ComputerUseApiName.screenshot;
+
 const applyDeviceActivationMetadata = (
   state: AgentState,
   toolIdentifier: string | undefined,
@@ -71,6 +80,7 @@ const applyDeviceActivationMetadata = (
   state.metadata = {
     ...state.metadata,
     activeDeviceId,
+    activeDeviceComputerUseReady: metadata.activeDeviceComputerUseReady === true,
     devicePlatform:
       typeof metadata.devicePlatform === 'string' ? metadata.devicePlatform : undefined,
     deviceSystemInfo: pickStringRecord(metadata.deviceSystemInfo),
@@ -138,6 +148,7 @@ export interface RuntimeExecutorContext {
   fileService?: any;
   messageModel: MessageModel;
   operationId: string;
+  processContentBlocks?: ToolExecutionContext['processContentBlocks'];
   serverDB: LobeChatDatabase;
   /** From execAgent `appContext.spaceId` — preferred Space for builtin tools (e.g. sandbox export). */
   spaceId?: string;
@@ -168,6 +179,7 @@ export const createRuntimeExecutors = (
     const provider = llmPayload.provider || state.modelRuntimeConfig?.provider;
     // Resolve tools via ToolResolver (unified tool injection)
     const activeDeviceId = state.metadata?.activeDeviceId;
+    const activeDeviceComputerUseReady = state.metadata?.activeDeviceComputerUseReady === true;
     const operationToolSet: OperationToolSet = state.operationToolSet ?? {
       enabledToolIds: [],
       manifestMap: state.toolManifestMap ?? {},
@@ -177,6 +189,8 @@ export const createRuntimeExecutors = (
 
     const stepDelta = buildStepToolDelta({
       activeDeviceId,
+      activeDeviceComputerUseReady,
+      computerUseManifest: ComputerUseManifest as unknown as LobeToolManifest,
       forceFinish: state.forceFinish,
       localSystemManifest: LocalSystemManifest as unknown as LobeToolManifest,
       operationManifestMap: operationToolSet.manifestMap,
@@ -726,6 +740,9 @@ export const createRuntimeExecutors = (
         sourceSetIds,
         memoryToolPermission: agentConfig?.chatConfig?.memory?.toolPermission,
         operationId,
+        processContentBlocks: shouldProcessToolContentBlocks(chatToolPayload)
+          ? ctx.processContentBlocks
+          : undefined,
         serverDB: ctx.serverDB,
         spaceId: ctx.spaceId,
         toolManifestMap: effectiveManifestMap,
@@ -958,6 +975,9 @@ export const createRuntimeExecutors = (
             sourceSetIds,
             memoryToolPermission: batchAgentConfig?.chatConfig?.memory?.toolPermission,
             operationId,
+            processContentBlocks: shouldProcessToolContentBlocks(chatToolPayload)
+              ? ctx.processContentBlocks
+              : undefined,
             serverDB: ctx.serverDB,
             spaceId: ctx.spaceId,
             toolManifestMap: batchManifestMap,

@@ -16,6 +16,19 @@ const mockLocalSystemManifest: LobeToolManifest = {
   type: 'builtin',
 };
 
+const mockComputerUseManifest: LobeToolManifest = {
+  api: [
+    {
+      description: 'Screenshot',
+      name: 'screenshot',
+      parameters: { properties: {}, type: 'object' },
+    },
+  ],
+  identifier: 'computer-use',
+  meta: { title: 'Computer Use' },
+  type: 'builtin',
+};
+
 const mockSearchManifest: LobeToolManifest = {
   api: [
     {
@@ -68,6 +81,34 @@ describe('buildStepToolDelta', () => {
     it('should not activate when no localSystemManifest', () => {
       const delta = buildStepToolDelta({
         activeDeviceId: 'device-123',
+        operationManifestMap: {},
+      });
+
+      expect(delta.activatedTools).toHaveLength(0);
+    });
+
+    it('should activate computer-use only when the active device allows it', () => {
+      const delta = buildStepToolDelta({
+        activeDeviceComputerUseReady: true,
+        activeDeviceId: 'device-123',
+        computerUseManifest: mockComputerUseManifest,
+        operationManifestMap: {},
+      });
+
+      expect(delta.activatedTools).toEqual([
+        {
+          id: 'computer-use',
+          manifest: mockComputerUseManifest,
+          source: 'device',
+        },
+      ]);
+    });
+
+    it('should not activate computer-use when the active device does not allow it', () => {
+      const delta = buildStepToolDelta({
+        activeDeviceComputerUseReady: false,
+        activeDeviceId: 'device-123',
+        computerUseManifest: mockComputerUseManifest,
         operationManifestMap: {},
       });
 
@@ -131,13 +172,15 @@ describe('buildStepToolDelta', () => {
     it('should handle device + mentions + forceFinish together', () => {
       const delta = buildStepToolDelta({
         activeDeviceId: 'device-123',
+        activeDeviceComputerUseReady: true,
+        computerUseManifest: mockComputerUseManifest,
         forceFinish: true,
         localSystemManifest: mockLocalSystemManifest,
         mentionedToolIds: ['tool-a'],
         operationManifestMap: {},
       });
 
-      expect(delta.activatedTools).toHaveLength(2); // local-system + tool-a
+      expect(delta.activatedTools).toHaveLength(3); // local-system + computer-use + tool-a
       expect(delta.deactivatedToolIds).toEqual(['*']);
     });
 

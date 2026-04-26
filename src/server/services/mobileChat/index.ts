@@ -148,6 +148,7 @@ interface MobileToolSet {
 }
 
 interface MobileDeviceContext {
+  activeDeviceComputerUseReady?: boolean;
   activeDeviceId?: string;
   deviceSystemInfo?: Record<string, string>;
   gatewayConfigured: boolean;
@@ -364,6 +365,14 @@ const createMobileOperationId = (payload: Pick<MobileChatPayload, 'sessionId' | 
 const isEligibleDevice = (device: DeviceAttachment) =>
   device.online && device.allowRemoteTools === true;
 
+const canUseRemoteComputer = (device?: DeviceAttachment) =>
+  !!device && isEligibleDevice(device) && device.allowRemoteComputerUse === true;
+
+const shouldProcessToolContentBlocks = (toolCall: ChatToolPayload) =>
+  toolCall.source === 'mcp' ||
+  (toolCall.identifier === ComputerUseIdentifier &&
+    toolCall.apiName === ComputerUseApiName.screenshot);
+
 const toDeviceSystemInfoVariables = (
   systemInfo: DeviceSystemInfo,
   device?: DeviceAttachment,
@@ -390,7 +399,10 @@ const hasRemoteDeviceActivation = (toolCall: ChatToolPayload, executionState?: u
 
   const activeDeviceId = metadata.activeDeviceId;
   return typeof activeDeviceId === 'string' && activeDeviceId.trim()
-    ? activeDeviceId.trim()
+    ? {
+        activeDeviceComputerUseReady: metadata.activeDeviceComputerUseReady === true,
+        activeDeviceId: activeDeviceId.trim(),
+      }
     : undefined;
 };
 
@@ -751,16 +763,20 @@ export class MobileChatService {
 
     return {
       activeDeviceId: activeDevice.deviceId,
+      activeDeviceComputerUseReady: canUseRemoteComputer(activeDevice),
       deviceSystemInfo,
       gatewayConfigured: true,
       onlineDevices,
     };
   };
 
-  private ensureActiveDeviceToolSet = (toolSet: MobileToolSet): MobileToolSet => {
+  private ensureActiveDeviceToolSet = (
+    toolSet: MobileToolSet,
+    options: { allowRemoteComputerUse?: boolean } = {},
+  ): MobileToolSet => {
     if (
       toolSet.manifestMap[LocalSystemManifest.identifier] &&
-      toolSet.manifestMap[ComputerUseManifest.identifier]
+      (!options.allowRemoteComputerUse || toolSet.manifestMap[ComputerUseManifest.identifier])
     ) {
       return toolSet;
     }
@@ -774,22 +790,24 @@ export class MobileChatService {
         ...new Set([
           ...toolSet.enabledToolIds,
           LocalSystemManifest.identifier,
-          ComputerUseManifest.identifier,
+          ...(options.allowRemoteComputerUse ? [ComputerUseManifest.identifier] : []),
         ]),
       ],
       manifestMap: {
         ...toolSet.manifestMap,
-        [ComputerUseManifest.identifier]: computerUseManifest,
+        ...(options.allowRemoteComputerUse
+          ? { [ComputerUseManifest.identifier]: computerUseManifest }
+          : {}),
         [LocalSystemManifest.identifier]: localSystemManifest,
       },
       sourceMap: {
         ...toolSet.sourceMap,
-        [ComputerUseManifest.identifier]: 'builtin',
+        ...(options.allowRemoteComputerUse ? { [ComputerUseManifest.identifier]: 'builtin' } : {}),
         [LocalSystemManifest.identifier]: 'builtin',
       },
       tools: dedupeTools([
         ...(toolSet.tools ?? []),
-        ...generateToolsFromManifest(computerUseManifest),
+        ...(options.allowRemoteComputerUse ? generateToolsFromManifest(computerUseManifest) : []),
         ...generateToolsFromManifest(localSystemManifest),
       ] as NonNullable<ChatStreamPayload['tools']>),
     };
@@ -801,14 +819,16 @@ export class MobileChatService {
     toolCall: ChatToolPayload;
     toolSet: MobileToolSet;
   }) => {
-    const activatedDeviceId = hasRemoteDeviceActivation(params.toolCall, params.executionState);
-    if (!activatedDeviceId) {
+    const activation = hasRemoteDeviceActivation(params.toolCall, params.executionState);
+    if (!activation) {
       return { activeDeviceId: params.activeDeviceId, toolSet: params.toolSet };
     }
 
     return {
-      activeDeviceId: activatedDeviceId,
-      toolSet: this.ensureActiveDeviceToolSet(params.toolSet),
+      activeDeviceId: activation.activeDeviceId,
+      toolSet: this.ensureActiveDeviceToolSet(params.toolSet, {
+        allowRemoteComputerUse: activation.activeDeviceComputerUseReady,
+      }),
     };
   };
 
@@ -827,8 +847,9 @@ export class MobileChatService {
       buildMobileToolExecutionContext({
         activeDeviceId: params.activeDeviceId,
         operationId: params.operationId,
-        processContentBlocks:
-          params.toolCall.source === 'mcp' ? params.boundProcessContentBlocks : undefined,
+        processContentBlocks: shouldProcessToolContentBlocks(params.toolCall)
+          ? params.boundProcessContentBlocks
+          : undefined,
         serverDB: this.serverDB,
         sourceSetIds: params.sourceSetIds,
         spaceId: params.payload.spaceId,
@@ -865,7 +886,12 @@ export class MobileChatService {
       ? [
           RemoteDeviceManifest.identifier,
           ...(deviceContext.activeDeviceId
-            ? [ComputerUseManifest.identifier, LocalSystemManifest.identifier]
+            ? [
+                LocalSystemManifest.identifier,
+                ...(deviceContext.activeDeviceComputerUseReady
+                  ? [ComputerUseManifest.identifier]
+                  : []),
+              ]
             : []),
         ]
       : [];
@@ -901,6 +927,7 @@ export class MobileChatService {
         },
         deviceContext: deviceContext.gatewayConfigured
           ? {
+              activeDeviceComputerUseReady: deviceContext.activeDeviceComputerUseReady === true,
               activeDeviceReady: !!deviceContext.activeDeviceId,
               deviceOnline: deviceContext.onlineDevices.some(isEligibleDevice),
               gatewayConfigured: true,
