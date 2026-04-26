@@ -41,6 +41,7 @@ import { notebookRouter } from './notebook';
 import { oauthDeviceFlowRouter } from './oauthDeviceFlow';
 import { pluginRouter } from './plugin';
 import { ragEvalRouter } from './ragEval';
+import { remoteDeviceRouter } from './remoteDevice';
 import { searchRouter } from './search';
 import { sessionRouter } from './session';
 import { sessionGroupRouter } from './sessionGroup';
@@ -94,6 +95,7 @@ export const lambdaRouter = router({
   plugin: pluginRouter,
   ragEval: ragEvalRouter,
   contentShare: contentShareRouter,
+  remoteDevice: remoteDeviceRouter,
   search: searchRouter,
   session: sessionRouter,
   sessionGroup: sessionGroupRouter,

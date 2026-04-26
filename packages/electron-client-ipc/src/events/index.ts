@@ -1,3 +1,4 @@
+import type { DeviceGatewayBroadcastEvents } from './deviceGateway';
 import type { NavigationBroadcastEvents } from './navigation';
 import type { ProtocolBroadcastEvents } from './protocol';
 import type { RemoteServerBroadcastEvents } from './remoteServer';
@@ -11,6 +12,7 @@ import type { AutoUpdateBroadcastEvents } from './update';
 export interface MainBroadcastEvents
   extends
     AutoUpdateBroadcastEvents,
+    DeviceGatewayBroadcastEvents,
     NavigationBroadcastEvents,
     RemoteServerBroadcastEvents,
     SystemBroadcastEvents,

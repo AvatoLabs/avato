@@ -40,8 +40,8 @@ describe('LobeVercelAIGatewayAI - custom features', () => {
     it('should have constructor options with default headers', () => {
       expect(params.constructorOptions).toBeDefined();
       expect(params.constructorOptions?.defaultHeaders).toEqual({
-        'http-referer': 'https://lobehub.com',
-        'x-title': 'LobeHub',
+        'http-referer': process.env.APP_URL || 'https://avato.turingmesh.com',
+        'x-title': 'Avato',
       });
     });
   });

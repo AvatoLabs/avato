@@ -241,6 +241,41 @@ export default {
   'defaultAgent.model.desc': 'Default model used when creating a new Agent',
   'defaultAgent.model.title': 'Model',
   'defaultAgent.title': 'Default Agent Settings',
+  'deviceGateway.connection.desc':
+    'Connection state for reverse device control through the gateway',
+  'deviceGateway.connection.title': 'Connection',
+  'deviceGateway.desc':
+    'Expose this desktop as an online device. Remote tool execution must be enabled separately before Web and mobile clients can run Local System tools, Skills, or local MCP.',
+  'deviceGateway.allowRemoteTools.desc':
+    'Allow Web and mobile clients signed in to this account to run Local System tools, Skills, and local MCP on this desktop',
+  'deviceGateway.allowRemoteTools.title': 'Remote Tool Execution',
+  'deviceGateway.deviceId.desc': 'Stable identifier registered by this desktop app',
+  'deviceGateway.deviceId.title': 'Device ID',
+  'deviceGateway.enabled.desc': 'Connect automatically after desktop sign-in',
+  'deviceGateway.enabled.title': 'Remote Device Agent',
+  'deviceGateway.gatewayUrl.desc':
+    'Override only for self-hosted or staging gateways. Saving reconnects the desktop agent.',
+  'deviceGateway.gatewayUrl.placeholder': 'Use the default gateway',
+  'deviceGateway.gatewayUrl.reset': 'Reset',
+  'deviceGateway.gatewayUrl.save': 'Save',
+  'deviceGateway.gatewayUrl.title': 'Gateway',
+  'deviceGateway.gatewayProxyUrl.desc':
+    'Optional proxy used only by the device gateway WebSocket. Leave global Network Proxy off if it breaks the main Avato server.',
+  'deviceGateway.gatewayProxyUrl.placeholder': 'Optional, for example http://127.0.0.1:49790',
+  'deviceGateway.gatewayProxyUrl.reset': 'Clear',
+  'deviceGateway.gatewayProxyUrl.save': 'Save',
+  'deviceGateway.gatewayProxyUrl.title': 'Gateway Proxy',
+  'deviceGateway.lastError.desc': 'Latest connection or authorization error',
+  'deviceGateway.lastError.title': 'Last Error',
+  'deviceGateway.refresh': 'Refresh',
+  'deviceGateway.status.authenticating': 'Authenticating',
+  'deviceGateway.status.connected': 'Connected',
+  'deviceGateway.status.connecting': 'Connecting',
+  'deviceGateway.status.disconnected': 'Disconnected',
+  'deviceGateway.status.reconnecting': 'Reconnecting',
+  'deviceGateway.status.unknown': 'Unknown',
+  'deviceGateway.title': 'Remote Device Gateway',
+  'deviceGateway.value.empty': 'Not available',
   'group.aiConfig': 'Agent',
   'group.common': 'General',
   'group.profile': 'Account',
@@ -1444,8 +1479,7 @@ When I am ___, I need ___
   'tools.avatohubSkill.disconnected': 'Disconnected',
 
   'tools.avatohubSkill.error': 'Error',
-  'tools.avatohubSkill.togglePluginFailed':
-    'Failed to update the skill state. Please try again.',
+  'tools.avatohubSkill.togglePluginFailed': 'Failed to update the skill state. Please try again.',
   // Avato Skill Providers i18n
   'tools.avatohubSkill.providers.linear.description':
     'Linear is a modern issue tracking and project management tool designed for high-performance teams to build better software faster',

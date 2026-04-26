@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,6 +10,7 @@ import EmptyPlaceholder from './EmptyPlaceholder';
 const mockNavigate = vi.hoisted(() => vi.fn());
 const mockOpenCreateSourceSet = vi.hoisted(() => vi.fn());
 const mockPushDockFileList = vi.hoisted(() => vi.fn());
+const mockUploadFolderWithStructure = vi.hoisted(() => vi.fn());
 const searchParamsState = vi.hoisted(() => ({
   value: 'assetClassification=brand&category=images',
 }));
@@ -29,7 +30,11 @@ vi.mock('@lobehub/ui', () => ({
       {children}
     </div>
   ),
-  FileTypeIcon: ({ icon, className }: any) => <div className={className}>{icon}</div>,
+  FileTypeIcon: ({ icon, className }: any) => (
+    <div className={className} data-testid="file-type-icon">
+      {icon}
+    </div>
+  ),
   Flexbox: ({ children, className, style }: any) => (
     <div className={className} style={style}>
       {children}
@@ -65,7 +70,11 @@ vi.mock('antd-style', () => {
   };
 
   return {
-    createStaticStyles: (factory: any) => factory({ css: () => 'cls', cssVar: mockCssVar }),
+    createStaticStyles: (factory: any) => {
+      const styles = factory({ css: () => '', cssVar: mockCssVar });
+
+      return Object.fromEntries(Object.keys(styles).map((key) => [key, key]));
+    },
     cssVar: mockCssVar,
     cx: (...classNames: string[]) => classNames.filter(Boolean).join(' '),
   };
@@ -73,10 +82,7 @@ vi.mock('antd-style', () => {
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (
-      key: string,
-      options?: { count?: number; defaultValue?: string; label?: string },
-    ) => {
+    t: (key: string, options?: { count?: number; defaultValue?: string; label?: string }) => {
       if (key === 'filters.clearGovernance') return 'Clear governance filters';
       if (key === 'filters.adjustGovernance') return 'Adjust governance filters';
       if (key === 'filters.adjustGovernanceFilter') return `Adjust ${options?.label} filter`;
@@ -203,6 +209,7 @@ vi.mock('@/store/file', () => ({
   useFileStore: (selector: any) =>
     selector({
       pushDockFileList: mockPushDockFileList,
+      uploadFolderWithStructure: mockUploadFolderWithStructure,
     }),
 }));
 
@@ -340,6 +347,38 @@ describe('EmptyPlaceholder', () => {
     expect(mockOpenCreateSourceSet).toHaveBeenCalledWith({ spaceId: 'space-1' });
   });
 
+  it('does not duplicate the drag-and-drop title in the normal empty state', () => {
+    searchParamsState.value = 'category=images';
+    contentManagerState.assetClassification = undefined;
+
+    render(
+      <MemoryRouter>
+        <EmptyPlaceholder />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByText('FileManager.emptyStatus.title')).toHaveLength(1);
+  });
+
+  it('keeps decorative card icons positioned by an outer slot', () => {
+    searchParamsState.value = 'category=images';
+    contentManagerState.assetClassification = undefined;
+
+    render(
+      <MemoryRouter>
+        <EmptyPlaceholder />
+      </MemoryRouter>,
+    );
+
+    const uploadFileButton = screen.getByRole('button', { name: /actions\.file/i });
+    const iconSlot = uploadFileButton.querySelector('.iconSlot');
+    const fileTypeIcon = uploadFileButton.querySelector('[data-testid="file-type-icon"]');
+
+    expect(iconSlot).toBeTruthy();
+    expect(iconSlot).toContainElement(fileTypeIcon);
+    expect(fileTypeIcon).not.toHaveClass('iconSlot');
+  });
+
   it('shows a pending memory review action and deep links to the first governance target', () => {
     searchParamsState.value = '';
     contentManagerState.assetClassification = undefined;
@@ -372,5 +411,41 @@ describe('EmptyPlaceholder', () => {
 
     expect(mockNavigate).toHaveBeenCalledWith('/spaces/space-1/memory');
     expect(screen.queryByRole('button', { name: 'Review 2 Pending' })).not.toBeInTheDocument();
+  });
+
+  it('uploads empty-state folders with structure instead of flattening files', async () => {
+    searchParamsState.value = '';
+    contentManagerState.assetClassification = undefined;
+    const file = new File(['content'], 'README.md');
+
+    Object.defineProperty(file, 'webkitRelativePath', {
+      value: 'project/README.md',
+    });
+
+    const { container } = render(
+      <MemoryRouter>
+        <EmptyPlaceholder />
+      </MemoryRouter>,
+    );
+
+    const folderInput = container.querySelector<HTMLInputElement>('input[webkitdirectory]');
+    expect(folderInput).toBeTruthy();
+
+    fireEvent.change(folderInput!, {
+      target: {
+        files: [file],
+      },
+    });
+
+    await waitFor(() => {
+      expect(mockUploadFolderWithStructure).toHaveBeenCalledWith(
+        [file],
+        undefined,
+        undefined,
+        'space-1',
+      );
+    });
+    expect(mockPushDockFileList).not.toHaveBeenCalled();
+    expect(folderInput!.value).toBe('');
   });
 });

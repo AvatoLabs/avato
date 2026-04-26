@@ -41,10 +41,10 @@ export const LobehubDetailProvider = ({ children, identifier }: LobehubDetailPro
 
   const { author, authorUrl, description, icon, readme, label } = config;
 
-  const localizedDescription = t(`tools.lobehubSkill.providers.${identifier}.description`, {
+  const localizedDescription = t(`tools.avatohubSkill.providers.${identifier}.description`, {
     defaultValue: description,
   });
-  const localizedReadme = t(`tools.lobehubSkill.providers.${identifier}.readme`, {
+  const localizedReadme = t(`tools.avatohubSkill.providers.${identifier}.readme`, {
     defaultValue: readme,
   });
 

@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./http": "./src/http.ts",
+    "./types": "./src/types.ts"
   },
   "main": "./src/index.ts",
   "scripts": {

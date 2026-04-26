@@ -1,6 +1,8 @@
+import { OFFICIAL_URL } from '@lobechat/const';
 import isEqual from 'fast-deep-equal';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import urlJoin from 'url-join';
 
 import { message } from '@/components/AntdStaticMethods';
 import { useMarketAuth } from '@/layout/AuthProvider/MarketAuth';
@@ -127,7 +129,7 @@ export const useMarketGroupPublish = ({ action, onSuccess }: UseMarketGroupPubli
         name: agent.title || 'Untitled Agent',
         role: agent.isSupervisor ? ('supervisor' as const) : ('participant' as const),
         // TODO: Construct proper A2A URL for the agent
-        url: `https://api.lobehub.com/a2a/agents/${agent.id}`,
+        url: urlJoin(OFFICIAL_URL, '/api/a2a/agents', agent.id),
       }));
 
       // Use tRPC publishOrCreate

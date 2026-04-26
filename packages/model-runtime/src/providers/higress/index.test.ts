@@ -28,6 +28,11 @@ describe('LobeHigressAI - params', () => {
     expect(params.constructorOptions?.defaultHeaders).toHaveProperty('HTTP-Referer');
     expect(params.constructorOptions?.defaultHeaders).toHaveProperty('X-Title');
     expect(params.constructorOptions?.defaultHeaders).toHaveProperty('x-Request-Id');
+    expect(params.constructorOptions?.defaultHeaders?.['HTTP-Referer']).toBe(
+      process.env.APP_URL || 'https://avato.turingmesh.com',
+    );
+    expect(params.constructorOptions?.defaultHeaders?.['X-Title']).toBe('Avato');
+    expect(params.constructorOptions?.defaultHeaders?.['x-Request-Id']).toMatch(/^avato-/);
   });
 
   describe('models function', () => {

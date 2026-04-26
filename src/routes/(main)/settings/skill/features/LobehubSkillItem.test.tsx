@@ -101,7 +101,7 @@ describe('LobehubSkillItem', () => {
     render(
       <LobehubSkillItem
         provider={{
-          author: 'LobeHub',
+          author: 'Avato',
           description: 'desc',
           icon: 'icon.png',
           id: 'linear',
@@ -124,7 +124,7 @@ describe('LobehubSkillItem', () => {
     render(
       <LobehubSkillItem
         provider={{
-          author: 'LobeHub',
+          author: 'Avato',
           description: 'desc',
           icon: 'icon.png',
           id: 'linear',

@@ -91,7 +91,9 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     opacity: 0.5;
     filter: blur(24px);
   `,
-  icon: css`
+  iconSlot: css`
+    pointer-events: none;
+
     position: absolute;
     z-index: 1;
     inset-block-end: -24px;
@@ -361,13 +363,14 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
                 </span>
                 <span className={styles.actionDescription}>{t('docEditor.editorPlaceholder')}</span>
                 <div className={styles.glow} style={{ background: cssVar.colorPrimary }} />
-                <FileTypeIcon
-                  className={styles.icon}
-                  color={cssVar.colorPrimary}
-                  icon={<Icon color={cssVar.colorTextLightSolid} icon={PlusIcon} />}
-                  size={ICON_SIZE}
-                  type={'file'}
-                />
+                <div className={styles.iconSlot}>
+                  <FileTypeIcon
+                    color={cssVar.colorPrimary}
+                    icon={<Icon color={cssVar.colorTextLightSolid} icon={PlusIcon} />}
+                    size={ICON_SIZE}
+                    type={'file'}
+                  />
+                </div>
               </Flexbox>
 
               {!isTablePage && (
@@ -390,13 +393,14 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
                     </span>
                     <span className={styles.actionDescription}>{t('empty')}</span>
                     <div className={styles.glow} style={{ background: cssVar.colorPrimary }} />
-                    <FileTypeIcon
-                      className={styles.icon}
-                      color={cssVar.colorPrimary}
-                      icon={<Icon color={cssVar.colorTextLightSolid} icon={ArrowUpIcon} />}
-                      size={ICON_SIZE}
-                      type={'file'}
-                    />
+                    <div className={styles.iconSlot}>
+                      <FileTypeIcon
+                        color={cssVar.colorPrimary}
+                        icon={<Icon color={cssVar.colorTextLightSolid} icon={ArrowUpIcon} />}
+                        size={ICON_SIZE}
+                        type={'file'}
+                      />
+                    </div>
                   </Flexbox>
                   <input
                     hidden

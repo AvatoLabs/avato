@@ -22,3 +22,4 @@ patchedDependencies:
   '@react-navigation/native-stack': patches/@react-navigation__native-stack.patch
   '@lobehub/ui': patches/@lobehub__ui.patch
   '@swagger-api/apidom-reference': patches/@swagger-api__apidom-reference.patch
+  'framer-motion@12.38.0': patches/framer-motion@12.38.0.patch

@@ -4,6 +4,7 @@ import {
   DEFAULT_DISCOVER_PROVIDER_ITEM,
   isDesktop,
   KLAVIS_SERVER_TYPES,
+  OFFICIAL_URL,
 } from '@lobechat/const';
 import {
   type AgentStatus,
@@ -247,7 +248,7 @@ export class DiscoverService {
     const deviceId = await getDeviceId();
 
     const { client_id, client_secret } = await this.market.registerClient({
-      clientName: `LobeHub ${isDesktop ? 'Desktop' : 'Web'}`,
+      clientName: `Avato ${isDesktop ? 'Desktop' : 'Web'}`,
       clientType: isDesktop ? 'desktop' : 'web',
       deviceId,
       platform: isDesktop ? process.platform : userAgent,
@@ -500,7 +501,7 @@ export class DiscoverService {
         forkedFromAgentId: (data as any).forkedFromAgentId,
         homepage:
           (data as any).homepage ||
-          `https://lobehub.com/discover/assistant/${(data as any).identifier}`,
+          urlJoin(OFFICIAL_URL, '/discover/assistant', (data as any).identifier),
         identifier: (data as any).identifier,
         isValidated: (data as any).isValidated,
         knowledgeCount:
@@ -641,7 +642,7 @@ export class DiscoverService {
           createdAt: item.createdAt || item.updatedAt || new Date().toISOString(),
           description: item.description || item.summary || '',
           forkCount: item.forkCount,
-          homepage: item.homepage || `https://lobehub.com/discover/assistant/${item.identifier}`,
+          homepage: item.homepage || urlJoin(OFFICIAL_URL, '/discover/assistant', item.identifier),
           identifier: item.identifier,
           installCount: item.installCount,
           knowledgeCount: item.knowledgeCount ?? item.config?.sourceSets?.length ?? 0,
@@ -852,7 +853,7 @@ export class DiscoverService {
           config: {} as any,
           createdAt: item.createdAt || item.updatedAt || new Date().toISOString(),
           description: item.description || '',
-          homepage: `https://lobehub.com/discover/assistant/${item.identifier}`,
+          homepage: urlJoin(OFFICIAL_URL, '/discover/assistant', item.identifier),
           identifier: item.identifier,
           installCount: item.installCount,
           knowledgeCount: item.knowledgeCount || 0,
@@ -965,7 +966,7 @@ export class DiscoverService {
         category: undefined,
         createdAt: '',
         description: builtinTool.manifest.meta.description || '',
-        homepage: 'https://lobehub.com',
+        homepage: OFFICIAL_URL,
         identifier: builtinTool.identifier,
         manifest: undefined,
         related: [],
@@ -990,7 +991,7 @@ export class DiscoverService {
         avatar: typeof klavisTool.icon === 'string' ? klavisTool.icon : '',
         category: undefined,
         createdAt: '',
-        description: `LobeHub Mcp Server: ${klavisTool.label}`,
+        description: `Avato MCP Server: ${klavisTool.label}`,
         homepage: 'https://klavis.ai',
         identifier: klavisTool.identifier,
         manifest: undefined,
@@ -1032,7 +1033,9 @@ export class DiscoverService {
 
   getPluginList = async (params: PluginQueryParams = {}): Promise<PluginListResponse> => {
     log('getPluginList: params=%O', params);
-    return this.getMcpList(this.mapPluginQueryToMcpParams(params)) as unknown as Promise<PluginListResponse>;
+    return this.getMcpList(
+      this.mapPluginQueryToMcpParams(params),
+    ) as unknown as Promise<PluginListResponse>;
   };
 
   // ============================== Providers ==============================
@@ -1568,7 +1571,7 @@ export class DiscoverService {
         createdAt: agent.createdAt,
         description: agent.description || '',
         forkCount: agent.forkCount,
-        homepage: `https://lobehub.com/discover/assistant/${agent.identifier}`,
+        homepage: urlJoin(OFFICIAL_URL, '/discover/assistant', agent.identifier),
         identifier: agent.identifier,
         installCount: agent.installCount,
         isValidated: agent.isValidated,
@@ -1589,7 +1592,7 @@ export class DiscoverService {
         createdAt: group.createdAt,
         description: group.description || '',
         forkCount: group.forkCount,
-        homepage: `https://lobehub.com/discover/group_agent/${group.identifier}`,
+        homepage: urlJoin(OFFICIAL_URL, '/discover/group_agent', group.identifier),
         identifier: group.identifier,
         installCount: group.installCount || 0,
         isFeatured: group.isFeatured || false,
@@ -1614,7 +1617,7 @@ export class DiscoverService {
           description: agent.description || '',
           forkCount: agent.forkCount || 0,
           forkedFromAgentId: agent.forkedFromAgentId || null,
-          homepage: `https://lobehub.com/discover/assistant/${agent.identifier}`,
+          homepage: urlJoin(OFFICIAL_URL, '/discover/assistant', agent.identifier),
           identifier: agent.identifier,
           installCount: agent.installCount,
           isValidated: agent.isValidated,
@@ -1637,7 +1640,7 @@ export class DiscoverService {
         description: group.description || '',
         forkCount: group.forkCount || 0,
         forkedFromGroupId: group.forkedFromGroupId || null,
-        homepage: `https://lobehub.com/discover/group_agent/${group.identifier}`,
+        homepage: urlJoin(OFFICIAL_URL, '/discover/group_agent', group.identifier),
         identifier: group.identifier,
         installCount: group.installCount || 0,
         isFeatured: group.isFeatured || false,
@@ -1662,7 +1665,7 @@ export class DiscoverService {
           description: agent.description || '',
           forkCount: agent.forkCount || 0,
           forkedFromAgentId: agent.forkedFromAgentId || null,
-          homepage: `https://lobehub.com/discover/assistant/${agent.identifier}`,
+          homepage: urlJoin(OFFICIAL_URL, '/discover/assistant', agent.identifier),
           identifier: agent.identifier,
           installCount: agent.installCount,
           isValidated: agent.isValidated,
@@ -1685,7 +1688,7 @@ export class DiscoverService {
         description: group.description || '',
         forkCount: group.forkCount || 0,
         forkedFromGroupId: group.forkedFromGroupId || null,
-        homepage: `https://lobehub.com/discover/group_agent/${group.identifier}`,
+        homepage: urlJoin(OFFICIAL_URL, '/discover/group_agent', group.identifier),
         identifier: group.identifier,
         installCount: group.installCount || 0,
         isFeatured: group.isFeatured || false,

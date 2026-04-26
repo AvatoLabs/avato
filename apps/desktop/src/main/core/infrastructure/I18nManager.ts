@@ -2,7 +2,7 @@ import { app } from 'electron';
 import i18next from 'i18next';
 
 import type { App } from '@/core/App';
-import { loadResources } from '@/locales/contents';
+import { loadResources } from '@/locales/resources';
 import { createLogger } from '@/utils/logger';
 
 // Create logger

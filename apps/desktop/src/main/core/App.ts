@@ -84,7 +84,7 @@ export class App {
     logger.info(` lng: ${app.getLocale()}`);
     logger.info(` bin: ${binDir}`);
     logger.info('----------------------------------------------');
-    logger.info('Starting LobeHub...');
+    logger.info('Starting Avato...');
 
     // Append bundled binaries directory to PATH for fallback tool resolution
     const pathSep = process.platform === 'win32' ? ';' : ':';
@@ -415,7 +415,7 @@ export class App {
     if (!isDev) return;
 
     logger.debug('Setting up dev branding');
-    app.setName('lobehub-desktop-dev');
+    app.setName('avato-desktop-dev');
     if (macOS()) {
       app.dock!.setIcon(join(buildDir, 'icon-dev.png'));
     }

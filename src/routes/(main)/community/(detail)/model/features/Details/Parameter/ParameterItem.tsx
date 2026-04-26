@@ -4,9 +4,11 @@ import { cssVar } from 'antd-style';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { OFFICIAL_URL } from '@/const/url';
+
 import Statistic from '../../../../../components/Statistic';
 
-const DEFAULT_DOC_URL = 'https://lobehub.com/docs/usage/agents/model';
+const DEFAULT_DOC_URL = `${OFFICIAL_URL}/docs/usage/agents/model`;
 
 export interface ParameterItemProps {
   defaultValue: string | number;

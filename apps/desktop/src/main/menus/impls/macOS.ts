@@ -3,12 +3,15 @@ import * as path from 'node:path';
 import type { MenuItemConstructorOptions } from 'electron';
 import { app, clipboard, Menu, shell } from 'electron';
 
-import { isDev } from '@/const/env';
+import { isDev, OFFICIAL_CLOUD_SERVER } from '@/const/env';
 import NotificationCtr from '@/controllers/NotificationCtr';
 import SystemController from '@/controllers/SystemCtr';
 
 import type { ContextMenuData, IMenuPlatform, MenuOptions } from '../types';
 import { BaseMenuPlatform } from './BaseMenuPlatform';
+
+const GITHUB_REPO_URL = 'https://github.com/AvatoLabs/avatohub';
+const GITHUB_ISSUES_URL = `${GITHUB_REPO_URL}/issues/new/choose`;
 
 export class MacOSMenu extends BaseMenuPlatform implements IMenuPlatform {
   private appMenu: Menu | null = null;
@@ -226,19 +229,19 @@ export class MacOSMenu extends BaseMenuPlatform implements IMenuPlatform {
         submenu: [
           {
             click: async () => {
-              await shell.openExternal('https://lobehub.com');
+              await shell.openExternal(OFFICIAL_CLOUD_SERVER);
             },
             label: t('help.visitWebsite'),
           },
           {
             click: async () => {
-              await shell.openExternal('https://github.com/lobehub/lobe-chat');
+              await shell.openExternal(GITHUB_REPO_URL);
             },
             label: t('help.githubRepo'),
           },
           {
             click: async () => {
-              await shell.openExternal('https://github.com/lobehub/lobe-chat/issues/new/choose');
+              await shell.openExternal(GITHUB_ISSUES_URL);
             },
             label: t('help.reportIssue'),
           },

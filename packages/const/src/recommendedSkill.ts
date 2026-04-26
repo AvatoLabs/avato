@@ -25,8 +25,7 @@ export const RECOMMENDED_SKILLS: RecommendedSkillItem[] = [
   { id: 'google-calendar', type: RecommendedSkillType.Klavis },
   { id: 'slack', type: RecommendedSkillType.Klavis },
 
-  // LobeHub Market Skills - dynamically fetched from market
-  // These providers are featured on https://lobehub.com/skills
+  // Market skills - dynamically fetched from the configured market
   { id: 'linear', type: RecommendedSkillType.Lobehub },
   { id: 'microsoft', type: RecommendedSkillType.Lobehub },
   { id: 'twitter', type: RecommendedSkillType.Lobehub },

@@ -3,6 +3,7 @@ import { type ChangeEvent } from 'react';
 import { useCallback } from 'react';
 
 import { type FileManageAction } from '@/store/file/slices/fileManager/action';
+
 import {
   filterFilesByBuiltInBlockList,
   filterFilesByGitignore,
@@ -14,7 +15,7 @@ interface UseUploadFolderOptions {
   currentFolderId?: string | null;
   sourceSetId?: string | null;
   spaceId?: string;
-  t: TFunction<'file'>;
+  t: TFunction;
   uploadFolderWithStructure: FileManageAction['uploadFolderWithStructure'];
 }
 

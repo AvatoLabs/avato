@@ -11,7 +11,7 @@ export const DEFAULT_AGENT_META: MetaData = {};
 export const DEFAULT_DOC_COPILOT_AVATAR = '/avatars/doc-copilot.svg';
 export const DEFAULT_GROUP_AGENT_BUILDER_AVATAR = '/avatars/group-agent-builder.svg';
 export const DEFAULT_INBOX_AVATAR = '/avatars/inbox-default.svg';
-export const DEFAULT_USER_AVATAR_URL = BRANDING_LOGO_URL || '/icons/icon-192x192.png';
+export const DEFAULT_USER_AVATAR_URL = BRANDING_LOGO_URL || '/icons/icon-192x192-transparent.png';
 
 const LEGACY_BUILTIN_AVATAR_MAP: Record<string, string> = {
   '/avatars/agent-builder.png': DEFAULT_AGENT_BUILDER_AVATAR,

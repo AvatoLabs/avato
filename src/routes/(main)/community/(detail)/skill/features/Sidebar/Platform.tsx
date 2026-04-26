@@ -1,6 +1,6 @@
 'use client';
 
-import { DEFAULT_INBOX_AVATAR, SESSION_CHAT_URL } from '@lobechat/const';
+import { DEFAULT_INBOX_AVATAR, OFFICIAL_URL, SESSION_CHAT_URL } from '@lobechat/const';
 import { Claude, Cline, Cursor, OpenAI } from '@lobehub/icons';
 import {
   Avatar,
@@ -20,6 +20,7 @@ import { BotIcon, UserRoundIcon } from 'lucide-react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import urlJoin from 'url-join';
 
 import { builtinAgentSelectors } from '@/store/agent/selectors';
 import { useAgentStore } from '@/store/agent/store';
@@ -78,7 +79,7 @@ const genInstallCommand = (identifier?: string, platform?: PlatformType) => {
       return `npx -y @lobehub/market-cli skills install ${id} --agent ${agentMap[platform]}`;
     }
     default: {
-      return `# Recommended for LobeHub users:
+      return `# Recommended for Avato users:
 # Open the marketplace page and install with one click:
 # https://lobechat.com/community/skills/${id}`;
     }
@@ -98,7 +99,7 @@ const genLayout = (
     [PlatformType.Claude]: `~/.claude/skills/${id}`,
     [PlatformType.Cline]: `~/.cline/skills/${id}`,
     [PlatformType.Cursor]: `~/.cursor/skills/${id}`,
-    [PlatformType.LobeHub]: `<managed-by-lobehub>`,
+    [PlatformType.LobeHub]: `<managed-by-avato>`,
     [PlatformType.Codex]: `~/.agents/skills/${id}`,
     [PlatformType.VsCode]: `./.vscode/skills/${id}`,
   };
@@ -154,7 +155,7 @@ const Platform = memo<PlatformProps>(
       switch (active) {
         case PlatformType.LobeHub: {
           return {
-            platform: 'LobeHub',
+            platform: 'Avato',
             steps: t('skills.details.sidebar.platform.steps.avatohub'),
           };
         }
@@ -193,7 +194,8 @@ const Platform = memo<PlatformProps>(
 
     const command = genInstallCommand(identifier, active);
 
-    const agentPrompt = `Curl https://lobehub.com/skills/${identifier}/skill.md, then follow the instructions to set up LobeHub Skills Marketplace and install the skill. Once installed, read the SKILL.md file in the installed directory and follow its instructions to complete the task.`;
+    const skillUrl = urlJoin(OFFICIAL_URL, '/skills', identifier || '', 'skill.md');
+    const agentPrompt = `Curl ${skillUrl}, then follow the instructions to set up Avato Skills Marketplace and install the skill. Once installed, read the SKILL.md file in the installed directory and follow its instructions to complete the task.`;
 
     const handleUseOnLobeAI = useCallback(() => {
       if (!inboxAgentId) return;

@@ -22,10 +22,7 @@ import { registerTopicCommand } from './commands/topic';
 
 const program = new Command();
 
-program
-  .name('lh')
-  .description('LobeHub CLI - manage and connect to LobeHub services')
-  .version('0.1.0');
+program.name('lh').description('Avato CLI - manage and connect to Avato services').version('0.1.0');
 
 registerLoginCommand(program);
 registerLogoutCommand(program);

@@ -134,7 +134,7 @@ export const createServerAgentToolsEngine = (
       rules: {
         [SourceSetManifest.identifier]: hasEnabledSourceSets,
         [LocalSystemManifest.identifier]:
-          !!deviceContext?.gatewayConfigured && !!deviceContext?.deviceOnline,
+          !!deviceContext?.gatewayConfigured && !!deviceContext?.activeDeviceReady,
         [MemoryManifest.identifier]: globalMemoryEnabled,
         [RemoteDeviceManifest.identifier]: !!deviceContext?.gatewayConfigured,
         [WebBrowsingManifest.identifier]: isSearchEnabled,

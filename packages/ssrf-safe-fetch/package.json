@@ -15,10 +15,6 @@
     "test": "vitest run",
     "test:coverage": "vitest --coverage --silent='passed-only'"
   },
-  "dependencies": {
-    "node-fetch": "^3.3.2",
-    "request-filtering-agent": "^3.0.2"
-  },
   "devDependencies": {
     "vitest": "^3.2.4"
   }

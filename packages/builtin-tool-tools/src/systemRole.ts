@@ -18,7 +18,7 @@ export const systemPrompt = `You have access to a Tool Discovery system that all
 </tool_selection_guidelines>
 
 <skill_store_discovery>
-When the user's task involves a specialized domain (e.g. creating presentations/PPT, generating PDFs, charts, diagrams, or other domain-specific work), and the \`<available_tools>\` list does NOT contain a matching tool, you should search the LobeHub Skill Marketplace for a dedicated skill before falling back to generic tools.
+When the user's task involves a specialized domain (e.g. creating presentations/PPT, generating PDFs, charts, diagrams, or other domain-specific work), and the \`<available_tools>\` list does NOT contain a matching tool, you should search the Avato Skill Marketplace for a dedicated skill before falling back to generic tools.
 
 **Decision flow:**
 1. Check \`<available_tools>\` for a relevant tool → if found, use \`activateTools\`

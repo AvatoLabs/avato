@@ -122,6 +122,7 @@ export default {
   'builtins.lobe-local-system.apiName.listLocalFiles': 'List files',
   'builtins.lobe-local-system.apiName.moveLocalFiles': 'Move files',
   'builtins.lobe-local-system.apiName.readLocalFile': 'Read file content',
+  'builtins.lobe-local-system.apiName.readLocalFiles': 'Read file contents',
   'builtins.lobe-local-system.apiName.renameLocalFile': 'Rename',
   'builtins.lobe-local-system.apiName.runCommand': 'Run command',
   'builtins.lobe-local-system.apiName.searchLocalFiles': 'Search files',

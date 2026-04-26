@@ -100,7 +100,7 @@ const Header = memo<HeaderProps>(({ type }) => {
       );
     }
 
-    // Handle Klavis/LobeHub skills
+    // Handle Klavis/Avato skills
     if (isConnected) return null;
 
     if (isConnecting) {

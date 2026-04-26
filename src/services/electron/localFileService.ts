@@ -22,6 +22,8 @@ import {
   type OpenLocalFolderParams,
   type PrepareSkillDirectoryParams,
   type PrepareSkillDirectoryResult,
+  type ReadLocalFileAsBase64Params,
+  type ReadLocalFileAsBase64Result,
   type RenameLocalFileParams,
   type ResolveSkillResourcePathParams,
   type ResolveSkillResourcePathResult,
@@ -46,6 +48,12 @@ class LocalFileService {
 
   async readLocalFiles(params: LocalReadFilesParams): Promise<LocalReadFileResult[]> {
     return ensureElectronIpc().localSystem.readFiles(params);
+  }
+
+  async readFileAsBase64(
+    params: ReadLocalFileAsBase64Params,
+  ): Promise<ReadLocalFileAsBase64Result> {
+    return ensureElectronIpc().localSystem.handleReadFileAsBase64(params);
   }
 
   async searchLocalFiles(params: LocalSearchFilesParams): Promise<LocalFileItem[]> {

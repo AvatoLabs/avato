@@ -187,7 +187,11 @@ const translateStudioText = (
   key: string,
   defaultValue: string,
   options?: Record<string, string | number>,
-) => t(key, { defaultValue, ns: 'setting', ...options });
+) => {
+  const value = t(key, { defaultValue, ns: 'setting', ...options });
+
+  return typeof value === 'string' && value ? value : defaultValue;
+};
 
 const studioDefaultNodeTitleMap = {
   'agent': 'Agent',

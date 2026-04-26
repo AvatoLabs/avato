@@ -3,6 +3,7 @@ import EditLocalFile from './EditLocalFile';
 import ListFiles from './ListFiles';
 import MoveLocalFiles from './MoveLocalFiles';
 import ReadLocalFile from './ReadLocalFile';
+import ReadLocalFiles from './ReadLocalFiles';
 import RunCommand from './RunCommand';
 import SearchFiles from './SearchFiles';
 import WriteFile from './WriteFile';
@@ -15,6 +16,7 @@ export const LocalSystemRenders = {
   [LocalSystemApiName.listLocalFiles]: ListFiles,
   [LocalSystemApiName.moveLocalFiles]: MoveLocalFiles,
   [LocalSystemApiName.readLocalFile]: ReadLocalFile,
+  [LocalSystemApiName.readLocalFiles]: ReadLocalFiles,
   [LocalSystemApiName.runCommand]: RunCommand,
   [LocalSystemApiName.searchLocalFiles]: SearchFiles,
   [LocalSystemApiName.writeLocalFile]: WriteFile,

@@ -5,6 +5,7 @@ import GrepContent from './GrepContent';
 import ListLocalFiles from './ListLocalFiles';
 import MoveLocalFiles from './MoveLocalFiles';
 import ReadLocalFile from './ReadLocalFile';
+import ReadLocalFiles from './ReadLocalFiles';
 import RenameLocalFile from './RenameLocalFile';
 import RunCommand from './RunCommand';
 import SearchLocalFiles from './SearchLocalFiles';
@@ -20,6 +21,7 @@ export const LocalSystemInterventions = {
   [LocalSystemApiName.listLocalFiles]: ListLocalFiles,
   [LocalSystemApiName.moveLocalFiles]: MoveLocalFiles,
   [LocalSystemApiName.readLocalFile]: ReadLocalFile,
+  [LocalSystemApiName.readLocalFiles]: ReadLocalFiles,
   [LocalSystemApiName.renameLocalFile]: RenameLocalFile,
   [LocalSystemApiName.runCommand]: RunCommand,
   [LocalSystemApiName.searchLocalFiles]: SearchLocalFiles,

@@ -155,6 +155,7 @@ describe('AiAgentService.execAgent - device auto-activation', () => {
   });
 
   const onlineDevice = {
+    allowRemoteTools: true,
     deviceId: 'device-001',
     hostname: 'my-laptop',
     lastSeen: '2026-03-06T12:00:00.000Z',
@@ -163,11 +164,21 @@ describe('AiAgentService.execAgent - device auto-activation', () => {
   };
 
   const onlineDevice2 = {
+    allowRemoteTools: true,
     deviceId: 'device-002',
     hostname: 'my-desktop',
     lastSeen: '2026-03-06T12:00:00.000Z',
     online: true,
     platform: 'darwin' as const,
+  };
+
+  const offlineDevice = {
+    allowRemoteTools: true,
+    deviceId: 'device-offline',
+    hostname: 'old-laptop',
+    lastSeen: '2026-03-06T10:00:00.000Z',
+    online: false,
+    platform: 'linux' as const,
   };
 
   describe('IM/Bot scenario with botContext', () => {
@@ -204,6 +215,38 @@ describe('AiAgentService.execAgent - device auto-activation', () => {
     it('should NOT auto-activate when no devices are online', async () => {
       mockDeviceProxy.isConfigured = true;
       mockDeviceProxy.queryDeviceList.mockResolvedValue([]);
+
+      await service.execAgent({
+        agentId: 'agent-1',
+        botContext: { platform: 'discord' } as any,
+        prompt: 'List my files',
+      });
+
+      expect(mockCreateOperation).toHaveBeenCalled();
+      const createOpArgs = mockCreateOperation.mock.calls[0][0];
+      expect(createOpArgs.activeDeviceId).toBeUndefined();
+    });
+
+    it('should NOT auto-activate when the only listed device is offline', async () => {
+      mockDeviceProxy.isConfigured = true;
+      mockDeviceProxy.queryDeviceList.mockResolvedValue([offlineDevice]);
+
+      await service.execAgent({
+        agentId: 'agent-1',
+        botContext: { platform: 'discord' } as any,
+        prompt: 'List my files',
+      });
+
+      expect(mockCreateOperation).toHaveBeenCalled();
+      const createOpArgs = mockCreateOperation.mock.calls[0][0];
+      expect(createOpArgs.activeDeviceId).toBeUndefined();
+    });
+
+    it('should NOT auto-activate when remote tools are disabled on the only online device', async () => {
+      mockDeviceProxy.isConfigured = true;
+      mockDeviceProxy.queryDeviceList.mockResolvedValue([
+        { ...onlineDevice, allowRemoteTools: false },
+      ]);
 
       await service.execAgent({
         agentId: 'agent-1',
@@ -300,6 +343,40 @@ describe('AiAgentService.execAgent - device auto-activation', () => {
               files: [],
               id: 'agent-1',
               sourceSets: [],
+              model: 'gpt-4',
+              plugins: [],
+              provider: 'openai',
+              systemRole: 'You are a helpful assistant',
+            }),
+          }) as any,
+      );
+
+      service = new AiAgentService(mockDb, userId);
+
+      await service.execAgent({
+        agentId: 'agent-1',
+        prompt: 'Run a command',
+      });
+
+      expect(mockCreateOperation).toHaveBeenCalled();
+      const createOpArgs = mockCreateOperation.mock.calls[0][0];
+      expect(createOpArgs.activeDeviceId).toBeUndefined();
+    });
+
+    it('should NOT activate boundDeviceId when only another device is online', async () => {
+      mockDeviceProxy.isConfigured = true;
+      mockDeviceProxy.queryDeviceList.mockResolvedValue([onlineDevice2]);
+
+      const { AgentService } = await import('@/server/services/agent');
+      vi.mocked(AgentService).mockImplementation(
+        () =>
+          ({
+            getAgentConfig: vi.fn().mockResolvedValue({
+              agencyConfig: { boundDeviceId: 'device-001' },
+              chatConfig: {},
+              files: [],
+              id: 'agent-1',
+              knowledgeBases: [],
               model: 'gpt-4',
               plugins: [],
               provider: 'openai',

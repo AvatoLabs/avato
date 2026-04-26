@@ -15,7 +15,7 @@ export const UPDATE_CHANNEL: UpdateChannel = VALID_CHANNELS.has(rawChannel as Up
     : 'stable';
 
 // S3 base URL for all channels
-// e.g., https://releases.lobehub.com
+// e.g., https://releases.example.com
 // Each channel resolves to {base}/{channel}/
 export const UPDATE_SERVER_URL = getDesktopEnv().UPDATE_SERVER_URL;
 

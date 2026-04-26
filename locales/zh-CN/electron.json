@@ -80,6 +80,7 @@
   "remoteServer.statusDisconnected": "未连接",
   "remoteServer.urlRequired": "请输入服务器地址",
   "sync.avatohubCloud.description": "官方提供的云版本",
+  "sync.avatohubCloud.serverUrl.placeholder": "服务器地址（可选，默认 Avato Cloud）",
   "sync.avatohubCloud.title": "Avato Cloud",
   "sync.continue": "继续",
   "sync.inCloud": "当前使用云端同步",

@@ -9,6 +9,10 @@ export interface ToolExecutionContext {
   activeDeviceId?: string;
   /** Memory tool permission from agent chat config */
   memoryToolPermission?: 'read-only' | 'read-write';
+  /** Current tool message id when available. */
+  messageId?: string;
+  /** Current agent runtime operation id. */
+  operationId?: string;
   /** Optional MCP content block post-processor for multimodal tool results */
   processContentBlocks?: ProcessContentBlocksFn;
   /** Server database for LobeHub Skills execution */

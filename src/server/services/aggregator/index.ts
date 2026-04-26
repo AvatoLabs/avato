@@ -25,8 +25,10 @@ const HIGRESS_MARKET_URL = 'https://mcp.higress.ai';
 const DEFAULT_PAGE_SIZE = 21;
 const MAX_PAGE_SIZE = 60;
 const SOURCE_PAGE_SIZE = 100;
-const MAX_SOURCE_REQUESTS = 100;
+const DEFAULT_MAX_SOURCE_REQUESTS = 2;
+const DEFAULT_MAX_HIGRESS_PAGES = 24;
 const MAX_FETCH_ATTEMPTS = 3;
+const SOURCE_FETCH_TIMEOUT = 25_000;
 const INSTALL_VERIFICATION_CONCURRENCY = 4;
 const INSTALL_VERIFICATION_TIMEOUT = 8000;
 const SOURCE_PRIORITY = [
@@ -170,6 +172,18 @@ const uniq = (values: Array<string | undefined>) => [
 ];
 
 const MIN_QUERY_LENGTH = 2;
+
+const getPositiveIntegerEnv = (name: string, fallback: number) => {
+  const value = Number.parseInt(process.env[name] || '', 10);
+
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+};
+
+const getMaxSourceRequests = () =>
+  getPositiveIntegerEnv('AGGREGATOR_MAX_SOURCE_REQUESTS', DEFAULT_MAX_SOURCE_REQUESTS);
+
+const getMaxHigressPages = () =>
+  getPositiveIntegerEnv('AGGREGATOR_MAX_HIGRESS_PAGES', DEFAULT_MAX_HIGRESS_PAGES);
 
 const includesQuery = (item: AggregatorCandidate | AggregatorItem, query?: string) => {
   if (!query) return true;
@@ -469,6 +483,17 @@ const isRetryableFetchError = (error: unknown) => {
   ].some((pattern) => message.includes(pattern));
 };
 
+const withSourceTimeout = <T>(source: AggregatorSource, promise: Promise<T>) =>
+  Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(
+        () => reject(new Error(`${source} registry refresh timed out after 25s`)),
+        SOURCE_FETCH_TIMEOUT,
+      );
+    }),
+  ]);
+
 const HIGRESS_PAGE_ID_PATTERN = /\/server\/(server\d+)/g;
 const HIGRESS_REPOSITORY_PATTERN =
   /https:\/\/github\.com\/alibaba\/higress\/tree\/main\/plugins\/wasm-go\/mcp-servers\/([^\\/"'<\s]+)/;
@@ -677,7 +702,7 @@ export class AggregatorService {
     const homeHtml = await this.fetchText(`${HIGRESS_MARKET_URL}/`);
     const pageIds = [
       ...new Set([...homeHtml.matchAll(HIGRESS_PAGE_ID_PATTERN)].map((match) => match[1])),
-    ];
+    ].slice(0, getMaxHigressPages());
     const results: AggregatorCandidate[] = [];
     let nextIndex = 0;
     const workerCount = Math.min(INSTALL_VERIFICATION_CONCURRENCY, pageIds.length);
@@ -739,7 +764,7 @@ export class AggregatorService {
     let cursor: string | undefined;
     let requestCount = 0;
 
-    while (requestCount < MAX_SOURCE_REQUESTS) {
+    while (requestCount < getMaxSourceRequests()) {
       const params = new URLSearchParams({
         limit: String(SOURCE_PAGE_SIZE),
       });
@@ -793,7 +818,7 @@ export class AggregatorService {
   private async fetchSmitheryRegistry(): Promise<AggregatorCandidate[]> {
     const candidates: AggregatorCandidate[] = [];
 
-    for (let page = 1; page <= MAX_SOURCE_REQUESTS; page += 1) {
+    for (let page = 1; page <= getMaxSourceRequests(); page += 1) {
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(SOURCE_PAGE_SIZE),
@@ -839,7 +864,7 @@ export class AggregatorService {
     let after: string | undefined;
     let requestCount = 0;
 
-    while (requestCount < MAX_SOURCE_REQUESTS) {
+    while (requestCount < getMaxSourceRequests()) {
       const params = new URLSearchParams({
         first: String(SOURCE_PAGE_SIZE),
       });
@@ -966,10 +991,10 @@ export class AggregatorService {
 
   async collectEntries(): Promise<AggregatorCollection> {
     const [officialResult, higressResult, smitheryResult, glamaResult] = await Promise.allSettled([
-      this.fetchOfficialRegistry(),
-      this.fetchHigressRegistry(),
-      this.fetchSmitheryRegistry(),
-      this.fetchGlamaRegistry(),
+      withSourceTimeout(AggregatorSource.Official, this.fetchOfficialRegistry()),
+      withSourceTimeout(AggregatorSource.Higress, this.fetchHigressRegistry()),
+      withSourceTimeout(AggregatorSource.Smithery, this.fetchSmitheryRegistry()),
+      withSourceTimeout(AggregatorSource.Glama, this.fetchGlamaRegistry()),
     ]);
 
     const candidates: AggregatorCandidate[] = [];

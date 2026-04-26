@@ -39,6 +39,7 @@ export interface ExecScriptParams {
     name?: string;
   };
   description: string;
+  timeout?: number;
 }
 
 export interface ExecScriptState {

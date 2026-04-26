@@ -34,7 +34,7 @@
     "apps/desktop/src/main"
   ],
   "scripts": {
-    "build": "bun run build:spa && bun run build:spa:copy && bun run build:next",
+    "build": "bun run build:spa && bun run build:spa:mobile && bun run build:spa:copy && bun run build:next",
     "build:analyze": "cross-env NODE_OPTIONS=--max-old-space-size=81920 next experimental-analyze",
     "build:docker": "pnpm run build:spa && pnpm run build:spa:mobile && pnpm run build:spa:copy && cross-env NODE_OPTIONS=--max-old-space-size=8192 DOCKER=true next build && pnpm run build-sitemap",
     "build:next": "cross-env NODE_OPTIONS=--max-old-space-size=7168 next build",
@@ -477,7 +477,6 @@
     "markdown-table": "^3.0.4",
     "mcp-hello-world": "^1.1.2",
     "mime": "^4.1.0",
-    "node-fetch": "^3.3.2",
     "node-gyp": "^11.5.0",
     "openapi-typescript": "^7.10.1",
     "p-map": "^7.0.4",
@@ -516,10 +515,11 @@
       "drizzle-orm": "^0.45.1"
     },
     "patchedDependencies": {
-      "@react-navigation/native-stack": "patches/@react-navigation__native-stack.patch",
       "@lobehub/editor": "patches/@lobehub__editor.patch",
       "@lobehub/ui": "patches/@lobehub__ui.patch",
-      "@swagger-api/apidom-reference": "patches/@swagger-api__apidom-reference.patch"
+      "@react-navigation/native-stack": "patches/@react-navigation__native-stack.patch",
+      "@swagger-api/apidom-reference": "patches/@swagger-api__apidom-reference.patch",
+      "framer-motion@12.38.0": "patches/framer-motion@12.38.0.patch"
     }
   }
 }

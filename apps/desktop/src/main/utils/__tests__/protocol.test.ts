@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { McpSchema } from '../../types/protocol';
+import type { McpSchema } from '../../types/protocol';
 import { generateRFCProtocolUrl, parseProtocolUrl } from '../protocol';
 
 describe('Protocol', () => {
@@ -27,7 +27,7 @@ describe('Protocol', () => {
         marketId: 'higress',
       });
 
-      expect(url).toMatch(/^lobehub:\/\/plugin\/install\?/);
+      expect(url).toMatch(/^avato:\/\/plugin\/install\?/);
       expect(url).toContain('id=edgeone-mcp');
       expect(url).toContain('marketId=higress');
 
@@ -62,7 +62,7 @@ describe('Protocol', () => {
         marketId: 'smithery',
       });
 
-      expect(url).toMatch(/^lobehub:\/\/plugin\/install\?/);
+      expect(url).toMatch(/^avato:\/\/plugin\/install\?/);
       expect(url).toContain('id=awesome-api');
       expect(url).toContain('marketId=smithery');
     });
@@ -125,7 +125,7 @@ describe('Protocol', () => {
     });
 
     it('should parse URLs with any action', () => {
-      const result = parseProtocolUrl('lobehub://plugin/configure?id=test');
+      const result = parseProtocolUrl('avato://plugin/configure?id=test');
       expect(result).toBeTruthy();
       expect(result?.urlType).toBe('plugin');
       expect(result?.action).toBe('configure');
@@ -133,7 +133,7 @@ describe('Protocol', () => {
     });
 
     it('should parse URLs with any query parameters', () => {
-      const result = parseProtocolUrl('lobehub://plugin/install?custom=value&another=param');
+      const result = parseProtocolUrl('avato://plugin/install?custom=value&another=param');
       expect(result).toBeTruthy();
       expect(result?.urlType).toBe('plugin');
       expect(result?.action).toBe('install');
@@ -142,7 +142,7 @@ describe('Protocol', () => {
     });
 
     it('should handle URLs without query parameters', () => {
-      const result = parseProtocolUrl('lobehub://plugin/install');
+      const result = parseProtocolUrl('avato://plugin/install');
       expect(result).toBeTruthy();
       expect(result?.urlType).toBe('plugin');
       expect(result?.action).toBe('install');
@@ -150,7 +150,7 @@ describe('Protocol', () => {
     });
 
     it('should return null for URLs without action', () => {
-      const result = parseProtocolUrl('lobehub://plugin/');
+      const result = parseProtocolUrl('avato://plugin/');
       expect(result).toBeNull();
     });
   });
@@ -182,11 +182,31 @@ describe('Protocol', () => {
       expect(parsedSchema).toEqual(schema);
     });
 
-    it('should handle different protocol schemes', () => {
+    it('should handle different Avato protocol schemes', () => {
+      const testCases = [
+        'avato://plugin/install?test=value',
+        'avato-dev://plugin/install?test=value',
+        'avato-beta://plugin/install?test=value',
+        'avato-canary://plugin/install?test=value',
+        'avato-nightly://plugin/install?test=value',
+      ];
+
+      testCases.forEach((url) => {
+        const parsed = parseProtocolUrl(url);
+        expect(parsed).toBeTruthy();
+        expect(parsed?.urlType).toBe('plugin');
+        expect(parsed?.action).toBe('install');
+        expect(parsed?.params.test).toBe('value');
+        expect(parsed?.originalUrl).toBe(url);
+      });
+    });
+
+    it('should keep parsing legacy LobeHub protocol schemes', () => {
       const testCases = [
         'lobehub://plugin/install?test=value',
         'lobehub-dev://plugin/install?test=value',
         'lobehub-beta://plugin/install?test=value',
+        'lobehub-canary://plugin/install?test=value',
         'lobehub-nightly://plugin/install?test=value',
       ];
 

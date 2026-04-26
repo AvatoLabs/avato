@@ -1,7 +1,7 @@
 export const LOBE_CHAT_CLOUD = 'Avato Cloud';
 
 export const BRANDING_NAME = 'Avato';
-export const BRANDING_LOGO_URL = '/icons/icon-192x192.png';
+export const BRANDING_LOGO_URL = '/icons/icon-192x192-transparent.png';
 
 export const ORG_NAME = 'Avato';
 

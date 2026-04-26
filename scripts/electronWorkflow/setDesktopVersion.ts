@@ -76,28 +76,28 @@ function updatePackageJson() {
     // 根据 releaseType 修改其他字段
     switch (releaseType) {
       case 'stable': {
-        packageJson.productName = 'LobeHub';
-        packageJson.name = 'lobehub-desktop';
+        packageJson.productName = 'Avato';
+        packageJson.name = 'avato-desktop';
         console.log('🌟 Setting as Stable version.');
         break;
       }
       case 'beta': {
-        packageJson.productName = 'LobeHub-Beta'; // Or 'LobeHub-Beta' if preferred
-        packageJson.name = 'lobehub-desktop-beta'; // Or 'lobehub-desktop' if preferred
+        packageJson.productName = 'Avato-Beta';
+        packageJson.name = 'avato-desktop-beta';
         console.log('🧪 Setting as Beta version.');
         updateAppIcon('beta');
         break;
       }
       case 'nightly': {
-        packageJson.productName = 'LobeHub-Nightly'; // Or 'LobeHub-Nightly'
-        packageJson.name = 'lobehub-desktop-nightly'; // Or 'lobehub-desktop-nightly'
+        packageJson.productName = 'Avato-Nightly';
+        packageJson.name = 'avato-desktop-nightly';
         console.log('🌙 Setting as Nightly version.');
         updateAppIcon('nightly');
         break;
       }
       case 'canary': {
-        packageJson.productName = 'LobeHub';
-        packageJson.name = 'lobehub-desktop-canary';
+        packageJson.productName = 'Avato';
+        packageJson.name = 'avato-desktop-canary';
         console.log('🐤 Setting as Canary version (same app name and icon as stable).');
         break;
       }

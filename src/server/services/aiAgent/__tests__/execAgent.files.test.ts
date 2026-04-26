@@ -168,7 +168,7 @@ describe('AiAgentService.execAgent - file upload handling', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.APP_URL = 'https://app.lobehub.com';
+    process.env.APP_URL = 'https://avato.turingmesh.com';
     delete process.env.INTERNAL_APP_URL;
     mockFindFilesByIds.mockResolvedValue([]);
     mockFindAccessibleSpaceById.mockResolvedValue(undefined);
@@ -215,7 +215,7 @@ describe('AiAgentService.execAgent - file upload handling', () => {
       mockUploadFromUrl.mockResolvedValue({
         fileId: 'file-abc',
         key: 'files/test-user-id/xxx/photo.png',
-        url: 'https://app.lobehub.com/f/file-abc',
+        url: 'https://avato.turingmesh.com/f/file-abc',
       });
 
       await service.execAgent({
@@ -255,7 +255,7 @@ describe('AiAgentService.execAgent - file upload handling', () => {
       mockUploadFromUrl.mockResolvedValue({
         fileId: 'file-img',
         key: 'files/test-user-id/xxx/screenshot.jpg',
-        url: 'https://app.lobehub.com/f/file-img',
+        url: 'https://avato.turingmesh.com/f/file-img',
       });
 
       await service.execAgent({
@@ -289,7 +289,7 @@ describe('AiAgentService.execAgent - file upload handling', () => {
       expect(mockResolveRuntimeFileInput).toHaveBeenCalledWith({
         db: mockDb,
         fileService: expect.any(Object),
-        url: 'https://app.lobehub.com/f/file-img',
+        url: 'https://avato.turingmesh.com/f/file-img',
         userId,
         via: 'ai_agent_input_image',
       });
@@ -300,7 +300,7 @@ describe('AiAgentService.execAgent - file upload handling', () => {
       mockUploadFromUrl.mockResolvedValue({
         fileId: 'file-img',
         key: 'v2/spaces/spc_team_ops/blobs/ai-agent-inputs/opq_1.png',
-        url: 'https://app.lobehub.com/f/file-img',
+        url: 'https://avato.turingmesh.com/f/file-img',
       });
 
       await service.execAgent({
@@ -330,7 +330,7 @@ describe('AiAgentService.execAgent - file upload handling', () => {
       mockUploadFromUrl.mockResolvedValue({
         fileId: 'file-pdf',
         key: 'files/test-user-id/xxx/doc.pdf',
-        url: 'https://app.lobehub.com/f/file-pdf',
+        url: 'https://avato.turingmesh.com/f/file-pdf',
       });
 
       await service.execAgent({

@@ -2,7 +2,6 @@
  * Lobe Skills Executor (Desktop)
  *
  * Desktop version: all commands run locally via localFileService.
- * No cloud sandbox, no exportFile.
  */
 import { builtinSkills } from '@lobechat/builtin-skills';
 import { SkillsExecutionRuntime } from '@lobechat/builtin-tool-skills/executionRuntime';
@@ -17,7 +16,10 @@ const runtime = new SkillsExecutionRuntime({
   builtinSkills: filterBuiltinSkills(builtinSkills),
   service: {
     execScript: async (command, options) => {
-      const cwd = await desktopSkillRuntimeService.resolveExecutionDirectory(options.config);
+      const cwd = await desktopSkillRuntimeService.resolveExecutionDirectory(
+        options.config,
+        options.context,
+      );
       const result = await localFileService.runCommand({ command, cwd, timeout: undefined });
       return {
         exitCode: result.exit_code ?? 1,
@@ -26,6 +28,8 @@ const runtime = new SkillsExecutionRuntime({
         success: result.success,
       };
     },
+    exportFile: (path, filename, context) =>
+      desktopSkillRuntimeService.exportFile(path, filename, context),
     findAll: () => agentSkillService.list(),
     findById: (id) => agentSkillService.getById(id),
     findByName: (name) => agentSkillService.getByName(name),

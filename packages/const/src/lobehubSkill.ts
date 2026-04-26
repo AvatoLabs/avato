@@ -1,6 +1,8 @@
 import type { IconType } from '@icons-pack/react-simple-icons';
 import { SiLinear, SiX } from '@icons-pack/react-simple-icons';
 
+import { OFFICIAL_URL } from './url';
+
 export interface LobehubSkillProviderType {
   /**
    * Author/Developer of the integration
@@ -46,8 +48,8 @@ export interface LobehubSkillProviderType {
  */
 export const LOBEHUB_SKILL_PROVIDERS: LobehubSkillProviderType[] = [
   {
-    author: 'LobeHub',
-    authorUrl: 'https://lobehub.com',
+    author: 'Avato',
+    authorUrl: OFFICIAL_URL,
     defaultVisible: true,
     description:
       'Linear is a modern issue tracking and project management tool designed for high-performance teams to build better software faster',
@@ -58,20 +60,20 @@ export const LOBEHUB_SKILL_PROVIDERS: LobehubSkillProviderType[] = [
     label: 'Linear',
   },
   {
-    author: 'LobeHub',
-    authorUrl: 'https://lobehub.com',
+    author: 'Avato',
+    authorUrl: OFFICIAL_URL,
     defaultVisible: true,
     description:
       'Outlook Calendar is an integrated scheduling tool within Microsoft Outlook that enables users to create appointments, organize meetings with others, and manage their time and events effectively.',
-    icon: 'https://hub-apac-1.lobeobjects.space/assets/logos/outlook.svg',
+    icon: 'Outlook',
     id: 'microsoft',
     readme:
       'Integrate with Outlook Calendar to view, create, and manage your events seamlessly. Schedule meetings, check availability, set reminders, and coordinate your time—all through natural language commands.',
     label: 'Outlook Calendar',
   },
   {
-    author: 'LobeHub',
-    authorUrl: 'https://lobehub.com',
+    author: 'Avato',
+    authorUrl: OFFICIAL_URL,
     defaultVisible: true,
     description:
       'X (Twitter) is a social media platform for sharing real-time updates, news, and engaging with your audience through posts, replies, and direct messages.',

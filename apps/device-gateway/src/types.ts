@@ -1,4 +1,5 @@
 export interface Env {
+  ALLOW_SERVICE_TOKEN_DEVICE_AUTH?: string;
   DEVICE_GATEWAY: DurableObjectNamespace;
   JWKS_PUBLIC_KEY: string;
   SERVICE_TOKEN: string;
@@ -7,12 +8,23 @@ export interface Env {
 // ─── Device Info ───
 
 export interface DeviceAttachment {
+  allowRemoteTools: boolean;
   authDeadline?: number;
   authenticated: boolean;
+  authExpiresAt?: number;
   connectedAt: number;
   deviceId: string;
   hostname: string;
   lastHeartbeat: number;
+  platform: string;
+  routeUserId?: string;
+}
+
+export interface PublicDeviceAttachment {
+  allowRemoteTools: boolean;
+  connectedAt: number;
+  deviceId: string;
+  hostname: string;
   platform: string;
 }
 
@@ -25,6 +37,7 @@ export interface AuthMessage {
 }
 
 export interface HeartbeatMessage {
+  allowRemoteTools?: boolean;
   type: 'heartbeat';
 }
 
@@ -40,7 +53,15 @@ export interface ToolCallResponseMessage {
 
 export interface SystemInfoResponseMessage {
   requestId: string;
-  result: DeviceSystemInfo;
+  result:
+    | {
+        error?: string;
+        success: false;
+      }
+    | {
+        success: true;
+        systemInfo: DeviceSystemInfo;
+      };
   type: 'system_info_response';
 }
 

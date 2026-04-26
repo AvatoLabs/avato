@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { App } from '@/core/App';
 
+import DeviceGatewayCtr from '../DeviceGatewayCtr';
 import RemoteServerConfigCtr from '../RemoteServerConfigCtr';
 
 const { ipcMainHandleMock } = vi.hoisted(() => ({
@@ -33,7 +34,11 @@ vi.mock('electron', () => ({
 
 // Mock @/const/env
 vi.mock('@/const/env', () => ({
-  OFFICIAL_CLOUD_SERVER: 'https://cloud.lobehub.com',
+  OFFICIAL_CLOUD_SERVER: 'https://avato.turingmesh.com',
+}));
+
+vi.mock('../DeviceGatewayCtr', () => ({
+  default: class DeviceGatewayCtr {},
 }));
 
 // Mock storeManager
@@ -47,8 +52,16 @@ const mockBrowserManager = {
   broadcastToAllWindows: vi.fn(),
 };
 
+const mockDeviceGatewayCtr = {
+  disconnectForRemoteServerReset: vi.fn().mockResolvedValue(undefined),
+};
+
 const mockApp = {
   browserManager: mockBrowserManager,
+  getController: vi.fn((controller) => {
+    if (controller === DeviceGatewayCtr) return mockDeviceGatewayCtr;
+    return undefined;
+  }),
   storeManager: mockStoreManager,
 } as unknown as App;
 
@@ -78,6 +91,37 @@ describe('RemoteServerConfigCtr', () => {
 
       expect(result).toEqual(config);
       expect(mockStoreManager.get).toHaveBeenCalledWith('dataSyncConfig');
+    });
+
+    it('should include the effective cloud URL for cloud mode', async () => {
+      mockStoreManager.get.mockReturnValue({
+        active: false,
+        storageMode: 'cloud',
+      });
+
+      const result = await controller.getRemoteServerConfig();
+
+      expect(result).toEqual({
+        active: false,
+        remoteServerUrl: 'https://avato.turingmesh.com',
+        storageMode: 'cloud',
+      });
+    });
+
+    it('should keep a configured cloud URL override', async () => {
+      mockStoreManager.get.mockReturnValue({
+        active: false,
+        remoteServerUrl: 'https://canary.turingmesh.com',
+        storageMode: 'cloud',
+      });
+
+      const result = await controller.getRemoteServerConfig();
+
+      expect(result).toEqual({
+        active: false,
+        remoteServerUrl: 'https://canary.turingmesh.com',
+        storageMode: 'cloud',
+      });
     });
   });
 
@@ -115,6 +159,7 @@ describe('RemoteServerConfigCtr', () => {
         storageMode: 'cloud',
       });
       expect(mockStoreManager.delete).toHaveBeenCalledWith('encryptedTokens');
+      expect(mockDeviceGatewayCtr.disconnectForRemoteServerReset).toHaveBeenCalled();
     });
   });
 
@@ -289,10 +334,13 @@ describe('RemoteServerConfigCtr', () => {
       await controller.clearTokens();
 
       expect(mockStoreManager.delete).toHaveBeenCalledWith('encryptedTokens');
+      expect(mockDeviceGatewayCtr.disconnectForRemoteServerReset).toHaveBeenCalled();
 
       // Verify tokens are cleared from memory
       const accessToken = await controller.getAccessToken();
       expect(accessToken).toBeNull();
+      expect(controller.getTokenExpiresAt()).toBeUndefined();
+      expect(controller.getLastTokenRefreshAt()).toBeUndefined();
     });
   });
 
@@ -718,7 +766,19 @@ describe('RemoteServerConfigCtr', () => {
 
       const result = await controller.getRemoteServerUrl();
 
-      expect(result).toBe('https://cloud.lobehub.com');
+      expect(result).toBe('https://avato.turingmesh.com');
+    });
+
+    it('should return configured cloud server override for cloud mode', async () => {
+      mockStoreManager.get.mockReturnValue({
+        active: true,
+        remoteServerUrl: 'https://canary.turingmesh.com',
+        storageMode: 'cloud',
+      });
+
+      const result = await controller.getRemoteServerUrl();
+
+      expect(result).toBe('https://canary.turingmesh.com');
     });
 
     it('should return custom URL for selfHost mode', async () => {

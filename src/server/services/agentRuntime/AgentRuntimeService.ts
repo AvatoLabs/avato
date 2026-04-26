@@ -494,21 +494,20 @@ export class AgentRuntimeService {
         currentContext = interventionResult.nextContext;
       }
 
-      // Pre-step computation: extract device context from DB messages
-      // Follows front-end computeStepContext pattern — computed at step boundary, not inside executors
-      if (!currentState.metadata?.activeDeviceId) {
-        const deviceContext = await this.computeDeviceContext(currentState);
-        if (deviceContext && currentState.metadata) {
-          currentState.metadata.activeDeviceId = deviceContext.activeDeviceId;
-          currentState.metadata.devicePlatform = deviceContext.devicePlatform;
-          currentState.metadata.deviceSystemInfo = deviceContext.deviceSystemInfo;
-          log(
-            '[%s][%d] Pre-step: device context computed from messages (deviceId: %s)',
-            operationId,
-            stepIndex,
-            deviceContext.activeDeviceId,
-          );
-        }
+      // Pre-step computation: extract the latest device activation from DB messages.
+      // This intentionally runs even when metadata already has activeDeviceId so a later
+      // RemoteDevice activation can replace an older or bound device.
+      const deviceContext = await this.computeDeviceContext(currentState);
+      if (deviceContext && currentState.metadata) {
+        currentState.metadata.activeDeviceId = deviceContext.activeDeviceId;
+        currentState.metadata.devicePlatform = deviceContext.devicePlatform;
+        currentState.metadata.deviceSystemInfo = deviceContext.deviceSystemInfo;
+        log(
+          '[%s][%d] Pre-step: device context computed from messages (deviceId: %s)',
+          operationId,
+          stepIndex,
+          deviceContext.activeDeviceId,
+        );
       }
 
       // Execute step

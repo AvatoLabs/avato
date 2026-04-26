@@ -19,6 +19,8 @@ const logger = createLogger('controllers:ShellCommandCtr');
 
 // Maximum output length to prevent context explosion
 const MAX_OUTPUT_LENGTH = 80_000;
+const MAX_BACKGROUND_PROCESSES = 32;
+const MAX_COMPLETED_PROCESS_RETENTION_MS = 10 * 60 * 1000;
 
 /**
  * Strip ANSI escape codes from terminal output
@@ -42,6 +44,7 @@ const truncateOutput = (str: string, maxLength: number = MAX_OUTPUT_LENGTH): str
 };
 
 interface ShellProcess {
+  completedAt?: number;
   lastReadStderr: number;
   lastReadStdout: number;
   process: ChildProcess;
@@ -79,6 +82,15 @@ export default class ShellCommandCtr extends ControllerModule {
 
     try {
       if (run_in_background) {
+        this.pruneCompletedShellProcesses();
+
+        if (this.shellProcesses.size >= MAX_BACKGROUND_PROCESSES) {
+          return {
+            error: `Too many background shell processes (limit: ${MAX_BACKGROUND_PROCESSES})`,
+            success: false,
+          };
+        }
+
         // Background execution
         const shellId = randomUUID();
         const childProcess = spawn(shellConfig.cmd, shellConfig.args, {
@@ -97,14 +109,15 @@ export default class ShellCommandCtr extends ControllerModule {
 
         // Capture output
         childProcess.stdout?.on('data', (data) => {
-          shellProcess.stdout.push(data.toString());
+          this.appendShellOutput(shellProcess, 'stdout', data.toString());
         });
 
         childProcess.stderr?.on('data', (data) => {
-          shellProcess.stderr.push(data.toString());
+          this.appendShellOutput(shellProcess, 'stderr', data.toString());
         });
 
         childProcess.on('exit', (code) => {
+          shellProcess.completedAt = Date.now();
           logger.debug(`${logPrefix} Background process exited`, { code, shellId });
         });
 
@@ -267,6 +280,36 @@ export default class ShellCommandCtr extends ControllerModule {
         error: (error as Error).message,
         success: false,
       };
+    }
+  }
+
+  private appendShellOutput(shellProcess: ShellProcess, stream: 'stderr' | 'stdout', data: string) {
+    const chunks = stream === 'stdout' ? shellProcess.stdout : shellProcess.stderr;
+    chunks.push(data);
+
+    const totalLength = chunks.reduce((sum, item) => sum + item.length, 0);
+    if (totalLength <= MAX_OUTPUT_LENGTH) return;
+
+    const trimmed = chunks.join('').slice(-MAX_OUTPUT_LENGTH);
+    chunks.splice(0, chunks.length, trimmed);
+
+    if (stream === 'stdout') {
+      shellProcess.lastReadStdout = 0;
+    } else {
+      shellProcess.lastReadStderr = 0;
+    }
+  }
+
+  private pruneCompletedShellProcesses() {
+    const now = Date.now();
+
+    for (const [shellId, shellProcess] of this.shellProcesses) {
+      if (
+        shellProcess.completedAt &&
+        now - shellProcess.completedAt > MAX_COMPLETED_PROCESS_RETENTION_MS
+      ) {
+        this.shellProcesses.delete(shellId);
+      }
     }
   }
 }

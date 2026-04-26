@@ -281,7 +281,7 @@ Content`;
       const testFiles = {
         'README.md': new TextEncoder().encode('Root readme'),
         'my-skill/SKILL.md': new TextEncoder().encode(skillMd),
-        'my-skill/content.txt': new TextEncoder().encode('Skill resource'),
+        'my-skill/resource.txt': new TextEncoder().encode('Skill resource'),
         'other-folder/file.txt': new TextEncoder().encode('Other file'),
       };
 
@@ -406,7 +406,7 @@ Deep nested content`;
           '---\nname: other\ndescription: other\n---\nOther',
         ),
         'openclaw-main/skills/skill-creator/SKILL.md': new TextEncoder().encode(skillMd),
-        'openclaw-main/skills/skill-creator/contents/template.md': new TextEncoder().encode(
+        'openclaw-main/skills/skill-creator/resources/template.md': new TextEncoder().encode(
           'Template',
         ),
       };

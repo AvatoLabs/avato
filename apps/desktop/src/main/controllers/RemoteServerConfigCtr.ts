@@ -9,6 +9,7 @@ import { OFFICIAL_CLOUD_SERVER } from '@/const/env';
 import { appendVercelCookie } from '@/utils/http-headers';
 import { createLogger } from '@/utils/logger';
 
+import DeviceGatewayCtr from './DeviceGatewayCtr';
 import { ControllerModule, IpcMethod } from './index';
 
 /**
@@ -35,6 +36,18 @@ const DETERMINISTIC_FAILURES = [
 
 // Create logger
 const logger = createLogger('controllers:RemoteServerConfigCtr');
+
+const getOfficialCloudRequestPatterns = () => {
+  try {
+    const url = new URL(OFFICIAL_CLOUD_SERVER);
+
+    return [`${url.origin}/*`];
+  } catch (error) {
+    logger.warn('Invalid OFFICIAL_CLOUD_SERVER for webRequest filter:', error);
+
+    return [];
+  }
+};
 
 /**
  * Remote Server Configuration Controller
@@ -66,6 +79,17 @@ export default class RemoteServerConfigCtr extends ControllerModule {
     return nextConfig;
   };
 
+  private withEffectiveRemoteServerUrl = (config: DataSyncConfig): DataSyncConfig => {
+    const normalized = this.normalizeConfig(config);
+
+    if (normalized.storageMode !== 'cloud') return normalized;
+
+    return {
+      ...normalized,
+      remoteServerUrl: normalized.remoteServerUrl || OFFICIAL_CLOUD_SERVER,
+    };
+  };
+
   /**
    * Get remote server configuration
    */
@@ -75,7 +99,7 @@ export default class RemoteServerConfigCtr extends ControllerModule {
     const { storeManager } = this.app;
 
     const config: DataSyncConfig = storeManager.get('dataSyncConfig');
-    const normalized = this.normalizeConfig(config);
+    const normalized = this.withEffectiveRemoteServerUrl(config);
 
     logger.debug(
       `Remote server config: active=${normalized.active}, storageMode=${normalized.storageMode}, url=${normalized.remoteServerUrl}`,
@@ -85,9 +109,9 @@ export default class RemoteServerConfigCtr extends ControllerModule {
   }
 
   /**
-   * Check if remote server is properly configured and ready for use
-   * For 'cloud' mode, only checks if active (remoteServerUrl is undefined, uses OFFICIAL_CLOUD_SERVER)
-   * For 'selfHost' mode, checks if active AND remoteServerUrl is configured
+   * Check if remote server is properly configured and ready for use.
+   * Cloud mode can use either the built-in official server or an optional server URL override.
+   * Self-host mode requires an explicit remoteServerUrl.
    * @param config Optional config object, if not provided will fetch current config
    * @returns true if remote server is properly configured
    */
@@ -300,9 +324,11 @@ export default class RemoteServerConfigCtr extends ControllerModule {
     this.encryptedAccessToken = undefined;
     this.encryptedRefreshToken = undefined;
     this.tokenExpiresAt = undefined;
+    this.lastRefreshAt = undefined;
     // Also clear from persistent storage
     logger.debug(`Deleting tokens from store key: ${this.encryptedTokensKey}`);
     this.app.storeManager.delete(this.encryptedTokensKey);
+    await this.app.getController(DeviceGatewayCtr)?.disconnectForRemoteServerReset();
   }
 
   /**
@@ -537,9 +563,11 @@ export default class RemoteServerConfigCtr extends ControllerModule {
   }
 
   async getRemoteServerUrl(config?: DataSyncConfig) {
-    const dataConfig = this.normalizeConfig(config ? config : await this.getRemoteServerConfig());
+    const dataConfig = this.normalizeConfig(config || (await this.getRemoteServerConfig()));
 
-    return dataConfig.storageMode === 'cloud' ? OFFICIAL_CLOUD_SERVER : dataConfig.remoteServerUrl;
+    return dataConfig.storageMode === 'cloud'
+      ? dataConfig.remoteServerUrl || OFFICIAL_CLOUD_SERVER
+      : dataConfig.remoteServerUrl;
   }
 
   /**
@@ -555,22 +583,20 @@ export default class RemoteServerConfigCtr extends ControllerModule {
     logger.info(`Setting up subscription webview session for partition: ${partition}`);
 
     const session = electronSession.fromPartition(partition);
+    const urls = getOfficialCloudRequestPatterns();
 
-    session.webRequest.onBeforeSendHeaders(
-      { urls: [`https://*.lobehub.com/*`] },
-      async (details, callback) => {
-        const requestHeaders = { ...details.requestHeaders };
+    session.webRequest.onBeforeSendHeaders({ urls }, async (details, callback) => {
+      const requestHeaders = { ...details.requestHeaders };
 
-        const token = await this.getAccessToken();
+      const token = await this.getAccessToken();
 
-        if (token) {
-          requestHeaders['Oidc-Auth'] = token;
-          logger.debug(`Injected Oidc-Auth token for: ${details.url}`);
-        }
+      if (token) {
+        requestHeaders['Oidc-Auth'] = token;
+        logger.debug(`Injected Oidc-Auth token for: ${details.url}`);
+      }
 
-        callback({ requestHeaders });
-      },
-    );
+      callback({ requestHeaders });
+    });
 
     logger.debug(`Subscription webview session setup completed for partition: ${partition}`);
 

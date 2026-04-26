@@ -71,4 +71,15 @@ describe('BackButton', () => {
 
     expect(mockNavigate).toHaveBeenCalledWith('/spaces/spc_1/files');
   });
+
+  it('renders a single button instead of nesting an ActionIcon button inside a link', () => {
+    render(
+      <MemoryRouter>
+        <BackButton title="back" to="/content" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('button')).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
 });

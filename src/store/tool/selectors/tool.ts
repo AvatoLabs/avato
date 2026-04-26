@@ -102,9 +102,9 @@ export interface AvailableToolForDiscovery {
  *
  * Sources:
  * 1. Builtin tools (from s.builtinTools) — exclude non-discoverable, skills, platform-unavailable
- * 2. User-installed plugins (from s.installedPlugins) — exclude Klavis/LobeHub Skill/agent skill overlap
+ * 2. User-installed plugins (from s.installedPlugins) — exclude Klavis/Avato Skill/agent skill overlap
  * 3. Klavis MCP servers (connected) — description from KLAVIS_SERVER_TYPES
- * 4. LobeHub Skill servers (connected) — description from LOBEHUB_SKILL_PROVIDERS
+ * 4. Avato Skill servers (connected) — description from LOBEHUB_SKILL_PROVIDERS
  */
 const availableToolsForDiscovery = (s: ToolStoreState): AvailableToolForDiscovery[] => {
   // Build exclusion sets for deduplication
@@ -125,7 +125,7 @@ const availableToolsForDiscovery = (s: ToolStoreState): AvailableToolForDiscover
     }));
 
   // 2. User-installed plugins — directly from s.installedPlugins
-  //    Exclude Klavis, LobeHub Skill, and agent skill entries (they are handled in dedicated sources)
+  //    Exclude Klavis, Avato Skill, and agent skill entries (they are handled in dedicated sources)
   const pluginItems = s.installedPlugins
     .filter((p) => !klavisIds.has(p.identifier))
     .filter((p) => !lobehubSkillIds.has(p.identifier))
@@ -153,7 +153,7 @@ const availableToolsForDiscovery = (s: ToolStoreState): AvailableToolForDiscover
       };
     });
 
-  // 4. LobeHub Skill servers (connected only)
+  // 4. Avato Skill servers (connected only)
   const lobehubSkillItems = (s.lobehubSkillServers || [])
     .filter((server) => server.status === LobehubSkillStatus.CONNECTED)
     .map((server) => {

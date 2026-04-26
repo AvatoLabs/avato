@@ -71,8 +71,8 @@ describe('login command', () => {
         expires_in: 600,
         interval: 1,
         user_code: 'USER-CODE',
-        verification_uri: 'https://app.lobehub.com/verify',
-        verification_uri_complete: 'https://app.lobehub.com/verify?code=USER-CODE',
+        verification_uri: 'https://avato.turingmesh.com/verify',
+        verification_uri_complete: 'https://avato.turingmesh.com/verify?code=USER-CODE',
         ...overrides,
       }),
       ok: true,
@@ -126,7 +126,7 @@ describe('login command', () => {
         refreshToken: 'refresh-tok',
       }),
     );
-    expect(saveSettings).toHaveBeenCalledWith({ serverUrl: 'https://app.lobehub.com' });
+    expect(saveSettings).toHaveBeenCalledWith({ serverUrl: 'https://avato.turingmesh.com' });
     expect(log.info).toHaveBeenCalledWith(expect.stringContaining('Login successful'));
   });
 

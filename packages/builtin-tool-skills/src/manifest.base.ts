@@ -41,7 +41,7 @@ export const readReferenceApi: LobeChatPluginApi = {
 
 export const exportFileApi: LobeChatPluginApi = {
   description:
-    'Export a file generated during skill execution to cloud storage. Use this to save outputs, results, or generated files for the user to download. The file will be uploaded and a permanent download URL will be returned.',
+    'Export a file generated during skill execution to workspace storage. Use this to save outputs, results, or generated files for the user to download. The file will be uploaded and a permanent download URL will be returned.',
   name: SkillsApiName.exportFile,
   parameters: {
     properties: {
@@ -88,6 +88,10 @@ export const execScriptBaseParams = {
     description:
       'Clear description of what this command does (5-10 words, in active voice). Use the same language as the user input.',
     type: 'string' as const,
+  },
+  timeout: {
+    description: 'Timeout in milliseconds (default: 120000ms, max: 600000ms).',
+    type: 'number' as const,
   },
 };
 

@@ -10,6 +10,7 @@ import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import urlJoin from 'url-join';
 
+import AuthIcons from '@/components/AuthIcons';
 import { OFFICIAL_SITE } from '@/const/url';
 import { isDesktop } from '@/const/version';
 import UserInfo from '@/features/User/UserInfo';
@@ -17,6 +18,11 @@ import { remoteServerService } from '@/services/electron/remoteServer';
 import { electronSystemService } from '@/services/electron/system';
 import { useElectronStore } from '@/store/electron';
 import { setDesktopAutoOidcFirstOpenHandled } from '@/utils/electron/autoOidc';
+import {
+  formatRemoteServerUrlForInput,
+  normalizeRemoteServerUrl,
+  validateRemoteServerUrl,
+} from '@/utils/electron/remoteServerUrl';
 
 import LobeMessage from '../components/LobeMessage';
 
@@ -24,6 +30,7 @@ const LEGACY_LOCAL_DB_MIGRATION_GUIDE_URL = urlJoin(
   OFFICIAL_SITE,
   '/docs/usage/migrate-from-local-database',
 );
+const CLOUD_SSO_PROVIDER = 'feishu';
 
 // 登录方式类型
 type LoginMethod = 'cloud' | 'selfhost';
@@ -61,7 +68,11 @@ interface LoginStepProps {
 const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
   const { t } = useTranslation('desktop-onboarding');
   const [endpoint, setEndpoint] = useState('');
+  const [cloudEndpoint, setCloudEndpoint] = useState('');
+  const [hasEditedCloudEndpoint, setHasEditedCloudEndpoint] = useState(false);
+  const [cloudEndpointError, setCloudEndpointError] = useState<string | null>(null);
   const [cloudLoginStatus, setCloudLoginStatus] = useState<LoginStatus>('idle');
+  const [selfhostEndpointError, setSelfhostEndpointError] = useState<string | null>(null);
   const [authProgress, setAuthProgress] = useState<AuthorizationProgress | null>(null);
   const [selfhostLoginStatus, setSelfhostLoginStatus] = useState<LoginStatus>('idle');
   const [remoteError, setRemoteError] = useState<string | null>(null);
@@ -91,6 +102,29 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
   ]);
 
   useDataSyncConfig();
+
+  useEffect(() => {
+    if (hasEditedCloudEndpoint) return;
+    if (cloudEndpoint) return;
+    if (dataSyncConfig?.storageMode !== 'cloud') return;
+    if (!dataSyncConfig.remoteServerUrl) return;
+    setCloudEndpoint(formatRemoteServerUrlForInput(dataSyncConfig.remoteServerUrl));
+  }, [
+    cloudEndpoint,
+    dataSyncConfig?.remoteServerUrl,
+    dataSyncConfig?.storageMode,
+    hasEditedCloudEndpoint,
+  ]);
+
+  const validateOptionalServerUrl = (url: string) =>
+    validateRemoteServerUrl(url, { invalidMessage: t('screen5.cloud.endpointInvalid') }) || null;
+
+  const validateRequiredServerUrl = (url: string) =>
+    validateRemoteServerUrl(url, {
+      invalidMessage: t('screen5.cloud.endpointInvalid'),
+      required: true,
+      requiredMessage: t('screen5.cloud.endpointInvalid'),
+    }) || null;
 
   useEffect(() => {
     if (!isDesktop) return;
@@ -128,12 +162,19 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
       return;
     }
 
+    const endpointError = validateOptionalServerUrl(cloudEndpoint);
+    setCloudEndpointError(endpointError);
+    if (endpointError) return;
+
+    const normalizedEndpoint = normalizeRemoteServerUrl(cloudEndpoint);
+    if (normalizedEndpoint) setCloudEndpoint(formatRemoteServerUrlForInput(normalizedEndpoint));
+
     setRemoteError(null);
     clearRemoteServerSyncError();
     setCloudLoginStatus('loading');
     setDesktopAutoOidcFirstOpenHandled();
     await connectRemoteServer({
-      remoteServerUrl: dataSyncConfig?.remoteServerUrl,
+      remoteServerUrl: normalizedEndpoint || undefined,
       storageMode: 'cloud',
     });
   };
@@ -146,8 +187,13 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
       return;
     }
 
-    const url = endpoint.trim();
+    const endpointError = validateRequiredServerUrl(endpoint);
+    setSelfhostEndpointError(endpointError);
+    if (endpointError) return;
+
+    const url = normalizeRemoteServerUrl(endpoint);
     if (!url) return;
+    setEndpoint(formatRemoteServerUrlForInput(url));
 
     setRemoteError(null);
     clearRemoteServerSyncError();
@@ -169,7 +215,11 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
     } finally {
       setCloudLoginStatus('idle');
       setSelfhostLoginStatus('idle');
+      setCloudEndpoint('');
+      setCloudEndpointError(null);
+      setHasEditedCloudEndpoint(false);
       setEndpoint('');
+      setSelfhostEndpointError(null);
       setIsSigningOut(false);
     }
   };
@@ -320,7 +370,14 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
 
       return (
         <Flexbox gap={8} style={{ width: '100%' }}>
-          <Button block disabled={true} icon={Cloud} loading={true} size={'large'} type={'primary'}>
+          <Button
+            block
+            disabled={true}
+            icon={<Icon icon={AuthIcons(CLOUD_SSO_PROVIDER, 18)} />}
+            loading={true}
+            size={'large'}
+            type={'primary'}
+          >
             {t('screen5.actions.signingIn')}
           </Button>
           <Text style={{ color: cssVar.colorTextDescription }} type={'secondary'}>
@@ -345,17 +402,51 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
     }
 
     return (
-      <Button
-        block
-        disabled={isConnectingServer}
-        icon={Cloud}
-        loading={false}
-        size={'large'}
-        type={'primary'}
-        onClick={handleCloudLogin}
-      >
-        {t('screen5.actions.signInCloud')}
-      </Button>
+      <Flexbox gap={12} style={{ width: '100%' }}>
+        <Input
+          placeholder={t('screen5.cloud.endpointPlaceholder')}
+          prefix={<Icon icon={Cloud} style={{ marginRight: 4 }} />}
+          size={'large'}
+          status={cloudEndpointError ? 'error' : undefined}
+          style={{ width: '100%' }}
+          value={cloudEndpoint}
+          onChange={(e) => {
+            const value = e.target.value;
+            setHasEditedCloudEndpoint(true);
+            setCloudEndpoint(value);
+            setCloudEndpointError(validateOptionalServerUrl(value));
+          }}
+          onContextMenu={async (e) => {
+            if (!isDesktop) return;
+            e.preventDefault();
+            const input = e.target as HTMLInputElement;
+            const selectionText = input.value.slice(
+              input.selectionStart || 0,
+              input.selectionEnd || 0,
+            );
+            await electronSystemService.showContextMenu('editor', {
+              selectionText: selectionText || undefined,
+            });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleCloudLogin();
+            }
+          }}
+        />
+        {cloudEndpointError && <Text type={'danger'}>{cloudEndpointError}</Text>}
+        <Button
+          block
+          disabled={isConnectingServer || !!cloudEndpointError}
+          icon={<Icon icon={AuthIcons(CLOUD_SSO_PROVIDER, 18)} />}
+          loading={false}
+          size={'large'}
+          type={'primary'}
+          onClick={handleCloudLogin}
+        >
+          {t('screen5.actions.signInCloud')}
+        </Button>
+      </Flexbox>
     );
   };
 
@@ -454,9 +545,14 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
           placeholder={t('screen5.selfhost.endpointPlaceholder')}
           prefix={<Icon icon={Server} style={{ marginRight: 4 }} />}
           size={'large'}
+          status={selfhostEndpointError ? 'error' : undefined}
           style={{ width: '100%' }}
           value={endpoint}
-          onChange={(e) => setEndpoint(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value;
+            setEndpoint(value);
+            setSelfhostEndpointError(value.trim() ? validateRequiredServerUrl(value) : null);
+          }}
           onContextMenu={async (e) => {
             if (!isDesktop) return;
             e.preventDefault();
@@ -475,8 +571,9 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
             }
           }}
         />
+        {selfhostEndpointError && <Text type={'danger'}>{selfhostEndpointError}</Text>}
         <Button
-          disabled={!endpoint.trim() || isConnectingServer}
+          disabled={!endpoint.trim() || isConnectingServer || !!selfhostEndpointError}
           loading={false}
           size={'large'}
           style={{ width: '100%' }}

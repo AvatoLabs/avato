@@ -1,14 +1,19 @@
 import { type StorageMode } from '@lobechat/electron-client-ipc';
 import { StorageModeEnum } from '@lobechat/electron-client-ipc';
 import { Button, Center, Flexbox, Input, stopPropagation } from '@lobehub/ui';
-import { LobeHub } from '@lobehub/ui/brand';
 import { createStaticStyles } from 'antd-style';
 import { Server } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ProductLogo } from '@/components/Branding';
 import { useElectronStore } from '@/store/electron';
 import { electronSyncSelectors } from '@/store/electron/selectors';
+import {
+  formatRemoteServerUrlForInput,
+  normalizeRemoteServerUrl,
+  validateRemoteServerUrl,
+} from '@/utils/electron/remoteServerUrl';
 
 import { Option } from './Option';
 
@@ -53,6 +58,9 @@ const styles = createStaticStyles(({ css, cssVar }) => {
     selfHostedInput: css`
       margin-block-start: 12px;
     `,
+    serverUrlInput: css`
+      margin-block-start: 12px;
+    `,
     selfHostedText: css`
       cursor: pointer;
       font-size: 14px;
@@ -77,6 +85,10 @@ interface ConnectionModeProps {
   setWaiting: (waiting: boolean) => void;
 }
 
+const AvatoCloudIcon = memo(() => <ProductLogo size={24} />);
+
+AvatoCloudIcon.displayName = 'AvatoCloudIcon';
+
 const ConnectionMode = memo<ConnectionModeProps>(({ setWaiting }) => {
   const { t } = useTranslation(['electron', 'common']);
   const [urlError, setUrlError] = useState<string | undefined>();
@@ -88,44 +100,42 @@ const ConnectionMode = memo<ConnectionModeProps>(({ setWaiting }) => {
   const [selectedOption, setSelectedOption] = useState<RemoteStorageMode>(
     storageMode === StorageModeEnum.SelfHost ? StorageModeEnum.SelfHost : StorageModeEnum.Cloud,
   );
-  const [selfHostedUrl, setSelfHostedUrl] = useState(rawRemoteServerUrl);
+  const [serverUrl, setServerUrl] = useState(() =>
+    formatRemoteServerUrlForInput(rawRemoteServerUrl),
+  );
 
-  const validateUrl = useCallback((url: string) => {
-    if (!url) {
-      return t('remoteServer.urlRequired');
-    }
-    try {
-      new URL(url);
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        throw new Error('Invalid protocol');
-      }
-      return undefined;
-    } catch {
-      return t('remoteServer.invalidUrl');
-    }
-  }, []);
+  const validateUrl = useCallback(
+    (url: string, required = true) => {
+      return validateRemoteServerUrl(url, {
+        invalidMessage: t('remoteServer.invalidUrl'),
+        required,
+        requiredMessage: t('remoteServer.urlRequired'),
+      });
+    },
+    [t],
+  );
 
   const handleSelectOption = (option: RemoteStorageMode) => {
     setSelectedOption(option);
-    if (option !== StorageModeEnum.SelfHost) {
-      setUrlError(undefined);
-    } else {
-      setUrlError(validateUrl(selfHostedUrl));
-    }
+    setUrlError(validateUrl(serverUrl, option === StorageModeEnum.SelfHost));
   };
 
   const handleContinue = async () => {
-    if (selectedOption === StorageModeEnum.SelfHost) {
-      const error = validateUrl(selfHostedUrl);
-      setUrlError(error);
-      if (error) {
-        return;
-      }
+    const normalizedServerUrl = normalizeRemoteServerUrl(serverUrl);
+    const error = validateUrl(normalizedServerUrl, selectedOption === StorageModeEnum.SelfHost);
+    setUrlError(error);
+
+    if (error) {
+      return;
     }
 
     // try to connect
     setWaiting(true);
-    await connect({ remoteServerUrl: selfHostedUrl, storageMode: selectedOption });
+    setServerUrl(formatRemoteServerUrlForInput(normalizedServerUrl));
+    await connect({
+      remoteServerUrl: normalizedServerUrl || undefined,
+      storageMode: selectedOption,
+    });
   };
 
   return (
@@ -147,12 +157,30 @@ const ConnectionMode = memo<ConnectionModeProps>(({ setWaiting }) => {
           </Flexbox>
           <Option
             description={t('sync.avatohubCloud.description')}
-            icon={LobeHub}
+            icon={AvatoCloudIcon}
             isSelected={selectedOption === StorageModeEnum.Cloud}
             label={t('sync.avatohubCloud.title')}
             value={StorageModeEnum.Cloud}
             onClick={handleSelectOption}
-          />
+          >
+            {selectedOption === StorageModeEnum.Cloud && (
+              <>
+                <Input
+                  className={styles.serverUrlInput}
+                  placeholder={t('sync.avatohubCloud.serverUrl.placeholder')}
+                  status={urlError ? 'error' : undefined}
+                  value={serverUrl}
+                  onClick={stopPropagation}
+                  onChange={(e) => {
+                    const newUrl = e.target.value;
+                    setServerUrl(newUrl);
+                    setUrlError(validateUrl(newUrl, false));
+                  }}
+                />
+                {urlError && <div className={styles.inputError}>{urlError}</div>}
+              </>
+            )}
+          </Option>
           {selectedOption === StorageModeEnum.SelfHost && (
             <Option
               description={t('sync.selfHosted.description')}
@@ -167,13 +195,13 @@ const ConnectionMode = memo<ConnectionModeProps>(({ setWaiting }) => {
                   <Input
                     autoFocus
                     className={styles.selfHostedInput}
-                    placeholder="https://your-lobechat.com"
+                    placeholder="https://your-avato.com"
                     status={urlError ? 'error' : undefined}
-                    value={selfHostedUrl}
+                    value={serverUrl}
                     onClick={stopPropagation}
                     onChange={(e) => {
                       const newUrl = e.target.value;
-                      setSelfHostedUrl(newUrl);
+                      setServerUrl(newUrl);
                       setUrlError(validateUrl(newUrl));
                     }}
                   />
@@ -192,7 +220,8 @@ const ConnectionMode = memo<ConnectionModeProps>(({ setWaiting }) => {
         type="primary"
         disabled={
           !selectedOption ||
-          (selectedOption === StorageModeEnum.SelfHost && (!!urlError || !selfHostedUrl))
+          !!urlError ||
+          (selectedOption === StorageModeEnum.SelfHost && !serverUrl.trim())
         }
         onClick={handleContinue}
       >

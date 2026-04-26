@@ -20,7 +20,7 @@ import { LobehubSkillStatus } from './types';
 const n = setNamespace('lobehubSkillStore');
 
 /**
- * LobeHub Skill Store Actions
+ * Avato Skill Store Actions
  */
 
 type Setter = StoreSetter<ToolStore>;

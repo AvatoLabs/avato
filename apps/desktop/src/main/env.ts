@@ -50,6 +50,20 @@ const envNumber = (defaultValue: number) =>
     }, z.number().optional())
     .default(defaultValue);
 
+const DEFAULT_OFFICIAL_CLOUD_SERVER =
+  process.env.OFFICIAL_CLOUD_SERVER ||
+  process.env.NEXT_PUBLIC_OFFICIAL_URL ||
+  process.env.APP_URL ||
+  'https://avato.turingmesh.com';
+
+const DEFAULT_DEVICE_GATEWAY_URL =
+  process.env.DEVICE_GATEWAY_URL || 'https://device-gateway.turingmesh.com';
+
+const DEFAULT_DESKTOP_CLOUD_SSO_PROVIDER =
+  process.env.DESKTOP_CLOUD_SSO_PROVIDER ||
+  process.env.NEXT_PUBLIC_DESKTOP_CLOUD_SSO_PROVIDER ||
+  'feishu';
+
 /**
  * Desktop (Electron main process) runtime env access.
  *
@@ -81,14 +95,20 @@ export const getDesktopEnv = memoize(() =>
       NODE_ENV: z.enum(['development', 'production', 'test']).optional(),
 
       // cloud server url (can be overridden for selfhost/dev)
-      OFFICIAL_CLOUD_SERVER: z.string().optional().default('https://app.lobehub.com'),
+      OFFICIAL_CLOUD_SERVER: z.string().optional().default(DEFAULT_OFFICIAL_CLOUD_SERVER),
+
+      // remote device gateway url (can be overridden for selfhost/dev)
+      DEVICE_GATEWAY_URL: z.string().url().optional().default(DEFAULT_DEVICE_GATEWAY_URL),
+
+      // default cloud SSO provider for desktop cloud sign-in
+      DESKTOP_CLOUD_SSO_PROVIDER: z.string().optional().default(DEFAULT_DESKTOP_CLOUD_SSO_PROVIDER),
 
       // updater
       // process.env.xxx will replace in build stage
       UPDATE_CHANNEL: z.string().optional().default(process.env.UPDATE_CHANNEL),
 
       // Custom update server URL (for stable channel)
-      // e.g., https://releases.lobehub.com/stable or https://your-bucket.s3.amazonaws.com/releases
+      // e.g., https://releases.example.com/stable or https://your-bucket.s3.amazonaws.com/releases
       UPDATE_SERVER_URL: z.string().optional().default(process.env.UPDATE_SERVER_URL),
 
       // Vercel JWT for bypassing deployment protection (dev only)
