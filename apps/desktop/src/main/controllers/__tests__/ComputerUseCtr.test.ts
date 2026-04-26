@@ -36,7 +36,9 @@ vi.mock('@/utils/logger', () => ({
 const createImage = (width = 100, height = 50, content = 'jpeg') => ({
   getSize: vi.fn(() => ({ height, width })),
   isEmpty: vi.fn(() => false),
-  resize: vi.fn(() => createImage(width, height, content)),
+  resize: vi.fn((size: { height: number; width: number }) =>
+    createImage(size.width, size.height, content),
+  ),
   toJPEG: vi.fn(() => Buffer.from(content)),
   toPNG: vi.fn(() => Buffer.from(content)),
 });
@@ -109,6 +111,20 @@ describe('ComputerUseCtr', () => {
       width: 100,
     });
     expect(browserWindow.capturePage).toHaveBeenCalled();
+  });
+
+  it('caps requested screenshot size for gateway transport', async () => {
+    const image = createImage(3840, 2160, 'large');
+    browserWindow.capturePage.mockResolvedValueOnce(image);
+
+    const result = await controller.screenshot({
+      maxHeight: 9999,
+      maxWidth: 9999,
+      source: 'main-window',
+    });
+
+    expect(image.resize).toHaveBeenCalledWith({ height: 1080, width: 1920 });
+    expect(result).toMatchObject({ height: 1080, success: true, width: 1920 });
   });
 
   it('captures a selected screen source', async () => {

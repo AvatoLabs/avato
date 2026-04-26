@@ -22,11 +22,11 @@ export const ComputerUseManifest: BuiltinToolManifest = {
             type: 'string',
           },
           maxHeight: {
-            description: 'Maximum output image height. Defaults to 900.',
+            description: 'Maximum output image height. Defaults to 900 and is capped at 1080.',
             type: 'number',
           },
           maxWidth: {
-            description: 'Maximum output image width. Defaults to 1280.',
+            description: 'Maximum output image width. Defaults to 1280 and is capped at 1920.',
             type: 'number',
           },
           quality: { description: 'JPEG quality from 1 to 100. Defaults to 70.', type: 'number' },

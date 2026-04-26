@@ -26,6 +26,8 @@ const DEFAULT_JPEG_QUALITY = 70;
 const MAX_DRAG_STEPS = 60;
 const MAX_KEY_CODE_LENGTH = 64;
 const MAX_SCROLL_DELTA = 2000;
+const MAX_SCREENSHOT_HEIGHT = 1080;
+const MAX_SCREENSHOT_WIDTH = 1920;
 const MAX_TYPE_TEXT_LENGTH = 4000;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -100,8 +102,12 @@ const encodeImage = (
   input: ComputerUseScreenshotInput,
 ): Pick<ComputerUseScreenshotResult, 'base64' | 'height' | 'mediaType' | 'width'> => {
   const size = image.getSize();
-  const maxWidth = clamp(Math.round(input.maxWidth ?? DEFAULT_MAX_WIDTH), 1, 4096);
-  const maxHeight = clamp(Math.round(input.maxHeight ?? DEFAULT_MAX_HEIGHT), 1, 4096);
+  const maxWidth = clamp(Math.round(input.maxWidth ?? DEFAULT_MAX_WIDTH), 1, MAX_SCREENSHOT_WIDTH);
+  const maxHeight = clamp(
+    Math.round(input.maxHeight ?? DEFAULT_MAX_HEIGHT),
+    1,
+    MAX_SCREENSHOT_HEIGHT,
+  );
   const fittedSize = fitSize(size.width, size.height, maxWidth, maxHeight);
   const outputImage =
     fittedSize.width === size.width && fittedSize.height === size.height
@@ -311,8 +317,16 @@ export default class ComputerUseCtr extends ControllerModule {
       displays.find((display) => String(display.id) === String(input.displayId)) ||
       screen.getPrimaryDisplay();
 
-    const maxWidth = clamp(Math.round(input.maxWidth ?? DEFAULT_MAX_WIDTH), 1, 4096);
-    const maxHeight = clamp(Math.round(input.maxHeight ?? DEFAULT_MAX_HEIGHT), 1, 4096);
+    const maxWidth = clamp(
+      Math.round(input.maxWidth ?? DEFAULT_MAX_WIDTH),
+      1,
+      MAX_SCREENSHOT_WIDTH,
+    );
+    const maxHeight = clamp(
+      Math.round(input.maxHeight ?? DEFAULT_MAX_HEIGHT),
+      1,
+      MAX_SCREENSHOT_HEIGHT,
+    );
     const thumbnailSize = fitSize(
       selectedDisplay.size.width,
       selectedDisplay.size.height,
