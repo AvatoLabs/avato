@@ -47,6 +47,7 @@ export const ComputerUseManifest: BuiltinToolManifest = {
     },
     {
       description: 'Click at window-relative coordinates on the activated Avato Desktop window.',
+      humanIntervention: 'required',
       name: ComputerUseApiName.click,
       parameters: {
         additionalProperties: false,
@@ -62,6 +63,7 @@ export const ComputerUseManifest: BuiltinToolManifest = {
     {
       description:
         'Double-click at window-relative coordinates on the activated Avato Desktop window.',
+      humanIntervention: 'required',
       name: ComputerUseApiName.doubleClick,
       parameters: {
         additionalProperties: false,
@@ -77,6 +79,7 @@ export const ComputerUseManifest: BuiltinToolManifest = {
     {
       description:
         'Drag from one window-relative point to another on the activated Avato Desktop window.',
+      humanIntervention: 'required',
       name: ComputerUseApiName.drag,
       parameters: {
         additionalProperties: false,
@@ -102,6 +105,7 @@ export const ComputerUseManifest: BuiltinToolManifest = {
     },
     {
       description: 'Scroll at window-relative coordinates on the activated Avato Desktop window.',
+      humanIntervention: 'required',
       name: ComputerUseApiName.scroll,
       parameters: {
         additionalProperties: false,
@@ -117,6 +121,7 @@ export const ComputerUseManifest: BuiltinToolManifest = {
     },
     {
       description: 'Type text into the focused element in the activated Avato Desktop window.',
+      humanIntervention: 'required',
       name: ComputerUseApiName.typeText,
       parameters: {
         additionalProperties: false,
@@ -127,6 +132,7 @@ export const ComputerUseManifest: BuiltinToolManifest = {
     },
     {
       description: 'Press a key in the activated Avato Desktop window.',
+      humanIntervention: 'required',
       name: ComputerUseApiName.pressKey,
       parameters: {
         additionalProperties: false,
