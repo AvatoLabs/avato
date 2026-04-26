@@ -181,6 +181,7 @@ describe('MobileChatService', () => {
     deviceProxyMock.isConfigured = true;
     deviceProxyMock.queryDeviceList.mockResolvedValue([
       {
+        allowRemoteComputerUse: false,
         allowRemoteTools: true,
         deviceId: 'device-1',
         hostname: 'Mac Studio',
@@ -232,7 +233,51 @@ describe('MobileChatService', () => {
     expect(toolSet.enabledToolIds).toEqual(
       expect.arrayContaining(['lobe-remote-device', 'lobe-local-system']),
     );
+    expect(toolSet.enabledToolIds).not.toContain('avato-computer-use');
     expect(toolSet.manifestMap['lobe-remote-device'].systemRole).toContain('Mac Studio');
+  });
+
+  it('should expose Computer Use only when the active desktop allows it', async () => {
+    deviceProxyMock.isConfigured = true;
+    deviceProxyMock.queryDeviceList.mockResolvedValue([
+      {
+        allowRemoteComputerUse: true,
+        allowRemoteTools: true,
+        deviceId: 'device-1',
+        hostname: 'Mac Studio',
+        lastSeen: new Date(0).toISOString(),
+        online: true,
+        platform: 'darwin',
+      },
+    ]);
+    deviceProxyMock.queryDeviceSystemInfo.mockResolvedValue(undefined);
+    pluginQueryMock.mockResolvedValue([]);
+
+    const service = new MobileChatService({
+      modelRuntime: { chat: vi.fn() } as any,
+      provider: 'openai',
+      requestSignal: new AbortController().signal,
+      serverDB: {} as any,
+      userId: 'user-1',
+    });
+
+    const deviceContext = await (service as any).resolveDeviceContext();
+    const toolSet = await (service as any).resolveToolSet({
+      conversationConfig: undefined,
+      deviceContext,
+      payload: {
+        messages: [{ content: 'hi', role: 'user' }],
+        model: 'gpt-4o',
+        stream: true,
+      },
+      pluginIds: [],
+      skillMetas: [],
+    });
+
+    expect(deviceContext.activeDeviceComputerUseReady).toBe(true);
+    expect(toolSet.enabledToolIds).toEqual(
+      expect.arrayContaining(['avato-computer-use', 'lobe-local-system']),
+    );
   });
 
   it('should activate Local System tools after a Remote Device activation result', () => {
@@ -270,6 +315,7 @@ describe('MobileChatService', () => {
     expect(activation.activeDeviceId).toBe('device-2');
     expect(activation.toolSet.enabledToolIds).toContain('lobe-local-system');
     expect(activation.toolSet.manifestMap['lobe-local-system']).toBeDefined();
+    expect(activation.toolSet.manifestMap['avato-computer-use']).toBeUndefined();
     expect(activation.toolSet.sourceMap['lobe-local-system']).toBe('builtin');
     expect(activation.toolSet.tools.length).toBeGreaterThan(0);
   });

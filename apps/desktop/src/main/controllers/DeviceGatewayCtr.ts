@@ -27,6 +27,7 @@ import { ProxyUrlBuilder } from '@/modules/networkProxy';
 import { createLogger } from '@/utils/logger';
 
 import type { MCPClientParams } from '../libs/mcp/types';
+import ComputerUseCtr from './ComputerUseCtr';
 import { ControllerModule, IpcMethod } from './index';
 import LocalFileCtr from './LocalFileCtr';
 import McpCtr from './McpCtr';
@@ -38,6 +39,7 @@ const logger = createLogger('controllers:DeviceGatewayCtr');
 const LOCAL_SYSTEM_IDENTIFIER = 'lobe-local-system';
 const MCP_IDENTIFIER = 'lobe-mcp';
 const SKILLS_IDENTIFIER = 'lobe-skills';
+const COMPUTER_USE_IDENTIFIER = 'avato-computer-use';
 const SKILL_EXEC_SCRIPT = 'execScript';
 const SKILL_EXPORT_FILE = 'exportFile';
 const MCP_CALL_TOOL = 'callTool';
@@ -45,6 +47,7 @@ const GATEWAY_START_AUTH_TIMEOUT = 15_000;
 const MAX_GATEWAY_TOOL_RESPONSE_CONTENT_LENGTH = 5_000_000;
 const MAX_SKILL_EXECUTION_CONTEXTS = 32;
 const REMOTE_TOOLS_DISABLED_ERROR = 'REMOTE_TOOLS_DISABLED';
+const REMOTE_COMPUTER_USE_DISABLED_ERROR = 'REMOTE_COMPUTER_USE_DISABLED';
 
 interface FetchRequestInitWithDispatcher extends RequestInit {
   dispatcher?: Dispatcher;
@@ -189,6 +192,10 @@ export default class DeviceGatewayCtr extends ControllerModule {
     return this.app.getController(LocalFileCtr);
   }
 
+  private get computerUseCtr() {
+    return this.app.getController(ComputerUseCtr);
+  }
+
   private get remoteServerConfigCtr() {
     return this.app.getController(RemoteServerConfigCtr);
   }
@@ -236,6 +243,7 @@ export default class DeviceGatewayCtr extends ControllerModule {
     ) {
       await this.startAgent();
     } else {
+      this.client?.setAllowRemoteComputerUse(next.allowRemoteComputerUse === true);
       this.client?.setAllowRemoteTools(next.allowRemoteTools === true);
       this.broadcastStatus();
     }
@@ -305,6 +313,7 @@ export default class DeviceGatewayCtr extends ControllerModule {
     this.lastError = undefined;
 
     const client = new GatewayClient({
+      allowRemoteComputerUse: storedConfig.allowRemoteComputerUse === true,
       allowRemoteTools: storedConfig.allowRemoteTools === true,
       deviceId,
       gatewayUrl,
@@ -366,6 +375,7 @@ export default class DeviceGatewayCtr extends ControllerModule {
 
   private getConfig(): DeviceGatewayConfig {
     return this.app.storeManager.get('deviceGateway', {
+      allowRemoteComputerUse: false,
       allowRemoteTools: false,
       enabled: true,
     });
@@ -379,6 +389,7 @@ export default class DeviceGatewayCtr extends ControllerModule {
     const config = this.getConfig();
 
     return {
+      allowRemoteComputerUse: config.allowRemoteComputerUse === true,
       allowRemoteTools: config.allowRemoteTools === true,
       connectionStatus: this.client?.connectionStatus ?? this.connectionStatus,
       deviceId: this.client?.currentDeviceId ?? config.deviceId,
@@ -540,6 +551,8 @@ export default class DeviceGatewayCtr extends ControllerModule {
         result = await this.executeMCPTool(toolCall.apiName, args);
       } else if (toolCall.identifier === SKILLS_IDENTIFIER) {
         result = await this.executeSkillsTool(toolCall.apiName, args);
+      } else if (toolCall.identifier === COMPUTER_USE_IDENTIFIER) {
+        result = await this.executeComputerUseTool(toolCall.apiName, args);
       } else {
         return {
           content: '',
@@ -612,6 +625,17 @@ export default class DeviceGatewayCtr extends ControllerModule {
     }
 
     return handler();
+  }
+
+  private executeComputerUseTool(apiName: string, args: Record<string, unknown>): Promise<unknown> {
+    if (!this.isRemoteComputerUseAllowed()) {
+      return Promise.resolve({
+        error: REMOTE_COMPUTER_USE_DISABLED_ERROR,
+        success: false,
+      });
+    }
+
+    return this.computerUseCtr.execute(apiName, args);
   }
 
   private async executeMCPTool(apiName: string, args: Record<string, unknown>): Promise<unknown> {
@@ -937,6 +961,10 @@ export default class DeviceGatewayCtr extends ControllerModule {
 
   private isRemoteToolsAllowed() {
     return this.getConfig().allowRemoteTools === true;
+  }
+
+  private isRemoteComputerUseAllowed() {
+    return this.getConfig().allowRemoteComputerUse === true;
   }
 
   private broadcastStatus() {

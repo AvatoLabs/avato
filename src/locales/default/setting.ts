@@ -249,6 +249,9 @@ export default {
   'deviceGateway.allowRemoteTools.desc':
     'Allow Web and mobile clients signed in to this account to run Local System tools, Skills, and local MCP on this desktop',
   'deviceGateway.allowRemoteTools.title': 'Remote Tool Execution',
+  'deviceGateway.allowRemoteComputerUse.desc':
+    'Allow Web and mobile clients signed in to this account to view and control the Avato Desktop window with screenshots, clicks, typing, scrolling, and key presses. Keep this off unless you trust the active session.',
+  'deviceGateway.allowRemoteComputerUse.title': 'Remote Computer Use',
   'deviceGateway.deviceId.desc': 'Stable identifier registered by this desktop app',
   'deviceGateway.deviceId.title': 'Device ID',
   'deviceGateway.enabled.desc': 'Connect automatically after desktop sign-in',

@@ -1,6 +1,7 @@
 // ─── Device Info ───
 
 export interface DeviceAttachment {
+  allowRemoteComputerUse?: boolean;
   allowRemoteTools: boolean;
   connectedAt: number;
   deviceId: string;
@@ -30,6 +31,7 @@ export interface AuthMessage {
 }
 
 export interface HeartbeatMessage {
+  allowRemoteComputerUse?: boolean;
   allowRemoteTools?: boolean;
   type: 'heartbeat';
 }

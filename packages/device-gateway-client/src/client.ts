@@ -96,6 +96,7 @@ const noopLogger: GatewayClientLogger = {
 };
 
 export interface GatewayClientOptions {
+  allowRemoteComputerUse?: boolean;
   allowRemoteTools?: boolean;
   /** Auto-reconnect on disconnection (default: true) */
   autoReconnect?: boolean;
@@ -126,6 +127,7 @@ export class GatewayClient extends EventEmitter {
   private userId?: string;
   private logger: GatewayClientLogger;
   private autoReconnect: boolean;
+  private allowRemoteComputerUse: boolean;
   private allowRemoteTools: boolean;
 
   constructor(options: GatewayClientOptions) {
@@ -137,6 +139,7 @@ export class GatewayClient extends EventEmitter {
     this.userId = options.userId;
     this.logger = options.logger || noopLogger;
     this.autoReconnect = options.autoReconnect ?? true;
+    this.allowRemoteComputerUse = options.allowRemoteComputerUse === true;
     this.allowRemoteTools = options.allowRemoteTools === true;
   }
 
@@ -214,6 +217,13 @@ export class GatewayClient extends EventEmitter {
     }
   }
 
+  setAllowRemoteComputerUse(allowRemoteComputerUse: boolean): void {
+    this.allowRemoteComputerUse = allowRemoteComputerUse;
+    if (this.status === 'connected') {
+      this.sendHeartbeat();
+    }
+  }
+
   // ─── Connection Logic ───
 
   private doConnect() {
@@ -255,6 +265,7 @@ export class GatewayClient extends EventEmitter {
     url.search = '';
 
     const params = new URLSearchParams({
+      allowRemoteComputerUse: String(this.allowRemoteComputerUse),
       allowRemoteTools: String(this.allowRemoteTools),
       deviceId: this.deviceId,
       hostname: os.hostname(),
@@ -397,7 +408,11 @@ export class GatewayClient extends EventEmitter {
   }
 
   private sendHeartbeat() {
-    this.sendMessage({ allowRemoteTools: this.allowRemoteTools, type: 'heartbeat' });
+    this.sendMessage({
+      allowRemoteComputerUse: this.allowRemoteComputerUse,
+      allowRemoteTools: this.allowRemoteTools,
+      type: 'heartbeat',
+    });
   }
 
   private stopHeartbeat() {

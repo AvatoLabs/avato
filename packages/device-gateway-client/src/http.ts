@@ -115,6 +115,8 @@ const isDeviceAttachment = (data: unknown): data is DeviceAttachment => {
   if (!isRecord(data)) return false;
 
   return (
+    (data.allowRemoteComputerUse === undefined ||
+      typeof data.allowRemoteComputerUse === 'boolean') &&
     (data.allowRemoteTools === undefined || typeof data.allowRemoteTools === 'boolean') &&
     typeof data.connectedAt === 'number' &&
     typeof data.deviceId === 'string' &&
@@ -124,6 +126,7 @@ const isDeviceAttachment = (data: unknown): data is DeviceAttachment => {
 };
 
 const pickDeviceAttachment = (data: DeviceAttachment): DeviceAttachment => ({
+  ...(data.allowRemoteComputerUse === true ? { allowRemoteComputerUse: true } : {}),
   allowRemoteTools: data.allowRemoteTools === true,
   connectedAt: data.connectedAt,
   deviceId: data.deviceId,

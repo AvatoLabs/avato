@@ -155,6 +155,7 @@ describe('GatewayClient', () => {
       expect(ws.url).toContain('deviceId=test-device-id');
       expect(ws.url).toContain('hostname=test-host');
       expect(ws.url).toContain('userId=test-user');
+      expect(ws.url).toContain('allowRemoteComputerUse=false');
       expect(ws.url).toContain('allowRemoteTools=true');
     });
 
@@ -487,7 +488,11 @@ describe('GatewayClient', () => {
       handler(JSON.stringify({ type: 'auth_success' }));
 
       expect(ws.send).toHaveBeenCalledWith(
-        JSON.stringify({ allowRemoteTools: true, type: 'heartbeat' }),
+        JSON.stringify({
+          allowRemoteComputerUse: false,
+          allowRemoteTools: true,
+          type: 'heartbeat',
+        }),
       );
     });
 
@@ -505,7 +510,11 @@ describe('GatewayClient', () => {
       await vi.advanceTimersByTimeAsync(30_000);
 
       expect(ws.send).toHaveBeenCalledWith(
-        JSON.stringify({ allowRemoteTools: true, type: 'heartbeat' }),
+        JSON.stringify({
+          allowRemoteComputerUse: false,
+          allowRemoteTools: true,
+          type: 'heartbeat',
+        }),
       );
     });
 
@@ -523,7 +532,11 @@ describe('GatewayClient', () => {
       handler(JSON.stringify({ type: 'auth_success' }));
 
       expect(ws.send).toHaveBeenLastCalledWith(
-        JSON.stringify({ allowRemoteTools: false, type: 'heartbeat' }),
+        JSON.stringify({
+          allowRemoteComputerUse: false,
+          allowRemoteTools: false,
+          type: 'heartbeat',
+        }),
       );
     });
 
@@ -540,7 +553,32 @@ describe('GatewayClient', () => {
       client.setAllowRemoteTools(false);
 
       expect(ws.send).toHaveBeenCalledWith(
-        JSON.stringify({ allowRemoteTools: false, type: 'heartbeat' }),
+        JSON.stringify({
+          allowRemoteComputerUse: false,
+          allowRemoteTools: false,
+          type: 'heartbeat',
+        }),
+      );
+    });
+
+    it('sends the latest remote computer use permission in heartbeat messages', async () => {
+      client.connect();
+      await vi.advanceTimersByTimeAsync(1);
+
+      const handler = (client as any).handleMessage;
+      handler(JSON.stringify({ type: 'auth_success' }));
+
+      const ws = (client as any).ws;
+      ws.send.mockClear();
+
+      client.setAllowRemoteComputerUse(true);
+
+      expect(ws.send).toHaveBeenCalledWith(
+        JSON.stringify({
+          allowRemoteComputerUse: true,
+          allowRemoteTools: true,
+          type: 'heartbeat',
+        }),
       );
     });
   });

@@ -2,9 +2,17 @@ import type { LobeToolManifest, StepToolDelta } from './types';
 
 export interface BuildStepToolDeltaParams {
   /**
+   * Whether the active device explicitly allows remote computer use.
+   */
+  activeDeviceComputerUseReady?: boolean;
+  /**
    * Currently active device ID (triggers local-system tool injection)
    */
   activeDeviceId?: string;
+  /**
+   * The computer-use manifest to inject when the active device allows it.
+   */
+  computerUseManifest?: LobeToolManifest;
   /**
    * Force finish flag — strips all tools for pure text output
    */
@@ -42,6 +50,19 @@ export function buildStepToolDelta(params: BuildStepToolDeltaParams): StepToolDe
     delta.activatedTools.push({
       id: params.localSystemManifest.identifier,
       manifest: params.localSystemManifest,
+      source: 'device',
+    });
+  }
+
+  if (
+    params.activeDeviceId &&
+    params.activeDeviceComputerUseReady &&
+    params.computerUseManifest &&
+    !params.operationManifestMap[params.computerUseManifest.identifier]
+  ) {
+    delta.activatedTools.push({
+      id: params.computerUseManifest.identifier,
+      manifest: params.computerUseManifest,
       source: 'device',
     });
   }

@@ -1,4 +1,5 @@
 export interface DeviceAttachment {
+  allowRemoteComputerUse?: boolean;
   allowRemoteTools?: boolean;
   deviceId: string;
   hostname: string;

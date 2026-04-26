@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { ComputerUseManifest } from '@lobechat/builtin-tool-computer-use';
 import { LocalSystemManifest } from '@lobechat/builtin-tool-local-system';
 import { MemoryManifest } from '@lobechat/builtin-tool-memory';
 import { RemoteDeviceManifest } from '@lobechat/builtin-tool-remote-device';
@@ -427,6 +428,52 @@ describe('createServerAgentToolsEngine', () => {
       });
 
       expect(result.enabledToolIds).not.toContain(LocalSystemManifest.identifier);
+    });
+  });
+
+  describe('ComputerUse tool enable rules', () => {
+    it('should enable ComputerUse only when an active device explicitly allows it', () => {
+      const context = createMockContext();
+      const engine = createServerAgentToolsEngine(context, {
+        agentConfig: { plugins: [ComputerUseManifest.identifier] },
+        deviceContext: {
+          activeDeviceComputerUseReady: true,
+          activeDeviceReady: true,
+          gatewayConfigured: true,
+        },
+        model: 'gpt-4',
+        provider: 'openai',
+      });
+
+      const result = engine.generateToolsDetailed({
+        model: 'gpt-4',
+        provider: 'openai',
+        toolIds: [ComputerUseManifest.identifier],
+      });
+
+      expect(result.enabledToolIds).toContain(ComputerUseManifest.identifier);
+    });
+
+    it('should disable ComputerUse when the active device has Remote Computer Use disabled', () => {
+      const context = createMockContext();
+      const engine = createServerAgentToolsEngine(context, {
+        agentConfig: { plugins: [ComputerUseManifest.identifier] },
+        deviceContext: {
+          activeDeviceComputerUseReady: false,
+          activeDeviceReady: true,
+          gatewayConfigured: true,
+        },
+        model: 'gpt-4',
+        provider: 'openai',
+      });
+
+      const result = engine.generateToolsDetailed({
+        model: 'gpt-4',
+        provider: 'openai',
+        toolIds: [ComputerUseManifest.identifier],
+      });
+
+      expect(result.enabledToolIds).not.toContain(ComputerUseManifest.identifier);
     });
   });
 

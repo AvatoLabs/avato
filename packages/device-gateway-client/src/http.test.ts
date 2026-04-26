@@ -115,6 +115,7 @@ describe('GatewayHttpClient', () => {
     it('should return device list on success', async () => {
       const devices = [
         {
+          allowRemoteComputerUse: true,
           allowRemoteTools: true,
           connectedAt: 1000,
           deviceId: 'd1',

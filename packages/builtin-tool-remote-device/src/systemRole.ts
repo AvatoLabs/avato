@@ -9,7 +9,7 @@ export const generateSystemPrompt = (devices?: DeviceAttachment[]): string => {
 ${onlineDevices
   .map(
     (d) =>
-      `- **${d.hostname}** (${d.platform}) — ID: \`${d.deviceId}\` — remote tools: ${d.allowRemoteTools ? 'enabled' : 'disabled'}`,
+      `- **${d.hostname}** (${d.platform}) — ID: \`${d.deviceId}\` — remote tools: ${d.allowRemoteTools ? 'enabled' : 'disabled'}, computer use: ${d.allowRemoteComputerUse ? 'enabled' : 'disabled'}`,
   )
   .join('\n')}
 </online-devices>`
