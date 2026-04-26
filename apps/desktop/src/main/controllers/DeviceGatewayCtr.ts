@@ -19,6 +19,7 @@ import { app as electronApp } from 'electron';
 import { HttpProxyAgent } from 'http-proxy-agent';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import superjson from 'superjson';
+import { type Dispatcher, ProxyAgent } from 'undici';
 
 import { DEVICE_GATEWAY_URL } from '@/const/env';
 import { defaultProxySettings } from '@/const/store';
@@ -44,6 +45,10 @@ const GATEWAY_START_AUTH_TIMEOUT = 15_000;
 const MAX_GATEWAY_TOOL_RESPONSE_CONTENT_LENGTH = 5_000_000;
 const MAX_SKILL_EXECUTION_CONTEXTS = 32;
 const REMOTE_TOOLS_DISABLED_ERROR = 'REMOTE_TOOLS_DISABLED';
+
+interface FetchRequestInitWithDispatcher extends RequestInit {
+  dispatcher?: Dispatcher;
+}
 
 interface ToolCallResult {
   content: string;
@@ -751,11 +756,20 @@ export default class DeviceGatewayCtr extends ControllerModule {
     const uploadUrl = this.parseUploadUrl(params.uploadUrl);
     const mimeType = localFile.mimeType || 'application/octet-stream';
     const buffer = Buffer.from(localFile.base64, 'base64');
-    const response = await fetch(uploadUrl, {
-      body: new Blob([buffer], { type: mimeType }),
-      headers: { 'content-type': mimeType },
-      method: 'PUT',
-    });
+    const proxyOptions = this.createGatewayFetchProxyOptions();
+    let response: Response;
+    try {
+      response = await fetch(uploadUrl, {
+        body: new Blob([buffer], { type: mimeType }),
+        ...proxyOptions,
+        headers: { 'content-type': mimeType },
+        method: 'PUT',
+      } as FetchRequestInitWithDispatcher);
+    } finally {
+      proxyOptions.dispatcher?.close().catch((error) => {
+        logger.warn('Failed to close Device Gateway fetch proxy dispatcher:', error);
+      });
+    }
 
     if (!response.ok) {
       return {
@@ -971,5 +985,19 @@ export default class DeviceGatewayCtr extends ControllerModule {
     return gatewayProtocol === 'https:' || gatewayProtocol === 'wss:'
       ? new HttpsProxyAgent(proxyUrl)
       : new HttpProxyAgent(proxyUrl);
+  }
+
+  private createGatewayFetchProxyOptions(): Pick<FetchRequestInitWithDispatcher, 'dispatcher'> {
+    const proxyUrl = this.resolveGatewayWebSocketProxyUrl(this.getConfig().gatewayProxyUrl);
+    if (!proxyUrl) return {};
+
+    if (proxyUrl.startsWith('socks:') || proxyUrl.startsWith('socks5:')) {
+      logger.warn('Device Gateway fetch proxy does not support socks5 yet; falling back direct');
+      return {};
+    }
+
+    return {
+      dispatcher: new ProxyAgent({ uri: proxyUrl }),
+    };
   }
 }

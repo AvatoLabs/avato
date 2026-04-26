@@ -793,6 +793,73 @@ describe('DeviceGatewayCtr', () => {
     );
   });
 
+  it('uploads skill export files through the gateway-only HTTP proxy when configured', async () => {
+    storeManager.get.mockImplementation((key: string, fallback?: unknown) => {
+      if (key === 'networkProxy') {
+        return {
+          enableProxy: false,
+          proxyBypass: 'localhost, 127.0.0.1, ::1',
+          proxyPort: '',
+          proxyRequireAuth: false,
+          proxyServer: '',
+          proxyType: 'http',
+        };
+      }
+
+      if (key === 'deviceGateway') {
+        return {
+          allowRemoteTools: true,
+          enabled: true,
+          gatewayProxyUrl: 'http://127.0.0.1:49790',
+          gatewayUrl: 'https://gateway.example.com',
+        };
+      }
+
+      return fallback;
+    });
+    localFileCtr.handlePrepareSkillDirectory.mockResolvedValue({
+      extractedDir: '/tmp/skill-dir',
+      success: true,
+      zipPath: '/tmp/skill.zip',
+    });
+    shellCommandCtr.handleRunCommand.mockResolvedValue({
+      exit_code: 0,
+      stdout: 'done',
+      success: true,
+    });
+
+    await (controller as any).executeToolCall({
+      apiName: 'execScript',
+      arguments: JSON.stringify({
+        command: 'node build.js',
+        executionContextId: 'operation-1',
+        zipSha256: 'hash-1',
+        zipUrl: 'https://example.com/skill.zip',
+      }),
+      identifier: 'lobe-skills',
+    });
+
+    const result = await (controller as any).executeToolCall({
+      apiName: 'exportFile',
+      arguments: JSON.stringify({
+        executionContextId: 'operation-1',
+        filename: 'result.txt',
+        path: 'output.txt',
+        uploadUrl: 'https://storage.example.com/upload',
+      }),
+      identifier: 'lobe-skills',
+    });
+
+    expect(result.success).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://storage.example.com/upload',
+      expect.objectContaining({
+        dispatcher: expect.anything(),
+        method: 'PUT',
+      }),
+    );
+  });
+
   it('rejects skill export files when no execution directory is active', async () => {
     const result = await (controller as any).executeToolCall({
       apiName: 'exportFile',

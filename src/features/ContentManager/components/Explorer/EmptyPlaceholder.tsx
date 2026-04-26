@@ -2,7 +2,7 @@ import { Center, FileTypeIcon, Flexbox, Icon, Text } from '@lobehub/ui';
 import { Upload } from 'antd';
 import { createStaticStyles, cssVar, cx } from 'antd-style';
 import { BrainCircuitIcon, FilterXIcon, SlidersHorizontal, XIcon } from 'lucide-react';
-import { memo, useMemo } from 'react';
+import { type ChangeEvent, memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import useSWR from 'swr';
@@ -21,13 +21,24 @@ import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { useFileStore } from '@/store/file';
 import { useServerConfigStore } from '@/store/serverConfig';
 
+import useUploadFolder from '../Header/hooks/useUploadFolder';
+
 const ICON_SIZE = 80;
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   actionTitle: css`
-    margin-block-start: 12px;
+    position: relative;
+    z-index: 2;
+
+    display: block;
+
+    max-width: calc(100% - 86px);
+    margin-block-start: 0;
+
     font-size: 16px;
+    line-height: 1.4;
     color: ${cssVar.colorText};
+    text-align: start;
   `,
   actionGrid: css`
     display: grid;
@@ -86,7 +97,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   cardButton: css`
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     justify-content: flex-start;
 
     border: 0;
@@ -105,10 +116,16 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 
     position: relative;
 
-    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
 
     width: 100%;
-    height: 100%;
+    min-height: 112px;
+    padding-block-start: 2px;
+    padding-inline-end: 88px;
+
+    text-align: start;
   `,
   intro: css`
     display: grid;
@@ -134,11 +151,13 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     opacity: 0.5;
     filter: blur(24px);
   `,
-  icon: css`
+  iconSlot: css`
+    pointer-events: none;
+
     position: absolute;
     z-index: 1;
-    inset-block-end: -24px;
-    inset-inline-end: 8px;
+    inset-block-end: -18px;
+    inset-inline-end: 10px;
 
     flex: none;
   `,
@@ -246,7 +265,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
   shell: css`
     display: grid;
-    gap: 18px;
+    gap: 28px;
     width: min(980px, 100%);
     padding: clamp(20px, 4vw, 36px);
   `,
@@ -258,8 +277,10 @@ const EmptyPlaceholder = memo(() => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const folderUploadInputRef = useRef<HTMLInputElement>(null);
 
   const pushDockFileList = useFileStore((s) => s.pushDockFileList);
+  const uploadFolderWithStructure = useFileStore((s) => s.uploadFolderWithStructure);
 
   const [
     assetClassification,
@@ -294,6 +315,19 @@ const EmptyPlaceholder = memo(() => {
   const pendingTarget = spaceId ? (pendingGovernanceTargetBySpaceId.get(spaceId) ?? null) : null;
   const showOpenSpaceMemoryAction =
     currentSpace?.kind === 'team' && !!spaceMemorySummary && !canReviewSpaceMemory;
+  const { handleFolderUpload } = useUploadFolder({
+    sourceSetId,
+    spaceId,
+    t,
+    uploadFolderWithStructure,
+  });
+  const handleEmptyFolderUpload = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => handleFolderUpload(event),
+    [handleFolderUpload],
+  );
+  const openFolderUploadDialog = useCallback(() => {
+    folderUploadInputRef.current?.click();
+  }, []);
   const hasGovernanceFilters = Boolean(
     assetClassification || assetRightsOwner || assetReviewStatus || assetUsagePolicy,
   );
@@ -379,9 +413,6 @@ const EmptyPlaceholder = memo(() => {
     <Center gap={24} height={'100%'} style={{ paddingBottom: 100 }} width={'100%'}>
       <div className={styles.shell}>
         <Flexbox className={styles.intro} justify={'center'}>
-          {!hasGovernanceFilters && (
-            <Text className={styles.introEyebrow}>{t('FileManager.emptyStatus.title')}</Text>
-          )}
           <Text as={'h4'}>
             {hasGovernanceFilters
               ? translateText('filters.empty.title')
@@ -444,13 +475,14 @@ const EmptyPlaceholder = memo(() => {
                     {translateText('filters.adjustGovernance')}
                   </span>
                   <div className={styles.glow} style={{ background: accentColors[0] }} />
-                  <FileTypeIcon
-                    aria-hidden
-                    className={styles.icon}
-                    color={accentColors[0]}
-                    icon={<Icon color={cssVar.colorTextLightSolid} icon={SlidersHorizontal} />}
-                    size={ICON_SIZE}
-                  />
+                  <div className={styles.iconSlot}>
+                    <FileTypeIcon
+                      aria-hidden
+                      color={accentColors[0]}
+                      icon={<Icon color={cssVar.colorTextLightSolid} icon={SlidersHorizontal} />}
+                      size={ICON_SIZE}
+                    />
+                  </div>
                 </Flexbox>
               </button>
               <button
@@ -463,13 +495,14 @@ const EmptyPlaceholder = memo(() => {
                     {translateText('filters.clearGovernance')}
                   </span>
                   <div className={styles.glow} style={{ background: accentColors[1] }} />
-                  <FileTypeIcon
-                    aria-hidden
-                    className={styles.icon}
-                    color={accentColors[1]}
-                    icon={<Icon color={cssVar.colorTextLightSolid} icon={FilterXIcon} />}
-                    size={ICON_SIZE}
-                  />
+                  <div className={styles.iconSlot}>
+                    <FileTypeIcon
+                      aria-hidden
+                      color={accentColors[1]}
+                      icon={<Icon color={cssVar.colorTextLightSolid} icon={FilterXIcon} />}
+                      size={ICON_SIZE}
+                    />
+                  </div>
                 </Flexbox>
               </button>
             </>
@@ -488,13 +521,14 @@ const EmptyPlaceholder = memo(() => {
                       {t('space.home.recall.actions.review', { count: pendingCount, ns: 'file' })}
                     </span>
                     <div className={styles.glow} style={{ background: accentColors[0] }} />
-                    <FileTypeIcon
-                      aria-hidden
-                      className={styles.icon}
-                      color={accentColors[0]}
-                      icon={<Icon color={cssVar.colorTextLightSolid} icon={BrainCircuitIcon} />}
-                      size={ICON_SIZE}
-                    />
+                    <div className={styles.iconSlot}>
+                      <FileTypeIcon
+                        aria-hidden
+                        color={accentColors[0]}
+                        icon={<Icon color={cssVar.colorTextLightSolid} icon={BrainCircuitIcon} />}
+                        size={ICON_SIZE}
+                      />
+                    </div>
                   </Flexbox>
                 </button>
               )}
@@ -509,13 +543,14 @@ const EmptyPlaceholder = memo(() => {
                       {t('space.home.recall.actions.open', { ns: 'file' })}
                     </span>
                     <div className={styles.glow} style={{ background: accentColors[0] }} />
-                    <FileTypeIcon
-                      aria-hidden
-                      className={styles.icon}
-                      color={accentColors[0]}
-                      icon={<Icon color={cssVar.colorTextLightSolid} icon={BrainCircuitIcon} />}
-                      size={ICON_SIZE}
-                    />
+                    <div className={styles.iconSlot}>
+                      <FileTypeIcon
+                        aria-hidden
+                        color={accentColors[0]}
+                        icon={<Icon color={cssVar.colorTextLightSolid} icon={BrainCircuitIcon} />}
+                        size={ICON_SIZE}
+                      />
+                    </div>
                   </Flexbox>
                 </button>
               )}
@@ -532,16 +567,20 @@ const EmptyPlaceholder = memo(() => {
                       {t('FileManager.emptyStatus.actions.sourceSet')}
                     </span>
                     <div className={styles.glow} style={{ background: accentColors[0] }} />
-                    <FileTypeIcon
-                      aria-hidden
-                      className={styles.icon}
-                      color={accentColors[0]}
-                      icon={
-                        <Icon color={cssVar.colorTextLightSolid} icon={RESOURCE_ENTRY_ICONS.plus} />
-                      }
-                      size={ICON_SIZE}
-                      type={'folder'}
-                    />
+                    <div className={styles.iconSlot}>
+                      <FileTypeIcon
+                        aria-hidden
+                        color={accentColors[0]}
+                        size={ICON_SIZE}
+                        type={'folder'}
+                        icon={
+                          <Icon
+                            color={cssVar.colorTextLightSolid}
+                            icon={RESOURCE_ENTRY_ICONS.plus}
+                          />
+                        }
+                      />
+                    </div>
                   </Flexbox>
                 </button>
               )}
@@ -561,54 +600,59 @@ const EmptyPlaceholder = memo(() => {
                       {t('FileManager.emptyStatus.actions.file')}
                     </span>
                     <div className={styles.glow} style={{ background: accentColors[1] }} />
-                    <FileTypeIcon
-                      aria-hidden
-                      className={styles.icon}
-                      color={accentColors[1]}
-                      size={ICON_SIZE}
-                      icon={
-                        <Icon
-                          color={cssVar.colorTextLightSolid}
-                          icon={RESOURCE_ENTRY_ICONS.uploadArrow}
-                        />
-                      }
-                    />
+                    <div className={styles.iconSlot}>
+                      <FileTypeIcon
+                        aria-hidden
+                        color={accentColors[1]}
+                        size={ICON_SIZE}
+                        icon={
+                          <Icon
+                            color={cssVar.colorTextLightSolid}
+                            icon={RESOURCE_ENTRY_ICONS.uploadArrow}
+                          />
+                        }
+                      />
+                    </div>
                   </Flexbox>
                 </button>
               </Upload>
-              <Upload
-                directory
-                className={styles.cardUpload}
-                multiple={true}
-                showUploadList={false}
-                beforeUpload={async (file) => {
-                  await pushDockFileList([file], sourceSetId, undefined, spaceId);
-
-                  return false;
-                }}
-              >
-                <button className={cx(styles.card, styles.cardButton)} type="button">
+              <div className={styles.cardUpload}>
+                <input
+                  multiple
+                  ref={folderUploadInputRef}
+                  style={{ display: 'none' }}
+                  type="file"
+                  // @ts-expect-error - webkitdirectory is not in the React types
+                  webkitdirectory=""
+                  onChange={handleEmptyFolderUpload}
+                />
+                <button
+                  className={cx(styles.card, styles.cardButton)}
+                  type="button"
+                  onClick={openFolderUploadDialog}
+                >
                   <Flexbox className={styles.cardContent}>
                     <span className={styles.actionTitle}>
                       {t('FileManager.emptyStatus.actions.folder')}
                     </span>
                     <div className={styles.glow} style={{ background: accentColors[2] }} />
-                    <FileTypeIcon
-                      aria-hidden
-                      className={styles.icon}
-                      color={accentColors[2]}
-                      size={ICON_SIZE}
-                      type={'folder'}
-                      icon={
-                        <Icon
-                          color={cssVar.colorTextLightSolid}
-                          icon={RESOURCE_ENTRY_ICONS.uploadArrow}
-                        />
-                      }
-                    />
+                    <div className={styles.iconSlot}>
+                      <FileTypeIcon
+                        aria-hidden
+                        color={accentColors[2]}
+                        size={ICON_SIZE}
+                        type={'folder'}
+                        icon={
+                          <Icon
+                            color={cssVar.colorTextLightSolid}
+                            icon={RESOURCE_ENTRY_ICONS.uploadArrow}
+                          />
+                        }
+                      />
+                    </div>
                   </Flexbox>
                 </button>
-              </Upload>
+              </div>
             </>
           )}
         </div>
