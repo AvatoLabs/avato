@@ -1,3 +1,4 @@
+import { type FileScope, getSourceSetScopeId } from '@/features/ContentManager/useFileScope';
 import { type ContentQueryParams } from '@/types/content';
 import {
   type FileAssetClassification,
@@ -6,12 +7,11 @@ import {
   type FilesTabs,
   type SortType,
 } from '@/types/files';
-import { getSourceSetScopeId, type FileScope } from '@/features/ContentManager/useFileScope';
 
 interface BuildExplorerQueryParamsOptions {
   assetClassification?: FileAssetClassification;
-  assetRightsOwner?: string;
   assetReviewStatus?: FileAssetReviewStatus;
+  assetRightsOwner?: string;
   assetUsagePolicy?: FileAssetUsagePolicy;
   category?: FilesTabs;
   currentFolderSlug?: string | null;
@@ -41,7 +41,11 @@ export function buildExplorerQueryParams({
   sortType,
   spaceId,
 }: BuildExplorerQueryParamsOptions): ContentQueryParams {
-  const effectiveSourceSetId = sourceSetId ?? getSourceSetScopeId(scope);
+  // URL scope is the source of truth and updates synchronously.
+  // Store sourceSetId lags behind by one frame (set via useEffect),
+  // so we prefer the URL-derived value to avoid a stale-key race that
+  // would cause SWR to skip re-fetching on scope switches.
+  const effectiveSourceSetId = getSourceSetScopeId(scope) ?? sourceSetId;
 
   return {
     assetClassification,

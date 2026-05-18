@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import { getFileScope, getSourceSetScopeId } from '@/features/ContentManager/useFileScope';
@@ -86,8 +86,11 @@ export const useContentManagerUrlSync = (enabled: boolean = true) => {
   ]);
 
   // ── URL → Store: Hydrate store from URL on navigation ──────────────
-  // Use stable setter refs so this effect only re-runs when URL values change.
-  useEffect(() => {
+  // Use useLayoutEffect so the store updates synchronously before paint.
+  // This prevents a one-frame race where the store still holds the old
+  // sourceSetId while the URL has already changed, causing SWR to skip
+  // re-fetching or fetch with stale params.
+  useLayoutEffect(() => {
     if (!enabled) return;
 
     isHandlingUrlChangeRef.current = true;

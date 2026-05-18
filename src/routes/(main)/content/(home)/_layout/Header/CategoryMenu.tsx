@@ -13,7 +13,7 @@ import {
   buildExplorerQueryParams,
   getExplorerCategoryFilter,
 } from '@/features/ContentManager/components/Explorer/queryParams';
-import { getFileScope } from '@/features/ContentManager/useFileScope';
+import { getFileScope, getSourceSetScopeId } from '@/features/ContentManager/useFileScope';
 import { buildFilesRootPath, stripFilesItemPath } from '@/features/ResourceSpaces';
 import {
   useContentManagerFetchGovernanceSummary,
@@ -116,7 +116,8 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     min-width: 0;
   `,
   governanceSummaryBarMobile: css`
-    padding: 8px 10px;
+    padding-block: 8px;
+    padding-inline: 10px;
     border: 1px solid ${cssVar.colorBorderSecondary};
     border-radius: 16px;
 
@@ -142,6 +143,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   governanceSummaryLabels: css`
     overflow: hidden;
     flex: 1;
+
     min-width: 160px;
 
     font-size: 12px;
@@ -161,9 +163,9 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     white-space: nowrap;
   `,
   mobileSummaryLead: css`
-    color: ${cssVar.colorText};
     font-size: 12px;
     font-weight: 600;
+    color: ${cssVar.colorText};
     white-space: nowrap;
   `,
   governancePopover: css`
@@ -214,14 +216,17 @@ const CategoryMenu = memo(() => {
   const usagePolicyParam =
     (searchParams.get('assetUsagePolicy') as FileAssetUsagePolicy | null) || undefined;
   const focusedGovernanceFilter = searchParams.get(GOVERNANCE_PANEL_FOCUS_QUERY_KEY) || undefined;
-  const showCategoryTabs = !sourceSetId;
+  const fileScope = getFileScope(searchParams);
+  // Derive sourceSetId from URL (immediate) to avoid one-frame race with store
+  const urlSourceSetId = getSourceSetScopeId(fileScope);
+  const effectiveSourceSetId = urlSourceSetId ?? sourceSetId;
+  const showCategoryTabs = !effectiveSourceSetId;
   const activeGovernanceFilterCount =
     Number(Boolean(classificationParam)) +
     Number(Boolean(rightsOwnerParam)) +
     Number(Boolean(reviewStatusParam)) +
     Number(Boolean(usagePolicyParam));
   const [draftRightsOwner, setDraftRightsOwner] = useState(rightsOwnerParam ?? '');
-  const fileScope = getFileScope(searchParams);
   const governanceSummaryParams = useMemo(
     () =>
       buildExplorerQueryParams({
@@ -229,10 +234,10 @@ const CategoryMenu = memo(() => {
         assetRightsOwner: rightsOwnerParam,
         assetReviewStatus: reviewStatusParam,
         assetUsagePolicy: usagePolicyParam,
-        category: getExplorerCategoryFilter(activeKey, sourceSetId),
+        category: getExplorerCategoryFilter(activeKey, effectiveSourceSetId ?? undefined),
         currentFolderSlug: currentFolderId,
         scope: fileScope === 'unassigned' ? 'unassigned' : 'all',
-        sourceSetId,
+        sourceSetId: effectiveSourceSetId ?? undefined,
         spaceId,
       }),
     [
@@ -242,7 +247,7 @@ const CategoryMenu = memo(() => {
       fileScope,
       rightsOwnerParam,
       reviewStatusParam,
-      sourceSetId,
+      effectiveSourceSetId,
       spaceId,
       usagePolicyParam,
     ],
@@ -665,10 +670,10 @@ const CategoryMenu = memo(() => {
       <Flexbox
         horizontal
         align={'center'}
+        gap={8}
         className={`${styles.governanceToolbar}${
           isMobile ? ` ${styles.governanceToolbarMobile} ${styles.containerMobile}` : ''
         }`}
-        gap={8}
       >
         {showCategoryTabs && (
           <Segmented
@@ -704,14 +709,14 @@ const CategoryMenu = memo(() => {
             >
               <Flexbox className={styles.governancePopover} gap={12}>
                 <Flexbox
+                  data-focused={focusedGovernanceFilter === 'assetClassification'}
+                  data-testid="governance-section-assetClassification"
+                  gap={6}
                   className={`${styles.governanceSection}${
                     focusedGovernanceFilter === 'assetClassification'
                       ? ` ${styles.governanceSectionFocused}`
                       : ''
                   }`}
-                  data-focused={focusedGovernanceFilter === 'assetClassification'}
-                  data-testid="governance-section-assetClassification"
-                  gap={6}
                 >
                   <span>{t('detail.asset.classification.label')}</span>
                   <Select
@@ -728,14 +733,14 @@ const CategoryMenu = memo(() => {
                   />
                 </Flexbox>
                 <Flexbox
+                  data-focused={focusedGovernanceFilter === 'assetUsagePolicy'}
+                  data-testid="governance-section-assetUsagePolicy"
+                  gap={6}
                   className={`${styles.governanceSection}${
                     focusedGovernanceFilter === 'assetUsagePolicy'
                       ? ` ${styles.governanceSectionFocused}`
                       : ''
                   }`}
-                  data-focused={focusedGovernanceFilter === 'assetUsagePolicy'}
-                  data-testid="governance-section-assetUsagePolicy"
-                  gap={6}
                 >
                   <span>{t('detail.asset.usagePolicy.label')}</span>
                   <Select
@@ -752,14 +757,14 @@ const CategoryMenu = memo(() => {
                   />
                 </Flexbox>
                 <Flexbox
+                  data-focused={focusedGovernanceFilter === 'assetRightsOwner'}
+                  data-testid="governance-section-assetRightsOwner"
+                  gap={6}
                   className={`${styles.governanceSection}${
                     focusedGovernanceFilter === 'assetRightsOwner'
                       ? ` ${styles.governanceSectionFocused}`
                       : ''
                   }`}
-                  data-focused={focusedGovernanceFilter === 'assetRightsOwner'}
-                  data-testid="governance-section-assetRightsOwner"
-                  gap={6}
                 >
                   <span>{t('detail.asset.rightsOwner.label')}</span>
                   <Input
@@ -775,7 +780,7 @@ const CategoryMenu = memo(() => {
                     }}
                   />
                   {hasPendingRightsOwnerDraft && (
-                    <Flexbox className={styles.governanceSectionActions} horizontal>
+                    <Flexbox horizontal className={styles.governanceSectionActions}>
                       <Button
                         size={'small'}
                         type={'primary'}
@@ -787,14 +792,14 @@ const CategoryMenu = memo(() => {
                   )}
                 </Flexbox>
                 <Flexbox
+                  data-focused={focusedGovernanceFilter === 'assetReviewStatus'}
+                  data-testid="governance-section-assetReviewStatus"
+                  gap={6}
                   className={`${styles.governanceSection}${
                     focusedGovernanceFilter === 'assetReviewStatus'
                       ? ` ${styles.governanceSectionFocused}`
                       : ''
                   }`}
-                  data-focused={focusedGovernanceFilter === 'assetReviewStatus'}
-                  data-testid="governance-section-assetReviewStatus"
-                  gap={6}
                 >
                   <span>{t('detail.asset.reviewStatus.label')}</span>
                   <Select
@@ -834,25 +839,17 @@ const CategoryMenu = memo(() => {
             open={governanceOpen}
             placement={'bottomLeft'}
             trigger={['click']}
-            onOpenChange={(open) => {
-              if (!open) {
-                closeGovernancePanel();
-                return;
-              }
-
-              setGovernanceOpen(true);
-            }}
             content={
               <Flexbox className={styles.governancePopover} gap={12}>
                 <Flexbox
+                  data-focused={focusedGovernanceFilter === 'assetClassification'}
+                  data-testid="governance-section-assetClassification"
+                  gap={6}
                   className={`${styles.governanceSection}${
                     focusedGovernanceFilter === 'assetClassification'
                       ? ` ${styles.governanceSectionFocused}`
                       : ''
                   }`}
-                  data-focused={focusedGovernanceFilter === 'assetClassification'}
-                  data-testid="governance-section-assetClassification"
-                  gap={6}
                 >
                   <span>{t('detail.asset.classification.label')}</span>
                   <Select
@@ -869,14 +866,14 @@ const CategoryMenu = memo(() => {
                   />
                 </Flexbox>
                 <Flexbox
+                  data-focused={focusedGovernanceFilter === 'assetUsagePolicy'}
+                  data-testid="governance-section-assetUsagePolicy"
+                  gap={6}
                   className={`${styles.governanceSection}${
                     focusedGovernanceFilter === 'assetUsagePolicy'
                       ? ` ${styles.governanceSectionFocused}`
                       : ''
                   }`}
-                  data-focused={focusedGovernanceFilter === 'assetUsagePolicy'}
-                  data-testid="governance-section-assetUsagePolicy"
-                  gap={6}
                 >
                   <span>{t('detail.asset.usagePolicy.label')}</span>
                   <Select
@@ -893,14 +890,14 @@ const CategoryMenu = memo(() => {
                   />
                 </Flexbox>
                 <Flexbox
+                  data-focused={focusedGovernanceFilter === 'assetRightsOwner'}
+                  data-testid="governance-section-assetRightsOwner"
+                  gap={6}
                   className={`${styles.governanceSection}${
                     focusedGovernanceFilter === 'assetRightsOwner'
                       ? ` ${styles.governanceSectionFocused}`
                       : ''
                   }`}
-                  data-focused={focusedGovernanceFilter === 'assetRightsOwner'}
-                  data-testid="governance-section-assetRightsOwner"
-                  gap={6}
                 >
                   <span>{t('detail.asset.rightsOwner.label')}</span>
                   <Input
@@ -914,7 +911,7 @@ const CategoryMenu = memo(() => {
                     onPressEnter={() => applyRightsOwnerFilter(draftRightsOwner, { close: true })}
                   />
                   {hasPendingRightsOwnerDraft && (
-                    <Flexbox className={styles.governanceSectionActions} horizontal>
+                    <Flexbox horizontal className={styles.governanceSectionActions}>
                       <Button
                         size={'small'}
                         type={'primary'}
@@ -926,14 +923,14 @@ const CategoryMenu = memo(() => {
                   )}
                 </Flexbox>
                 <Flexbox
+                  data-focused={focusedGovernanceFilter === 'assetReviewStatus'}
+                  data-testid="governance-section-assetReviewStatus"
+                  gap={6}
                   className={`${styles.governanceSection}${
                     focusedGovernanceFilter === 'assetReviewStatus'
                       ? ` ${styles.governanceSectionFocused}`
                       : ''
                   }`}
-                  data-focused={focusedGovernanceFilter === 'assetReviewStatus'}
-                  data-testid="governance-section-assetReviewStatus"
-                  gap={6}
                 >
                   <span>{t('detail.asset.reviewStatus.label')}</span>
                   <Select
@@ -966,6 +963,14 @@ const CategoryMenu = memo(() => {
                 )}
               </Flexbox>
             }
+            onOpenChange={(open) => {
+              if (!open) {
+                closeGovernancePanel();
+                return;
+              }
+
+              setGovernanceOpen(true);
+            }}
           >
             <Button
               className={styles.governanceButton}
@@ -981,22 +986,24 @@ const CategoryMenu = memo(() => {
       </Flexbox>
       {activeGovernanceFilters.length > 0 && (
         <Flexbox
+          data-testid="governance-summary-bar"
+          gap={8}
           horizontal={!isMobile}
           className={`${styles.governanceSummaryBar}${
             isMobile ? ` ${styles.governanceSummaryBarMobile}` : ''
           }`}
-          data-testid="governance-summary-bar"
-          gap={8}
         >
           <Flexbox
+            gap={isMobile ? 6 : 0}
             className={`${styles.governanceSummaryMeta}${
               isMobile ? ` ${styles.governanceSummaryMetaMobile}` : ''
             }`}
-            gap={isMobile ? 6 : 0}
           >
             <Flexbox horizontal gap={8} wrap={isMobile ? 'wrap' : undefined}>
               {typeof matchingFilesCount === 'number' && (
-                <span className={isMobile ? styles.mobileSummaryLead : styles.governanceSummaryText}>
+                <span
+                  className={isMobile ? styles.mobileSummaryLead : styles.governanceSummaryText}
+                >
                   {t('filters.matchingFiles', { count: matchingFilesCount })}
                 </span>
               )}
@@ -1014,10 +1021,10 @@ const CategoryMenu = memo(() => {
           </Flexbox>
           <Flexbox
             horizontal
+            gap={4}
             className={`${styles.governanceSummaryActions}${
               isMobile ? ` ${styles.governanceSummaryActionsMobile}` : ''
             }`}
-            gap={4}
           >
             <Button
               aria-label={t('filters.adjustGovernance')}

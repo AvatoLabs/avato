@@ -116,6 +116,33 @@ describe('buildExplorerQueryParams', () => {
     expect(params.parentId).toBe('folder-slug');
     expect(params.sourceSetId).toBe('ss_1');
   });
+
+  it('prefers URL scope over store sourceSetId to avoid stale-key race', () => {
+    // Simulates the one-frame race: URL already changed to collection B
+    // but the store still holds the old sourceSetId for collection A.
+    const params = buildExplorerQueryParams({
+      scope: 'source-set:ss_new',
+      sourceSetId: 'ss_old',
+      sorter: 'createdAt',
+      sortType: SortType.Desc,
+      spaceId: 'spc_1',
+    });
+
+    // URL scope wins — effectiveSourceSetId should be ss_new, not ss_old
+    expect(params.sourceSetId).toBe('ss_new');
+  });
+
+  it('falls back to store sourceSetId when URL scope has no collection id', () => {
+    const params = buildExplorerQueryParams({
+      scope: 'all',
+      sourceSetId: 'ss_1',
+      sorter: 'createdAt',
+      sortType: SortType.Desc,
+      spaceId: 'spc_1',
+    });
+
+    expect(params.sourceSetId).toBe('ss_1');
+  });
 });
 
 describe('isSpaceLevelContentFilter', () => {
