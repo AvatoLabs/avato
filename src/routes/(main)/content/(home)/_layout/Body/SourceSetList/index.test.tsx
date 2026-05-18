@@ -8,13 +8,18 @@ import SourceSetList from './index';
 
 const sourceSetListState = vi.hoisted(() => ({
   current: {
-    data: [] as Array<{ description?: string | null; id: string; name: string; spaceId?: string | null }>,
+    data: [] as Array<{
+      description?: string | null;
+      id: string;
+      name: string;
+      spaceId?: string | null;
+    }>,
     isLoading: false,
   },
 }));
 
 const paramsState = vi.hoisted(() => ({
-  current: {} as { id?: string },
+  current: {} as { slug?: string },
 }));
 
 const fileScopeState = vi.hoisted(() => ({
@@ -60,11 +65,11 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) =>
       (
-        {
+        ({
           'emptyState.action': 'Create Source Set',
           'emptyState.description': 'Source sets help you organize and manage your knowledge base',
           'emptyState.title': 'Create your first source set',
-        } as Record<string, string>
+        }) as Record<string, string>
       )[key] ?? key,
   }),
 }));
@@ -131,12 +136,11 @@ describe('SourceSetList', () => {
     expect(openCreateSourceSetMock).toHaveBeenCalledWith({ spaceId: 'spc_ops' });
   });
 
-  it('renders the list shell and prioritizes the route source set id over scoped source set id', () => {
-    paramsState.current = { id: 'sst_route' };
+  it('renders the list shell and marks the scoped source set as active', () => {
     sourceSetListState.current = {
       data: [
         { description: null, id: 'sst_scope', name: 'Scoped Set', spaceId: 'spc_ops' },
-        { description: null, id: 'sst_route', name: 'Route Set', spaceId: 'spc_ops' },
+        { description: null, id: 'sst_other', name: 'Other Set', spaceId: 'spc_ops' },
       ],
       isLoading: false,
     };
@@ -144,7 +148,7 @@ describe('SourceSetList', () => {
     render(<SourceSetList />);
 
     expect(screen.getByTestId('source-set-list-shell')).toBeInTheDocument();
-    expect(screen.getByTestId('source-set-item-sst_scope')).toHaveAttribute('data-active', 'false');
-    expect(screen.getByTestId('source-set-item-sst_route')).toHaveAttribute('data-active', 'true');
+    expect(screen.getByTestId('source-set-item-sst_scope')).toHaveAttribute('data-active', 'true');
+    expect(screen.getByTestId('source-set-item-sst_other')).toHaveAttribute('data-active', 'false');
   });
 });

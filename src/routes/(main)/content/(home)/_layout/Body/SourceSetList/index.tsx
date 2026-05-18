@@ -6,7 +6,6 @@ import { createStaticStyles, cssVar } from 'antd-style';
 import { FolderKanban, Plus } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
 
 import { useFileScope } from '@/features/ContentManager/useFileScope';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
@@ -32,20 +31,19 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     min-width: 0;
   `,
   emptyStateDescription: css`
-    color: ${cssVar.colorTextTertiary};
     font-size: 12px;
     line-height: 1.5;
+    color: ${cssVar.colorTextTertiary};
   `,
   emptyStateTitle: css`
-    color: ${cssVar.colorTextSecondary};
     font-size: 14px;
     font-weight: 500;
+    color: ${cssVar.colorTextSecondary};
   `,
   listShell: css`
     gap: 2px;
     padding: 4px;
     border-radius: 16px;
-
     background: color-mix(in srgb, ${cssVar.colorFillQuaternary} 42%, transparent);
   `,
 }));
@@ -55,12 +53,10 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
  */
 const SourceSetList = memo(() => {
   const { t } = useTranslation(['file', 'sourceSet']);
-  const { id: routeSourceSetId } = useParams<{ id?: string }>();
   const spaceId = useContentManagerStore((s) => s.spaceId);
-  const { sourceSetId: scopedSourceSetId } = useFileScope(spaceId);
+  const { sourceSetId: activeSourceSetId } = useFileScope(spaceId);
   const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
   const { data, isLoading } = useFetchSourceSetList(spaceId);
-  const activeSourceSetId = routeSourceSetId ?? scopedSourceSetId;
 
   const { open } = useCreateSourceSetModal();
 

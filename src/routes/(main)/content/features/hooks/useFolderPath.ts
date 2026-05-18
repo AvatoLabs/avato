@@ -14,10 +14,10 @@ import { getFileScope, getSourceSetScopeId } from '@/features/ContentManager/use
  */
 export const useFolderPath = () => {
   const [searchParams] = useSearchParams();
-  const params = useParams<{ id?: string; slug?: string }>();
+  const params = useParams<{ slug?: string }>();
 
-  // Extract knowledge base ID from params
-  const sourceSetId = params.id || getSourceSetScopeId(getFileScope(searchParams)) || null;
+  // Extract source-set ID from URL query params (single source of truth)
+  const sourceSetId = getSourceSetScopeId(getFileScope(searchParams)) || null;
 
   // Determine if we're in a knowledge base context
   const isInKnowledgeBase = !!sourceSetId;
