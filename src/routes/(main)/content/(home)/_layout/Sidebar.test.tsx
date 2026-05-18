@@ -46,12 +46,8 @@ vi.mock('@/features/ResourceSpaces/SpaceSection', () => ({
   default: ({ itemKey }: { itemKey: string }) => <div>{`spaces:${itemKey}`}</div>,
 }));
 
-vi.mock('./FileScopeSection', () => ({
-  default: ({ itemKey }: { itemKey: string }) => <div>{`file-scope:${itemKey}`}</div>,
-}));
-
-vi.mock('./Body', () => ({
-  default: ({ itemKey }: { itemKey: string }) => <div>{`source-sets:${itemKey}`}</div>,
+vi.mock('./FilesSection', () => ({
+  default: ({ itemKey }: { itemKey: string }) => <div>{`files:${itemKey}`}</div>,
 }));
 
 vi.mock('./Header', () => ({
@@ -70,8 +66,7 @@ describe('ResourceHomeSidebar', () => {
 
     expect(screen.getByText('quick-access:quick-access')).toBeInTheDocument();
     expect(screen.getByText('spaces:space')).toBeInTheDocument();
-    expect(screen.queryByText('file-scope:file-scope')).not.toBeInTheDocument();
-    expect(screen.queryByText('source-sets:source-set')).not.toBeInTheDocument();
+    expect(screen.queryByText('files:files')).not.toBeInTheDocument();
     expect(accordionProps.current).toMatchObject({
       defaultExpandedKeys: ['space', 'quick-access'],
       gap: 8,
@@ -81,7 +76,7 @@ describe('ResourceHomeSidebar', () => {
     );
   });
 
-  it('renders source sets when a space is active', () => {
+  it('renders files section when a space is active', () => {
     render(
       <MemoryRouter initialEntries={['/spaces/spc_test/files']}>
         <Routes>
@@ -92,14 +87,13 @@ describe('ResourceHomeSidebar', () => {
 
     expect(screen.getByText('quick-access:quick-access')).toBeInTheDocument();
     expect(screen.getByText('spaces:space')).toBeInTheDocument();
-    expect(screen.getByText('file-scope:file-scope')).toBeInTheDocument();
-    expect(screen.getByText('source-sets:source-set')).toBeInTheDocument();
+    expect(screen.getByText('files:files')).toBeInTheDocument();
     expect(accordionProps.current).toMatchObject({
-      defaultExpandedKeys: ['space', 'file-scope', 'source-set'],
+      defaultExpandedKeys: ['space', 'files'],
       gap: 8,
     });
     expect(screen.getByTestId('sidebar-accordion').textContent).toBe(
-      'spaces:spacefile-scope:file-scopesource-sets:source-setquick-access:quick-access',
+      'spaces:spacefiles:filesquick-access:quick-access',
     );
   });
 });

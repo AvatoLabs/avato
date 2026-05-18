@@ -9,21 +9,19 @@ import SideBarLayout from '@/features/NavPanel/SideBarLayout';
 import QuickAccessSection from '@/features/ResourceSpaces/QuickAccessSection';
 import SpaceSection from '@/features/ResourceSpaces/SpaceSection';
 
-import SidebarBody from './Body';
-import FileScopeSection from './FileScopeSection';
+import FilesSection from './FilesSection';
 import Header from './Header';
 
 export enum GroupKey {
-  FileScope = 'file-scope',
+  Files = 'files',
   QuickAccess = 'quick-access',
-  SourceSet = 'source-set',
   Space = 'space',
 }
 
 const Sidebar = memo(() => {
   const { spaceId } = useParams<{ spaceId?: string }>();
   const defaultExpandedKeys = spaceId
-    ? [GroupKey.Space, GroupKey.FileScope, GroupKey.SourceSet]
+    ? [GroupKey.Space, GroupKey.Files]
     : [GroupKey.Space, GroupKey.QuickAccess];
 
   return (
@@ -32,10 +30,9 @@ const Sidebar = memo(() => {
         header={<Header />}
         body={
           <Flexbox paddingBlock={8} paddingInline={4}>
-            <Accordion gap={8} defaultExpandedKeys={defaultExpandedKeys}>
+            <Accordion defaultExpandedKeys={defaultExpandedKeys} gap={8}>
               <SpaceSection itemKey={GroupKey.Space} />
-              {spaceId && <FileScopeSection itemKey={GroupKey.FileScope} />}
-              {spaceId && <SidebarBody itemKey={GroupKey.SourceSet} />}
+              {spaceId && <FilesSection itemKey={GroupKey.Files} />}
               <QuickAccessSection itemKey={GroupKey.QuickAccess} />
             </Accordion>
           </Flexbox>
