@@ -51,8 +51,18 @@ const syncResourceStore = (
   data: ResourceQueryResponse,
   actionName: string,
 ) => {
-  const { governanceCapabilities, hasMore, offset, queryParams, resourceList, resourceMap, total } =
-    useFileStore.getState();
+  const {
+    governanceCapabilities,
+    hasMore,
+    offset,
+    queryParams,
+    requestedQueryParams,
+    resourceList,
+    resourceMap,
+    total,
+  } = useFileStore.getState();
+  if (!isSameResourceQueryParams(requestedQueryParams, params)) return;
+
   const isActiveQuery = isSameResourceQueryParams(queryParams, params);
   const nextState = isActiveQuery
     ? mergeActiveResourceList(data.items, resourceList, offset)
@@ -86,6 +96,13 @@ const syncResourceStore = (
   );
 };
 
+const setRequestedResourceQueryParams = (params: ContentQueryParams, actionName: string) => {
+  const { requestedQueryParams } = useFileStore.getState();
+  if (isSameResourceQueryParams(requestedQueryParams, params)) return;
+
+  useFileStore.setState({ requestedQueryParams: params }, false, actionName);
+};
+
 /**
  * Revalidate resources with current or specific query params
  * This can be called from outside React components (e.g., store actions)
@@ -101,9 +118,17 @@ export const revalidateResources = async (params?: ContentQueryParams) => {
  * Custom SWR hook for fetching resources with caching and revalidation
  */
 export const useFetchResources = (params: ContentQueryParams | null, enable: any = true) => {
+  useEffect(() => {
+    if (!enable || !params) return;
+
+    setRequestedResourceQueryParams(params, 'useFetchResources/requested');
+  }, [enable, params]);
+
   return useClientDataSWR(
     enable && params ? [SWR_KEY_CONTENT_ITEMS, params] : null,
     async ([, queryParams]: [string, ContentQueryParams]) => {
+      setRequestedResourceQueryParams(queryParams, 'useFetchResources/fetcher');
+
       const response = await contentService.queryContentItems({
         ...queryParams,
         limit: queryParams.limit || 50,

@@ -97,6 +97,7 @@ export class ResourceActionImpl {
         hasMore: false,
         offset: 0,
         queryParams: undefined,
+        requestedQueryParams: undefined,
         resourceList: [],
         resourceMap: new Map(),
         syncQueue: [],

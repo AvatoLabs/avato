@@ -28,6 +28,13 @@ export interface ResourceState {
    * Current query parameters
    */
   queryParams?: ContentQueryParams;
+
+  /**
+   * Latest query params requested by the active resource fetch.
+   * Used to ignore stale responses after fast scope switches.
+   */
+  requestedQueryParams?: ContentQueryParams;
+
   /**
    * Derived sorted/filtered list (computed from map)
    * Used for rendering in UI
@@ -62,6 +69,7 @@ export const initialResourceState: ResourceState = {
   isLoadingMore: false,
   isSyncing: false,
   offset: 0,
+  requestedQueryParams: undefined,
   resourceList: [],
   resourceMap: new Map(),
   syncQueue: [],

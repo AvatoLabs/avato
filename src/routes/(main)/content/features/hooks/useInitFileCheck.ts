@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { isCanonicalDocumentEntry } from '@/features/ContentManager/utils/isCanonicalDocumentEntry';
@@ -46,7 +46,7 @@ export const useInitFileCheck = () => {
     navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
   }, [location.pathname, navigate, queryFileId, routeFileId, searchParams]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!fileId) {
       setMode('explorer');
       setCurrentViewItemId(undefined);
