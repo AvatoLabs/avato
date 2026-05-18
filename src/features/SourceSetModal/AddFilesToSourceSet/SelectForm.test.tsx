@@ -87,14 +87,14 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, options?: { count?: number; name?: string }) =>
       ({
-        'addToSourceSet.addSuccess': 'Add success',
-        'addToSourceSet.confirm': 'Add',
-        'addToSourceSet.id.placeholder': 'Please select a source set',
-        'addToSourceSet.id.required': 'Please select a source set',
-        'addToSourceSet.id.title': 'Target Source Set',
-        'addToSourceSet.totalFiles': `${options?.count ?? 0} files selected`,
-        'addToSourceSet.workspace': 'Workspace',
-        'addToSourceSet.workspaceHint': `Showing source sets from ${options?.name} first.`,
+        'addToCollection.addSuccess': 'Add success',
+        'addToCollection.confirm': 'Add',
+        'addToCollection.id.placeholder': 'Please select a collection',
+        'addToCollection.id.required': 'Please select a collection',
+        'addToCollection.id.title': 'Target Collection',
+        'addToCollection.totalFiles': `${options?.count ?? 0} files selected`,
+        'addToCollection.workspace': 'Workspace',
+        'addToCollection.workspaceHint': `Showing collections from ${options?.name} first.`,
       })[key] || key,
   }),
 }));
@@ -137,19 +137,19 @@ describe('SelectForm', () => {
     });
   });
 
-  it('fetches source sets from the current route workspace and shows the workspace hint', () => {
+  it('fetches collections from the current route workspace and shows the workspace hint', () => {
     render(<SelectForm fileIds={['file-1']} />);
 
     expect(mockUseFetchSourceSetList).toHaveBeenCalledWith('space-route');
     expect(screen.getByText('Workspace')).toBeInTheDocument();
-    expect(screen.getByText('Showing source sets from Ops Workspace first.')).toBeInTheDocument();
+    expect(screen.getByText('Showing collections from Ops Workspace first.')).toBeInTheDocument();
   });
 
   it('uses the current route workspace in the success link after adding files', async () => {
     const onClose = vi.fn();
     render(<SelectForm fileIds={['file-1', 'file-2']} onClose={onClose} />);
 
-    fireEvent.change(screen.getByLabelText('Please select a source set'), {
+    fireEvent.change(screen.getByLabelText('Please select a collection'), {
       target: { value: 'ss-2' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));

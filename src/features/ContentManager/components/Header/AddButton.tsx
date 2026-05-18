@@ -191,11 +191,11 @@ const AddButton = ({ compact }: AddButtonProps) => {
       data-no-highlight
       icon={RESOURCE_ENTRY_ICONS.plus}
       size="small"
-      title={t('addSourceSet')}
+      title={t('addCollection')}
     />
   ) : (
     <Button data-no-highlight icon={RESOURCE_ENTRY_ICONS.plus} size="small" type="primary">
-      {t('addSourceSet')}
+      {t('addCollection')}
     </Button>
   );
 

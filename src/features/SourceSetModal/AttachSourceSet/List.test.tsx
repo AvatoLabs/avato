@@ -9,19 +9,18 @@ import { setActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import List from './List';
 
 const mockGetSourceItems = vi.hoisted(() => vi.fn());
-const mockUseFetchSourceSetList = vi.hoisted(
-  () =>
-    vi.fn(
-      () =>
-        ({
-          data: [] as Array<{
-            description?: string;
-            id: string;
-            name: string;
-            spaceId: string;
-          }>,
-        }) as const,
-    ),
+const mockUseFetchSourceSetList = vi.hoisted(() =>
+  vi.fn(
+    () =>
+      ({
+        data: [] as Array<{
+          description?: string;
+          id: string;
+          name: string;
+          spaceId: string;
+        }>,
+      }) as const,
+  ),
 );
 
 vi.mock('@lobehub/ui', () => ({
@@ -89,21 +88,28 @@ vi.mock('react-i18next', () => ({
         'conversationFiles.picker.scope': 'Current conversation',
         'conversationFiles.picker.searchPlaceholder': 'Search files and folders',
         'conversationFiles.picker.sources': 'Resources',
-        'sourceSet.picker.action.add': 'Add',
-        'sourceSet.picker.action.addSourceSet': 'Add Source Set',
-        'sourceSet.picker.action.addVisible': 'Add This View',
-        'sourceSet.picker.action.added': 'Added',
-        'sourceSet.picker.action.browse': 'Browse',
-        'sourceSet.picker.action.upload': 'Upload Files',
-        'sourceSet.picker.allFiles': 'Standalone Files',
-        'sourceSet.picker.allFilesDesc': 'Files outside any source set.',
-        'sourceSet.picker.empty': 'No files here yet.',
-        'sourceSet.picker.scope': 'Agent knowledge',
-        'sourceSet.picker.searchPlaceholder': 'Search files in this location',
-        'sourceSet.picker.sourceWorkspace': `From ${options?.name}`,
-        'sourceSet.picker.sources': 'Resources',
-        'sourceSet.picker.workspace': 'Workspace',
-        'sourceSet.picker.workspaceHint': `Browsing content from ${options?.name} first.`,
+        'collection.picker.action.add': 'Add',
+        'collection.picker.action.addCollection': 'Add Collection',
+        'collection.picker.action.addVisible': 'Add This View',
+        'collection.picker.action.added': 'Added',
+        'collection.picker.action.browse': 'Browse',
+        'collection.picker.action.upload': 'Upload Files',
+        'collection.picker.allFiles': 'Standalone Files',
+        'collection.picker.allFilesDesc': 'Files outside any collection.',
+        'collection.picker.empty': 'No files here yet.',
+        'collection.picker.scope': 'Agent sources',
+        'collection.picker.searchPlaceholder': 'Search files in this location',
+        'collection.picker.sourceWorkspace': `From ${options?.name}`,
+        'collection.picker.sources': 'Content',
+        'collection.picker.workspace': 'Workspace',
+        'collection.picker.workspaceHint': `Browsing content from ${options?.name} first.`,
+        'collection.picker.action.createCollection': 'New Collection',
+        'collection.picker.action.openResources': 'Open Content',
+        'collection.picker.action.detail': 'Details',
+        'collection.picker.action.remove': 'Remove',
+        'collection.picker.folderHint': 'Open this folder to browse files inside it.',
+        'collection.picker.subfolder': 'Subfolder',
+        'collection.picker.title': 'Add Sources',
         'loading': 'Loading...',
         'networkError': 'Network error',
       })[key] || key,
@@ -255,7 +261,7 @@ describe('SourceSetPickerList', () => {
 
     expect(screen.getByRole('button', { name: 'Upload Files' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Open Resources' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'New Source Set' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New Collection' })).not.toBeInTheDocument();
     expect(screen.queryByText('0 source sets and 0 files added')).not.toBeInTheDocument();
     expect(screen.getAllByText('Standalone Files')).toHaveLength(1);
   });

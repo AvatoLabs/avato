@@ -74,7 +74,7 @@ const SourceSetScopeItem = memo<SourceSetScopeItemProps>(
             message.error(t('collection.list.removeError', { ns: 'file' }));
           }
         },
-        title: t('collection.list.confirmRemoveSourceSet', { ns: 'file' }),
+        title: t('collection.list.confirmRemoveCollection', { ns: 'file' }),
       });
     }, [message, modal, removeSourceSet, sourceSet.id, t]);
 

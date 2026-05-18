@@ -783,7 +783,7 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
                 >
                   {selectedSourceSetAttached
                     ? t('collection.picker.action.added')
-                    : t('collection.picker.action.addSourceSet')}
+                    : t('collection.picker.action.addCollection')}
                 </Button>
               ) : canAddVisibleFiles ? (
                 <Button

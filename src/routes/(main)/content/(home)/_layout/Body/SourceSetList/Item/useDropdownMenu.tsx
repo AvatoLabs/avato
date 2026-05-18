@@ -44,7 +44,7 @@ export const useDropdownMenu = ({
           message.error(t('collection.list.removeError'));
         }
       },
-      title: t('collection.list.confirmRemoveSourceSet'),
+      title: t('collection.list.confirmRemoveCollection'),
     });
   };
 

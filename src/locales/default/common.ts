@@ -237,6 +237,7 @@ export default {
   'cmdk.search.folders': 'Folders',
 
   'cmdk.search.collection': 'Collection',
+  'cmdk.search.sourceSet': 'Collection',
 
   'cmdk.search.collections': 'Collections',
 

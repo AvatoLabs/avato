@@ -414,6 +414,7 @@ export default {
   'shared.kind.document': 'Document',
   'shared.kind.file': 'File',
   'shared.kind.collection': 'Collection',
+  'shared.kind.source_set': 'Collection',
   'shared.subtitle': 'Items you can access through direct sharing.',
   'shared.title': 'Shared with Me',
   'space.create.confirm': 'Create Team Space',

@@ -83,7 +83,7 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(
                   successKey: undefined,
                 });
               },
-              title: t('collection.list.confirmRemoveSourceSet', { ns: 'file' }),
+              title: t('collection.list.confirmRemoveCollection', { ns: 'file' }),
             });
           },
         });
@@ -394,10 +394,10 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(
       <DropdownMenu nativeButton items={menuItems} placement="bottomLeft">
         <ActionIconWithChevron
           icon={RESOURCE_ENTRY_ICONS.more}
+          title={t('FileManager.actions.batchActions', 'Batch actions')}
           label={
             selectCount > 0 ? t('FileManager.actions.batchActions', 'Batch actions') : undefined
           }
-          title={t('FileManager.actions.batchActions', 'Batch actions')}
         />
       </DropdownMenu>
     );

@@ -51,10 +51,10 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) =>
       ({
-        'sourceSet.picker.action.add': 'Add',
-        'sourceSet.picker.action.added': 'Added',
-        'sourceSet.picker.action.detail': 'Details',
-        'sourceSet.picker.action.remove': 'Remove',
+        'collection.picker.action.add': 'Add',
+        'collection.picker.action.added': 'Added',
+        'collection.picker.action.detail': 'Details',
+        'collection.picker.action.remove': 'Remove',
       })[key] || key,
   }),
 }));
