@@ -16,7 +16,13 @@ interface BuildFileAssetBadgesParams {
   assetUsagePolicy?: FileAssetUsagePolicy | null;
   assetVersionLabel?: string | null;
   compact?: boolean;
+  /** The ID of the currently active collection scope; badges for this collection are skipped (redundant). */
+  currentSourceSetId?: string | null;
+  /** Resolves a collection ID to its display name. Returns undefined if unknown. */
+  getSourceSetNameById?: (id: string) => string | undefined;
   maxVisible?: number;
+  /** Collection IDs this item belongs to. */
+  sourceSetIds?: string[];
   t: AssetBadgeTranslator;
 }
 
@@ -37,12 +43,54 @@ export const buildFileAssetBadges = ({
   assetRenditionCount,
   assetUsagePolicy,
   assetVersionLabel,
+  currentSourceSetId,
   t,
   maxVisible,
+  getSourceSetNameById,
+  sourceSetIds,
 }: BuildFileAssetBadgesParams): FileAssetBadgeDescriptor[] => {
   const badges: FileAssetBadgeDescriptor[] = [];
   const normalizeCompactLabel = (value: string, maxLength = 14) =>
     value.length <= maxLength ? value : `${value.slice(0, maxLength - 1).trimEnd()}…`;
+
+  // Collection badges — show which collections this file belongs to
+  if (sourceSetIds && sourceSetIds.length > 0 && getSourceSetNameById) {
+    const visibleIds = sourceSetIds.filter((id) => id !== currentSourceSetId);
+    const namedBadges: FileAssetBadgeDescriptor[] = [];
+    let unnamedCount = 0;
+
+    for (const id of visibleIds) {
+      const name = getSourceSetNameById(id);
+      if (name) {
+        namedBadges.push({
+          key: `collection:${id}`,
+          label: compact ? normalizeCompactLabel(name, 12) : name,
+          title: compact && name.length > 12 ? name : undefined,
+          variant: 'filled',
+        });
+      } else {
+        unnamedCount++;
+      }
+    }
+
+    badges.push(...namedBadges);
+
+    // If some collections couldn't be resolved by name, show a count badge
+    if (unnamedCount > 0 && namedBadges.length === 0) {
+      badges.push({
+        key: `collection:unnamed:${unnamedCount}`,
+        label:
+          unnamedCount === 1
+            ? t('collection.badge.assigned', { defaultValue: 'In collection', ns: 'file' })
+            : t('collection.badge.assignedCount', {
+                count: unnamedCount,
+                defaultValue: `${unnamedCount} collections`,
+                ns: 'file',
+              }),
+        variant: 'filled',
+      });
+    }
+  }
 
   if (assetUsagePolicy && assetUsagePolicy !== 'internal') {
     badges.push({

@@ -17,6 +17,7 @@ import {
 } from '@/routes/(main)/content/features/DndContextWrapper';
 import { documentService } from '@/services/document';
 import { useFileStore } from '@/store/file';
+import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { type FileListItem } from '@/types/files';
 import { type FileUploadStatus } from '@/types/files/upload';
 
@@ -228,6 +229,7 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
     metadata,
     sourceType,
     slug,
+    sourceSetIds,
     fileId,
     uploadStatus,
   }) => {
@@ -235,6 +237,11 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
     const { message } = App.useApp();
     const [markdownContent, setMarkdownContent] = useState<string>('');
     const [isLoadingMarkdown, setIsLoadingMarkdown] = useState(false);
+    const getSourceSetNameById = useCallback(
+      (id: string) => sourceSetSelectors.getSourceSetNameById(id)(useSourceSetStore.getState()),
+      [],
+    );
+
     const [isRenaming, setIsRenaming] = useState(false);
 
     // Get file store actions
@@ -280,6 +287,9 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
           assetRenditionCount,
           assetUsagePolicy,
           assetVersionLabel,
+          currentSourceSetId: sourceSetId,
+          getSourceSetNameById,
+          sourceSetIds,
           t,
         }),
       [
@@ -290,6 +300,9 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
         assetRenditionCount,
         assetUsagePolicy,
         assetVersionLabel,
+        getSourceSetNameById,
+        sourceSetId,
+        sourceSetIds,
         t,
       ],
     );

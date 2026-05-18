@@ -2,7 +2,7 @@
 
 import { Block, Center, Flexbox, Image, Tag, Text } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import FileIcon from '@/components/FileIcon';
@@ -10,6 +10,7 @@ import { buildFileAssetBadges } from '@/features/ContentManager/utils/buildFileA
 import { buildFileGovernanceActivity } from '@/features/ContentManager/utils/buildFileGovernanceActivity';
 import Time from '@/routes/(main)/home/features/components/Time';
 import { RECENT_BLOCK_SIZE } from '@/routes/(main)/home/features/const';
+import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { type FileListItem } from '@/types/files';
 import { formatSize } from '@/utils/format';
 
@@ -28,6 +29,10 @@ interface RecentResourceItemProps {
 
 const RecentResourceItem = memo<RecentResourceItemProps>(({ file }) => {
   const { t } = useTranslation('file');
+  const getSourceSetNameById = useCallback(
+    (id: string) => sourceSetSelectors.getSourceSetNameById(id)(useSourceSetStore.getState()),
+    [],
+  );
   const isImage = IMAGE_FILE_TYPES.has(file.fileType);
   const assetBadges = buildFileAssetBadges({
     assetClassification: file.assetClassification,
@@ -39,6 +44,8 @@ const RecentResourceItem = memo<RecentResourceItemProps>(({ file }) => {
     assetRenditionCount: file.assetRenditionCount,
     assetUsagePolicy: file.assetUsagePolicy,
     assetVersionLabel: file.assetVersionLabel,
+    getSourceSetNameById,
+    sourceSetIds: file.sourceSetIds,
     t,
   });
   const governanceActivity = buildFileGovernanceActivity({

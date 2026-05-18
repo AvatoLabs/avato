@@ -161,4 +161,58 @@ describe('buildFileAssetBadges', () => {
       },
     ]);
   });
+
+  describe('collection badges', () => {
+    it('should render named collection badges before governance badges', () => {
+      expect(
+        buildFileAssetBadges({
+          sourceSetIds: ['col-1', 'col-2'],
+          getSourceSetNameById: (id: string) =>
+            id === 'col-1' ? 'Marketing' : id === 'col-2' ? 'Brand Assets' : undefined,
+          t: t as any,
+        }),
+      ).toEqual([
+        { key: 'collection:col-1', label: 'Marketing', variant: 'filled' },
+        { key: 'collection:col-2', label: 'Brand Assets', variant: 'filled' },
+      ]);
+    });
+
+    it('should skip the current scope collection badge as redundant', () => {
+      expect(
+        buildFileAssetBadges({
+          currentSourceSetId: 'col-1',
+          sourceSetIds: ['col-1', 'col-2'],
+          getSourceSetNameById: (id: string) =>
+            id === 'col-1' ? 'Marketing' : id === 'col-2' ? 'Brand Assets' : undefined,
+          t: t as any,
+        }),
+      ).toEqual([{ key: 'collection:col-2', label: 'Brand Assets', variant: 'filled' }]);
+    });
+
+    it('should show fallback badge when collection name cannot be resolved', () => {
+      expect(
+        buildFileAssetBadges({
+          sourceSetIds: ['col-unknown'],
+          getSourceSetNameById: () => undefined,
+          t: t as any,
+        }),
+      ).toEqual([
+        {
+          key: 'collection:unnamed:1',
+          label: 'collection.badge.assigned',
+          variant: 'filled',
+        },
+      ]);
+    });
+
+    it('should not render collection badges when sourceSetIds is empty', () => {
+      expect(
+        buildFileAssetBadges({
+          sourceSetIds: [],
+          getSourceSetNameById: (id: string) => id,
+          t: t as any,
+        }),
+      ).toEqual([]);
+    });
+  });
 });

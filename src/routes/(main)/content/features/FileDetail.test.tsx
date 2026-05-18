@@ -4,8 +4,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import FileDetail from './FileDetail';
 import { formatDateTime } from '@/utils/format';
+
+import FileDetail from './FileDetail';
 
 const mockMessageSuccess = vi.hoisted(() => vi.fn());
 const mockMessageError = vi.hoisted(() => vi.fn());
@@ -71,7 +72,7 @@ vi.mock('antd', () => ({
       }}
     >
       {options?.map((option: any) => (
-        <option key={option.value} disabled={option.disabled} value={option.value}>
+        <option disabled={option.disabled} key={option.value} value={option.value}>
           {option.label}
         </option>
       ))}
@@ -155,6 +156,7 @@ const baseProps = {
   id: 'file-1',
   name: 'Brand Spec.md',
   size: 1024,
+  sourceSetIds: [],
   sourceType: 'file',
   spaceId: 'spc_team',
   updatedAt: new Date('2026-04-04T12:00:00.000Z'),

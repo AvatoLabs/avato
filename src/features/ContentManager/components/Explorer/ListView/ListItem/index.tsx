@@ -31,6 +31,7 @@ import {
 } from '@/routes/(main)/content/features/DndContextWrapper';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { fileManagerSelectors, useFileStore } from '@/store/file';
+import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { type FileListItem as FileListItemType } from '@/types/files';
 import { type FileUploadStatus } from '@/types/files/upload';
 import { formatSize } from '@/utils/format';
@@ -107,7 +108,6 @@ const styles = createStaticStyles(({ css }) => {
     name: css`
       overflow: hidden;
       flex: 1;
-
       color: ${cssVar.colorText};
       white-space: nowrap;
     `,
@@ -178,6 +178,7 @@ const FileListItem = memo<FileListItemProps>(
     metadata,
     sourceType,
     slug,
+    sourceSetIds,
     uploadStatus,
     pendingRenameItemId,
     onHoverChange,
@@ -202,6 +203,11 @@ const FileListItem = memo<FileListItemProps>(
         setPendingRenameItemId: s.setPendingRenameItemId,
       }),
       shallow,
+    );
+
+    const getSourceSetNameById = useCallback(
+      (id: string) => sourceSetSelectors.getSourceSetNameById(id)(useSourceSetStore.getState()),
+      [],
     );
 
     const [isRenaming, setIsRenaming] = useState(false);
@@ -308,6 +314,9 @@ const FileListItem = memo<FileListItemProps>(
           assetRenditionCount,
           assetUsagePolicy,
           assetVersionLabel,
+          currentSourceSetId: contentManagerState.sourceSetId,
+          getSourceSetNameById,
+          sourceSetIds,
           t,
         }),
       [
@@ -318,6 +327,9 @@ const FileListItem = memo<FileListItemProps>(
         assetRenditionCount,
         assetUsagePolicy,
         assetVersionLabel,
+        contentManagerState.sourceSetId,
+        getSourceSetNameById,
+        sourceSetIds,
         t,
       ],
     );
@@ -569,7 +581,12 @@ const FileListItem = memo<FileListItemProps>(
                     ))}
                   </Flexbox>
                   {governanceActivity && (
-                    <Text ellipsis fontSize={12} title={governanceActivity.title} type={'secondary'}>
+                    <Text
+                      ellipsis
+                      fontSize={12}
+                      title={governanceActivity.title}
+                      type={'secondary'}
+                    >
                       {governanceActivity.label}
                     </Text>
                   )}
@@ -636,11 +653,7 @@ const FileListItem = memo<FileListItemProps>(
           </Flexbox>
           {!isDragging && (
             <>
-              <Flexbox
-                className={styles.item}
-                style={{ flexShrink: 0 }}
-                width={columnWidths.date}
-              >
+              <Flexbox className={styles.item} style={{ flexShrink: 0 }} width={columnWidths.date}>
                 <Text>{displayTime}</Text>
               </Flexbox>
               <Flexbox className={styles.item} style={{ flexShrink: 0 }} width={columnWidths.size}>

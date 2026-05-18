@@ -11,7 +11,7 @@ import { useSpaceItem } from '@/features/ResourceSpaces/useSpaceItem';
 import { useCreateSourceSetModal } from '@/features/SourceSetModal';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 
-import SourceSetList from './SourceSetList';
+import SourceSetList from './Body/SourceSetList';
 
 /**
  * Unified Files & Collections navigation section.

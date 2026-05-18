@@ -103,6 +103,7 @@ export class FileService {
         finishEmbedding: false,
         id: doc.id,
         sourceSetId: doc.sourceSetId ?? null,
+        sourceSetIds: doc.sourceSetId ? [doc.sourceSetId] : [],
         metadata: doc.metadata,
         name: doc.title || doc.filename || 'Untitled',
         parentId: doc.parentId,

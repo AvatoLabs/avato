@@ -40,6 +40,7 @@ const toExplorerItem = (item: ContentItem): ExplorerItem => ({
   embeddingError: item.embeddingError ?? null,
   embeddingStatus: (item.embeddingStatus ?? null) as any,
   finishEmbedding: item.finishEmbedding ?? false,
+  sourceSetIds: item.sourceSetIds ?? [],
   url: item.url ?? '',
 });
 
@@ -99,7 +100,10 @@ const isPendingUploadVisible = (
     return false;
   }
 
-  return matchesContentCategory(uploadItem.file.type || 'application/octet-stream', params.category);
+  return matchesContentCategory(
+    uploadItem.file.type || 'application/octet-stream',
+    params.category,
+  );
 };
 
 export const mapContentItemsToExplorerItems = (items: ContentItem[]): ExplorerItem[] =>
@@ -134,6 +138,8 @@ export const buildPendingUploadExplorerItems = (
         name: item.file.name,
         parentId: item.parentId ?? null,
         size: item.file.size,
+        sourceSetId: item.sourceSetId ?? null,
+        sourceSetIds: item.sourceSetId ? [item.sourceSetId] : [],
         sourceType: 'file',
         spaceId: item.spaceId ?? null,
         updatedAt: createdAt,

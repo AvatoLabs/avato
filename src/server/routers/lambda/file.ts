@@ -67,12 +67,12 @@ const toQueryFileListParams = (
 ): QueryFileListParams => ({
   ...input,
   ...overrides,
-  assetClassification:
-    (overrides?.assetClassification ?? input.assetClassification) as QueryFileListParams['assetClassification'],
-  assetReviewStatus:
-    (overrides?.assetReviewStatus ?? input.assetReviewStatus) as QueryFileListParams['assetReviewStatus'],
-  assetUsagePolicy:
-    (overrides?.assetUsagePolicy ?? input.assetUsagePolicy) as QueryFileListParams['assetUsagePolicy'],
+  assetClassification: (overrides?.assetClassification ??
+    input.assetClassification) as QueryFileListParams['assetClassification'],
+  assetReviewStatus: (overrides?.assetReviewStatus ??
+    input.assetReviewStatus) as QueryFileListParams['assetReviewStatus'],
+  assetUsagePolicy: (overrides?.assetUsagePolicy ??
+    input.assetUsagePolicy) as QueryFileListParams['assetUsagePolicy'],
 });
 
 const normalizeFileType = (fileType?: string | null, name?: string | null): string => {
@@ -784,6 +784,7 @@ export const fileRouter = router({
         parentId: item.parentId,
         size: item.size,
         sourceSetId: undefined,
+        sourceSetIds: [],
         sourceType: 'file' as const,
         spaceId: item.spaceId,
         updatedAt: item.updatedAt,
@@ -1070,7 +1071,7 @@ export const fileRouter = router({
     .query(async ({ ctx, input }): Promise<FileGovernanceSummary> => {
       await assertAccessibleKnowledgeSpace(ctx, input);
 
-      const [classificationRows, reviewStatusRows, usagePolicyRows] = await Promise.all([
+      const [classificationRows, reviewStatusRows, usagePolicyRows] = (await Promise.all([
         ctx.fileModel.queryGovernanceRows(
           toQueryFileListParams(input, {
             assetClassification: undefined,
@@ -1086,7 +1087,7 @@ export const fileRouter = router({
             assetUsagePolicy: undefined,
           }),
         ),
-      ]) as [GovernanceRow[], GovernanceRow[], GovernanceRow[]];
+      ])) as [GovernanceRow[], GovernanceRow[], GovernanceRow[]];
 
       const [visibleClassificationRows, visibleReviewStatusRows, visibleUsagePolicyRows] =
         await Promise.all(
@@ -1232,20 +1233,20 @@ export const fileRouter = router({
       throw new TRPCError({ code: 'FORBIDDEN', message: 'CLEAR_FILES_DENIED' });
     }
 
-      const removeGlobalFile = serverDBEnv.REMOVE_GLOBAL_FILE ?? true;
-      const cleared = await ctx.fileModel.clear(removeGlobalFile, {
-        includeUnscoped: true,
-        spaceId: personalSpace.id,
-      });
+    const removeGlobalFile = serverDBEnv.REMOVE_GLOBAL_FILE ?? true;
+    const cleared = await ctx.fileModel.clear(removeGlobalFile, {
+      includeUnscoped: true,
+      spaceId: personalSpace.id,
+    });
     await ctx.contentModel.invalidateAuthzEpochsAfterRemoval(
       cleared.map((file) => ({ contentUid: file.contentUid, spaceId: file.spaceId })),
     );
 
-      const removableUrls = await resolveRemovableStorageUrls(
-        ctx.fileModel,
-        cleared,
-        removeGlobalFile,
-      );
+    const removableUrls = await resolveRemovableStorageUrls(
+      ctx.fileModel,
+      cleared,
+      removeGlobalFile,
+    );
 
     if (removableUrls.length === 1) {
       await ctx.fileService.deleteFile(removableUrls[0]!);

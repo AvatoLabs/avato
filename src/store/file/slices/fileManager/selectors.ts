@@ -6,35 +6,39 @@ const uploadStatusArray = new Set(['uploading', 'pending', 'processing']);
 
 const dockFileList = (s: FilesStoreState) => s.dockUploadFileList;
 const dockRawFileList = (s: FilesStoreState) => s.dockUploadFileList.map((item) => item.file);
-const getFileById = (id?: string | null) => (s: FilesStoreState): FileListItem | undefined => {
-  if (!id) return;
+const getFileById =
+  (id?: string | null) =>
+  (s: FilesStoreState): FileListItem | undefined => {
+    if (!id) return;
 
-  // Prefer resourceMap (Explorer's data) when fileList may be empty or stale
-  const fromResourceMap = s.resourceMap?.get(id);
-  if (fromResourceMap) {
-    const mappedResource: FileListItem = {
-      chunkCount: fromResourceMap.chunkCount ?? null,
-      chunkingError: fromResourceMap.chunkingError ?? null,
-      chunkingStatus: (fromResourceMap.chunkingStatus ?? null) as FileListItem['chunkingStatus'],
-      createdAt: fromResourceMap.createdAt,
-      embeddingError: fromResourceMap.embeddingError ?? null,
-      embeddingStatus: (fromResourceMap.embeddingStatus ?? null) as FileListItem['embeddingStatus'],
-      fileId: fromResourceMap.fileId ?? null,
-      fileType: fromResourceMap.fileType,
-      finishEmbedding: fromResourceMap.finishEmbedding ?? false,
-      id: fromResourceMap.id,
-      name: fromResourceMap.name,
-      size: fromResourceMap.size,
-      sourceType: fromResourceMap.sourceType,
-      updatedAt: fromResourceMap.updatedAt,
-      url: fromResourceMap.url ?? '',
-    };
+    // Prefer resourceMap (Explorer's data) when fileList may be empty or stale
+    const fromResourceMap = s.resourceMap?.get(id);
+    if (fromResourceMap) {
+      const mappedResource: FileListItem = {
+        chunkCount: fromResourceMap.chunkCount ?? null,
+        chunkingError: fromResourceMap.chunkingError ?? null,
+        chunkingStatus: (fromResourceMap.chunkingStatus ?? null) as FileListItem['chunkingStatus'],
+        createdAt: fromResourceMap.createdAt,
+        embeddingError: fromResourceMap.embeddingError ?? null,
+        embeddingStatus: (fromResourceMap.embeddingStatus ??
+          null) as FileListItem['embeddingStatus'],
+        fileId: fromResourceMap.fileId ?? null,
+        fileType: fromResourceMap.fileType,
+        finishEmbedding: fromResourceMap.finishEmbedding ?? false,
+        id: fromResourceMap.id,
+        name: fromResourceMap.name,
+        size: fromResourceMap.size,
+        sourceSetIds: fromResourceMap.sourceSetIds ?? [],
+        sourceType: fromResourceMap.sourceType,
+        updatedAt: fromResourceMap.updatedAt,
+        url: fromResourceMap.url ?? '',
+      };
 
-    return mappedResource;
-  }
+      return mappedResource;
+    }
 
-  return s.fileList.find((item) => item.id === id);
-};
+    return s.fileList.find((item) => item.id === id);
+  };
 
 const isUploadingFiles = (s: FilesStoreState) =>
   s.dockUploadFileList.some((file) => uploadStatusArray.has(file.status));
@@ -42,7 +46,9 @@ const isUploadingFiles = (s: FilesStoreState) =>
 const overviewUploadingStatus = (s: FilesStoreState): FileUploadStatus => {
   if (s.dockUploadFileList.length === 0) return 'pending';
 
-  if (s.dockUploadFileList.some((file) => file.status === 'uploading' || file.status === 'pending')) {
+  if (
+    s.dockUploadFileList.some((file) => file.status === 'uploading' || file.status === 'pending')
+  ) {
     return 'uploading';
   }
 

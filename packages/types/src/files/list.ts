@@ -69,6 +69,8 @@ export interface FileListItem {
   size: number;
   slug?: string | null;
   sourceSetId?: string | null;
+  /** All collection IDs this file belongs to */
+  sourceSetIds: string[];
   sourceType: string;
   spaceId?: string | null;
   updatedAt: Date;

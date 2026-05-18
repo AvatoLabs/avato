@@ -45,6 +45,7 @@ const FilePreviewModal = memo<FilePreviewModalProps>(({ file, open, onClose }) =
         id={file.id}
         name={file.file.name}
         size={file.file.size}
+        sourceSetIds={[]}
         sourceType="upload"
         updatedAt={new Date()}
         url={previewUrl}

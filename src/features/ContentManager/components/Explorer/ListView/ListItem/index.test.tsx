@@ -61,7 +61,9 @@ vi.mock('antd-style', () => ({
 vi.mock('@lobehub/ui', () => ({
   Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
   Center: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  Checkbox: ({ checked, ...props }: any) => <input readOnly checked={checked} type="checkbox" {...props} />,
+  Checkbox: ({ checked, ...props }: any) => (
+    <input readOnly checked={checked} type="checkbox" {...props} />
+  ),
   ContextMenuTrigger: ({ children, ...props }: any) => <div {...props}>{children}</div>,
   Flexbox: ({ children, ...props }: any) => <div {...props}>{children}</div>,
   Icon: ({ icon }: any) => <span>{String(icon)}</span>,
@@ -82,7 +84,9 @@ vi.mock('react-i18next', () => ({
         'detail.asset.usagePolicy.restricted': 'Restricted',
         'FileManager.actions.chunking': 'Chunking',
         'file:pageList.untitled': 'Untitled',
-      })[key] || options?.defaultValue || key,
+      })[key] ||
+      options?.defaultValue ||
+      key,
   }),
 }));
 
@@ -201,15 +205,16 @@ describe('FileListItem', () => {
         isAnyRowHovered={false}
         metadata={null}
         name="Brand Guide.pdf"
-        onHoverChange={vi.fn()}
-        onSelectedChange={vi.fn()}
         pendingRenameItemId={null}
         selected={false}
         size={1024}
+        sourceSetIds={[]}
         sourceType="file"
         updatedAt={new Date('2026-04-05T00:00:00.000Z')}
         uploadStatus={undefined}
         url="/f/file-1"
+        onHoverChange={vi.fn()}
+        onSelectedChange={vi.fn()}
       />,
     );
 

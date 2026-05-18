@@ -129,6 +129,12 @@ export interface ExplainAccessResult {
  * Used by the ContentManager optimistic layer.
  */
 export interface ContentItem {
+  _optimistic?: {
+    error?: Error;
+    isPending: boolean;
+    lastSyncAttempt?: Date;
+    retryCount: number;
+  };
   assetClassification?: FileAssetClassification | null;
   assetLatestGovernanceAuditAction?: string | null;
   assetLatestGovernanceAuditActorDisplayName?: string | null;
@@ -139,12 +145,6 @@ export interface ContentItem {
   assetReviewStatus?: FileAssetReviewStatus | null;
   assetUsagePolicy?: FileAssetUsagePolicy | null;
   assetVersionLabel?: string | null;
-  _optimistic?: {
-    error?: Error;
-    isPending: boolean;
-    lastSyncAttempt?: Date;
-    retryCount: number;
-  };
   chunkCount?: number | null;
   chunkingError?: any | null;
   chunkingStatus?: string | null;
@@ -165,6 +165,8 @@ export interface ContentItem {
   size: number;
   slug?: string | null;
   sourceSetId?: string;
+  /** All collection IDs this item belongs to */
+  sourceSetIds?: string[];
   sourceType: 'document' | 'file';
   spaceId?: string;
   title?: string;
@@ -185,8 +187,8 @@ export interface SyncOperation {
 
 export interface ContentQueryParams {
   assetClassification?: FileAssetClassification;
-  assetRightsOwner?: string;
   assetReviewStatus?: FileAssetReviewStatus;
+  assetRightsOwner?: string;
   assetUsagePolicy?: FileAssetUsagePolicy;
   category?: FilesTabs;
   limit?: number;
@@ -208,10 +210,10 @@ export interface CreateFileResourceParams {
   parentId?: string;
   sha256: string;
   size: number;
-  storageKey: string;
   sourceSetId?: string;
   sourceType: 'file';
   spaceId?: string;
+  storageKey: string;
 }
 
 export interface CreateDocumentResourceParams {

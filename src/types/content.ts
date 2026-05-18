@@ -12,6 +12,13 @@ import {
  * Used by ContentManager for optimistic updates and local-first state management
  */
 export interface ContentItem {
+  // Optimistic tracking (UI state, not persisted)
+  _optimistic?: {
+    error?: Error;
+    isPending: boolean;
+    lastSyncAttempt?: Date;
+    retryCount: number;
+  };
   assetClassification?: FileAssetClassification | null;
   assetLatestGovernanceAuditAction?: string | null;
   assetLatestGovernanceAuditActorDisplayName?: string | null;
@@ -22,13 +29,6 @@ export interface ContentItem {
   assetReviewStatus?: FileAssetReviewStatus | null;
   assetUsagePolicy?: FileAssetUsagePolicy | null;
   assetVersionLabel?: string | null;
-  // Optimistic tracking (UI state, not persisted)
-  _optimistic?: {
-    error?: Error;
-    isPending: boolean;
-    lastSyncAttempt?: Date;
-    retryCount: number;
-  };
 
   chunkCount?: number | null;
   chunkingError?: any | null;
@@ -62,6 +62,8 @@ export interface ContentItem {
 
   slug?: string | null;
   sourceSetId?: string;
+  /** All collection IDs this item belongs to */
+  sourceSetIds?: string[];
   // bytes for files, char count for documents
   sourceType: 'file' | 'document';
   title?: string;
@@ -94,8 +96,8 @@ export interface SyncOperation {
  */
 export interface ContentQueryParams {
   assetClassification?: FileAssetClassification;
-  assetRightsOwner?: string;
   assetReviewStatus?: FileAssetReviewStatus;
+  assetRightsOwner?: string;
   assetUsagePolicy?: FileAssetUsagePolicy;
   category?: FilesTabs;
   limit?: number;
@@ -121,8 +123,8 @@ export interface CreateFileParams {
   sha256: string;
   size: number;
   sourceSetId?: string;
-  spaceId?: string;
   sourceType: 'file';
+  spaceId?: string;
   storageKey: string;
 }
 
@@ -137,8 +139,8 @@ export interface CreateDocumentParams {
   parentId?: string;
   slug?: string;
   sourceSetId?: string;
-  spaceId?: string;
   sourceType: 'document';
+  spaceId?: string;
   title: string;
 }
 

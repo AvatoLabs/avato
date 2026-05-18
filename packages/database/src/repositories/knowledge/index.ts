@@ -29,6 +29,8 @@ export interface AgentSourceItem {
   size: number;
   slug?: string | null;
   sourceSetId?: string | null;
+  /** All collection IDs this item belongs to */
+  sourceSetIds: string[];
   /**
    * Source type to distinguish between files and documents
    * - 'file': from files table
@@ -113,7 +115,9 @@ export class KnowledgeRepo {
     }
 
     if (assetRightsOwner) {
-      assetConditions.push(sql`${sql.raw(`${alias}.rights_owner`)} ILIKE ${`%${assetRightsOwner}%`}`);
+      assetConditions.push(
+        sql`${sql.raw(`${alias}.rights_owner`)} ILIKE ${`%${assetRightsOwner}%`}`,
+      );
     }
 
     return assetConditions;
@@ -226,6 +230,9 @@ export class KnowledgeRepo {
         fileType: row.file_type,
         id: row.id,
         sourceSetId: row.source_set_id ?? null,
+        sourceSetIds: Array.isArray(row.source_set_ids)
+          ? row.source_set_ids.filter((id: any): id is string => typeof id === 'string')
+          : [],
         metadata,
         name: row.name,
         parentId: row.parent_id ?? null,
@@ -343,6 +350,7 @@ export class KnowledgeRepo {
         name: row.name,
         size: Number(row.size),
         slug: row.slug,
+        sourceSetIds: [],
         sourceType: row.source_type,
         updatedAt: new Date(row.updated_at),
         url: row.url,
@@ -499,7 +507,8 @@ export class KnowledgeRepo {
           COALESCE(d.metadata, f.metadata) as metadata,
           'file' as source_type,
           f.parent_id,
-          ${sourceSetId}::text as source_set_id
+          ${sourceSetId}::text as source_set_id,
+          ARRAY[${sourceSetId}::text]::text[] as source_set_ids
         FROM ${files} f
         INNER JOIN ${sourceSetFiles} kbf
           ON f.id = kbf.file_id
@@ -548,7 +557,11 @@ export class KnowledgeRepo {
         COALESCE(d.metadata, f.metadata) as metadata,
         'file' as source_type,
         f.parent_id,
-        NULL::text as source_set_id
+        NULL::text as source_set_id,
+        COALESCE(
+          (SELECT array_agg(ssf.source_set_id) FROM ${sourceSetFiles} ssf WHERE ssf.file_id = f.id),
+          '{}'
+        )::text[] as source_set_ids
       FROM ${files} f
       ${
         assetWhereConditions.length > 0
@@ -593,7 +606,8 @@ export class KnowledgeRepo {
           NULL::jsonb as metadata,
           NULL::text as source_type,
           NULL::varchar(255) as parent_id,
-          NULL::text as source_set_id
+          NULL::text as source_set_id,
+          '{}'::text[] as source_set_ids
         WHERE false
       `;
     }
@@ -657,7 +671,8 @@ export class KnowledgeRepo {
             NULL::jsonb as metadata,
             NULL::text as source_type,
             NULL::varchar(255) as parent_id,
-            NULL::text as source_set_id
+            NULL::text as source_set_id,
+            '{}'::text[] as source_set_ids
           WHERE false
         `;
       }
@@ -727,7 +742,8 @@ export class KnowledgeRepo {
               NULL::jsonb as metadata,
               NULL::text as source_type,
               NULL::varchar(255) as parent_id,
-              NULL::text as source_set_id
+              NULL::text as source_set_id,
+              '{}'::text[] as source_set_ids
             WHERE false
           `;
         }
@@ -756,7 +772,8 @@ export class KnowledgeRepo {
           d.metadata,
           'document' as source_type,
           d.parent_id,
-          d.source_set_id
+          d.source_set_id,
+          COALESCE(ARRAY[d.source_set_id]::text[], '{}'::text[]) as source_set_ids
         FROM ${documents} d
         WHERE ${sql.join(kbWhereConditions, sql` AND `)}
       `;
@@ -780,7 +797,8 @@ export class KnowledgeRepo {
         metadata,
         'document' as source_type,
         parent_id,
-        source_set_id
+        source_set_id,
+        COALESCE(ARRAY[source_set_id]::text[], '{}'::text[]) as source_set_ids
       FROM ${documents}
       WHERE ${sql.join(whereConditions, sql` AND `)}
     `;

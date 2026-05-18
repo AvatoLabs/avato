@@ -152,6 +152,8 @@ export default {
   'collection.list.confirmRemoveCollection':
     'You are about to delete this collection. Its files will stay in Content and be removed from this collection. This action cannot be undone.',
   'collection.list.empty': 'Click <1>+</1> to create your first collection',
+  'collection.badge.assigned': 'In collection',
+  'collection.badge.assignedCount': '{{count}} collections',
   'collection.list.removeError': 'Failed to delete Collection',
   'collection.new': 'New Collection',
   'collection.renameFolderEmpty': 'Folder name cannot be empty',
