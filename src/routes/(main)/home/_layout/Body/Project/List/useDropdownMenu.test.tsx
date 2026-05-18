@@ -73,7 +73,7 @@ describe('useProjectItemDropdownMenu', () => {
       await confirmConfig.onOk();
     });
 
-    expect(mockMessage.error).toHaveBeenCalledWith('sourceSet.list.removeError');
+    expect(mockMessage.error).toHaveBeenCalledWith('collection.list.removeError');
     expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to delete project source set:', error);
 
     consoleErrorSpy.mockRestore();

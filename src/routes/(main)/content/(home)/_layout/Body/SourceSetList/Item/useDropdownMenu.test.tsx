@@ -87,7 +87,7 @@ describe('SourceSet item dropdown menu', () => {
       await confirmConfig.onOk();
     });
 
-    expect(mockMessageError).toHaveBeenCalledWith('sourceSet.list.removeError');
+    expect(mockMessageError).toHaveBeenCalledWith('collection.list.removeError');
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       'Failed to delete source set from content list:',
       error,

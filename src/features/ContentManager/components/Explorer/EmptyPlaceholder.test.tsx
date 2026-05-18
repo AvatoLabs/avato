@@ -248,7 +248,7 @@ describe('EmptyPlaceholder', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Adjust governance filters' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Clear governance filters' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /actions\.sourceSet/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /actions\.collection/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /actions\.file/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /actions\.folder/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Review 2 Pending' })).not.toBeInTheDocument();
@@ -342,7 +342,7 @@ describe('EmptyPlaceholder', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /actions\.sourceSet/i }));
+    fireEvent.click(screen.getByRole('button', { name: /actions\.collection/i }));
 
     expect(mockOpenCreateSourceSet).toHaveBeenCalledWith({ spaceId: 'space-1' });
   });

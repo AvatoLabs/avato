@@ -166,9 +166,7 @@ describe('useDropdownMenu', () => {
     });
 
     expect(mockRemoveFilesFromSourceSet).toHaveBeenCalledWith('source-set-1', ['page-1']);
-    expect(mockMessage.error).toHaveBeenCalledWith(
-      'FileManager.actions.removeFromSourceSetError',
-    );
+    expect(mockMessage.error).toHaveBeenCalledWith('FileManager.actions.removeFromCollectionError');
     expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to remove page from source set:', error);
 
     consoleErrorSpy.mockRestore();

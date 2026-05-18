@@ -1,8 +1,8 @@
 /**
  * @vitest-environment happy-dom
  */
-import type { ItemType, MenuItemType } from 'antd/es/menu/interface';
 import { act, renderHook } from '@testing-library/react';
+import type { ItemType, MenuItemType } from 'antd/es/menu/interface';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useFileItemDropdown } from './useFileItemDropdown';
@@ -172,11 +172,11 @@ const findAction = (
     (item): item is MenuItemType & { onClick: NonNullable<MenuItemType['onClick']> } =>
       Boolean(
         item &&
-          typeof item === 'object' &&
-          'key' in item &&
-          item.key === key &&
-          'onClick' in item &&
-          typeof item.onClick === 'function',
+        typeof item === 'object' &&
+        'key' in item &&
+        item.key === key &&
+        'onClick' in item &&
+        typeof item.onClick === 'function',
       ),
   );
 
@@ -474,7 +474,7 @@ describe('useFileItemDropdown', () => {
     });
 
     expect(mockRemoveFilesFromSourceSet).toHaveBeenCalledWith('sst_1', ['file_1']);
-    expect(mockMessage.error).toHaveBeenCalledWith('FileManager.actions.removeFromSourceSetError');
+    expect(mockMessage.error).toHaveBeenCalledWith('FileManager.actions.removeFromCollectionError');
   });
 
   it('shows an error when deleting an item fails', async () => {

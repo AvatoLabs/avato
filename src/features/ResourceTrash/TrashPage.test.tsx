@@ -6,14 +6,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import TrashPage from './TrashPage';
 
-const { searchParamsState, storeState } = vi.hoisted(() => ({
-  searchParamsState: {
-    current: new URLSearchParams(),
-  },
-  storeState: {
-    setSourceSetId: vi.fn(),
-    setSpaceId: vi.fn(),
-  },
+const searchParamsState = vi.hoisted(() => ({
+  current: new URLSearchParams(),
 }));
 
 vi.mock('@lobehub/ui', () => ({
@@ -31,8 +25,8 @@ vi.mock('@/features/ContentManager/useFileScope', () => ({
     scope.startsWith('source-set:') ? scope.slice('source-set:'.length) : null,
 }));
 
-vi.mock('@/routes/(main)/content/features/store', () => ({
-  useContentManagerStore: (selector: any) => selector(storeState),
+vi.mock('@/routes/(main)/content/features/hooks/useContentManagerUrlSync', () => ({
+  useContentManagerUrlSync: vi.fn(),
 }));
 
 vi.mock('./TrashContent', () => ({
@@ -47,11 +41,9 @@ describe('TrashPage', () => {
     searchParamsState.current = new URLSearchParams('scope=source-set:ss_ops');
   });
 
-  it('derives the source set scope from the query string', () => {
+  it('derives the source set scope from the query string and passes it to TrashContent', () => {
     render(<TrashPage />);
 
-    expect(storeState.setSpaceId).toHaveBeenCalledWith('spc_ops');
-    expect(storeState.setSourceSetId).toHaveBeenCalledWith('ss_ops');
     expect(screen.getByTestId('trash-content')).toHaveTextContent('spc_ops:ss_ops');
   });
 });

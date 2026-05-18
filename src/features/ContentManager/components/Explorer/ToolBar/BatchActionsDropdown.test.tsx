@@ -106,8 +106,8 @@ vi.mock('react-i18next', () => ({
           'detail.asset.rightsOwner.placeholder': 'Enter rights owner',
           'detail.asset.usagePolicy.restricted': 'Restricted',
           'FileManager.actions.deleteError': 'Delete failed.',
-          'FileManager.actions.removeFromSourceSetError': 'Remove from source set failed.',
-          'sourceSet.list.removeError': 'Delete source set failed.',
+          'FileManager.actions.removeFromCollectionError': 'Remove from source set failed.',
+          'collection.list.removeError': 'Delete source set failed.',
           'delete': 'Delete',
         }) as Record<string, string>
       )[key] || key,
@@ -167,7 +167,9 @@ describe('BatchActionsDropdown', () => {
     contentManagerState.sourceSetId = undefined;
     contentManagerState.spaceId = 'spc_team';
     mockConfirm.mockImplementation(({ onOk }: any) => onOk?.());
-    mockCreateBatchRightsOwnerModal.mockImplementation(({ onSubmit }: any) => onSubmit?.('Brand Team'));
+    mockCreateBatchRightsOwnerModal.mockImplementation(({ onSubmit }: any) =>
+      onSubmit?.('Brand Team'),
+    );
   });
 
   it('should expose approve and archive batch actions', async () => {
@@ -333,7 +335,7 @@ describe('BatchActionsDropdown', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'header.actions.deleteSourceSet' }));
+    fireEvent.click(screen.getByRole('button', { name: 'header.actions.deleteCollection' }));
 
     await waitFor(() => {
       expect(onActionClick).toHaveBeenCalledWith('deleteSourceSet');
