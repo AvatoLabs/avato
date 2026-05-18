@@ -128,13 +128,37 @@ describe('buildExplorerQueryParams', () => {
       spaceId: 'spc_1',
     });
 
-    // URL scope wins — effectiveSourceSetId should be ss_new, not ss_old
     expect(params.sourceSetId).toBe('ss_new');
   });
 
-  it('falls back to store sourceSetId when URL scope has no collection id', () => {
+  it('clears stale store sourceSetId when URL scope is all', () => {
     const params = buildExplorerQueryParams({
       scope: 'all',
+      sourceSetId: 'ss_old',
+      sorter: 'createdAt',
+      sortType: SortType.Desc,
+      spaceId: 'spc_1',
+    });
+
+    expect(params.sourceSetId).toBeUndefined();
+    expect(params.showFilesInSourceSet).toBe(true);
+  });
+
+  it('clears stale store sourceSetId when URL scope is unassigned', () => {
+    const params = buildExplorerQueryParams({
+      scope: 'unassigned',
+      sourceSetId: 'ss_old',
+      sorter: 'createdAt',
+      sortType: SortType.Desc,
+      spaceId: 'spc_1',
+    });
+
+    expect(params.sourceSetId).toBeUndefined();
+    expect(params.showFilesInSourceSet).toBe(false);
+  });
+
+  it('falls back to store sourceSetId only when scope is not provided', () => {
+    const params = buildExplorerQueryParams({
       sourceSetId: 'ss_1',
       sorter: 'createdAt',
       sortType: SortType.Desc,

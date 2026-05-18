@@ -35,17 +35,15 @@ export function buildExplorerQueryParams({
   assetUsagePolicy,
   category,
   currentFolderSlug,
-  scope = 'all',
+  scope,
   sourceSetId,
   sorter,
   sortType,
   spaceId,
 }: BuildExplorerQueryParamsOptions): ContentQueryParams {
-  // URL scope is the source of truth and updates synchronously.
-  // Store sourceSetId lags behind by one frame (set via useEffect),
-  // so we prefer the URL-derived value to avoid a stale-key race that
-  // would cause SWR to skip re-fetching on scope switches.
-  const effectiveSourceSetId = getSourceSetScopeId(scope) ?? sourceSetId;
+  // When scope is provided it comes from the URL and is authoritative.
+  // Only fall back to store sourceSetId for legacy callers that do not pass scope.
+  const effectiveSourceSetId = scope ? (getSourceSetScopeId(scope) ?? undefined) : sourceSetId;
 
   return {
     assetClassification,

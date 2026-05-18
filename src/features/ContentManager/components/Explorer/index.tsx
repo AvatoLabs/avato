@@ -25,8 +25,8 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   page: css`
     position: relative;
 
-    min-height: 0;
     height: 100%;
+    min-height: 0;
     padding: clamp(12px, 1.8vw, 18px);
 
     background:
@@ -38,53 +38,52 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
   shell: css`
     width: min(100%, 1520px);
-    min-height: 0;
     height: 100%;
+    min-height: 0;
     margin-inline: auto;
   `,
   stage: css`
     overflow: hidden;
-
     display: flex;
     flex-direction: column;
 
-    min-height: 0;
     height: 100%;
+    min-height: 0;
     border: 1px solid color-mix(in srgb, ${cssVar.colorBorderSecondary} 90%, transparent);
     border-radius: 24px;
 
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, ${cssVar.colorBgContainer} 97%, ${cssVar.colorBgElevated}) 0%,
-        color-mix(in srgb, ${cssVar.colorBgContainer} 92%, ${cssVar.colorBgLayout}) 100%
-      );
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, ${cssVar.colorBgContainer} 97%, ${cssVar.colorBgElevated}) 0%,
+      color-mix(in srgb, ${cssVar.colorBgContainer} 92%, ${cssVar.colorBgLayout}) 100%
+    );
+    backdrop-filter: blur(16px);
     box-shadow:
       0 28px 72px -48px color-mix(in srgb, ${cssVar.colorText} 24%, transparent),
       inset 0 1px 0 color-mix(in srgb, white 55%, transparent);
-    backdrop-filter: blur(16px);
 
-    @media (max-width: 768px) {
+    @media (width <= 768px) {
       border-radius: 18px;
     }
   `,
   sourceSetSection: css`
-    padding-inline: clamp(12px, 2vw, 18px);
     padding-block-end: 8px;
-    border-bottom: 1px solid ${cssVar.colorBorderSecondary};
+    padding-inline: clamp(12px, 2vw, 18px);
+    border-block-end: 1px solid ${cssVar.colorBorderSecondary};
   `,
   viewport: css`
     position: relative;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
 
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, ${cssVar.colorFillQuaternary} 54%, transparent) 0%,
-        transparent 88px
-      );
+    overflow: hidden;
+    flex: 1;
+
+    min-height: 0;
+
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, ${cssVar.colorFillQuaternary} 54%, transparent) 0%,
+      transparent 88px
+    );
   `,
 }));
 
@@ -127,7 +126,7 @@ const ResourceExplorer = memo(() => {
     s.sortType,
     s.spaceId,
   ]);
-  const { scope } = useFileScope(spaceId);
+  const { scope, sourceSetId: scopeSourceSetId } = useFileScope(spaceId);
 
   const isExplorerMode = mode === 'explorer';
 
@@ -149,7 +148,7 @@ const ResourceExplorer = memo(() => {
         category,
         currentFolderSlug,
         scope,
-        sourceSetId,
+        sourceSetId: scopeSourceSetId ?? undefined,
         sorter,
         sortType,
         spaceId,
@@ -162,7 +161,7 @@ const ResourceExplorer = memo(() => {
       category,
       currentFolderSlug,
       scope,
-      sourceSetId,
+      scopeSourceSetId,
       sorter,
       sortType,
       spaceId,

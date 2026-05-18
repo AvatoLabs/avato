@@ -193,10 +193,9 @@ const CategoryMenu = memo(() => {
   const { spaceId } = useParams<{ spaceId?: string }>();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [activeKey, currentFolderId, sourceSetId, setMode] = useContentManagerStore((s) => [
+  const [activeKey, currentFolderId, setMode] = useContentManagerStore((s) => [
     s.category,
     s.currentFolderId,
-    s.sourceSetId,
     s.setMode,
   ]);
   const isMobile = useServerConfigStore((s) => s.isMobile);
@@ -217,9 +216,8 @@ const CategoryMenu = memo(() => {
     (searchParams.get('assetUsagePolicy') as FileAssetUsagePolicy | null) || undefined;
   const focusedGovernanceFilter = searchParams.get(GOVERNANCE_PANEL_FOCUS_QUERY_KEY) || undefined;
   const fileScope = getFileScope(searchParams);
-  // Derive sourceSetId from URL (immediate) to avoid one-frame race with store
-  const urlSourceSetId = getSourceSetScopeId(fileScope);
-  const effectiveSourceSetId = urlSourceSetId ?? sourceSetId;
+  // Derive sourceSetId from URL to avoid a one-frame race with store.
+  const effectiveSourceSetId = getSourceSetScopeId(fileScope) ?? undefined;
   const showCategoryTabs = !effectiveSourceSetId;
   const activeGovernanceFilterCount =
     Number(Boolean(classificationParam)) +
@@ -236,8 +234,8 @@ const CategoryMenu = memo(() => {
         assetUsagePolicy: usagePolicyParam,
         category: getExplorerCategoryFilter(activeKey, effectiveSourceSetId ?? undefined),
         currentFolderSlug: currentFolderId,
-        scope: fileScope === 'unassigned' ? 'unassigned' : 'all',
-        sourceSetId: effectiveSourceSetId ?? undefined,
+        scope: fileScope,
+        sourceSetId: effectiveSourceSetId,
         spaceId,
       }),
     [
