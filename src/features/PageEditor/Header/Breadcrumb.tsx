@@ -63,7 +63,7 @@ const Breadcrumb = memo(() => {
         ? [
             {
               key: 'source-set',
-              label: sourceSetName || t('sourceSet.title'),
+              label: sourceSetName || t('collection.title'),
               onClick: spaceId ? () => navigate(docsPath) : undefined,
             },
           ]

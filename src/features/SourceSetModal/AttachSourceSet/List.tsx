@@ -194,7 +194,9 @@ const SourceWorkspaceBadge = memo(
 
     if (!spaceId || !spaceName || spaceId === activeSpaceId) return null;
 
-    return <Tag bordered={false}>{t('sourceSet.picker.sourceWorkspace', { name: spaceName })}</Tag>;
+    return (
+      <Tag bordered={false}>{t('collection.picker.sourceWorkspace', { name: spaceName })}</Tag>
+    );
   },
 );
 
@@ -216,7 +218,7 @@ const FileEntryRow = memo<FileEntryRowProps>(
     const browseLabel = t(
       scope === 'conversation'
         ? 'conversationFiles.picker.action.browse'
-        : 'sourceSet.picker.action.browse',
+        : 'collection.picker.action.browse',
     );
 
     const handleClick = useCallback(() => {
@@ -252,7 +254,7 @@ const FileEntryRow = memo<FileEntryRowProps>(
                 ? t(
                     scope === 'conversation'
                       ? 'conversationFiles.picker.subfolder'
-                      : 'sourceSet.picker.subfolder',
+                      : 'collection.picker.subfolder',
                   )
                 : item.fileType}
             </Text>
@@ -287,12 +289,12 @@ const FileEntryRow = memo<FileEntryRowProps>(
               ? t(
                   scope === 'conversation'
                     ? 'conversationFiles.picker.action.added'
-                    : 'sourceSet.picker.action.added',
+                    : 'collection.picker.action.added',
                 )
               : t(
                   scope === 'conversation'
                     ? 'conversationFiles.picker.action.add'
-                    : 'sourceSet.picker.action.add',
+                    : 'collection.picker.action.add',
                 )}
           </Button>
         )}
@@ -356,14 +358,14 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
         description: t(
           isConversationScope
             ? 'conversationFiles.picker.allFilesDesc'
-            : 'sourceSet.picker.allFilesDesc',
+            : 'collection.picker.allFilesDesc',
           { ns: 'chat' },
         ),
         icon: FileStack,
         id: 'all-files',
         key: 'all-files',
         name: t(
-          isConversationScope ? 'conversationFiles.picker.allFiles' : 'sourceSet.picker.allFiles',
+          isConversationScope ? 'conversationFiles.picker.allFiles' : 'collection.picker.allFiles',
           { ns: 'chat' },
         ),
         type: 'all-files',
@@ -653,14 +655,16 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
         <Flexbox gap={6}>
           <Text className={styles.panelTitle}>
             {t(
-              isConversationScope ? 'conversationFiles.picker.sources' : 'sourceSet.picker.sources',
+              isConversationScope
+                ? 'conversationFiles.picker.sources'
+                : 'collection.picker.sources',
             )}
           </Text>
           {activeWorkspaceName && (
             <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
-              <Tag bordered={false}>{t('sourceSet.picker.workspace', { ns: 'chat' })}</Tag>
+              <Tag bordered={false}>{t('collection.picker.workspace', { ns: 'chat' })}</Tag>
               <Text className={styles.sourceSecondary}>
-                {t('sourceSet.picker.workspaceHint', {
+                {t('collection.picker.workspaceHint', {
                   name: activeWorkspaceName,
                   ns: 'chat',
                 })}
@@ -703,7 +707,7 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
               </Flexbox>
 
               {source.type === 'source-set' && sourceSetAttached && (
-                <Tag>{t('sourceSet.picker.action.added')}</Tag>
+                <Tag>{t('collection.picker.action.added')}</Tag>
               )}
             </Flexbox>
           );
@@ -741,7 +745,7 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
               )}
               {targetWorkspaceName && targetSpaceId && targetSpaceId !== activeWorkspaceSpaceId && (
                 <Tag bordered={false}>
-                  {t('sourceSet.picker.sourceWorkspace', {
+                  {t('collection.picker.sourceWorkspace', {
                     name: targetWorkspaceName,
                     ns: 'chat',
                   })}
@@ -761,7 +765,7 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
                   {t(
                     isConversationScope
                       ? 'conversationFiles.picker.action.upload'
-                      : 'sourceSet.picker.action.upload',
+                      : 'collection.picker.action.upload',
                   )}
                 </Button>
               )}
@@ -778,8 +782,8 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
                   }
                 >
                   {selectedSourceSetAttached
-                    ? t('sourceSet.picker.action.added')
-                    : t('sourceSet.picker.action.addSourceSet')}
+                    ? t('collection.picker.action.added')
+                    : t('collection.picker.action.addSourceSet')}
                 </Button>
               ) : canAddVisibleFiles ? (
                 <Button
@@ -794,7 +798,7 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
                   {t(
                     isConversationScope
                       ? 'conversationFiles.picker.action.addVisible'
-                      : 'sourceSet.picker.action.addVisible',
+                      : 'collection.picker.action.addVisible',
                   )}
                 </Button>
               ) : null}
@@ -809,7 +813,7 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
             placeholder={t(
               isConversationScope
                 ? 'conversationFiles.picker.searchPlaceholder'
-                : 'sourceSet.picker.searchPlaceholder',
+                : 'collection.picker.searchPlaceholder',
             )}
             onChange={handleSearchChange}
           />
@@ -837,7 +841,7 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
                     : t(
                         isConversationScope
                           ? 'conversationFiles.picker.empty'
-                          : 'sourceSet.picker.empty',
+                          : 'collection.picker.empty',
                       )
                 }
               />
@@ -852,7 +856,7 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
                     {t(
                       isConversationScope
                         ? 'conversationFiles.picker.action.upload'
-                        : 'sourceSet.picker.action.upload',
+                        : 'collection.picker.action.upload',
                     )}
                   </Button>
                 </Flexbox>

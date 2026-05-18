@@ -19,9 +19,11 @@ const useStyles = createStyles(({ css, token }) => ({
   content: css`
     overflow: hidden;
     flex: 1;
+
     min-height: 0;
     border: 1px solid ${token.colorBorderSecondary};
     border-radius: ${token.borderRadiusLG}px;
+
     background: ${token.colorBgContainer};
   `,
 }));
@@ -56,7 +58,7 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
     }
 
     if (currentSourceSetScopeId) {
-      return scopedSourceSet?.name || t('pageList.sourceSet.assigned', { ns: 'file' });
+      return scopedSourceSet?.name || t('pageList.collection.assigned', { ns: 'file' });
     }
 
     return t(isTablePage ? 'pageList.tableTitle' : 'pageList.title', { ns: 'file' });

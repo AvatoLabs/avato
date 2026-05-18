@@ -49,7 +49,7 @@ const EmptyStatus = memo(() => {
     >
       <LineIcon />
       <Flexbox horizontal align={'center'} className={styles.paragraph}>
-        <Trans i18nKey={'sourceSet.list.empty'} ns={'file'}>
+        <Trans i18nKey={'collection.list.empty'} ns={'file'}>
           点击 <kbd>+</kbd> 开始创建资源库
         </Trans>
       </Flexbox>

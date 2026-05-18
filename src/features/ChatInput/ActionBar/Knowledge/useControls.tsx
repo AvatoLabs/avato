@@ -73,7 +73,7 @@ export const useControls = ({
         })),
       ],
       key: 'relatedSources',
-      label: t('sourceSet.relatedSources'),
+      label: t('collection.relatedSources'),
       type: 'group',
     },
     {
@@ -83,7 +83,7 @@ export const useControls = ({
       extra: <Icon icon={ArrowRight} />,
       icon: LibraryBig,
       key: 'source-set-store',
-      label: t('sourceSet.viewMore'),
+      label: t('collection.viewMore'),
       onClick: () => {
         setModalOpen(true);
       },

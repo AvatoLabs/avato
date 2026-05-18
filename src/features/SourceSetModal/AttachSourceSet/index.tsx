@@ -38,7 +38,7 @@ export const AttachSourceSetModal = memo<AttachSourceSetModalProps>(
     const { t } = useTranslation('chat');
     const mobile = useServerConfigStore((s) => s.isMobile);
     const subtitle = t(
-      scope === 'conversation' ? 'conversationFiles.picker.scope' : 'sourceSet.picker.scope',
+      scope === 'conversation' ? 'conversationFiles.picker.scope' : 'collection.picker.scope',
     );
 
     return (
@@ -62,7 +62,7 @@ export const AttachSourceSetModal = memo<AttachSourceSetModalProps>(
           width={'100%'}
         >
           <Flexbox className={styles.header}>
-            <Text className={styles.title}>{t('sourceSet.picker.title')}</Text>
+            <Text className={styles.title}>{t('collection.picker.title')}</Text>
             <Text className={styles.subtitle}>{subtitle}</Text>
           </Flexbox>
           <List scope={scope} />

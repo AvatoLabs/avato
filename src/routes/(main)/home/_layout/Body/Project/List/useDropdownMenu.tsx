@@ -69,7 +69,7 @@ export const useProjectItemDropdownMenu = ({
                 await removeSourceSet(id);
               } catch (error) {
                 console.error('Failed to delete project source set:', error);
-                message.error(t('sourceSet.list.removeError', { ns: 'file' }));
+                message.error(t('collection.list.removeError', { ns: 'file' }));
               }
             },
             title: t('project.deleteConfirm'),

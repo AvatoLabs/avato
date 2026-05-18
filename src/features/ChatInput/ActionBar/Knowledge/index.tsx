@@ -33,7 +33,7 @@ const Knowledge = memo(() => {
         disabled
         icon={LibraryBig}
         showTooltip={true}
-        title={t('sourceSet.disabled', { cloud: LOBE_CHAT_CLOUD })}
+        title={t('collection.disabled', { cloud: LOBE_CHAT_CLOUD })}
       />
     );
 
@@ -42,7 +42,7 @@ const Knowledge = memo(() => {
       icon={LibraryBig}
       loading={updating}
       showTooltip={false}
-      title={t('sourceSet.title')}
+      title={t('collection.title')}
       dropdown={{
         maxHeight: 500,
         maxWidth: 480,
@@ -53,12 +53,12 @@ const Knowledge = memo(() => {
   );
 
   return (
-    <Suspense fallback={<Action disabled icon={LibraryBig} title={t('sourceSet.title')} />}>
+    <Suspense fallback={<Action disabled icon={LibraryBig} title={t('collection.title')} />}>
       {showTip ? (
         <TipGuide
           open={showTip}
           placement={'top'}
-          title={t('sourceSet.uploadGuide')}
+          title={t('collection.uploadGuide')}
           onOpenChange={() => {
             updateGuideState({ uploadFileInSourceSet: false });
           }}

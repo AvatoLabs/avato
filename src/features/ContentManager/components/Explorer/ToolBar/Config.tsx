@@ -20,7 +20,7 @@ const Config = memo<ConfigProps>(({ config, onConfigChange }) => {
         onConfigChange({ showFilesInSourceSet: !config.showFilesInSourceSet });
       }}
     >
-      {t('FileManager.config.showFilesInSourceSet')}
+      {t('FileManager.config.showFilesInCollection')}
       <Switch size={'small'} value={config.showFilesInSourceSet} />
     </Flexbox>
   );

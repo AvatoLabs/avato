@@ -83,7 +83,7 @@ const MainMenu = memo(() => {
           value="create new source set"
           onSelect={handleCreateSourceSet}
         >
-          {t('cmdk.newSourceSet')}
+          {t('cmdk.newCollection')}
         </CommandItem>
 
         {menuContext !== 'settings' &&

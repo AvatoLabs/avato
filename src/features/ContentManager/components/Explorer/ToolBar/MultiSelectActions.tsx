@@ -96,17 +96,17 @@ const MultiSelectActions = memo<MultiSelectActionsProps>(
                       },
                       onOk: async () => {
                         await runAction('removeFromSourceSet', {
-                          errorKey: 'FileManager.actions.removeFromSourceSetError',
-                          successKey: 'FileManager.actions.removeFromSourceSetSuccess',
+                          errorKey: 'FileManager.actions.removeFromCollectionError',
+                          successKey: 'FileManager.actions.removeFromCollectionSuccess',
                         });
                       },
-                      title: t('FileManager.actions.confirmRemoveFromSourceSet', {
+                      title: t('FileManager.actions.confirmRemoveFromCollection', {
                         count: selectCount,
                       }),
                     });
                   }}
                 >
-                  {t('FileManager.actions.removeFromSourceSet')}
+                  {t('FileManager.actions.removeFromCollection')}
                 </Button>
                 <Button
                   color={'default'}
@@ -117,7 +117,7 @@ const MultiSelectActions = memo<MultiSelectActionsProps>(
                     onActionClick('moveToSourceSet');
                   }}
                 >
-                  {t('FileManager.actions.moveToOtherSourceSet')}
+                  {t('FileManager.actions.moveToOtherCollection')}
                 </Button>
               </>
             ) : (
@@ -130,7 +130,7 @@ const MultiSelectActions = memo<MultiSelectActionsProps>(
                   onActionClick('addToSourceSet');
                 }}
               >
-                {t('FileManager.actions.addToSourceSet')}
+                {t('FileManager.actions.addToCollection')}
               </Button>
             )}
             <Button

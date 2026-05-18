@@ -55,11 +55,11 @@ export default {
   'clientDB.initing.migrating': 'Performing database migration...',
   'clientDB.initing.ready': 'Database is ready',
   'clientDB.modal.desc':
-    'Enable the next-generation client database. Persist chat data in your browser and unlock advanced features like Files and Reference Sets.',
+    'Enable the next-generation client database. Persist chat data in your browser and unlock advanced features like Files and Collections.',
   'clientDB.modal.enable': 'Enable Now',
-  'clientDB.modal.features.sourceSet.desc':
-    'Build reusable reference sets and let Agents read them with clear scope.',
-  'clientDB.modal.features.sourceSet.title': 'Reference set chat support — your second brain',
+  'clientDB.modal.features.collection.desc':
+    'Build reusable collections and let Agents read them with clear scope.',
+  'clientDB.modal.features.collection.title': 'Collection chat support — your second brain',
   'clientDB.modal.features.localFirst.desc':
     'Chat data is stored entirely in the browser, keeping your data always under your control.',
   'clientDB.modal.features.localFirst.title': 'Local first, privacy first',
@@ -176,7 +176,7 @@ export default {
 
   'cmdk.keywords.referral': 'referral rewards invite bonus',
 
-  'cmdk.keywords.resources': 'files folders source sets drive library',
+  'cmdk.keywords.resources': 'files folders collections drive library',
 
   'cmdk.keywords.settings': 'settings preferences configuration options',
 
@@ -200,7 +200,7 @@ export default {
 
   'cmdk.newAgentTeam': 'Create New Group',
 
-  'cmdk.newSourceSet': 'Create New Reference Set',
+  'cmdk.newCollection': 'Create New Collection',
 
   'cmdk.newPage': 'Create New Doc',
 
@@ -236,9 +236,9 @@ export default {
 
   'cmdk.search.folders': 'Folders',
 
-  'cmdk.search.sourceSet': 'Reference Set',
+  'cmdk.search.collection': 'Collection',
 
-  'cmdk.search.sourceSets': 'Reference Sets',
+  'cmdk.search.collections': 'Collections',
 
   'cmdk.search.loading': 'Searching...',
 
@@ -419,7 +419,7 @@ export default {
   'more': 'More',
   'navPanel.agent': 'Agent',
   'navPanel.displayItems': 'Display Items',
-  'navPanel.sourceSet': 'Reference Sets',
+  'navPanel.collection': 'Collections',
   'navPanel.searchAgent': 'Search Agent...',
   'navPanel.searchResultEmpty': 'No search results found',
   'new': 'New',
@@ -483,7 +483,7 @@ export default {
   'tab.eval': 'Eval Lab',
   'tab.files': 'Files',
   'tab.home': 'Home',
-  'tab.sourceSet': 'Reference Sets',
+  'tab.collection': 'Collections',
   'tab.me': 'Me',
   'tab.memory': 'Memory',
   'tab.pages': 'Documents',

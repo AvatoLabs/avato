@@ -90,7 +90,7 @@ export const useDropdownMenu = (): MenuProps['items'] => {
               })),
               icon: <Icon icon={FolderOpen} />,
               key: 'create-in-source-set',
-              label: t('pageList.createInSourceSet', { ns: 'file' }),
+              label: t('pageList.createInCollection', { ns: 'file' }),
             },
             { type: 'divider' as const },
           ]
@@ -109,7 +109,7 @@ export const useDropdownMenu = (): MenuProps['items'] => {
               })),
               icon: <Icon icon={FolderOpen} />,
               key: 'scope-by-source-set',
-              label: t('pageList.scope.bySourceSet', { ns: 'file' }),
+              label: t('pageList.scope.byCollection', { ns: 'file' }),
             },
           ]
         : []),
@@ -134,8 +134,8 @@ export const useDropdownMenu = (): MenuProps['items'] => {
 
     if (sourceSets.length > 0) {
       const createDefaultLabel = currentSourceSetScopeId
-        ? `${t(pageKind === TABLE_PAGE_KIND ? 'header.newTableButton' : 'header.newPageButton', { ns: 'file' })} · ${currentSourceSetName || t('pageList.sourceSet.assigned', { ns: 'file' })}`
-        : `${t(pageKind === TABLE_PAGE_KIND ? 'header.newTableButton' : 'header.newPageButton', { ns: 'file' })} · ${t('pageList.sourceSet.unassigned', { ns: 'file' })}`;
+        ? `${t(pageKind === TABLE_PAGE_KIND ? 'header.newTableButton' : 'header.newPageButton', { ns: 'file' })} · ${currentSourceSetName || t('pageList.collection.assigned', { ns: 'file' })}`
+        : `${t(pageKind === TABLE_PAGE_KIND ? 'header.newTableButton' : 'header.newPageButton', { ns: 'file' })} · ${t('pageList.collection.unassigned', { ns: 'file' })}`;
 
       items.unshift({
         icon: <Icon icon={pageKind === TABLE_PAGE_KIND ? Table2 : FileText} />,

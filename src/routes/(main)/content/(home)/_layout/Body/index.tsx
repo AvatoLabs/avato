@@ -27,13 +27,13 @@ const SidebarBody = memo<{ itemKey: string }>(({ itemKey }) => {
         <ActionIcon
           icon={RESOURCE_ENTRY_ICONS.plus}
           size={'small'}
-          title={t('sourceSet.new', { defaultValue: 'New Source Set' })}
+          title={t('collection.new', { defaultValue: 'New Source Set' })}
           onClick={handleCreate}
         />
       }
       title={
         <Text ellipsis fontSize={12} type={'secondary'} weight={500}>
-          {t('sourceSet.title', { defaultValue: 'Source Sets' })}
+          {t('collection.title', { defaultValue: 'Source Sets' })}
         </Text>
       }
     >

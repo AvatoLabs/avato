@@ -98,7 +98,7 @@ const Actions = memo<ActionsProps>(({ id, type, enabled, scope, spaceId }) => {
             {
               icon: <Icon icon={InfoIcon} />,
               key: 'detail',
-              label: t('sourceSet.picker.action.detail'),
+              label: t('collection.picker.action.detail'),
               onClick: () => {
                 if (type === AgentSourceKind.SourceSet) {
                   window.open(buildSourceSetPath(targetSpaceId, id));
@@ -116,7 +116,7 @@ const Actions = memo<ActionsProps>(({ id, type, enabled, scope, spaceId }) => {
               danger: true,
               icon: <Icon icon={Trash2} />,
               key: 'remove',
-              label: t('sourceSet.picker.action.remove'),
+              label: t('collection.picker.action.remove'),
               onClick: removeSource,
             },
           ]}
@@ -130,7 +130,7 @@ const Actions = memo<ActionsProps>(({ id, type, enabled, scope, spaceId }) => {
           type={'primary'}
           onClick={assignSource}
         >
-          {t('sourceSet.picker.action.add')}
+          {t('collection.picker.action.add')}
         </Button>
       )}
     </Flexbox>

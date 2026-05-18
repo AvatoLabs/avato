@@ -10,7 +10,7 @@ export default {
   'navigation.groupChat': 'Group Chat',
   'navigation.home': 'Home',
   'navigation.image': 'Artwork',
-  'navigation.sourceSet': 'Reference Sets',
+  'navigation.collection': 'Collections',
   'navigation.avatohub': 'Avato',
   'navigation.memory': 'Memory',
   'navigation.memoryContexts': 'Memory - Contexts',

@@ -41,10 +41,10 @@ export const useDropdownMenu = ({
           await removeSourceSet(id);
         } catch (error) {
           console.error('Failed to delete source set from content list:', error);
-          message.error(t('sourceSet.list.removeError'));
+          message.error(t('collection.list.removeError'));
         }
       },
-      title: t('sourceSet.list.confirmRemoveSourceSet'),
+      title: t('collection.list.confirmRemoveSourceSet'),
     });
   };
 

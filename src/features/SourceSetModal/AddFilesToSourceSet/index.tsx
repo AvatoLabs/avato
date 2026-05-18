@@ -30,7 +30,7 @@ const ModalContent = memo<ModalContentProps>(({ fileIds, onClose, sourceSetId })
     <>
       <Flexbox horizontal gap={8} paddingBlock={16} paddingInline={16} style={{ paddingBottom: 0 }}>
         <Icon icon={BookUp2Icon} />
-        {t('addToSourceSet.title')}
+        {t('addToCollection.title')}
       </Flexbox>
       <Flexbox padding={16} style={{ paddingTop: 0 }}>
         <SelectForm fileIds={fileIds} sourceSetId={sourceSetId} onClose={handleClose} />
@@ -48,8 +48,8 @@ export const useAddFilesToSourceSetModal = () => {
         <Suspense fallback={<div style={{ minHeight: 200 }} />}>
           <ModalContent
             fileIds={params?.fileIds || []}
-            onClose={params?.onClose}
             sourceSetId={params?.sourceSetId}
+            onClose={params?.onClose}
           />
         </Suspense>
       ),

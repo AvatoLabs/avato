@@ -192,7 +192,7 @@ export const useFileItemDropdown = ({
         try {
           await addFilesToSourceSet(sourceSet.id, [id]);
           message.success(
-            t('addToSourceSet.addSuccess', {
+            t('addToCollection.addSuccess', {
               count: 1,
               ns: 'sourceSet',
             }),
@@ -204,9 +204,9 @@ export const useFileItemDropdown = ({
           const isDuplicateError =
             e?.data?.code === 'CONFLICT' || e?.message === 'FILE_ALREADY_IN_KNOWLEDGE_BASE';
           if (isDuplicateError) {
-            message.warning(t('addToSourceSet.alreadyExists', { ns: 'sourceSet' }));
+            message.warning(t('addToCollection.alreadyExists', { ns: 'sourceSet' }));
           } else {
-            message.error(t('addToSourceSet.error', { ns: 'sourceSet' }));
+            message.error(t('addToCollection.error', { ns: 'sourceSet' }));
           }
         }
       },
@@ -226,15 +226,15 @@ export const useFileItemDropdown = ({
           // Folders are source-set scoped, so clear parentId before re-attaching.
           await moveContentItem(id, null);
           await addFilesToSourceSet(sourceSet.id, [id]);
-          message.success(t('moveToSourceSet.success', { ns: 'sourceSet' }));
+          message.success(t('moveToCollection.success', { ns: 'sourceSet' }));
         } catch (e: any) {
           console.error(e);
           const isDuplicateError =
             e?.data?.code === 'CONFLICT' || e?.message === 'FILE_ALREADY_IN_KNOWLEDGE_BASE';
           if (isDuplicateError) {
-            message.warning(t('addToSourceSet.alreadyExists', { ns: 'sourceSet' }));
+            message.warning(t('addToCollection.alreadyExists', { ns: 'sourceSet' }));
           } else {
-            message.error(t('moveToSourceSet.error', { ns: 'sourceSet' }));
+            message.error(t('moveToCollection.error', { ns: 'sourceSet' }));
           }
         }
       },
@@ -247,12 +247,12 @@ export const useFileItemDropdown = ({
               children: moveToSourceSetSubmenu,
               icon: <Icon icon={RESOURCE_ENTRY_ICONS.sourceSetAdd} />,
               key: 'moveToSourceSet',
-              label: t('FileManager.actions.moveToOtherSourceSet'),
+              label: t('FileManager.actions.moveToOtherCollection'),
             },
             {
               icon: <Icon icon={RESOURCE_ENTRY_ICONS.sourceSetRemove} />,
               key: 'removeFromSourceSet',
-              label: t('FileManager.actions.removeFromSourceSet'),
+              label: t('FileManager.actions.removeFromCollection'),
               onClick: async ({ domEvent }) => {
                 domEvent.stopPropagation();
 
@@ -263,13 +263,13 @@ export const useFileItemDropdown = ({
                   onOk: async () => {
                     try {
                       await removeFilesFromSourceSet(sourceSetId, [id]);
-                      message.success(t('FileManager.actions.removeFromSourceSetSuccess'));
+                      message.success(t('FileManager.actions.removeFromCollectionSuccess'));
                     } catch (error) {
                       console.error('Failed to remove item from source set:', error);
-                      message.error(t('FileManager.actions.removeFromSourceSetError'));
+                      message.error(t('FileManager.actions.removeFromCollectionError'));
                     }
                   },
-                  title: t('FileManager.actions.confirmRemoveFromSourceSet', {
+                  title: t('FileManager.actions.confirmRemoveFromCollection', {
                     count: 1,
                   }),
                 });
@@ -281,7 +281,7 @@ export const useFileItemDropdown = ({
               children: addToSourceSetSubmenu,
               icon: <Icon icon={RESOURCE_ENTRY_ICONS.sourceSetAdd} />,
               key: 'addToSourceSet',
-              label: t('FileManager.actions.addToSourceSet'),
+              label: t('FileManager.actions.addToCollection'),
             },
           ]
     ) as ItemType[];

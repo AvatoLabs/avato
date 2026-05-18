@@ -10,11 +10,12 @@ import { useTranslation } from 'react-i18next';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import { revealChatContextPanel } from '@/features/ChatInput/utils/revealChatContextPanel';
+import { useResourceShareModal } from '@/features/ResourceSharing';
 import { resolveSpaceMemorySurfaceState } from '@/features/ResourceSpaces/spaceMemoryCapabilities';
 import { useOpenCreateSpaceMemoryCandidateModal } from '@/features/ResourceSpaces/useOpenCreateSpaceMemoryCandidateModal';
 import { useSpaceItem } from '@/features/ResourceSpaces/useSpaceItem';
-import { useResourceShareModal } from '@/features/ResourceSharing';
 import { lambdaClient } from '@/libs/trpc/client';
+import { documentService } from '@/services/document';
 import { pageSelectors, usePageStore } from '@/store/docs';
 import { revalidatePageDocuments } from '@/store/docs/slices/list/action';
 import { useDocumentStore } from '@/store/document';
@@ -30,7 +31,6 @@ import {
   normalizeExportFileName,
   XLSX_MIME_TYPE,
 } from '@/utils/documentExport';
-import { documentService } from '@/services/document';
 
 import { usePageEditorStore, useStoreApi } from '../store';
 
@@ -105,7 +105,9 @@ export const useMenu = (): { menuItems: any[] } => {
     try {
       const state = storeApi.getState();
       const title = state.title || pageDocument?.title || t('pageList.untitled', { ns: 'file' });
-      const liveMarkdown = ((state.editor?.getDocument('markdown') as unknown as string) || '').trim();
+      const liveMarkdown = (
+        (state.editor?.getDocument('markdown') as unknown as string) || ''
+      ).trim();
       const persistedMarkdown = liveMarkdown
         ? ''
         : ((await documentService.getDocumentById(documentId))?.content || '').trim();
@@ -160,16 +162,16 @@ export const useMenu = (): { menuItems: any[] } => {
       try {
         await addFilesToSourceSet(targetSourceSetId, [documentId]);
         await syncSourceAssignments(targetSourceSetId);
-        message.success(t('addToSourceSet.addSuccess', { count: 1, ns: 'sourceSet' }));
+        message.success(t('addToCollection.addSuccess', { count: 1, ns: 'sourceSet' }));
       } catch (error: any) {
         console.error(error);
         const isDuplicateError =
           error?.data?.code === 'CONFLICT' || error?.message === 'FILE_ALREADY_IN_KNOWLEDGE_BASE';
 
         if (isDuplicateError) {
-          message.warning(t('addToSourceSet.alreadyExists', { ns: 'sourceSet' }));
+          message.warning(t('addToCollection.alreadyExists', { ns: 'sourceSet' }));
         } else {
-          message.error(t('addToSourceSet.error', { ns: 'sourceSet' }));
+          message.error(t('addToCollection.error', { ns: 'sourceSet' }));
         }
       }
     },
@@ -185,16 +187,16 @@ export const useMenu = (): { menuItems: any[] } => {
         await moveContentItem(documentId, null);
         await addFilesToSourceSet(targetSourceSetId, [documentId]);
         await syncSourceAssignments(targetSourceSetId);
-        message.success(t('moveToSourceSet.success', { ns: 'sourceSet' }));
+        message.success(t('moveToCollection.success', { ns: 'sourceSet' }));
       } catch (error: any) {
         console.error(error);
         const isDuplicateError =
           error?.data?.code === 'CONFLICT' || error?.message === 'FILE_ALREADY_IN_KNOWLEDGE_BASE';
 
         if (isDuplicateError) {
-          message.warning(t('addToSourceSet.alreadyExists', { ns: 'sourceSet' }));
+          message.warning(t('addToCollection.alreadyExists', { ns: 'sourceSet' }));
         } else {
-          message.error(t('moveToSourceSet.error', { ns: 'sourceSet' }));
+          message.error(t('moveToCollection.error', { ns: 'sourceSet' }));
         }
       }
     },
@@ -220,14 +222,14 @@ export const useMenu = (): { menuItems: any[] } => {
           await removeFilesFromSourceSet(sourceSetId, [documentId]);
           await syncSourceAssignments(undefined);
           message.success(
-            t('FileManager.actions.removeFromSourceSetSuccess', { ns: 'components' }),
+            t('FileManager.actions.removeFromCollectionSuccess', { ns: 'components' }),
           );
         } catch (error) {
           console.error('Failed to remove page from source set:', error);
-          message.error(t('FileManager.actions.removeFromSourceSetError', { ns: 'components' }));
+          message.error(t('FileManager.actions.removeFromCollectionError', { ns: 'components' }));
         }
       },
-      title: t('FileManager.actions.confirmRemoveFromSourceSet', { count: 1, ns: 'components' }),
+      title: t('FileManager.actions.confirmRemoveFromCollection', { count: 1, ns: 'components' }),
     });
   }, [documentId, message, modal, removeFilesFromSourceSet, sourceSetId, syncSourceAssignments, t]);
 
@@ -421,7 +423,7 @@ export const useMenu = (): { menuItems: any[] } => {
                           })),
                           icon: <Icon icon={RESOURCE_ENTRY_ICONS.sourceSetAdd} />,
                           key: 'move-to-source-set',
-                          label: t('FileManager.actions.moveToOtherSourceSet', {
+                          label: t('FileManager.actions.moveToOtherCollection', {
                             ns: 'components',
                           }),
                         },
@@ -430,7 +432,7 @@ export const useMenu = (): { menuItems: any[] } => {
                   {
                     icon: <Icon icon={RESOURCE_ENTRY_ICONS.sourceSetRemove} />,
                     key: 'remove-from-source-set',
-                    label: t('FileManager.actions.removeFromSourceSet', { ns: 'components' }),
+                    label: t('FileManager.actions.removeFromCollection', { ns: 'components' }),
                     onClick: handleRemoveFromSourceSet,
                   },
                 ]
@@ -443,7 +445,7 @@ export const useMenu = (): { menuItems: any[] } => {
                     })),
                     icon: <Icon icon={RESOURCE_ENTRY_ICONS.sourceSetAdd} />,
                     key: 'add-to-source-set',
-                    label: t('FileManager.actions.addToSourceSet', { ns: 'components' }),
+                    label: t('FileManager.actions.addToCollection', { ns: 'components' }),
                   },
                 ]),
           ]

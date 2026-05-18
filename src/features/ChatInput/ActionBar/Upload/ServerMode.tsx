@@ -262,7 +262,7 @@ const FileUpload = memo(() => {
         <TipGuide
           open={showTip}
           placement={'top'}
-          title={t('sourceSet.uploadGuide')}
+          title={t('collection.uploadGuide')}
           onOpenChange={() => {
             updateGuideState({ uploadFileInSourceSet: false });
           }}

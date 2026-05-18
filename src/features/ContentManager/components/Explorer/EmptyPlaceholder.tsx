@@ -564,7 +564,7 @@ const EmptyPlaceholder = memo(() => {
                 >
                   <Flexbox className={styles.cardContent}>
                     <span className={styles.actionTitle}>
-                      {t('FileManager.emptyStatus.actions.sourceSet')}
+                      {t('FileManager.emptyStatus.actions.collection')}
                     </span>
                     <div className={styles.glow} style={{ background: accentColors[0] }} />
                     <div className={styles.iconSlot}>

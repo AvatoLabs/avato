@@ -97,16 +97,16 @@ export const useDropdownMenu = ({
       try {
         await addFilesToSourceSet(targetSourceSetId, [pageId]);
         syncSourceAssignments(targetSourceSetId);
-        message.success(t('addToSourceSet.addSuccess', { count: 1, ns: 'sourceSet' }));
+        message.success(t('addToCollection.addSuccess', { count: 1, ns: 'sourceSet' }));
       } catch (error: any) {
         console.error(error);
         const isDuplicateError =
           error?.data?.code === 'CONFLICT' || error?.message === 'FILE_ALREADY_IN_KNOWLEDGE_BASE';
 
         if (isDuplicateError) {
-          message.warning(t('addToSourceSet.alreadyExists', { ns: 'sourceSet' }));
+          message.warning(t('addToCollection.alreadyExists', { ns: 'sourceSet' }));
         } else {
-          message.error(t('addToSourceSet.error', { ns: 'sourceSet' }));
+          message.error(t('addToCollection.error', { ns: 'sourceSet' }));
         }
       }
     },
@@ -122,16 +122,16 @@ export const useDropdownMenu = ({
         await moveContentItem(pageId, null);
         await addFilesToSourceSet(targetSourceSetId, [pageId]);
         syncSourceAssignments(targetSourceSetId);
-        message.success(t('moveToSourceSet.success', { ns: 'sourceSet' }));
+        message.success(t('moveToCollection.success', { ns: 'sourceSet' }));
       } catch (error: any) {
         console.error(error);
         const isDuplicateError =
           error?.data?.code === 'CONFLICT' || error?.message === 'FILE_ALREADY_IN_KNOWLEDGE_BASE';
 
         if (isDuplicateError) {
-          message.warning(t('addToSourceSet.alreadyExists', { ns: 'sourceSet' }));
+          message.warning(t('addToCollection.alreadyExists', { ns: 'sourceSet' }));
         } else {
-          message.error(t('moveToSourceSet.error', { ns: 'sourceSet' }));
+          message.error(t('moveToCollection.error', { ns: 'sourceSet' }));
         }
       }
     },
@@ -156,13 +156,15 @@ export const useDropdownMenu = ({
         try {
           await removeFilesFromSourceSet(sourceSetId, [pageId]);
           syncSourceAssignments(undefined);
-          message.success(t('FileManager.actions.removeFromSourceSetSuccess', { ns: 'components' }));
+          message.success(
+            t('FileManager.actions.removeFromCollectionSuccess', { ns: 'components' }),
+          );
         } catch (error) {
           console.error('Failed to remove page from source set:', error);
-          message.error(t('FileManager.actions.removeFromSourceSetError', { ns: 'components' }));
+          message.error(t('FileManager.actions.removeFromCollectionError', { ns: 'components' }));
         }
       },
-      title: t('FileManager.actions.confirmRemoveFromSourceSet', { count: 1, ns: 'components' }),
+      title: t('FileManager.actions.confirmRemoveFromCollection', { count: 1, ns: 'components' }),
     });
   }, [message, modal, pageId, removeFilesFromSourceSet, sourceSetId, syncSourceAssignments, t]);
 
@@ -182,7 +184,7 @@ export const useDropdownMenu = ({
                           })),
                           icon: <Icon icon={RESOURCE_ENTRY_ICONS.sourceSetAdd} />,
                           key: 'move-to-source-set',
-                          label: t('FileManager.actions.moveToOtherSourceSet', {
+                          label: t('FileManager.actions.moveToOtherCollection', {
                             ns: 'components',
                           }),
                         },
@@ -191,7 +193,7 @@ export const useDropdownMenu = ({
                   {
                     icon: <Icon icon={RESOURCE_ENTRY_ICONS.sourceSetRemove} />,
                     key: 'remove-from-source-set',
-                    label: t('FileManager.actions.removeFromSourceSet', { ns: 'components' }),
+                    label: t('FileManager.actions.removeFromCollection', { ns: 'components' }),
                     onClick: handleRemoveFromSourceSet,
                   },
                 ]
@@ -204,7 +206,7 @@ export const useDropdownMenu = ({
                     })),
                     icon: <Icon icon={RESOURCE_ENTRY_ICONS.sourceSetAdd} />,
                     key: 'add-to-source-set',
-                    label: t('FileManager.actions.addToSourceSet', { ns: 'components' }),
+                    label: t('FileManager.actions.addToCollection', { ns: 'components' }),
                   },
                 ]),
             { type: 'divider' as const },

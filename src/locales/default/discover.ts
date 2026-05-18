@@ -125,8 +125,8 @@ export default {
   'assistants.description': 'About this Agent',
   'assistants.detail': 'Details',
   'assistants.details.capabilities.knowledge.desc':
-    'This Agent includes the following reference sets to help answer more questions.',
-  'assistants.details.capabilities.knowledge.title': 'Reference Sets',
+    'This Agent includes the following collections to help answer more questions.',
+  'assistants.details.capabilities.knowledge.title': 'Collections',
   'assistants.details.capabilities.plugin.desc':
     'This Agent includes the following Skills to help you complete more tasks.',
   'assistants.details.capabilities.plugin.title': 'Built-in Skills',
@@ -186,7 +186,7 @@ export default {
   'assistants.systemRole': 'Agent Profile',
   'assistants.tokenUsage': 'Agent Prompt Token Usage',
   'assistants.try': 'Try',
-  'assistants.withSourceSet': 'This Agent includes Reference Sets',
+  'assistants.withCollection': 'This Agent includes Collections',
   'assistants.withPlugin': 'This Agent includes Skills',
   'back': 'Back to Discovery',
   'category.assistant.academic': 'Academic',
@@ -237,7 +237,7 @@ export default {
   'filterBy.other.functionCall': 'Supports Function Calls',
   'filterBy.other.title': 'Other',
   'filterBy.other.vision': 'Supports Visual Recognition',
-  'filterBy.other.withSourceSet': 'Includes Reference Sets',
+  'filterBy.other.withCollection': 'Includes Collections',
   'filterBy.other.withTool': 'Includes Skills',
   'filterBy.pricing': 'Model Pricing',
   'filterBy.timePeriod.all': 'All Time',

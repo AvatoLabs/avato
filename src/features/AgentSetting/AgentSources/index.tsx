@@ -121,7 +121,7 @@ const SourceItemRow = memo<SourceItemRowProps>(
     const secondary =
       item.description ||
       (item.type === AgentSourceKind.SourceSet
-        ? t('settingSources.item.sourceSetDesc')
+        ? t('settingSources.item.collectionDesc')
         : item.fileType || t('settingSources.item.fileDesc'));
 
     return (
@@ -141,7 +141,7 @@ const SourceItemRow = memo<SourceItemRowProps>(
               <Tag bordered={false}>
                 {t(
                   item.type === AgentSourceKind.SourceSet
-                    ? 'settingSources.badge.sourceSet'
+                    ? 'settingSources.badge.collection'
                     : 'settingSources.badge.file',
                 )}
               </Tag>
@@ -361,7 +361,7 @@ const AgentSources = memo(() => {
           </Empty>
         ) : (
           <Flexbox gap={16}>
-            {renderSection(t('settingSources.section.sourceSets'), sourceSetItems)}
+            {renderSection(t('settingSources.section.collections'), sourceSetItems)}
             {renderSection(t('settingSources.section.files'), fileItems)}
           </Flexbox>
         )}

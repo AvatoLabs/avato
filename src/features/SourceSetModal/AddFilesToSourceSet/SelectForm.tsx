@@ -36,7 +36,7 @@ const SelectForm = memo<CreateFormProps>(({ onClose, sourceSetId, fileIds }) => 
       message.success({
         content: (
           <Trans
-            i18nKey={'addToSourceSet.addSuccess'}
+            i18nKey={'addToCollection.addSuccess'}
             ns={'sourceSet'}
             components={[
               <span key="0" />,
@@ -60,7 +60,7 @@ const SelectForm = memo<CreateFormProps>(({ onClose, sourceSetId, fileIds }) => 
       layout={'vertical'}
       footer={
         <Button block htmlType={'submit'} loading={loading} type={'primary'}>
-          {t('addToSourceSet.confirm')}
+          {t('addToCollection.confirm')}
         </Button>
       }
       items={[
@@ -68,7 +68,7 @@ const SelectForm = memo<CreateFormProps>(({ onClose, sourceSetId, fileIds }) => 
           children: (
             <Block horizontal align={'center'} gap={8} padding={16} variant={'filled'}>
               <MaterialFileTypeIcon filename={''} size={32} />
-              {t('addToSourceSet.totalFiles', { count: fileIds.length })}
+              {t('addToCollection.totalFiles', { count: fileIds.length })}
             </Block>
           ),
           noStyle: true,
@@ -78,9 +78,9 @@ const SelectForm = memo<CreateFormProps>(({ onClose, sourceSetId, fileIds }) => 
               {
                 children: (
                   <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
-                    <Tag bordered={false}>{t('addToSourceSet.workspace')}</Tag>
+                    <Tag bordered={false}>{t('addToCollection.workspace')}</Tag>
                     <Text type={'secondary'}>
-                      {t('addToSourceSet.workspaceHint', { name: activeWorkspaceName })}
+                      {t('addToCollection.workspaceHint', { name: activeWorkspaceName })}
                     </Text>
                   </Flexbox>
                 ),
@@ -93,7 +93,7 @@ const SelectForm = memo<CreateFormProps>(({ onClose, sourceSetId, fileIds }) => 
             <Select
               autoFocus
               loading={isLoading}
-              placeholder={t('addToSourceSet.id.placeholder')}
+              placeholder={t('addToCollection.id.placeholder')}
               options={(data || [])
                 .filter((item) => item.id !== sourceSetId)
                 .map((item) => ({
@@ -107,9 +107,9 @@ const SelectForm = memo<CreateFormProps>(({ onClose, sourceSetId, fileIds }) => 
                 }))}
             />
           ),
-          label: t('addToSourceSet.id.title'),
+          label: t('addToCollection.id.title'),
           name: 'id',
-          rules: [{ message: t('addToSourceSet.id.required'), required: true }],
+          rules: [{ message: t('addToCollection.id.required'), required: true }],
         },
       ]}
       onFinish={onFinish}

@@ -217,7 +217,7 @@ const SearchResults = memo<SearchResultsProps>(
           return t('cmdk.search.memory');
         }
         case 'sourceSet': {
-          return t('cmdk.search.sourceSet');
+          return t('cmdk.search.collection');
         }
       }
     };

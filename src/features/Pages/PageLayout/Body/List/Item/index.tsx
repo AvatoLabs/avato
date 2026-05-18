@@ -120,8 +120,8 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
     if (currentSourceSetScopeId || showOnlyPagesWithoutSourceSet) return undefined;
 
     const ownershipLabel = document?.sourceSetId
-      ? sourceSetName || t('pageList.sourceSet.assigned')
-      : t('pageList.sourceSet.unassigned');
+      ? sourceSetName || t('pageList.collection.assigned')
+      : t('pageList.collection.unassigned');
 
     return (
       <Tag

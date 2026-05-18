@@ -9,14 +9,14 @@ import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
-import { SPACE_LIST_KEY } from '@/features/ResourceSpaces/SpaceList';
+import { buildSourceSetFileScope, useFileScope } from '@/features/ContentManager/useFileScope';
 import { buildSpaceMemoryPath } from '@/features/ResourceSpaces/paths';
+import { SPACE_LIST_KEY } from '@/features/ResourceSpaces/SpaceList';
 import {
   buildPendingGovernancePath,
   canReviewSpaceMemorySummary,
   useTeamSpaceMemoryScopeSummaries,
 } from '@/features/ResourceSpaces/useTeamSpaceMemoryScopeSummaries';
-import { buildSourceSetFileScope, useFileScope } from '@/features/ContentManager/useFileScope';
 import { useCreateSourceSetModal } from '@/features/SourceSetModal';
 import { lambdaClient } from '@/libs/trpc/client';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
@@ -116,7 +116,7 @@ const SourceSetListSection = memo(() => {
     return (
       <Flexbox gap={8} paddingBlock={12} style={{ flexShrink: 0 }}>
         <Text className={styles.sectionTitle} fontSize={14} type="secondary" weight={500}>
-          {t('sourceSet.title', { defaultValue: 'Source Sets' })}
+          {t('collection.title', { defaultValue: 'Source Sets' })}
         </Text>
         <Flexbox horizontal className={styles.list} gap={12}>
           {currentSpace?.kind === 'team' && pendingCount > 0 && pendingTarget && (
@@ -147,7 +147,7 @@ const SourceSetListSection = memo(() => {
             onClick={handleCreate}
           >
             <Icon aria-hidden icon={PlusIcon} size={20} />
-            <Text fontSize={14}>{t('sourceSet.new', { defaultValue: 'New Source Set' })}</Text>
+            <Text fontSize={14}>{t('collection.new', { defaultValue: 'New Source Set' })}</Text>
           </button>
         </Flexbox>
       </Flexbox>
@@ -157,7 +157,7 @@ const SourceSetListSection = memo(() => {
   return (
     <Flexbox gap={8} paddingBlock={12} style={{ flexShrink: 0 }}>
       <Text className={styles.sectionTitle} fontSize={14} type="secondary" weight={500}>
-        {t('sourceSet.title', { defaultValue: 'Source Sets' })}
+        {t('collection.title', { defaultValue: 'Source Sets' })}
       </Text>
       <Flexbox horizontal className={styles.list} gap={12}>
         {currentSpace?.kind === 'team' && pendingCount > 0 && pendingTarget && (
@@ -200,7 +200,7 @@ const SourceSetListSection = memo(() => {
         ))}
         <button className={cx(styles.card, styles.createCard)} type="button" onClick={handleCreate}>
           <Icon aria-hidden icon={PlusIcon} size={20} />
-          <Text fontSize={14}>{t('sourceSet.new', { defaultValue: 'New Source Set' })}</Text>
+          <Text fontSize={14}>{t('collection.new', { defaultValue: 'New Source Set' })}</Text>
         </button>
       </Flexbox>
     </Flexbox>

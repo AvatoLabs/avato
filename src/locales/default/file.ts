@@ -12,7 +12,7 @@ export default {
   'actions.rename.placeholder': 'Enter new name',
   'actions.rename.success': 'Renamed successfully',
   'addFolder': 'Create Folder',
-  'addSourceSet': 'Add',
+  'addCollection': 'Add',
   'addPage': 'Create Doc',
   'detail.basic.createdAt': 'Creation Time',
   'detail.basic.filename': 'File Name',
@@ -110,7 +110,7 @@ export default {
   'header.actions.connect': 'Connect...',
   'header.actions.createFolderError': 'Failed to create folder',
   'header.actions.creatingFolder': 'Creating folder...',
-  'header.actions.deleteSourceSet': 'Delete Reference Set',
+  'header.actions.deleteCollection': 'Delete Collection',
   'header.actions.gitignore.apply': 'Apply Rules',
   'header.actions.gitignore.cancel': 'Ignore Rules',
   'header.actions.gitignore.content':
@@ -147,17 +147,17 @@ export default {
   'home.recentPages': 'Recent Docs',
   'home.uploadEntries.files.title': 'Upload Files',
   'home.uploadEntries.folder.title': 'Upload Folder',
-  'home.uploadEntries.sourceSet.title': 'Create New Reference Set',
+  'home.uploadEntries.collection.title': 'Create New Collection',
   'home.uploadEntries.newPage.title': 'New Doc',
-  'sourceSet.list.confirmRemoveSourceSet':
-    'You are about to delete this reference set. Its files will stay in Content and be removed from this reference set. This action cannot be undone.',
-  'sourceSet.list.empty': 'Click <1>+</1> to create your first reference set',
-  'sourceSet.list.removeError': 'Failed to delete Reference Set',
-  'sourceSet.new': 'New Reference Set',
-  'sourceSet.renameFolderEmpty': 'Folder name cannot be empty',
-  'sourceSet.renameFolderFailed': 'Failed to rename folder',
-  'sourceSet.renameFolderSuccess': 'Folder renamed',
-  'sourceSet.title': 'Reference Sets',
+  'collection.list.confirmRemoveCollection':
+    'You are about to delete this collection. Its files will stay in Content and be removed from this collection. This action cannot be undone.',
+  'collection.list.empty': 'Click <1>+</1> to create your first collection',
+  'collection.list.removeError': 'Failed to delete Collection',
+  'collection.new': 'New Collection',
+  'collection.renameFolderEmpty': 'Folder name cannot be empty',
+  'collection.renameFolderFailed': 'Failed to rename folder',
+  'collection.renameFolderSuccess': 'Folder renamed',
+  'collection.title': 'Collections',
   'loadMore': 'Load More',
   'menu.allFiles': 'All Files',
   'menu.allPages': 'All Docs',
@@ -166,7 +166,7 @@ export default {
   'menu.openHome': 'Open Home',
   'menu.openHomeInWorkspace': 'Open Files in {{name}}',
   'networkError':
-    'Failed to retrieve reference sets. Please check your network connection and try again.',
+    'Failed to retrieve collections. Please check your network connection and try again.',
   'notSupportGuide.desc':
     'The current deployment mode does not support file management. Switch to <1>server database deployment mode</1>, or use <3>Avatoloud</3>.',
   'notSupportGuide.features.allKind.desc':
@@ -176,8 +176,8 @@ export default {
     'Utilizes high-performance vector models to vectorize text chunks, enabling semantic search of file content.',
   'notSupportGuide.features.embeddings.title': 'Vector Semantics',
   'notSupportGuide.features.libraries.desc':
-    'Create reference sets and add files to build reusable AI sources.',
-  'notSupportGuide.features.libraries.title': 'Reference Sets',
+    'Create collections and add files to build reusable AI sources.',
+  'notSupportGuide.features.libraries.title': 'Collections',
   'notSupportGuide.title': 'The current deployment mode does not support file management',
   'docEditor.addIcon': 'Add Icon',
   'docEditor.autoSaveMessage': 'Your doc is saved automatically. No need to save manually.',
@@ -292,15 +292,15 @@ export default {
   'pageList.noResults': 'No matching docs found',
   'pageList.pageCount': '{{count}} docs in total',
   'pageList.pageSizeItem': '{{count}} items',
-  'pageList.createInSourceSet': 'Create in Source Set',
+  'pageList.createInCollection': 'Create in Collection',
   'pageList.scope.allDocs': 'All Docs',
   'pageList.scope.allTables': 'All Tables',
-  'pageList.scope.bySourceSet': 'Browse by Source Set',
+  'pageList.scope.byCollection': 'Browse by Collection',
   'pageList.scope.unassigned': 'Unassigned',
   'pageList.scope.unassignedHint':
-    'These docs are not in any source set yet. Source sets are optional, so you can group them only when it helps.',
-  'pageList.sourceSet.assigned': 'Source Set',
-  'pageList.sourceSet.unassigned': 'Unassigned',
+    'These docs are not in any collection yet. Collections are optional, so you can group them only when it helps.',
+  'pageList.collection.assigned': 'Collection',
+  'pageList.collection.unassigned': 'Unassigned',
   'pageList.tableCount': '{{count}} tables in total',
   'pageList.tableEmpty': 'No tables yet. Click the button above to create your first one.',
   'pageList.tableNoResults': 'No matching tables found',
@@ -411,7 +411,7 @@ export default {
   'shared.empty': 'No items have been shared with you yet.',
   'shared.kind.document': 'Document',
   'shared.kind.file': 'File',
-  'shared.kind.source_set': 'Reference Set',
+  'shared.kind.collection': 'Collection',
   'shared.subtitle': 'Items you can access through direct sharing.',
   'shared.title': 'Shared with Me',
   'space.create.confirm': 'Create Team Space',
@@ -431,12 +431,12 @@ export default {
     'Manage who can access and collaborate in this workspace.',
   'space.home.cards.settings.description':
     'Rename the workspace and adjust collaboration settings.',
-  'space.home.cards.sourceSets.description':
-    'Browse and manage source sets from the files and docs surfaces.',
+  'space.home.cards.collections.description':
+    'Browse and manage collections from the files and docs surfaces.',
   'space.home.description.personalFallback':
-    'Use this personal workspace to keep documents, files, and source sets organized.',
+    'Use this personal workspace to keep documents, files, and collections organized.',
   'space.home.description.teamFallback':
-    'Use this team workspace to organize shared documents, files, source sets, and collaborators.',
+    'Use this team workspace to organize shared documents, files, collections, and collaborators.',
   'space.home.recall.actions.open': 'Open Space Memory',
   'space.home.recall.actions.review': 'Review {{count}} Pending',
   'space.home.recall.description.clear':
@@ -695,7 +695,7 @@ export default {
   'space.memory.sources.document': 'Document',
   'space.memory.sources.file': 'File',
   'space.memory.sources.message': 'Message',
-  'space.memory.sources.source_set': 'Source Set',
+  'space.memory.sources.collection': 'Collection',
   'space.memory.sources.topic': 'Topic',
   'space.memory.subtitle.personal':
     'Keep durable personal memory separate from shared workspace memory, and promote only what should persist here.',
@@ -785,7 +785,7 @@ export default {
   'trash.emptyError': 'Failed to empty recycle bin',
   'trash.emptyState': 'No deleted files, docs, or folders.',
   'trash.hint':
-    'Soft-deleted files, docs, and folders in this reference set. Restored items reappear in the content tree.',
+    'Soft-deleted files, docs, and folders in this collection. Restored items reappear in the content tree.',
   'trash.hintAll':
     'Soft-deleted files, docs, and folders you own. Restored items reappear in the content tree.',
   'trash.kind.file': 'File',

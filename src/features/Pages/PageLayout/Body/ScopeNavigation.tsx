@@ -25,6 +25,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   sectionTitle: css`
     margin-block: 8px 4px;
     padding-inline: 12px;
+
     font-size: 12px;
     font-weight: 500;
     color: ${cssVar.colorTextDescription};
@@ -70,10 +71,10 @@ const SourceSetScopeItem = memo<SourceSetScopeItemProps>(
             await removeSourceSet(sourceSet.id);
           } catch (error) {
             console.error('Failed to remove source set:', error);
-            message.error(t('sourceSet.list.removeError', { ns: 'file' }));
+            message.error(t('collection.list.removeError', { ns: 'file' }));
           }
         },
-        title: t('sourceSet.list.confirmRemoveSourceSet', { ns: 'file' }),
+        title: t('collection.list.confirmRemoveSourceSet', { ns: 'file' }),
       });
     }, [message, modal, removeSourceSet, sourceSet.id, t]);
 
@@ -167,7 +168,7 @@ const ScopeNavigation = memo(() => {
       />
 
       {pageSpaceId && (
-        <Text className={styles.sectionTitle}>{t('sourceSet.title', { ns: 'file' })}</Text>
+        <Text className={styles.sectionTitle}>{t('collection.title', { ns: 'file' })}</Text>
       )}
 
       {isLoading ? (
@@ -175,7 +176,7 @@ const ScopeNavigation = memo(() => {
       ) : sortedSourceSets.length === 0 ? (
         pageSpaceId ? (
           <EmptyNavItem
-            title={t('sourceSet.new', { ns: 'file' })}
+            title={t('collection.new', { ns: 'file' })}
             onClick={() => openCreateSourceSetModal({ spaceId: pageSpaceId })}
           />
         ) : null
