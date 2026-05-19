@@ -1,11 +1,13 @@
 import {
   ArrowLeft,
   Bot,
+  CalendarClock,
   ChevronDown,
   ChevronRight,
   Cpu,
   MessageSquare,
   Puzzle,
+  RadioTower,
   Save,
   Settings2,
 } from 'lucide-react-native';
@@ -14,6 +16,7 @@ import {
   ActivityIndicator,
   Image as RNImage,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   Switch,
@@ -34,7 +37,8 @@ import { getProviderIconUrl } from '../constants/cdn';
 import type { MobileRecommendedBuiltinIcon } from '../constants/recommendedBuiltins';
 import { MOBILE_RECOMMENDED_BUILTIN_SKILLS } from '../constants/recommendedBuiltins';
 import { useAgentConfig, useAgentConfigByAgentId } from '../hooks/useAgentConfig';
-import { agentApi, agentSkillApi, pluginApi, userApi } from '../lib/api';
+import { agentApi, agentSkillApi, getApiUrl, pluginApi, userApi } from '../lib/api';
+import { joinWebPath } from '../lib/communityLinks';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
@@ -105,6 +109,16 @@ const getConfigContentWidth = (screenWidth: number, screenHeight: number) =>
     Math.max(screenWidth - 40, 0),
     getResponsiveLayoutMetrics(screenWidth, screenHeight).settingsMaxWidth,
   );
+
+type AgentWebManagementPath = 'channel' | 'cron/new';
+
+const buildAgentWebManagementPath = (agentId: string, path: AgentWebManagementPath): `/${string}` =>
+  `/agent/${encodeURIComponent(agentId)}/${path}`;
+
+const openWebPath = async (path: `/${string}`) => {
+  const baseUrl = await getApiUrl();
+  await Linking.openURL(joinWebPath(baseUrl, path));
+};
 
 const buildDraft = (config: any): AgentDraft => ({
   agentId: config?.id || '',
@@ -262,6 +276,79 @@ function ToggleRow({
         onValueChange={onValueChange}
       />
     </View>
+  );
+}
+
+function ExternalManagementRow({
+  description,
+  icon: Icon,
+  label,
+  onPress,
+}: {
+  description: string;
+  icon: React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
+  label: string;
+  onPress: () => void;
+}) {
+  const colors = useThemeColors();
+  return (
+    <TouchableOpacity activeOpacity={0.85} className="flex-row items-center py-2" onPress={onPress}>
+      <View
+        className="h-11 w-11 items-center justify-center rounded-2xl"
+        style={{ backgroundColor: colors.primarySubtle }}
+      >
+        <Icon color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+      </View>
+      <View className="ml-3 flex-1">
+        <Text className="text-[15px] font-semibold tracking-tight text-foreground">{label}</Text>
+        <Text className="mt-0.5 text-[12px] leading-5 text-secondary/60">{description}</Text>
+      </View>
+      <ChevronRight color={colors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
+    </TouchableOpacity>
+  );
+}
+
+function AgentWebManagementSection({
+  agentId,
+  contentWidth,
+}: {
+  agentId: string;
+  contentWidth: number;
+}) {
+  const { t } = useI18n();
+  const toast = useToast();
+
+  const handleOpen = useCallback(
+    async (path: AgentWebManagementPath) => {
+      if (!agentId) return;
+
+      try {
+        await openWebPath(buildAgentWebManagementPath(agentId, path));
+      } catch {
+        toast.show('error', t.agentConfigOpenWebFailed);
+      }
+    },
+    [agentId, t.agentConfigOpenWebFailed, toast],
+  );
+
+  if (!agentId) return null;
+
+  return (
+    <SectionCard contentWidth={contentWidth} title={t.agentConfigWebManagement}>
+      <ExternalManagementRow
+        description={t.agentConfigCronJobsDesc}
+        icon={CalendarClock}
+        label={t.agentConfigCronJobs}
+        onPress={() => void handleOpen('cron/new')}
+      />
+      <View className="my-2 h-px bg-foreground/[0.04]" />
+      <ExternalManagementRow
+        description={t.agentConfigChannelsDesc}
+        icon={RadioTower}
+        label={t.agentConfigChannels}
+        onPress={() => void handleOpen('channel')}
+      />
+    </SectionCard>
   );
 }
 
@@ -897,6 +984,8 @@ function SessionAgentConfigScreen({
           </TouchableOpacity>
         </SectionCard>
 
+        <AgentWebManagementSection agentId={draft.agentId} contentWidth={contentWidth} />
+
         <CollapsibleSection
           contentWidth={contentWidth}
           expanded={assistantExpanded}
@@ -1469,6 +1558,8 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
             />
           </TouchableOpacity>
         </SectionCard>
+
+        <AgentWebManagementSection agentId={draft.agentId} contentWidth={contentWidth} />
 
         <CollapsibleSection
           contentWidth={contentWidth}

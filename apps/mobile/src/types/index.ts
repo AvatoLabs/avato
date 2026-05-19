@@ -259,6 +259,38 @@ export interface MobileThreadItem {
   updatedAt?: string;
 }
 
+export interface SharedTopicGroupMember {
+  avatar: string | null;
+  backgroundColor: string | null;
+  id: string;
+  title: string | null;
+}
+
+export interface SharedTopicData {
+  agentId: string | null;
+  agentMeta?: {
+    avatar?: string | null;
+    backgroundColor?: string | null;
+    marketIdentifier?: string | null;
+    slug?: string | null;
+    title?: string | null;
+  };
+  groupId: string | null;
+  groupMeta?: {
+    avatar?: string | null;
+    backgroundColor?: string | null;
+    createdAt?: string | Date | null;
+    members?: SharedTopicGroupMember[];
+    title?: string | null;
+    updatedAt?: string | Date | null;
+    userId?: string | null;
+  };
+  shareId: string;
+  title: string | null;
+  topicId: string;
+  visibility: 'link' | 'private';
+}
+
 // ---- Agent ----
 
 export interface Agent {
@@ -710,6 +742,29 @@ export interface HeatmapDay {
   level: number;
 }
 
+export interface UsageRecordItem {
+  createdAt: string;
+  id: string;
+  model: string;
+  provider: string;
+  spend: number;
+  totalInputTokens?: number | null;
+  totalOutputTokens?: number | null;
+  totalTokens?: number | null;
+  tps?: number | null;
+  ttft?: number | null;
+  type: string;
+}
+
+export interface UsageLog {
+  date: number;
+  day: string;
+  records: UsageRecordItem[];
+  totalRequests: number;
+  totalSpend: number;
+  totalTokens: number;
+}
+
 export interface UserRegistrationDuration {
   createdAt?: string;
   duration?: number;
@@ -1068,6 +1123,18 @@ export interface MobileSpaceItem {
   membershipRole?: MobileSpaceRole;
   name: string;
   updatedAt?: string;
+}
+
+export interface MobileSpaceMemberItem {
+  avatar?: string | null;
+  createdBy?: string;
+  fullName?: string | null;
+  joinedAt?: string;
+  role: MobileSpaceRole;
+  spaceId: string;
+  updatedAt?: string;
+  userId: string;
+  username?: string | null;
 }
 
 export type MobileSpaceMemorySection = 'inbox' | 'published' | 'playbooks' | 'policies';

@@ -1,5 +1,6 @@
 /**
- * Deep links and universal links containing `/share/r/:token` open the in-app public share preview.
+ * Deep links and universal links containing `/share/r/:token` or `/share/t/:shareId`
+ * open the in-app public share preview.
  */
 import type { MainTabParamList, RootStackParamList } from '../navigation/types';
 import {
@@ -14,6 +15,7 @@ import {
 } from './navigation';
 
 const SHARE_R_PATH = /\/share\/r\/([^/?#]+)/;
+const SHARE_T_PATH = /\/share\/t\/([^/?#]+)/;
 const CHAT_PATH = /^\/chat\/?$/;
 const MESSAGE_DETAIL_PATH = /^\/(?:chat\/)?message\/?$/;
 const TOOL_DETAIL_PATH = /^\/(?:chat\/)?tool\/?$/;
@@ -32,6 +34,7 @@ type ParsedNavigationTarget =
   | { params: RootStackParamList['MessageDetail']; route: 'MessageDetail' }
   | { params: RootStackParamList['Notebook']; route: 'Notebook' }
   | { params: RootStackParamList['PublicResourceShare']; route: 'PublicResourceShare' }
+  | { params: RootStackParamList['PublicTopicShare']; route: 'PublicTopicShare' }
   | { params: RootStackParamList['ToolDetail']; route: 'ToolDetail' }
   | { params: RootStackParamList['ThreadDetail']; route: 'ThreadDetail' }
   | { params: RootStackParamList['ThreadList']; route: 'ThreadList' };
@@ -85,15 +88,31 @@ export function parseResourceShareUrl(
   return { initialPassword, token };
 }
 
+export function parseTopicShareUrl(url: string): RootStackParamList['PublicTopicShare'] | null {
+  const match = url.match(SHARE_T_PATH);
+  if (!match?.[1]) return null;
+  return { shareId: decodeURIComponent(match[1]) };
+}
+
 export function navigateToPublicResourceShare(params: RootStackParamList['PublicResourceShare']) {
   if (!navigationRef.isReady()) return;
   navigationRef.navigate('PublicResourceShare', params);
+}
+
+export function navigateToPublicTopicShare(params: RootStackParamList['PublicTopicShare']) {
+  if (!navigationRef.isReady()) return;
+  navigationRef.navigate('PublicTopicShare', params);
 }
 
 export function parseIncomingNavigationUrl(url: string): ParsedNavigationTarget | null {
   const shareParams = parseResourceShareUrl(url);
   if (shareParams) {
     return { params: shareParams, route: 'PublicResourceShare' };
+  }
+
+  const topicShareParams = parseTopicShareUrl(url);
+  if (topicShareParams) {
+    return { params: topicShareParams, route: 'PublicTopicShare' };
   }
 
   const path = getUrlPath(url);
@@ -273,6 +292,10 @@ export function handleIncomingShareUrl(url: string | null | undefined) {
   switch (parsed.route) {
     case 'PublicResourceShare': {
       navigateToPublicResourceShare(parsed.params);
+      return;
+    }
+    case 'PublicTopicShare': {
+      navigateToPublicTopicShare(parsed.params);
       return;
     }
     case 'ChatDetail': {

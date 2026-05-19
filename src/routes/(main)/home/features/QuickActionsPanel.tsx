@@ -215,10 +215,12 @@ const QuickActionsPanel = memo(() => {
     s.clearInputMode,
   ]);
   const mainInputEditor = useChatStore((s) => s.mainInputEditor);
+  const translateText = (key: string, options?: Record<string, unknown>) =>
+    t(key as any, options as any) as string;
 
   const modeActions: ModeQuickAction[] = [
     {
-      footer: t('workspace.quickActions.hint.agent'),
+      footer: translateText('workspace.quickActions.hint.agent'),
       icon: ACTION_ENTRY_ICONS.createAgent,
       key: 'agent',
       kind: 'mode',
@@ -226,7 +228,7 @@ const QuickActionsPanel = memo(() => {
       title: t('starter.createAgent'),
     },
     {
-      footer: t('workspace.quickActions.hint.group'),
+      footer: translateText('workspace.quickActions.hint.group'),
       icon: ACTION_ENTRY_ICONS.createGroup,
       key: 'group',
       kind: 'mode',
@@ -235,8 +237,8 @@ const QuickActionsPanel = memo(() => {
     },
     {
       footer: workspaceName
-        ? t('workspace.quickActions.hint.writeInWorkspace', { name: workspaceName })
-        : t('workspace.quickActions.hint.write'),
+        ? translateText('workspace.quickActions.hint.writeInWorkspace', { name: workspaceName })
+        : translateText('workspace.quickActions.hint.write'),
       icon: ACTION_ENTRY_ICONS.write,
       key: 'write',
       kind: 'mode',
@@ -248,8 +250,10 @@ const QuickActionsPanel = memo(() => {
   const utilityActions: UtilityQuickAction[] = [
     {
       footer: workspaceName
-        ? t('workspace.quickActions.hint.documentsInWorkspace', { name: workspaceName })
-        : t('workspace.quickActions.hint.documents'),
+        ? translateText('workspace.quickActions.hint.documentsInWorkspace', {
+            name: workspaceName,
+          })
+        : translateText('workspace.quickActions.hint.documents'),
       icon: FileTextIcon,
       key: 'documents',
       kind: 'utility',
@@ -257,7 +261,7 @@ const QuickActionsPanel = memo(() => {
       title: t('workspace.quickActions.newDoc'),
     },
     {
-      footer: t('workspace.quickActions.hint.community'),
+      footer: translateText('workspace.quickActions.hint.community'),
       icon: Blocks,
       key: 'community',
       kind: 'utility',
@@ -272,9 +276,9 @@ const QuickActionsPanel = memo(() => {
         <span className={styles.eyebrow}>{t('workspace.quickActions.title')}</span>
         {workspaceName && (
           <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
-            <Tag bordered={false}>{t('workspace.quickActions.scope.workspace')}</Tag>
+            <Tag bordered={false}>{translateText('workspace.quickActions.scope.workspace')}</Tag>
             <span className={styles.contextHint}>
-              {t('workspace.quickActions.scope.inWorkspace', { name: workspaceName })}
+              {translateText('workspace.quickActions.scope.inWorkspace', { name: workspaceName })}
             </span>
           </Flexbox>
         )}

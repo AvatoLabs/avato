@@ -9,6 +9,11 @@ vi.mock('@/components/Loading/BrandTextLoading', () => ({
   default: () => <div>loading</div>,
 }));
 
+vi.mock('@/features/ResourceSpaces', () => ({
+  isWorkspaceResourcePath: (pathname: string) =>
+    pathname === '/spaces' || pathname.startsWith('/spaces/'),
+}));
+
 vi.mock('@/layout/AuthProvider/MarketAuth', () => ({
   MarketAuthProvider: ({ children }: any) => <>{children}</>,
 }));

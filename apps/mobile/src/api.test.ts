@@ -215,7 +215,7 @@ describe('spaceMemoryApi', () => {
 
     const [url, options] = fetchMock.mock.calls[0] as [string, { method: string }];
 
-    expect(url).toContain('/trpc/mobile/spaceMemory.listEntries?input=');
+    expect(url).toContain('/trpc/lambda/spaceMemory.listEntries?input=');
     expect(decodeURIComponent(url)).toContain('"spaceId":"space-team-1"');
     expect(decodeURIComponent(url)).toContain('"section":"published"');
     expect(decodeURIComponent(url)).toContain('"recallFilter":"all"');
@@ -265,7 +265,7 @@ describe('spaceMemoryApi', () => {
 
     const [url, options] = fetchMock.mock.calls[0] as [string, { method: string }];
 
-    expect(url).toContain('/trpc/mobile/spaceMemory.getEntry?input=');
+    expect(url).toContain('/trpc/lambda/spaceMemory.getEntry?input=');
     expect(decodeURIComponent(url)).toContain('"spaceId":"space-team-1"');
     expect(decodeURIComponent(url)).toContain('"id":"mem-1"');
     expect(options.method).toBe('GET');
@@ -301,7 +301,7 @@ describe('spaceMemoryApi', () => {
     });
 
     const [url, options] = fetchMock.mock.calls[0] as [string, { body: string; method: string }];
-    expect(url).toContain('/trpc/mobile/spaceMemory.createCandidate');
+    expect(url).toContain('/trpc/lambda/spaceMemory.createCandidate');
     expect(options.method).toBe('POST');
     expect(options.body).toContain('"spaceId":"space-team-1"');
     expect(options.body).toContain('"title":"New draft"');
@@ -346,7 +346,7 @@ describe('spaceMemoryApi', () => {
     await spaceMemoryApi.exportAuditBundle('space-team-1', 'mem-1');
 
     const [url, options] = fetchMock.mock.calls[0] as [string, { method: string }];
-    expect(url).toContain('/trpc/mobile/spaceMemory.exportAuditBundle?input=');
+    expect(url).toContain('/trpc/lambda/spaceMemory.exportAuditBundle?input=');
     expect(decodeURIComponent(url)).toContain('"spaceId":"space-team-1"');
     expect(decodeURIComponent(url)).toContain('"id":"mem-1"');
     expect(decodeURIComponent(url)).toContain('"recallFilter":"all"');
@@ -396,7 +396,7 @@ describe('spaceMemoryApi', () => {
     await spaceMemoryApi.exportAuditBundles('space-team-1', ['mem-1', 'mem-2'], 'active');
 
     const [url, options] = fetchMock.mock.calls[0] as [string, { method: string }];
-    expect(url).toContain('/trpc/mobile/spaceMemory.exportAuditBundles?input=');
+    expect(url).toContain('/trpc/lambda/spaceMemory.exportAuditBundles?input=');
     expect(decodeURIComponent(url)).toContain('"spaceId":"space-team-1"');
     expect(decodeURIComponent(url)).toContain('"ids":["mem-1","mem-2"]');
     expect(decodeURIComponent(url)).toContain('"recallFilter":"active"');
@@ -418,7 +418,7 @@ describe('spaceMemoryApi', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, options] = fetchMock.mock.calls[0] as [string, { body: string; method: string }];
 
-    expect(url).toContain('/trpc/mobile/spaceMemory.publishEntry');
+    expect(url).toContain('/trpc/lambda/spaceMemory.publishEntry');
     expect(options.method).toBe('POST');
     expect(options.body).toContain('"spaceId":"space-team-1"');
     expect(options.body).toContain('"id":"mem-1"');
@@ -439,7 +439,7 @@ describe('spaceMemoryApi', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, options] = fetchMock.mock.calls[0] as [string, { body: string; method: string }];
 
-    expect(url).toContain('/trpc/mobile/spaceMemory.rejectEntry');
+    expect(url).toContain('/trpc/lambda/spaceMemory.rejectEntry');
     expect(options.method).toBe('POST');
     expect(options.body).toContain('"spaceId":"space-team-1"');
     expect(options.body).toContain('"id":"mem-1"');
@@ -469,7 +469,7 @@ describe('spaceMemoryApi', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, options] = fetchMock.mock.calls[0] as [string, { body: string; method: string }];
 
-    expect(url).toContain('/trpc/mobile/spaceMemory.mergeEntry');
+    expect(url).toContain('/trpc/lambda/spaceMemory.mergeEntry');
     expect(options.method).toBe('POST');
     expect(options.body).toContain('"spaceId":"space-team-1"');
     expect(options.body).toContain('"candidateId":"mem-candidate"');
@@ -490,7 +490,7 @@ describe('spaceMemoryApi', () => {
     await spaceMemoryApi.revalidateEntry('space-team-1', 'mem-1');
 
     const [url, options] = fetchMock.mock.calls[0] as [string, { body: string; method: string }];
-    expect(url).toContain('/trpc/mobile/spaceMemory.revalidateEntries');
+    expect(url).toContain('/trpc/lambda/spaceMemory.revalidateEntries');
     expect(options.method).toBe('POST');
     expect(options.body).toContain('"spaceId":"space-team-1"');
     expect(options.body).toContain('"ids":["mem-1"]');
@@ -509,10 +509,497 @@ describe('spaceMemoryApi', () => {
     await spaceMemoryApi.markEntryStale('space-team-1', 'mem-1');
 
     const [url, options] = fetchMock.mock.calls[0] as [string, { body: string; method: string }];
-    expect(url).toContain('/trpc/mobile/spaceMemory.markEntriesStale');
+    expect(url).toContain('/trpc/lambda/spaceMemory.markEntriesStale');
     expect(options.method).toBe('POST');
     expect(options.body).toContain('"spaceId":"space-team-1"');
     expect(options.body).toContain('"ids":["mem-1"]');
+  });
+});
+
+describe('lobehubSkillApi', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('uses the tools tRPC namespace for connect queries', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          result: {
+            data: {
+              json: {
+                authorizeUrl: 'https://market.example.com/oauth',
+              },
+            },
+          },
+        }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { lobehubSkillApi } = await import('./lib/api');
+    await lobehubSkillApi.getAuthorizeUrl('github', {
+      redirectUri: 'com.avato.app://oauth',
+      scopes: ['repo'],
+    });
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, { method: string }];
+
+    expect(url).toContain('/trpc/tools/market.connectGetAuthorizeUrl?input=');
+    expect(decodeURIComponent(url)).toContain('"provider":"github"');
+    expect(decodeURIComponent(url)).toContain('"redirectUri":"com.avato.app://oauth"');
+    expect(decodeURIComponent(url)).toContain('"scopes":["repo"]');
+    expect(options.method).toBe('GET');
+  });
+
+  it('uses the tools tRPC namespace for connect mutations', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ result: { data: { json: { success: true } } } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { lobehubSkillApi } = await import('./lib/api');
+    await lobehubSkillApi.revoke('github');
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, { body: string; method: string }];
+
+    expect(url).toContain('/trpc/tools/market.connectRevoke');
+    expect(options.method).toBe('POST');
+    expect(options.body).toContain('"provider":"github"');
+  });
+});
+
+describe('marketSkillApi community discovery', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('loads the full Web community discovery source set', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      const decodedUrl = decodeURIComponent(url);
+      if (decodedUrl.includes('aggregator.getRegistryEntries')) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({
+              result: {
+                data: {
+                  json: {
+                    currentPage: 1,
+                    items: [
+                      {
+                        description: 'registry description',
+                        icon: 'https://example.com/icon.png',
+                        identifier: 'registry-fetch',
+                        installability: {
+                          installSchema: {
+                            config: {
+                              type: 'http',
+                              url: 'https://mcp.example.com/sse',
+                            },
+                            identifier: 'registry-fetch',
+                          },
+                          level: 'verified',
+                        },
+                        sourceLinks: [{ source: 'official', url: 'https://example.com/registry' }],
+                        sources: ['official'],
+                        title: 'Registry Fetch',
+                      },
+                    ],
+                    pageSize: 21,
+                    totalCount: 1,
+                    totalPages: 1,
+                  },
+                },
+              },
+            }),
+        };
+      }
+
+      if (decodedUrl.includes('aggregator.getSkillEntries')) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({
+              result: {
+                data: {
+                  json: {
+                    currentPage: 1,
+                    items: [
+                      {
+                        category: 'writing',
+                        description: 'skillhub description',
+                        importIdentifier: 'skillhub-writer',
+                        importUrl: 'https://example.com/writer.md',
+                        installability: { level: 'installable' },
+                        sourceLinks: [{ source: 'skillhub', url: 'https://example.com/skillhub' }],
+                        sources: ['skillhub'],
+                        title: 'SkillHub Writer',
+                      },
+                    ],
+                    pageSize: 21,
+                    totalCount: 1,
+                    totalPages: 1,
+                  },
+                },
+              },
+            }),
+        };
+      }
+
+      const source = decodedUrl.includes('market.getAssistantList')
+        ? 'agent'
+        : decodedUrl.includes('market.getGroupAgentList')
+          ? 'group_agent'
+          : decodedUrl.includes('market.getModelList')
+            ? 'model'
+            : decodedUrl.includes('market.getPluginList')
+              ? 'plugin'
+              : decodedUrl.includes('market.getProviderList')
+                ? 'provider'
+                : 'unknown';
+
+      return {
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            result: {
+              data: {
+                json: {
+                  currentPage: 1,
+                  items: [
+                    {
+                      category: source === 'provider' ? undefined : 'productivity',
+                      description: `${source} description`,
+                      displayName: `${source} item`,
+                      identifier: `${source}-1`,
+                      meta: {
+                        avatar: '🤖',
+                        title: `${source} title`,
+                      },
+                    },
+                  ],
+                  pageSize: 21,
+                  totalCount: 1,
+                  totalPages: 1,
+                },
+              },
+            },
+          }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { marketSkillApi } = await import('./lib/api');
+    const [agents, groups, models, plugins, providers, aggregatorMcps, aggregatorSkills] =
+      await Promise.all([
+        marketSkillApi.getAgentList({ q: 'bot' }, { forceRefresh: true }),
+        marketSkillApi.getGroupAgentList(undefined, { forceRefresh: true }),
+        marketSkillApi.getModelList(undefined, { forceRefresh: true }),
+        marketSkillApi.getPluginList(undefined, { forceRefresh: true }),
+        marketSkillApi.getProviderList(undefined, { forceRefresh: true }),
+        marketSkillApi.getAggregatorMcpList(undefined, { forceRefresh: true }),
+        marketSkillApi.getAggregatorSkillList(undefined, { forceRefresh: true }),
+      ]);
+
+    expect(agents.items[0]).toMatchObject({ _source: 'agent', identifier: 'agent-1' });
+    expect(groups.items[0]).toMatchObject({ _source: 'group_agent', identifier: 'group_agent-1' });
+    expect(models.items[0]).toMatchObject({ _source: 'model', identifier: 'model-1' });
+    expect(plugins.items[0]).toMatchObject({ _source: 'plugin', identifier: 'plugin-1' });
+    expect(providers.items[0]).toMatchObject({ _source: 'provider', identifier: 'provider-1' });
+    expect(aggregatorMcps.items[0]).toMatchObject({
+      _source: 'aggregator_mcp',
+      aggregatorInstallabilityLevel: 'verified',
+      identifier: 'registry-fetch',
+      webDetailPath: '/community/aggregator?q=registry-fetch',
+    });
+    expect(aggregatorSkills.items[0]).toMatchObject({
+      _source: 'aggregator_skill',
+      identifier: 'skillhub-writer',
+      importUrl: 'https://example.com/writer.md',
+      webDetailPath: '/community/aggregator?kind=skills&q=skillhub-writer',
+    });
+
+    const calledUrls = fetchMock.mock.calls.map(([url]) => decodeURIComponent(String(url)));
+    expect(calledUrls.some((url) => url.includes('/trpc/mobile/market.getAssistantList'))).toBe(
+      true,
+    );
+    expect(calledUrls.some((url) => url.includes('/trpc/mobile/market.getGroupAgentList'))).toBe(
+      true,
+    );
+    expect(calledUrls.some((url) => url.includes('/trpc/mobile/market.getModelList'))).toBe(true);
+    expect(calledUrls.some((url) => url.includes('/trpc/mobile/market.getPluginList'))).toBe(true);
+    expect(calledUrls.some((url) => url.includes('/trpc/mobile/market.getProviderList'))).toBe(
+      true,
+    );
+    expect(
+      calledUrls.some((url) => url.includes('/trpc/mobile/aggregator.getRegistryEntries')),
+    ).toBe(true);
+    expect(calledUrls.some((url) => url.includes('/trpc/mobile/aggregator.getSkillEntries'))).toBe(
+      true,
+    );
+  });
+
+  it('installs installable aggregator entries through native mobile paths', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      const decodedUrl = decodeURIComponent(url);
+
+      if (decodedUrl.includes('mcp.getStreamableMcpServerManifest')) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({
+              result: {
+                data: {
+                  json: {
+                    api: [{ name: 'search', parameters: {} }],
+                    identifier: 'registry-fetch',
+                    meta: { title: 'Registry Fetch' },
+                  },
+                },
+              },
+            }),
+        };
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ result: { data: { json: { id: 'ok' } } } }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { marketSkillApi } = await import('./lib/api');
+    await marketSkillApi.install({
+      _source: 'aggregator_skill',
+      aggregatorInstallabilityLevel: 'verified',
+      identifier: 'skillhub-writer',
+      importIdentifier: 'skillhub-writer',
+      importUrl: 'https://example.com/writer.md',
+    });
+    await marketSkillApi.install({
+      _source: 'aggregator_mcp',
+      aggregatorInstallSchema: {
+        config: {
+          headers: { 'X-Test': '1' },
+          type: 'http',
+          url: 'https://mcp.example.com/sse',
+        },
+        description: 'registry description',
+        icon: 'https://example.com/icon.png',
+        identifier: 'registry-fetch',
+        name: 'Registry Fetch',
+      },
+      aggregatorInstallabilityLevel: 'verified',
+      description: 'registry description',
+      identifier: 'registry-fetch',
+      name: 'Registry Fetch',
+    });
+
+    const calledUrls = fetchMock.mock.calls.map(([url]) => decodeURIComponent(String(url)));
+    expect(calledUrls.some((url) => url.includes('/trpc/mobile/agentSkills.importFromUrl'))).toBe(
+      true,
+    );
+    expect(
+      calledUrls.some((url) => url.includes('/trpc/mobile/mcp.getStreamableMcpServerManifest')),
+    ).toBe(true);
+    expect(
+      calledUrls.some((url) => url.includes('/trpc/mobile/plugin.createOrInstallPlugin')),
+    ).toBe(true);
+
+    const importCall = fetchMock.mock.calls.find(([url]) =>
+      decodeURIComponent(String(url)).includes('agentSkills.importFromUrl'),
+    );
+    expect(JSON.parse(String(importCall?.[1]?.body))).toMatchObject({
+      json: {
+        identifier: 'skillhub-writer',
+        source: 'market',
+        url: 'https://example.com/writer.md',
+      },
+    });
+
+    const pluginCall = fetchMock.mock.calls.find(([url]) =>
+      decodeURIComponent(String(url)).includes('plugin.createOrInstallPlugin'),
+    );
+    expect(JSON.parse(String(pluginCall?.[1]?.body))).toMatchObject({
+      json: {
+        customParams: {
+          mcp: {
+            headers: { 'X-Test': '1' },
+            type: 'http',
+            url: 'https://mcp.example.com/sse',
+          },
+        },
+        identifier: 'registry-fetch',
+        type: 'customPlugin',
+      },
+    });
+  });
+});
+
+describe('topicShareApi', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('loads shared topic metadata through the lambda namespace', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          result: {
+            data: {
+              json: {
+                agentId: 'agent-1',
+                shareId: 'share-1',
+                title: 'Release plan',
+                topicId: 'topic-1',
+                visibility: 'link',
+              },
+            },
+          },
+        }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { topicShareApi } = await import('./lib/api');
+    const result = await topicShareApi.getSharedTopic('share-1');
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, { method: string }];
+
+    expect(result.title).toBe('Release plan');
+    expect(url).toContain('/trpc/lambda/share.getSharedTopic?input=');
+    expect(decodeURIComponent(url)).toContain('"shareId":"share-1"');
+    expect(options.method).toBe('GET');
+  });
+
+  it('loads shared topic messages through the public lambda message endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          result: {
+            data: {
+              json: [
+                {
+                  content: 'hello',
+                  createdAt: '2026-05-19T00:00:00.000Z',
+                  id: 'msg-1',
+                  role: 'user',
+                  sessionId: 'agent-1',
+                  updatedAt: '2026-05-19T00:00:00.000Z',
+                },
+              ],
+            },
+          },
+        }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { topicShareApi } = await import('./lib/api');
+    const messages = await topicShareApi.listMessages('share-1');
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, { method: string }];
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({ content: 'hello', id: 'msg-1', role: 'user' });
+    expect(url).toContain('/trpc/lambda/message.getMessages?input=');
+    expect(decodeURIComponent(url)).toContain('"topicShareId":"share-1"');
+    expect(options.method).toBe('GET');
+  });
+});
+
+describe('statsApi usage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('loads monthly usage through the lambda usage router', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          result: {
+            data: {
+              json: [{ id: 'usage-1', model: 'gpt-5.4', provider: 'openai', type: 'chat' }],
+            },
+          },
+        }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { statsApi } = await import('./lib/api');
+    const result = await statsApi.findUsageByMonth('2026-05');
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, { method: string }];
+    expect(result).toHaveLength(1);
+    expect(url).toContain('/trpc/lambda/usage.findByMonth?input=');
+    expect(decodeURIComponent(url)).toContain('"mo":"2026-05"');
+    expect(options.method).toBe('GET');
+  });
+
+  it('loads grouped monthly usage through the lambda usage router', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          result: {
+            data: {
+              json: [
+                {
+                  day: '2026-05-19',
+                  records: [],
+                  totalRequests: 1,
+                  totalSpend: 0.001,
+                  totalTokens: 128,
+                },
+              ],
+            },
+          },
+        }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { statsApi } = await import('./lib/api');
+    const result = await statsApi.findUsageGroupedByDay('2026-05');
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, { method: string }];
+    expect(result[0]?.totalTokens).toBe(128);
+    expect(url).toContain('/trpc/lambda/usage.findAndGroupByDay?input=');
+    expect(decodeURIComponent(url)).toContain('"mo":"2026-05"');
+    expect(options.method).toBe('GET');
   });
 });
 
@@ -847,6 +1334,41 @@ describe('spaceApi', () => {
     expect(result).toEqual({ id: 'space-2', kind: 'team', name: 'Design Ops' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toContain('/trpc/lambda/space.createTeamSpace');
+  });
+
+  it('wraps space management mutations through the lambda router', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ result: { data: { json: { success: true } } } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { spaceApi } = await import('./lib/api');
+    await spaceApi.update('space-1', { description: 'Updated', name: 'Team' });
+    await spaceApi.addMemberByUsername({
+      role: 'editor',
+      spaceId: 'space-1',
+      username: 'arthur',
+    });
+    await spaceApi.updateMemberRole('space-1', 'user-1', 'viewer');
+    await spaceApi.removeMember('space-1', 'user-1');
+    await spaceApi.transferOwnership('space-1', 'user-2');
+    await spaceApi.delete('space-1');
+
+    const calls = fetchMock.mock.calls.map(([url, options]) => ({
+      body: (options as { body?: string }).body,
+      url: String(url),
+    }));
+
+    expect(calls[0]?.url).toContain('/trpc/lambda/space.updateSpace');
+    expect(calls[0]?.body).toContain('"id":"space-1"');
+    expect(calls[1]?.url).toContain('/trpc/lambda/space.addSpaceMemberByUsername');
+    expect(calls[1]?.body).toContain('"username":"arthur"');
+    expect(calls[2]?.url).toContain('/trpc/lambda/space.updateSpaceMemberRole');
+    expect(calls[3]?.url).toContain('/trpc/lambda/space.removeSpaceMember');
+    expect(calls[4]?.url).toContain('/trpc/lambda/space.transferSpaceOwnership');
+    expect(calls[5]?.url).toContain('/trpc/lambda/space.deleteSpace');
   });
 });
 

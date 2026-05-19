@@ -122,6 +122,7 @@ export function useResourceContentOverlayComposer({
       onCreateSpace: state.spaceCreate.openCreateSpaceModal,
       onOpenSharedWithMe: state.previewShare.openSharedWithMe,
       onOpenSpaceMemory: state.headerControls.openScopeSpaceMemory,
+      onOpenSpaceSettings: state.headerControls.openSpaceSettings,
       onOpenTrash: actions.trash.openTrash,
       onSelectAllFiles: () => state.scopeNavigation.applyFileScope('all'),
       onSelectSourceSet: state.scopeNavigation.switchToSourceSet,

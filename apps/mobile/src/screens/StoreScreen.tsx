@@ -8,17 +8,23 @@
  */
 import * as DocumentPicker from 'expo-document-picker';
 import {
+  Bot,
   Box,
+  BrainCircuit,
   Check,
   ChevronRight,
+  Cpu,
   Download,
   FileArchive,
   Github,
   Link as LinkIcon,
+  Network,
   Package,
   Plus,
+  Puzzle,
   Search,
   Trash2,
+  Users,
   X,
 } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -27,6 +33,7 @@ import {
   Alert,
   FlatList,
   Image as RNImage,
+  Linking,
   Modal,
   Pressable,
   RefreshControl,
@@ -61,6 +68,7 @@ import {
 import {
   agentSkillApi,
   fileApi,
+  getApiUrl,
   type MarketCategoryItem,
   type MarketListItem,
   marketSkillApi,
@@ -69,6 +77,7 @@ import {
   userApi,
 } from '../lib/api';
 import { useMainTabScrollableContentPaddingBottom } from '../lib/bottomChrome';
+import { getCommunityDetailPath, joinWebPath } from '../lib/communityLinks';
 import { haptics } from '../lib/haptics';
 import { type I18nStore, type Locale, useI18n } from '../lib/i18n';
 import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
@@ -76,13 +85,37 @@ import { type ColorTokens, useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { AgentSkillItem, InstalledPlugin } from '../types';
 
-type ExploreSource = 'mcp' | 'skill';
+const EXPLORE_SOURCE_KEYS = [
+  'mcp',
+  'skill',
+  'aggregator_mcp',
+  'aggregator_skill',
+  'agent',
+  'group_agent',
+  'model',
+  'provider',
+  'plugin',
+] as const;
+
+type ExploreSource = (typeof EXPLORE_SOURCE_KEYS)[number];
 type StoreTab = 'explore' | 'installed';
 
 const MARKET_PAGE_SIZE = 21;
 
 const getValidCategoryKeys = (source: ExploreSource) =>
-  source === 'mcp' ? [...FALLBACK_MCP_CATEGORY_KEYS] : [...FALLBACK_SKILL_CATEGORY_KEYS];
+  source === 'mcp'
+    ? [...FALLBACK_MCP_CATEGORY_KEYS]
+    : source === 'skill'
+      ? [...FALLBACK_SKILL_CATEGORY_KEYS]
+      : [];
+
+const createExploreSourceRecord = <T,>(
+  buildValue: (source: ExploreSource) => T,
+): Record<ExploreSource, T> =>
+  Object.fromEntries(EXPLORE_SOURCE_KEYS.map((source) => [source, buildValue(source)])) as Record<
+    ExploreSource,
+    T
+  >;
 
 interface StoreInstalledItem {
   avatar?: string;
@@ -408,6 +441,84 @@ const filterMarketItemsByQuery = (items: MarketListItem[], query?: string) => {
   );
 };
 
+const AGGREGATOR_INSTALLABLE_LEVELS = new Set(['installable', 'verified']);
+
+const isInstallableMarketItem = (item: MarketListItem) =>
+  item._source === 'builtin' ||
+  item._source === 'mcp' ||
+  item._source === 'skill' ||
+  (item._source === 'aggregator_mcp' &&
+    item.aggregatorInstallSchema?.config?.type === 'http' &&
+    Boolean(item.aggregatorInstallSchema.config.url) &&
+    AGGREGATOR_INSTALLABLE_LEVELS.has(item.aggregatorInstallabilityLevel || '')) ||
+  (item._source === 'aggregator_skill' &&
+    Boolean(item.importUrl) &&
+    AGGREGATOR_INSTALLABLE_LEVELS.has(item.aggregatorInstallabilityLevel || ''));
+
+const getExploreSourceLabel = (source: MarketListItem['_source'], t: I18nStore['t']) => {
+  switch (source) {
+    case 'agent': {
+      return t.storeAgents;
+    }
+    case 'aggregator_mcp': {
+      return t.storeAggregatorMcp;
+    }
+    case 'aggregator_skill': {
+      return t.storeAggregatorSkills;
+    }
+    case 'builtin': {
+      return t.storeBuiltIn;
+    }
+    case 'group_agent': {
+      return t.storeGroupAgents;
+    }
+    case 'mcp': {
+      return t.storeMcp;
+    }
+    case 'model': {
+      return t.storeModels;
+    }
+    case 'plugin': {
+      return t.storePlugins;
+    }
+    case 'provider': {
+      return t.storeProviders;
+    }
+    case 'skill': {
+      return t.storeSkills;
+    }
+  }
+};
+
+const getExploreSourceIcon = (source: ExploreSource) => {
+  switch (source) {
+    case 'agent': {
+      return Bot;
+    }
+    case 'aggregator_mcp': {
+      return Network;
+    }
+    case 'aggregator_skill': {
+      return Puzzle;
+    }
+    case 'group_agent': {
+      return Users;
+    }
+    case 'model': {
+      return BrainCircuit;
+    }
+    case 'plugin': {
+      return Puzzle;
+    }
+    case 'provider': {
+      return Cpu;
+    }
+    default: {
+      return Package;
+    }
+  }
+};
+
 const ItemCard = memo<{
   installed?: boolean;
   item: MarketListItem;
@@ -416,13 +527,22 @@ const ItemCard = memo<{
 }>(({ item, installed, onPress, onInstall }) => {
   const colors = useThemeColors();
   const { t } = useI18n();
-  const typeLabel =
-    item._source === 'mcp'
-      ? t.storeMcp
-      : item._source === 'builtin'
-        ? t.storeBuiltIn
-        : t.storeSkills;
-  const isMcp = item._source === 'mcp';
+  const typeLabel = getExploreSourceLabel(item._source, t);
+  const canInstall = isInstallableMarketItem(item);
+  const isMcpLike =
+    item._source === 'mcp' || item._source === 'plugin' || item._source === 'aggregator_mcp';
+  const isSkillLike =
+    item._source === 'skill' || item._source === 'builtin' || item._source === 'aggregator_skill';
+  const tagBackgroundColor = isMcpLike
+    ? colors.sourceMarketMuted
+    : isSkillLike
+      ? colors.sourceBuiltinMuted
+      : colors.primarySubtle;
+  const tagTextColor = isMcpLike
+    ? colors.sourceMarket
+    : isSkillLike
+      ? colors.sourceBuiltin
+      : colors.primary;
   return (
     <PressableScale
       accessibilityLabel={item.name || item.identifier}
@@ -454,9 +574,9 @@ const ItemCard = memo<{
               {item.name || item.identifier}
             </Text>
             <MetaTag
-              backgroundColor={isMcp ? colors.sourceMarketMuted : colors.sourceBuiltinMuted}
+              backgroundColor={tagBackgroundColor}
               label={typeLabel}
-              textColor={isMcp ? colors.sourceMarket : colors.sourceBuiltin}
+              textColor={tagTextColor}
             />
           </View>
 
@@ -488,7 +608,7 @@ const ItemCard = memo<{
           >
             <Check color={colors.primary} size={14} strokeWidth={2.5} />
           </View>
-        ) : (
+        ) : canInstall ? (
           <TouchableOpacity
             accessibilityLabel={`${t.storeInstall}: ${item.name || item.identifier}`}
             accessibilityRole="button"
@@ -503,6 +623,8 @@ const ItemCard = memo<{
           >
             <Download color={colors.primary} size={14} strokeWidth={2.5} />
           </TouchableOpacity>
+        ) : (
+          <ChevronRight color={colors.secondaryText} size={16} strokeWidth={1.5} />
         )}
       </View>
     </PressableScale>
@@ -1286,6 +1408,7 @@ function StoreItemModal({
   detail,
   onClose,
   onInstall,
+  onOpenWebDetail,
   onUninstall,
   t,
 }: {
@@ -1293,6 +1416,7 @@ function StoreItemModal({
   detail: StoreDetailItem | null;
   onClose: () => void;
   onInstall: () => void;
+  onOpenWebDetail: () => void;
   onUninstall: () => void;
   t: I18nStore['t'];
 }) {
@@ -1304,10 +1428,12 @@ function StoreItemModal({
   const isInstalled = Boolean(
     detail.installedPlugin || detail.installedSkill || detail.builtinItem,
   );
-  const canInstall = Boolean(detail.marketItem) && !isInstalled;
+  const canInstall =
+    Boolean(detail.marketItem && isInstallableMarketItem(detail.marketItem)) && !isInstalled;
   const canUninstall = Boolean(
     detail.installedPlugin || detail.installedSkill || detail.builtinItem,
   );
+  const isPreviewOnly = Boolean(detail.marketItem && !isInstallableMarketItem(detail.marketItem));
 
   return (
     <Modal
@@ -1384,6 +1510,16 @@ function StoreItemModal({
                 </Text>
               </View>
             ) : null}
+            {isPreviewOnly ? (
+              <View
+                className="px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: colors.fillTertiary }}
+              >
+                <Text className="text-[11px] font-medium" style={{ color: colors.secondaryText }}>
+                  {t.storePreviewOnly}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           {detail.author ? (
@@ -1397,6 +1533,12 @@ function StoreItemModal({
           {detail.installedSkill?.source === 'builtin' || detail.builtinItem ? (
             <Text className="text-[12px] leading-5 mt-4" style={{ color: colors.secondaryText }}>
               {t.storeBuiltIn}
+            </Text>
+          ) : null}
+
+          {isPreviewOnly ? (
+            <Text className="text-[12px] leading-5 mt-4" style={{ color: colors.secondaryText }}>
+              {t.storePreviewOnlyDesc}
             </Text>
           ) : null}
 
@@ -1437,6 +1579,19 @@ function StoreItemModal({
                 )}
               </PressableScale>
             ) : null}
+
+            {detail.marketItem ? (
+              <PressableScale
+                className="rounded-xl py-3 items-center"
+                disabled={actionLoading}
+                style={{ backgroundColor: colors.fillTertiary }}
+                onPress={onOpenWebDetail}
+              >
+                <Text className="text-[14px] font-semibold" style={{ color: colors.primary }}>
+                  {t.storeOpenWebDetail}
+                </Text>
+              </PressableScale>
+            ) : null}
           </View>
         </Pressable>
       </Pressable>
@@ -1470,20 +1625,17 @@ export default function StoreScreen() {
   const [marketItems, setMarketItems] = useState<MarketListItem[]>([]);
   const [marketCategoriesBySource, setMarketCategoriesBySource] = useState<
     Record<ExploreSource, MarketCategoryItem[]>
-  >({
-    mcp: [],
-    skill: [],
-  });
-  const [marketMcpTotal, setMarketMcpTotal] = useState(0);
-  const [marketSkillTotal, setMarketSkillTotal] = useState(0);
+  >(createExploreSourceRecord(() => []));
+  const [marketTotalsBySource, setMarketTotalsBySource] = useState<Record<ExploreSource, number>>(
+    createExploreSourceRecord(() => 0),
+  );
   const [marketLoading, setMarketLoading] = useState(false);
   const [marketPage, setMarketPage] = useState(1);
   const [marketHasMore, setMarketHasMore] = useState(true);
   const [marketLoadingMore, setMarketLoadingMore] = useState(false);
-  const [marketSourceErrors, setMarketSourceErrors] = useState<Record<ExploreSource, boolean>>({
-    mcp: false,
-    skill: false,
-  });
+  const [marketSourceErrors, setMarketSourceErrors] = useState<Record<ExploreSource, boolean>>(
+    createExploreSourceRecord(() => false),
+  );
   const marketRequestIdRef = useRef(0);
 
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
@@ -1492,13 +1644,11 @@ export default function StoreScreen() {
   const [installedLoading, setInstalledLoading] = useState(false);
   const [installedCatalogLoaded, setInstalledCatalogLoaded] = useState(false);
   const marketSnapshotRef = useRef<Record<ExploreSource, MarketListItem[]>>({
-    mcp: [],
-    skill: [],
+    ...createExploreSourceRecord(() => []),
   });
-  const marketCategoryRequestIdRef = useRef<Record<ExploreSource, number>>({
-    mcp: 0,
-    skill: 0,
-  });
+  const marketCategoryRequestIdRef = useRef<Record<ExploreSource, number>>(
+    createExploreSourceRecord(() => 0),
+  );
   const installedRequestIdRef = useRef(0);
   const exploreSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const categoryFetchHintShownRef = useRef<Set<ExploreSource>>(new Set());
@@ -1694,10 +1844,21 @@ export default function StoreScreen() {
       }));
 
       try {
+        const categoryParams = { q: appliedSearchQuery || undefined };
         const list =
           source === 'mcp'
-            ? await marketSkillApi.getMcpCategories({ q: appliedSearchQuery || undefined }, options)
-            : await marketSkillApi.getCategories({ q: appliedSearchQuery || undefined }, options);
+            ? await marketSkillApi.getMcpCategories(categoryParams, options)
+            : source === 'skill'
+              ? await marketSkillApi.getCategories(categoryParams, options)
+              : source === 'agent'
+                ? await marketSkillApi.getAgentCategories(categoryParams, options)
+                : source === 'group_agent'
+                  ? await marketSkillApi.getGroupAgentCategories(categoryParams, options)
+                  : source === 'model'
+                    ? await marketSkillApi.getModelCategories(categoryParams, options)
+                    : source === 'plugin'
+                      ? await marketSkillApi.getPluginCategories(categoryParams, options)
+                      : [];
 
         if (requestId !== marketCategoryRequestIdRef.current[source]) return;
 
@@ -1756,26 +1917,51 @@ export default function StoreScreen() {
       }
 
       try {
+        const listParams = {
+          category: categoryParam,
+          page,
+          pageSize: MARKET_PAGE_SIZE,
+          q: appliedSearchQuery || undefined,
+        };
         const result =
           source === 'mcp'
-            ? await marketSkillApi.getMcpList(
-                {
-                  category: categoryParam,
-                  page,
-                  pageSize: MARKET_PAGE_SIZE,
-                  q: appliedSearchQuery || undefined,
-                },
-                options,
-              )
-            : await marketSkillApi.getSkillList(
-                {
-                  category: categoryParam,
-                  page,
-                  pageSize: MARKET_PAGE_SIZE,
-                  q: appliedSearchQuery || undefined,
-                },
-                options,
-              );
+            ? await marketSkillApi.getMcpList(listParams, options)
+            : source === 'skill'
+              ? await marketSkillApi.getSkillList(listParams, options)
+              : source === 'aggregator_mcp'
+                ? await marketSkillApi.getAggregatorMcpList(
+                    {
+                      page,
+                      pageSize: MARKET_PAGE_SIZE,
+                      q: appliedSearchQuery || undefined,
+                    },
+                    options,
+                  )
+                : source === 'aggregator_skill'
+                  ? await marketSkillApi.getAggregatorSkillList(
+                      {
+                        page,
+                        pageSize: MARKET_PAGE_SIZE,
+                        q: appliedSearchQuery || undefined,
+                      },
+                      options,
+                    )
+                  : source === 'agent'
+                    ? await marketSkillApi.getAgentList(listParams, options)
+                    : source === 'group_agent'
+                      ? await marketSkillApi.getGroupAgentList(listParams, options)
+                      : source === 'model'
+                        ? await marketSkillApi.getModelList(listParams, options)
+                        : source === 'plugin'
+                          ? await marketSkillApi.getPluginList(listParams, options)
+                          : await marketSkillApi.getProviderList(
+                              {
+                                page,
+                                pageSize: MARKET_PAGE_SIZE,
+                                q: appliedSearchQuery || undefined,
+                              },
+                              options,
+                            );
 
         if (requestId !== marketRequestIdRef.current) return;
 
@@ -1788,16 +1974,10 @@ export default function StoreScreen() {
           marketSnapshotRef.current[source] = remoteItems;
         }
 
-        if (source === 'mcp') {
-          setMarketMcpTotal((prev) =>
-            page === 1 ? resolvedTotalCount : prev || resolvedTotalCount,
-          );
-        }
-        if (source === 'skill') {
-          setMarketSkillTotal((prev) =>
-            page === 1 ? resolvedTotalCount : prev || resolvedTotalCount,
-          );
-        }
+        setMarketTotalsBySource((prev) => ({
+          ...prev,
+          [source]: page === 1 ? resolvedTotalCount : prev[source] || resolvedTotalCount,
+        }));
 
         if (!append && page === 1 && !categoryParam && remoteItems.length > 0) {
           setMarketCategoriesBySource((prev) => ({
@@ -1843,8 +2023,7 @@ export default function StoreScreen() {
             source,
           ),
         }));
-        if (source === 'mcp') setMarketMcpTotal(fallbackItems.length);
-        if (source === 'skill') setMarketSkillTotal(fallbackItems.length);
+        setMarketTotalsBySource((prev) => ({ ...prev, [source]: fallbackItems.length }));
         setMarketHasMore(false);
         toast.show('error', t.storeLoadFailed || t.errorNetwork);
       } finally {
@@ -1906,6 +2085,11 @@ export default function StoreScreen() {
   const handleInstall = useCallback(
     async (item: MarketListItem) => {
       haptics.light();
+      if (!isInstallableMarketItem(item)) {
+        toast.show('info', t.storePreviewOnly);
+        return false;
+      }
+
       try {
         if (item._source === 'builtin') {
           await updateBuiltinSkillInstallation(item.identifier, true);
@@ -1925,6 +2109,7 @@ export default function StoreScreen() {
       fetchInstalled,
       t.storeInstallFailed,
       t.storeInstallSuccess,
+      t.storePreviewOnly,
       toast,
       updateBuiltinSkillInstallation,
     ],
@@ -2051,12 +2236,7 @@ export default function StoreScreen() {
         identifier: item.identifier,
         installedPlugin,
         installedSkill,
-        label:
-          item._source === 'builtin'
-            ? t.storeBuiltIn
-            : item._source === 'mcp'
-              ? t.storeMcp
-              : t.storeSkills,
+        label: getExploreSourceLabel(item._source, t),
         marketItem: item,
         name: item.name || item.identifier,
       };
@@ -2151,6 +2331,34 @@ export default function StoreScreen() {
     toast,
     updateBuiltinSkillInstallation,
   ]);
+
+  const handleSelectedOpenWebDetail = useCallback(async () => {
+    if (!selectedDetail?.marketItem) return;
+
+    try {
+      if (selectedDetail.marketItem.webDetailPath) {
+        const baseUrl = await getApiUrl();
+        await Linking.openURL(joinWebPath(baseUrl, selectedDetail.marketItem.webDetailPath));
+        return;
+      }
+
+      const path = getCommunityDetailPath(
+        selectedDetail.marketItem._source,
+        selectedDetail.marketItem.identifier,
+      );
+      if (path) {
+        const baseUrl = await getApiUrl();
+        await Linking.openURL(joinWebPath(baseUrl, path));
+        return;
+      }
+
+      if (selectedDetail.marketItem.sourceUrl) {
+        await Linking.openURL(selectedDetail.marketItem.sourceUrl);
+      }
+    } catch {
+      toast.show('error', t.storeOpenWebDetailFailed);
+    }
+  }, [selectedDetail?.marketItem, t.storeOpenWebDetailFailed, toast]);
 
   const handleImportUrl = useCallback(
     async (url: string) => {
@@ -2295,15 +2503,13 @@ export default function StoreScreen() {
     [allInstalled.length, t.storeExplore, t.storeInstalled],
   );
   const exploreSources = useMemo(
-    () => [
-      { key: 'mcp' as const, label: t.storeMcp },
-      { key: 'skill' as const, label: t.storeSkills },
-    ],
-    [t.storeMcp, t.storeSkills],
-  );
-  const exploreSourceSwitchItems = useMemo(
-    () => exploreSources.map((source) => ({ label: source.label, value: source.key })),
-    [exploreSources],
+    () =>
+      EXPLORE_SOURCE_KEYS.map((source) => ({
+        icon: getExploreSourceIcon(source),
+        key: source,
+        label: getExploreSourceLabel(source, t),
+      })),
+    [t],
   );
 
   const isExplore = activeTab === 'explore';
@@ -2314,7 +2520,7 @@ export default function StoreScreen() {
     ({ item }: { item: MarketListItem }) => (
       <View style={{ width: pageContentWidth }}>
         <ItemCard
-          installed={installedIds.has(item.identifier)}
+          installed={isInstallableMarketItem(item) && installedIds.has(item.identifier)}
           item={item}
           onInstall={(marketItem) => void handleInstall(marketItem)}
           onPress={(marketItem) => {
@@ -2342,7 +2548,7 @@ export default function StoreScreen() {
     [pageContentWidth],
   );
 
-  const currentExploreTotal = activeExploreSource === 'mcp' ? marketMcpTotal : marketSkillTotal;
+  const currentExploreTotal = marketTotalsBySource[activeExploreSource];
   const activeExploreTotalCount =
     currentExploreTotal > 0
       ? Math.max(currentExploreTotal, marketItems.length)
@@ -2456,17 +2662,32 @@ export default function StoreScreen() {
               contentContainerStyle={{ gap: 6, paddingRight: 12 }}
               showsHorizontalScrollIndicator={false}
             >
-              <View style={{ flexShrink: 0, width: 156 }}>
-                <SegmentedControl
-                  items={exploreSourceSwitchItems}
-                  value={activeExploreSource}
-                  onChange={(value) => {
-                    haptics.selection();
-                    setActiveExploreCategory(ALL_CATEGORY_KEY);
-                    setActiveExploreSource(value);
-                  }}
-                />
-              </View>
+              {exploreSources.map((source) => {
+                const active = activeExploreSource === source.key;
+                const Icon = source.icon;
+                const total = marketTotalsBySource[source.key];
+
+                return (
+                  <FilterChip
+                    active={active}
+                    count={total > 0 ? formatCount(total, locale) : undefined}
+                    key={source.key}
+                    label={source.label}
+                    icon={
+                      <Icon
+                        color={active ? colors.primary : colors.muted}
+                        size={13}
+                        strokeWidth={tokens.icon.strokeWidth}
+                      />
+                    }
+                    onPress={() => {
+                      haptics.selection();
+                      setActiveExploreCategory(ALL_CATEGORY_KEY);
+                      setActiveExploreSource(source.key);
+                    }}
+                  />
+                );
+              })}
               {categoryOptions.length > 0 ? <View style={{ width: 2 }} /> : null}
               {categoryOptions.map((category) => {
                 const active = activeExploreCategory === category.key;
@@ -2755,6 +2976,7 @@ export default function StoreScreen() {
         t={t}
         onClose={() => setSelectedEntry(null)}
         onInstall={() => void handleSelectedInstall()}
+        onOpenWebDetail={() => void handleSelectedOpenWebDetail()}
         onUninstall={handleSelectedUninstall}
       />
     </View>

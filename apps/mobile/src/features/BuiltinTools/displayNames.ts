@@ -1,8 +1,114 @@
 /**
  * Display names for builtin tools (Inspector / title fallback).
- * Maps identifier+apiName to user-friendly labels.
- * TODO: migrate to i18n keys for full locale support.
+ * Maps identifier+apiName to i18n keys, with legacy locale maps kept as fallback.
  */
+
+import type { TranslationKeys } from '../../lib/i18n';
+
+export type MobileBuiltinDisplayNameOptions = {
+  locale?: string;
+  t?: (key: keyof TranslationKeys) => string | undefined;
+};
+
+const DISPLAY_NAME_KEYS: Record<string, Record<string, keyof TranslationKeys>> = {
+  'lobe-gtd': {
+    clearTodos: 'builtinToolGtdClearTodos',
+    completeTodos: 'builtinToolGtdCompleteTodos',
+    createPlan: 'builtinToolGtdCreatePlan',
+    createTodos: 'builtinToolGtdCreateTodos',
+    execTask: 'builtinToolGtdExecTask',
+    execTasks: 'builtinToolGtdExecTasks',
+    removeTodos: 'builtinToolGtdRemoveTodos',
+    updatePlan: 'builtinToolGtdUpdatePlan',
+    updateTodos: 'builtinToolGtdUpdateTodos',
+  },
+  'lobe-notebook': { createDocument: 'builtinToolNotebookCreateDocument' },
+  'lobe-user-memory': {
+    addExperienceMemory: 'builtinToolUserMemoryAddExperienceMemory',
+    addPreferenceMemory: 'builtinToolUserMemoryAddPreferenceMemory',
+    searchUserMemory: 'builtinToolUserMemorySearchUserMemory',
+  },
+  'lobe-cloud-sandbox': { executeCode: 'builtinToolCloudSandboxExecuteCode' },
+  'lobe-calculator': {
+    base: 'builtinToolCalculatorBase',
+    calculate: 'builtinToolCalculatorCalculate',
+    defintegrate: 'builtinToolCalculatorDefintegrate',
+    differentiate: 'builtinToolCalculatorDifferentiate',
+    evaluate: 'builtinToolCalculatorEvaluate',
+    execute: 'builtinToolCalculatorExecute',
+    integrate: 'builtinToolCalculatorIntegrate',
+    limit: 'builtinToolCalculatorLimit',
+    solve: 'builtinToolCalculatorSolve',
+    sort: 'builtinToolCalculatorSort',
+  },
+  'lobe-web-browsing': { search: 'builtinToolWebBrowsingSearch' },
+  'lobe-source-set': {
+    readSourceFiles: 'builtinToolSourceSetReadSourceFiles',
+    searchSourceSet: 'builtinToolSourceSetSearchSourceSet',
+  },
+  'lobe-agent-builder': {
+    getAvailableModels: 'builtinToolAgentBuilderGetAvailableModels',
+    installPlugin: 'builtinToolAgentBuilderInstallPlugin',
+    searchMarketTools: 'builtinToolAgentBuilderSearchMarketTools',
+    updateAgentConfig: 'builtinToolAgentBuilderUpdateAgentConfig',
+    updatePrompt: 'builtinToolAgentBuilderUpdatePrompt',
+  },
+  'lobe-agent-management': {
+    callAgent: 'builtinToolAgentManagementCallAgent',
+    createAgent: 'builtinToolAgentManagementCreateAgent',
+    deleteAgent: 'builtinToolAgentManagementDeleteAgent',
+    searchAgent: 'builtinToolAgentManagementSearchAgent',
+    updateAgent: 'builtinToolAgentManagementUpdateAgent',
+  },
+  'lobe-group-agent-builder': {
+    batchCreateAgents: 'builtinToolGroupAgentBuilderBatchCreateAgents',
+    createAgent: 'builtinToolGroupAgentBuilderCreateAgent',
+    getAgentInfo: 'builtinToolGroupAgentBuilderGetAgentInfo',
+    getAvailableModels: 'builtinToolGroupAgentBuilderGetAvailableModels',
+    installPlugin: 'builtinToolGroupAgentBuilderInstallPlugin',
+    inviteAgent: 'builtinToolGroupAgentBuilderInviteAgent',
+    removeAgent: 'builtinToolGroupAgentBuilderRemoveAgent',
+    searchAgent: 'builtinToolGroupAgentBuilderSearchAgent',
+    searchMarketTools: 'builtinToolGroupAgentBuilderSearchMarketTools',
+    updateAgentPrompt: 'builtinToolGroupAgentBuilderUpdateAgentPrompt',
+    updateConfig: 'builtinToolGroupAgentBuilderUpdateConfig',
+    updateGroup: 'builtinToolGroupAgentBuilderUpdateGroup',
+    updateGroupPrompt: 'builtinToolGroupAgentBuilderUpdateGroupPrompt',
+  },
+  'lobe-local-system': {
+    editLocalFile: 'builtinToolLocalSystemEditLocalFile',
+    getCommandOutput: 'builtinToolLocalSystemGetCommandOutput',
+    globLocalFiles: 'builtinToolLocalSystemGlobLocalFiles',
+    grepContent: 'builtinToolLocalSystemGrepContent',
+    killCommand: 'builtinToolLocalSystemKillCommand',
+    listLocalFiles: 'builtinToolLocalSystemListLocalFiles',
+    moveLocalFiles: 'builtinToolLocalSystemMoveLocalFiles',
+    readLocalFile: 'builtinToolLocalSystemReadLocalFile',
+    renameLocalFile: 'builtinToolLocalSystemRenameLocalFile',
+    runCommand: 'builtinToolLocalSystemRunCommand',
+    searchLocalFiles: 'builtinToolLocalSystemSearchLocalFiles',
+    writeLocalFile: 'builtinToolLocalSystemWriteLocalFile',
+  },
+  'lobe-group-management': {
+    broadcast: 'builtinToolGroupManagementBroadcast',
+    executeAgentTask: 'builtinToolGroupManagementExecuteAgentTask',
+    executeAgentTasks: 'builtinToolGroupManagementExecuteAgentTasks',
+    speak: 'builtinToolGroupManagementSpeak',
+    vote: 'builtinToolGroupManagementVote',
+  },
+  'lobe-skill-store': {
+    importFromMarket: 'builtinToolSkillStoreImportFromMarket',
+    importSkill: 'builtinToolSkillStoreImportSkill',
+    searchSkill: 'builtinToolSkillStoreSearchSkill',
+  },
+  'lobe-skills': {
+    execScript: 'builtinToolSkillsExecScript',
+    exportFile: 'builtinToolSkillsExportFile',
+    readReference: 'builtinToolSkillsReadReference',
+    runSkill: 'builtinToolSkillsRunSkill',
+    searchSkill: 'builtinToolSkillsSearchSkill',
+  },
+};
 
 const DISPLAY_NAMES_ZH: Record<string, Record<string, string>> = {
   'lobe-gtd': {
@@ -201,9 +307,16 @@ const DISPLAY_NAMES_EN: Record<string, Record<string, string>> = {
 export function getMobileBuiltinDisplayName(
   identifier?: string,
   apiName?: string,
-  locale?: string,
+  optionsOrLocale?: MobileBuiltinDisplayNameOptions | string,
 ): string | undefined {
   if (!identifier || !apiName) return undefined;
+  const options =
+    typeof optionsOrLocale === 'string' ? { locale: optionsOrLocale } : optionsOrLocale;
+  const i18nKey = DISPLAY_NAME_KEYS[identifier]?.[apiName];
+  const localized = i18nKey ? options?.t?.(i18nKey) : undefined;
+  if (localized) return localized;
+
+  const locale = options?.locale;
   const isZh = locale?.startsWith('zh');
   const map = isZh ? DISPLAY_NAMES_ZH : DISPLAY_NAMES_EN;
   return map[identifier]?.[apiName];

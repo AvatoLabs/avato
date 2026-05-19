@@ -76,6 +76,41 @@ export const mobileRoutes: RouteObject[] = [
         path: 'agent',
       },
 
+      // Group chat routes
+      {
+        children: [
+          {
+            element: redirectElement('/'),
+            index: true,
+          },
+          {
+            children: [
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/group'),
+                  'Mobile > Agent Group',
+                ),
+                index: true,
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/group/profile'),
+                  'Mobile > Agent Group > Profile',
+                ),
+                path: 'profile',
+              },
+            ],
+            element: dynamicLayout(
+              () => import('@/routes/(main)/group/_layout'),
+              'Mobile > Group > Layout',
+            ),
+            errorElement: <ErrorBoundary resetPath="/group" />,
+            path: ':gid',
+          },
+        ],
+        path: 'group',
+      },
+
       // Discover routes with nested structure
       {
         children: [
@@ -131,10 +166,24 @@ export const mobileRoutes: RouteObject[] = [
               },
               {
                 element: dynamicElement(
+                  () => import('@/routes/(main)/community/(list)/skill'),
+                  'Mobile > Discover > List > Skill',
+                ),
+                path: 'skill',
+              },
+              {
+                element: dynamicElement(
                   () => import('@/routes/(main)/community/(list)/plugin'),
                   'Mobile > Discover > List > Plugin Legacy Redirect',
                 ),
                 path: 'plugin',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/community/(list)/aggregator'),
+                  'Mobile > Discover > List > Aggregator',
+                ),
+                path: 'aggregator',
               },
             ],
             element: dynamicElement(
@@ -158,6 +207,16 @@ export const mobileRoutes: RouteObject[] = [
               {
                 element: dynamicElement(
                   () =>
+                    import('@/routes/(main)/community/(detail)/group_agent').then(
+                      (m) => m.MobileDiscoverGroupAgentDetailPage,
+                    ),
+                  'Mobile > Discover > Detail > Group Agent',
+                ),
+                path: 'group_agent/:slug',
+              },
+              {
+                element: dynamicElement(
+                  () =>
                     import('@/routes/(main)/community/(detail)/model').then(
                       (m) => m.MobileModelPage,
                     ),
@@ -174,6 +233,16 @@ export const mobileRoutes: RouteObject[] = [
                   'Mobile > Discover > Detail > Provider',
                 ),
                 path: 'provider/:slug',
+              },
+              {
+                element: dynamicElement(
+                  () =>
+                    import('@/routes/(main)/community/(detail)/skill').then(
+                      (m) => m.MobileSkillPage,
+                    ),
+                  'Mobile > Discover > Detail > Skill',
+                ),
+                path: 'skill/:slug',
               },
               {
                 element: dynamicElement(
@@ -411,6 +480,41 @@ export const mobileRoutes: RouteObject[] = [
           },
         ],
         path: 'spaces/:spaceId',
+      },
+
+      // Web generation and workflow studio fallbacks
+      {
+        children: [
+          {
+            element: dynamicElement(() => import('@/routes/(main)/image'), 'Mobile > Image'),
+            index: true,
+          },
+        ],
+        element: dynamicLayout(
+          () => import('@/routes/(main)/image/_layout'),
+          'Mobile > Image > Layout',
+        ),
+        errorElement: <ErrorBoundary resetPath="/image" />,
+        path: 'image',
+      },
+      {
+        children: [
+          {
+            element: dynamicElement(() => import('@/routes/(main)/video'), 'Mobile > Video'),
+            index: true,
+          },
+        ],
+        element: dynamicLayout(
+          () => import('@/routes/(main)/video/_layout'),
+          'Mobile > Video > Layout',
+        ),
+        errorElement: <ErrorBoundary resetPath="/video" />,
+        path: 'video',
+      },
+      {
+        element: dynamicElement(() => import('@/routes/(main)/studio'), 'Mobile > Avato Studio'),
+        errorElement: <ErrorBoundary resetPath="/studio" />,
+        path: 'studio',
       },
 
       ...BusinessMobileRoutesWithMainLayout,

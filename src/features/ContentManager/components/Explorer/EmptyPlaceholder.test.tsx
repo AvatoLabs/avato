@@ -375,7 +375,7 @@ describe('EmptyPlaceholder', () => {
     const fileTypeIcon = uploadFileButton.querySelector('[data-testid="file-type-icon"]');
 
     expect(iconSlot).toBeTruthy();
-    expect(iconSlot).toContainElement(fileTypeIcon);
+    expect(iconSlot).toContainElement(fileTypeIcon as HTMLElement);
     expect(fileTypeIcon).not.toHaveClass('iconSlot');
   });
 

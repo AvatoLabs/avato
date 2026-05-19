@@ -5,6 +5,7 @@ import {
   FolderOpen,
   House,
   Link2,
+  Settings,
   Trash2,
   Users,
 } from 'lucide-react-native';
@@ -43,6 +44,7 @@ interface ResourceScopeLauncherSheetProps {
   onCreateSpace: () => void;
   onOpenSharedWithMe: () => void;
   onOpenSpaceMemory?: () => void;
+  onOpenSpaceSettings: (spaceId: string) => void;
   onOpenTrash: () => void;
   onSelectAllFiles: () => void;
   onSelectSourceSet: (item: SourceSetItem) => void;
@@ -76,6 +78,7 @@ export default function ResourceScopeLauncherSheet({
   onCreateSpace,
   onOpenSharedWithMe,
   onOpenSpaceMemory,
+  onOpenSpaceSettings,
   onOpenTrash,
   onSelectAllFiles,
   onSelectSourceSet,
@@ -235,6 +238,25 @@ export default function ResourceScopeLauncherSheet({
                   </View>
                   {active ? (
                     <Check color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  ) : null}
+                  {space.kind === 'team' ? (
+                    <TouchableOpacity
+                      accessibilityLabel={t.spaceSettingsTitle}
+                      accessibilityRole="button"
+                      activeOpacity={0.72}
+                      className="ml-2 h-8 w-8 items-center justify-center rounded-full"
+                      style={{ backgroundColor: colors.background }}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        onOpenSpaceSettings(space.id);
+                      }}
+                    >
+                      <Settings
+                        color={colors.secondaryText}
+                        size={15}
+                        strokeWidth={tokens.icon.strokeWidth}
+                      />
+                    </TouchableOpacity>
                   ) : null}
                 </TouchableOpacity>
               );

@@ -132,6 +132,81 @@ export type TranslationKeys = {
   chatToolStreamingRunning: string;
   chatToolTapToExpand: string;
   chatToolTapToCollapse: string;
+  builtinToolGtdClearTodos: string;
+  builtinToolGtdCompleteTodos: string;
+  builtinToolGtdCreatePlan: string;
+  builtinToolGtdCreateTodos: string;
+  builtinToolGtdExecTask: string;
+  builtinToolGtdExecTasks: string;
+  builtinToolGtdRemoveTodos: string;
+  builtinToolGtdUpdatePlan: string;
+  builtinToolGtdUpdateTodos: string;
+  builtinToolNotebookCreateDocument: string;
+  builtinToolUserMemoryAddExperienceMemory: string;
+  builtinToolUserMemoryAddPreferenceMemory: string;
+  builtinToolUserMemorySearchUserMemory: string;
+  builtinToolCloudSandboxExecuteCode: string;
+  builtinToolCalculatorBase: string;
+  builtinToolCalculatorCalculate: string;
+  builtinToolCalculatorDefintegrate: string;
+  builtinToolCalculatorDifferentiate: string;
+  builtinToolCalculatorEvaluate: string;
+  builtinToolCalculatorExecute: string;
+  builtinToolCalculatorIntegrate: string;
+  builtinToolCalculatorLimit: string;
+  builtinToolCalculatorSolve: string;
+  builtinToolCalculatorSort: string;
+  builtinToolWebBrowsingSearch: string;
+  builtinToolSourceSetReadSourceFiles: string;
+  builtinToolSourceSetSearchSourceSet: string;
+  builtinToolAgentBuilderGetAvailableModels: string;
+  builtinToolAgentBuilderInstallPlugin: string;
+  builtinToolAgentBuilderSearchMarketTools: string;
+  builtinToolAgentBuilderUpdateAgentConfig: string;
+  builtinToolAgentBuilderUpdatePrompt: string;
+  builtinToolAgentManagementCallAgent: string;
+  builtinToolAgentManagementCreateAgent: string;
+  builtinToolAgentManagementDeleteAgent: string;
+  builtinToolAgentManagementSearchAgent: string;
+  builtinToolAgentManagementUpdateAgent: string;
+  builtinToolGroupAgentBuilderBatchCreateAgents: string;
+  builtinToolGroupAgentBuilderCreateAgent: string;
+  builtinToolGroupAgentBuilderGetAgentInfo: string;
+  builtinToolGroupAgentBuilderGetAvailableModels: string;
+  builtinToolGroupAgentBuilderInstallPlugin: string;
+  builtinToolGroupAgentBuilderInviteAgent: string;
+  builtinToolGroupAgentBuilderRemoveAgent: string;
+  builtinToolGroupAgentBuilderSearchAgent: string;
+  builtinToolGroupAgentBuilderSearchMarketTools: string;
+  builtinToolGroupAgentBuilderUpdateAgentPrompt: string;
+  builtinToolGroupAgentBuilderUpdateConfig: string;
+  builtinToolGroupAgentBuilderUpdateGroup: string;
+  builtinToolGroupAgentBuilderUpdateGroupPrompt: string;
+  builtinToolLocalSystemEditLocalFile: string;
+  builtinToolLocalSystemGetCommandOutput: string;
+  builtinToolLocalSystemGlobLocalFiles: string;
+  builtinToolLocalSystemGrepContent: string;
+  builtinToolLocalSystemKillCommand: string;
+  builtinToolLocalSystemListLocalFiles: string;
+  builtinToolLocalSystemMoveLocalFiles: string;
+  builtinToolLocalSystemReadLocalFile: string;
+  builtinToolLocalSystemRenameLocalFile: string;
+  builtinToolLocalSystemRunCommand: string;
+  builtinToolLocalSystemSearchLocalFiles: string;
+  builtinToolLocalSystemWriteLocalFile: string;
+  builtinToolGroupManagementBroadcast: string;
+  builtinToolGroupManagementExecuteAgentTask: string;
+  builtinToolGroupManagementExecuteAgentTasks: string;
+  builtinToolGroupManagementSpeak: string;
+  builtinToolGroupManagementVote: string;
+  builtinToolSkillStoreImportFromMarket: string;
+  builtinToolSkillStoreImportSkill: string;
+  builtinToolSkillStoreSearchSkill: string;
+  builtinToolSkillsExecScript: string;
+  builtinToolSkillsExportFile: string;
+  builtinToolSkillsReadReference: string;
+  builtinToolSkillsRunSkill: string;
+  builtinToolSkillsSearchSkill: string;
   chatShowMore: string;
   chatShowLess: string;
   chatAskAnything: string;
@@ -238,6 +313,9 @@ export type TranslationKeys = {
   groupAddMembers: string;
   groupCreateDefaultTitle: string;
   groupStartConversation: string;
+  groupOpenWebProfile: string;
+  groupOpenWebProfileDesc: string;
+  groupOpenWebFailed: string;
   groupCreateSupervisorModel: string;
   groupMentionAllMembers: string;
   groupMentionTitle: string;
@@ -319,6 +397,12 @@ export type TranslationKeys = {
   agentConfigOpenStore: string;
   agentConfigSkills: string;
   agentConfigSkillsIds: string;
+  agentConfigWebManagement: string;
+  agentConfigCronJobs: string;
+  agentConfigCronJobsDesc: string;
+  agentConfigChannels: string;
+  agentConfigChannelsDesc: string;
+  agentConfigOpenWebFailed: string;
   agentConfigAdvanced: string;
   agentConfigNamePlaceholder: string;
   agentConfigDescriptionPlaceholder: string;
@@ -352,7 +436,19 @@ export type TranslationKeys = {
   settingsGroupI18n: string;
   settingsGroupMemory: string;
   settingsGroupData: string;
+  settingsGroupAdvanced: string;
   settingsGroupAccount: string;
+  settingsOpenWebSettings: string;
+  settingsOpenWebSettingsDesc: string;
+  settingsOpenWebStudio: string;
+  settingsOpenWebStudioDesc: string;
+  settingsOpenWebMcpStudio: string;
+  settingsOpenWebMcpStudioDesc: string;
+  settingsOpenWebImage: string;
+  settingsOpenWebImageDesc: string;
+  settingsOpenWebVideo: string;
+  settingsOpenWebVideoDesc: string;
+  settingsOpenWebFailed: string;
   /** Root settings screen — bridges tab label (Me) and page title (Settings) */
   settingsHeaderSubtitle: string;
   /** Shown under Connection & AI section to explain overlap with overview card */
@@ -451,6 +547,33 @@ export type TranslationKeys = {
   workspaceManageSourceSet: string;
   workspaceSwitchSpaces: string;
   workspaceSwitchSourceSets: string;
+  spaceSettingsTitle: string;
+  spaceSettingsProfile: string;
+  spaceSettingsLoadFailed: string;
+  spaceSettingsSaved: string;
+  spaceMembersTitle: string;
+  spaceMembersLoadFailed: string;
+  spaceMemberUsernamePlaceholder: string;
+  spaceMemberAdd: string;
+  spaceMemberAdded: string;
+  spaceMemberAddFailed: string;
+  spaceMemberRoleUpdated: string;
+  spaceMemberRemove: string;
+  spaceMemberRemoveTitle: string;
+  spaceMemberRemoveDesc: string;
+  spaceMemberRemoved: string;
+  spaceTransferOwner: string;
+  spaceTransferOwnerTitle: string;
+  spaceTransferOwnerDesc: string;
+  spaceTransferOwnerDone: string;
+  spaceDelete: string;
+  spaceDeleteTitle: string;
+  spaceDeleteDesc: string;
+  spaceDeleted: string;
+  spaceRoleOwner: string;
+  spaceRoleAdmin: string;
+  spaceRoleEditor: string;
+  spaceRoleViewer: string;
 
   // Message Actions
   msgActionCopy: string;
@@ -951,6 +1074,19 @@ export type TranslationKeys = {
   resourcePublicShareNotFoundHint: string;
   resourcePublicShareDownloadFailed: string;
   resourcePublicShareSourceSetHint: string;
+  topicPublicShareTitle: string;
+  topicPublicShareSubtitle: string;
+  topicPublicShareNotFound: string;
+  topicPublicShareNotFoundHint: string;
+  topicPublicShareMessagesEmpty: string;
+  topicPublicShareMessagesEmptyDesc: string;
+  topicPublicShareFromAgent: string;
+  topicPublicShareFromGroup: string;
+  topicPublicShareMessageCount: string;
+  topicPublicShareFindMore: string;
+  topicPublicShareTryItYourself: string;
+  topicPublicShareDisclaimer: string;
+  topicPublicShareOpenFailed: string;
   resourceGovernanceUsageInternal: string;
   resourceGovernanceUsagePublic: string;
   resourceGovernanceUsageRestricted: string;
@@ -1053,7 +1189,14 @@ export type TranslationKeys = {
   tabStore: string;
   storeSearch: string;
   storeExplore: string;
+  storeAgents: string;
+  storeAggregatorMcp: string;
+  storeAggregatorSkills: string;
+  storeGroupAgents: string;
   storeMcp: string;
+  storeModels: string;
+  storePlugins: string;
+  storeProviders: string;
   storeSkills: string;
   storeInstalled: string;
   storeEmpty: string;
@@ -1063,6 +1206,10 @@ export type TranslationKeys = {
   storeBuiltIn: string;
   storeFromStore: string;
   storeImported: string;
+  storePreviewOnly: string;
+  storePreviewOnlyDesc: string;
+  storeOpenWebDetail: string;
+  storeOpenWebDetailFailed: string;
   storeRemove: string;
   storeRemoveConfirm: string;
   storeRemoveDesc: string;
@@ -1218,6 +1365,19 @@ export type TranslationKeys = {
   statsHeatmapDayTitle: string;
   statsHeatmapDayMessage: string;
   statsHeatmapCellA11y: string;
+  statsUsage: string;
+  statsUsageMonth: string;
+  statsUsageSpend: string;
+  statsUsageTokens: string;
+  statsUsageRequests: string;
+  statsUsageByModel: string;
+  statsUsageByProvider: string;
+  statsUsageRecentLogs: string;
+  statsNoUsage: string;
+  statsShare: string;
+  statsShareFailed: string;
+  statsOpenWebStats: string;
+  statsOpenWebFailed: string;
 
   // Memory
   memoryTitle: string;
@@ -1591,6 +1751,81 @@ export const enUS: TranslationKeys = {
   chatToolStreamingRunning: 'Running…',
   chatToolTapToExpand: 'Tap to expand',
   chatToolTapToCollapse: 'Tap to collapse',
+  builtinToolGtdClearTodos: 'Clear todos',
+  builtinToolGtdCompleteTodos: 'Complete todos',
+  builtinToolGtdCreatePlan: 'Create plan',
+  builtinToolGtdCreateTodos: 'Create todos',
+  builtinToolGtdExecTask: 'Exec task',
+  builtinToolGtdExecTasks: 'Exec tasks',
+  builtinToolGtdRemoveTodos: 'Remove todos',
+  builtinToolGtdUpdatePlan: 'Update plan',
+  builtinToolGtdUpdateTodos: 'Update todos',
+  builtinToolNotebookCreateDocument: 'Create document',
+  builtinToolUserMemoryAddExperienceMemory: 'Add experience',
+  builtinToolUserMemoryAddPreferenceMemory: 'Add preference',
+  builtinToolUserMemorySearchUserMemory: 'Search memory',
+  builtinToolCloudSandboxExecuteCode: 'Execute code',
+  builtinToolCalculatorBase: 'Base conversion',
+  builtinToolCalculatorCalculate: 'Calculate',
+  builtinToolCalculatorDefintegrate: 'Definite integral',
+  builtinToolCalculatorDifferentiate: 'Differentiate',
+  builtinToolCalculatorEvaluate: 'Evaluate',
+  builtinToolCalculatorExecute: 'Execute',
+  builtinToolCalculatorIntegrate: 'Integrate',
+  builtinToolCalculatorLimit: 'Limit',
+  builtinToolCalculatorSolve: 'Solve',
+  builtinToolCalculatorSort: 'Sort',
+  builtinToolWebBrowsingSearch: 'Web search',
+  builtinToolSourceSetReadSourceFiles: 'Read source files',
+  builtinToolSourceSetSearchSourceSet: 'Source set search',
+  builtinToolAgentBuilderGetAvailableModels: 'Get available models',
+  builtinToolAgentBuilderInstallPlugin: 'Install plugin',
+  builtinToolAgentBuilderSearchMarketTools: 'Search market tools',
+  builtinToolAgentBuilderUpdateAgentConfig: 'Update agent config',
+  builtinToolAgentBuilderUpdatePrompt: 'Update prompt',
+  builtinToolAgentManagementCallAgent: 'Call agent',
+  builtinToolAgentManagementCreateAgent: 'Create agent',
+  builtinToolAgentManagementDeleteAgent: 'Delete agent',
+  builtinToolAgentManagementSearchAgent: 'Search agent',
+  builtinToolAgentManagementUpdateAgent: 'Update agent',
+  builtinToolGroupAgentBuilderBatchCreateAgents: 'Batch create agents',
+  builtinToolGroupAgentBuilderCreateAgent: 'Create agent',
+  builtinToolGroupAgentBuilderGetAgentInfo: 'Get member info',
+  builtinToolGroupAgentBuilderGetAvailableModels: 'Get available models',
+  builtinToolGroupAgentBuilderInstallPlugin: 'Install plugin',
+  builtinToolGroupAgentBuilderInviteAgent: 'Invite member',
+  builtinToolGroupAgentBuilderRemoveAgent: 'Remove member',
+  builtinToolGroupAgentBuilderSearchAgent: 'Search agent',
+  builtinToolGroupAgentBuilderSearchMarketTools: 'Search market tools',
+  builtinToolGroupAgentBuilderUpdateAgentPrompt: 'Update agent prompt',
+  builtinToolGroupAgentBuilderUpdateConfig: 'Update agent config',
+  builtinToolGroupAgentBuilderUpdateGroup: 'Update group',
+  builtinToolGroupAgentBuilderUpdateGroupPrompt: 'Update group prompt',
+  builtinToolLocalSystemEditLocalFile: 'Edit file',
+  builtinToolLocalSystemGetCommandOutput: 'Get command output',
+  builtinToolLocalSystemGlobLocalFiles: 'Glob search files',
+  builtinToolLocalSystemGrepContent: 'Search content',
+  builtinToolLocalSystemKillCommand: 'Kill command',
+  builtinToolLocalSystemListLocalFiles: 'List files',
+  builtinToolLocalSystemMoveLocalFiles: 'Move files',
+  builtinToolLocalSystemReadLocalFile: 'Read file',
+  builtinToolLocalSystemRenameLocalFile: 'Rename',
+  builtinToolLocalSystemRunCommand: 'Run command',
+  builtinToolLocalSystemSearchLocalFiles: 'Search files',
+  builtinToolLocalSystemWriteLocalFile: 'Write file',
+  builtinToolGroupManagementBroadcast: 'Broadcast',
+  builtinToolGroupManagementExecuteAgentTask: 'Execute task',
+  builtinToolGroupManagementExecuteAgentTasks: 'Execute tasks',
+  builtinToolGroupManagementSpeak: 'Speak',
+  builtinToolGroupManagementVote: 'Vote',
+  builtinToolSkillStoreImportFromMarket: 'Import from market',
+  builtinToolSkillStoreImportSkill: 'Import skill',
+  builtinToolSkillStoreSearchSkill: 'Search skill',
+  builtinToolSkillsExecScript: 'Exec script',
+  builtinToolSkillsExportFile: 'Export file',
+  builtinToolSkillsReadReference: 'Read reference',
+  builtinToolSkillsRunSkill: 'Run skill',
+  builtinToolSkillsSearchSkill: 'Search skill',
   chatShowMore: 'Show more',
   chatShowLess: 'Show less',
   chatAskAnything: 'Ask anything...',
@@ -1698,6 +1933,10 @@ export const enUS: TranslationKeys = {
   groupAddMembers: 'Add Members',
   groupCreateDefaultTitle: 'New Group Chat',
   groupStartConversation: 'Start Conversation',
+  groupOpenWebProfile: 'Open Web group workspace',
+  groupOpenWebProfileDesc:
+    'Manage group profile, member agents, and advanced group editing in Web.',
+  groupOpenWebFailed: 'Could not open Web group workspace',
   groupCreateSupervisorModel: 'Host model',
   groupMentionAllMembers: 'All members',
   groupMentionTitle: 'Mention',
@@ -1775,6 +2014,12 @@ export const enUS: TranslationKeys = {
   agentConfigOpenStore: 'Open Agent Store',
   agentConfigSkills: 'Skills',
   agentConfigSkillsIds: 'Skill IDs (comma-separated)',
+  agentConfigWebManagement: 'Automation & channels',
+  agentConfigCronJobs: 'Scheduled tasks',
+  agentConfigCronJobsDesc: 'Open Web to create and manage agent cron jobs.',
+  agentConfigChannels: 'Channels',
+  agentConfigChannelsDesc: 'Open Web to configure bot channels and webhooks.',
+  agentConfigOpenWebFailed: 'Could not open Web management',
   agentConfigAdvanced: 'Advanced',
   agentConfigNamePlaceholder: 'Name your assistant',
   agentConfigDescriptionPlaceholder: 'Add a short description',
@@ -1812,7 +2057,19 @@ export const enUS: TranslationKeys = {
   settingsGroupI18n: 'Internationalization',
   settingsGroupMemory: 'Memory',
   settingsGroupData: 'Data & Voice',
+  settingsGroupAdvanced: 'Advanced',
   settingsGroupAccount: 'Account',
+  settingsOpenWebSettings: 'Open Web settings',
+  settingsOpenWebSettingsDesc: 'Advanced, API key, security, proxy, and billing settings.',
+  settingsOpenWebStudio: 'Open Web Studio',
+  settingsOpenWebStudioDesc: 'Use workflow studio and advanced MCP orchestration in Web.',
+  settingsOpenWebMcpStudio: 'Open MCP Studio',
+  settingsOpenWebMcpStudioDesc: 'Continue to the Web MCP workflow studio.',
+  settingsOpenWebImage: 'Open Web image',
+  settingsOpenWebImageDesc: 'Use the full Web image workspace and generation history.',
+  settingsOpenWebVideo: 'Open Web video',
+  settingsOpenWebVideoDesc: 'Use the full Web video workspace and generation history.',
+  settingsOpenWebFailed: 'Could not open Web settings',
   settingsHeaderSubtitle: 'Profile, workspace & preferences',
   settingsConnectionAlsoInOverview: 'Full controls — same destinations as the overview shortcuts above',
   settingsComingSoonSection: 'Coming soon',
@@ -1902,6 +2159,33 @@ export const enUS: TranslationKeys = {
   workspaceManageSourceSet: 'Manage source set',
   workspaceSwitchSpaces: 'Spaces',
   workspaceSwitchSourceSets: 'Source Sets',
+  spaceSettingsTitle: 'Space Settings',
+  spaceSettingsProfile: 'Profile',
+  spaceSettingsLoadFailed: 'Could not load space settings',
+  spaceSettingsSaved: 'Space updated',
+  spaceMembersTitle: 'Members',
+  spaceMembersLoadFailed: 'Could not load members',
+  spaceMemberUsernamePlaceholder: 'Username',
+  spaceMemberAdd: 'Add member',
+  spaceMemberAdded: 'Member added',
+  spaceMemberAddFailed: 'Could not add member',
+  spaceMemberRoleUpdated: 'Role updated',
+  spaceMemberRemove: 'Remove',
+  spaceMemberRemoveTitle: 'Remove member',
+  spaceMemberRemoveDesc: 'Remove this member from the space?',
+  spaceMemberRemoved: 'Member removed',
+  spaceTransferOwner: 'Transfer owner',
+  spaceTransferOwnerTitle: 'Transfer ownership',
+  spaceTransferOwnerDesc: 'Transfer ownership to this member?',
+  spaceTransferOwnerDone: 'Ownership transferred',
+  spaceDelete: 'Delete space',
+  spaceDeleteTitle: 'Delete space',
+  spaceDeleteDesc: 'This will permanently delete the team space.',
+  spaceDeleted: 'Space deleted',
+  spaceRoleOwner: 'Owner',
+  spaceRoleAdmin: 'Admin',
+  spaceRoleEditor: 'Editor',
+  spaceRoleViewer: 'Viewer',
 
   msgActionCopy: 'Copy',
   msgActionEdit: 'Edit',
@@ -2393,6 +2677,20 @@ export const enUS: TranslationKeys = {
     'Check the link and password. A wrong password looks the same as an expired or invalid link.',
   resourcePublicShareDownloadFailed: 'Could not open the download link.',
   resourcePublicShareSourceSetHint: 'For the full source set and file list, use LobeHub in a browser.',
+  topicPublicShareTitle: 'Shared topic',
+  topicPublicShareSubtitle: 'Read-only conversation',
+  topicPublicShareNotFound: 'This topic share is unavailable.',
+  topicPublicShareNotFoundHint: 'The link may be invalid, private, or expired.',
+  topicPublicShareMessagesEmpty: 'No messages in this shared topic',
+  topicPublicShareMessagesEmptyDesc: 'There is nothing to preview yet.',
+  topicPublicShareFromAgent: 'Assistant',
+  topicPublicShareFromGroup: 'Group',
+  topicPublicShareMessageCount: '{count} messages',
+  topicPublicShareFindMore: 'Find more',
+  topicPublicShareTryItYourself: 'Try it yourself',
+  topicPublicShareDisclaimer:
+    'This content is shared by a user and does not represent the views of Avato.',
+  topicPublicShareOpenFailed: 'Could not open link',
   resourceGovernanceUsageInternal: 'Internal',
   resourceGovernanceUsagePublic: 'Public',
   resourceGovernanceUsageRestricted: 'Restricted',
@@ -2494,7 +2792,14 @@ export const enUS: TranslationKeys = {
   tabStore: 'Store',
   storeSearch: 'Search extensions...',
   storeExplore: 'Explore',
+  storeAgents: 'Agents',
+  storeAggregatorMcp: 'MCP Registry',
+  storeAggregatorSkills: 'SkillHub',
+  storeGroupAgents: 'Groups',
   storeMcp: 'MCP',
+  storeModels: 'Models',
+  storePlugins: 'Plugins',
+  storeProviders: 'Providers',
   storeSkills: 'Skills',
   storeInstalled: 'Installed',
   storeEmpty: 'No extensions found',
@@ -2504,6 +2809,10 @@ export const enUS: TranslationKeys = {
   storeBuiltIn: 'Built-in',
   storeFromStore: 'Store',
   storeImported: 'Imported',
+  storePreviewOnly: 'Preview only',
+  storePreviewOnlyDesc: 'This marketplace item can be browsed on mobile. Installation and workspace actions remain available on web.',
+  storeOpenWebDetail: 'Open Web detail',
+  storeOpenWebDetailFailed: 'Could not open Web detail',
   storeRemove: 'Remove',
   storeRemoveConfirm: 'Remove extension',
   storeRemoveDesc: 'Remove this extension?',
@@ -2659,6 +2968,19 @@ export const enUS: TranslationKeys = {
   statsHeatmapDayTitle: 'Activity',
   statsHeatmapDayMessage: 'Date: {date}\nMessages: {count}\nIntensity: {level} / 4',
   statsHeatmapCellA11y: '{date}, intensity {level} of 4',
+  statsUsage: 'Usage',
+  statsUsageMonth: '{month}',
+  statsUsageSpend: 'Spend',
+  statsUsageTokens: 'Tokens',
+  statsUsageRequests: 'Requests',
+  statsUsageByModel: 'Model',
+  statsUsageByProvider: 'Provider',
+  statsUsageRecentLogs: 'Recent usage',
+  statsNoUsage: 'No usage this month',
+  statsShare: 'Share stats',
+  statsShareFailed: 'Could not share statistics.',
+  statsOpenWebStats: 'Open Web statistics',
+  statsOpenWebFailed: 'Could not open Web statistics.',
 
   memoryTitle: 'Memory',
   memoryDesc: 'AI remembers your preferences, identity, and experiences',
@@ -3030,6 +3352,81 @@ const zh_tw: TranslationKeys = {
   chatToolStreamingRunning: '執行中…',
   chatToolTapToExpand: '點擊展開',
   chatToolTapToCollapse: '點擊收起',
+  builtinToolGtdClearTodos: '清除待辦',
+  builtinToolGtdCompleteTodos: '完成待辦',
+  builtinToolGtdCreatePlan: '建立計劃',
+  builtinToolGtdCreateTodos: '建立待辦',
+  builtinToolGtdExecTask: '執行任務',
+  builtinToolGtdExecTasks: '執行任務',
+  builtinToolGtdRemoveTodos: '刪除待辦',
+  builtinToolGtdUpdatePlan: '更新計劃',
+  builtinToolGtdUpdateTodos: '更新待辦',
+  builtinToolNotebookCreateDocument: '建立文檔',
+  builtinToolUserMemoryAddExperienceMemory: '添加經歷記憶',
+  builtinToolUserMemoryAddPreferenceMemory: '添加偏好記憶',
+  builtinToolUserMemorySearchUserMemory: '搜尋記憶',
+  builtinToolCloudSandboxExecuteCode: '執行代碼',
+  builtinToolCalculatorBase: '進位轉換',
+  builtinToolCalculatorCalculate: '計算',
+  builtinToolCalculatorDefintegrate: '定積分',
+  builtinToolCalculatorDifferentiate: '求導',
+  builtinToolCalculatorEvaluate: '求值',
+  builtinToolCalculatorExecute: '執行',
+  builtinToolCalculatorIntegrate: '積分',
+  builtinToolCalculatorLimit: '求極限',
+  builtinToolCalculatorSolve: '求解',
+  builtinToolCalculatorSort: '排序',
+  builtinToolWebBrowsingSearch: '網頁搜尋',
+  builtinToolSourceSetReadSourceFiles: '讀取來源文件',
+  builtinToolSourceSetSearchSourceSet: '來源集檢索',
+  builtinToolAgentBuilderGetAvailableModels: '獲取可用模型',
+  builtinToolAgentBuilderInstallPlugin: '安裝插件',
+  builtinToolAgentBuilderSearchMarketTools: '搜尋市場工具',
+  builtinToolAgentBuilderUpdateAgentConfig: '更新 Agent 配置',
+  builtinToolAgentBuilderUpdatePrompt: '更新提示詞',
+  builtinToolAgentManagementCallAgent: '調用 Agent',
+  builtinToolAgentManagementCreateAgent: '建立 Agent',
+  builtinToolAgentManagementDeleteAgent: '刪除 Agent',
+  builtinToolAgentManagementSearchAgent: '搜尋 Agent',
+  builtinToolAgentManagementUpdateAgent: '更新 Agent',
+  builtinToolGroupAgentBuilderBatchCreateAgents: '批量建立 Agent',
+  builtinToolGroupAgentBuilderCreateAgent: '建立 Agent',
+  builtinToolGroupAgentBuilderGetAgentInfo: '獲取成員資訊',
+  builtinToolGroupAgentBuilderGetAvailableModels: '獲取可用模型',
+  builtinToolGroupAgentBuilderInstallPlugin: '安裝插件',
+  builtinToolGroupAgentBuilderInviteAgent: '邀請成員',
+  builtinToolGroupAgentBuilderRemoveAgent: '移除成員',
+  builtinToolGroupAgentBuilderSearchAgent: '搜尋 Agent',
+  builtinToolGroupAgentBuilderSearchMarketTools: '搜尋市場工具',
+  builtinToolGroupAgentBuilderUpdateAgentPrompt: '更新 Agent 提示詞',
+  builtinToolGroupAgentBuilderUpdateConfig: '更新 Agent 配置',
+  builtinToolGroupAgentBuilderUpdateGroup: '更新群組',
+  builtinToolGroupAgentBuilderUpdateGroupPrompt: '更新群組提示詞',
+  builtinToolLocalSystemEditLocalFile: '編輯文件',
+  builtinToolLocalSystemGetCommandOutput: '獲取命令輸出',
+  builtinToolLocalSystemGlobLocalFiles: 'Glob 搜尋文件',
+  builtinToolLocalSystemGrepContent: '內容搜尋',
+  builtinToolLocalSystemKillCommand: '終止命令',
+  builtinToolLocalSystemListLocalFiles: '列出文件',
+  builtinToolLocalSystemMoveLocalFiles: '移動文件',
+  builtinToolLocalSystemReadLocalFile: '讀取文件',
+  builtinToolLocalSystemRenameLocalFile: '重命名',
+  builtinToolLocalSystemRunCommand: '執行命令',
+  builtinToolLocalSystemSearchLocalFiles: '搜尋文件',
+  builtinToolLocalSystemWriteLocalFile: '寫入文件',
+  builtinToolGroupManagementBroadcast: '廣播',
+  builtinToolGroupManagementExecuteAgentTask: '執行任務',
+  builtinToolGroupManagementExecuteAgentTasks: '執行任務',
+  builtinToolGroupManagementSpeak: '發言',
+  builtinToolGroupManagementVote: '投票',
+  builtinToolSkillStoreImportFromMarket: '從市場導入',
+  builtinToolSkillStoreImportSkill: '導入技能',
+  builtinToolSkillStoreSearchSkill: '搜尋技能',
+  builtinToolSkillsExecScript: '執行腳本',
+  builtinToolSkillsExportFile: '匯出文件',
+  builtinToolSkillsReadReference: '讀取引用',
+  builtinToolSkillsRunSkill: '運行技能',
+  builtinToolSkillsSearchSkill: '搜尋技能',
   chatShowMore: '展開更多',
   chatShowLess: '收起',
   chatAskAnything: '有什麼可以幫助你的嗎？',
@@ -3131,6 +3528,9 @@ const zh_tw: TranslationKeys = {
   groupAddMembers: '新增成員',
   groupCreateDefaultTitle: '新群組會話',
   groupStartConversation: '開始對話',
+  groupOpenWebProfile: '打開 Web 群組工作台',
+  groupOpenWebProfileDesc: '在 Web 管理群組資料、成員助手與進階群組編輯。',
+  groupOpenWebFailed: '無法打開 Web 群組工作台',
   groupCreateSupervisorModel: '主持人模型',
   groupMentionAllMembers: '全體成員',
   groupMentionTitle: '提及',
@@ -3208,6 +3608,12 @@ const zh_tw: TranslationKeys = {
   agentConfigOpenStore: '打開助手商店',
   agentConfigSkills: '技能',
   agentConfigSkillsIds: '技能 ID（逗號分隔）',
+  agentConfigWebManagement: '自動化與渠道',
+  agentConfigCronJobs: '定時任務',
+  agentConfigCronJobsDesc: '打開 Web 建立與管理助手定時任務。',
+  agentConfigChannels: '渠道',
+  agentConfigChannelsDesc: '打開 Web 配置機器人渠道與 Webhook。',
+  agentConfigOpenWebFailed: '無法打開 Web 管理頁',
   agentConfigAdvanced: '進階設定',
   agentConfigNamePlaceholder: '為你的助手命名',
   agentConfigDescriptionPlaceholder: '新增簡短描述',
@@ -3245,7 +3651,19 @@ const zh_tw: TranslationKeys = {
   settingsGroupI18n: '國際化',
   settingsGroupMemory: '記憶',
   settingsGroupData: '資料與語音',
+  settingsGroupAdvanced: '進階',
   settingsGroupAccount: '帳戶',
+  settingsOpenWebSettings: '打開 Web 設定',
+  settingsOpenWebSettingsDesc: '進階、API Key、安全、代理與帳單設定。',
+  settingsOpenWebStudio: '打開 Web 工作室',
+  settingsOpenWebStudioDesc: '在 Web 使用工作流工作室與進階 MCP 編排。',
+  settingsOpenWebMcpStudio: '打開 MCP Studio',
+  settingsOpenWebMcpStudioDesc: '前往 Web MCP 工作流工作室。',
+  settingsOpenWebImage: '打開 Web 圖像',
+  settingsOpenWebImageDesc: '使用完整 Web 圖像工作區與生成歷史。',
+  settingsOpenWebVideo: '打開 Web 影片',
+  settingsOpenWebVideoDesc: '使用完整 Web 影片工作區與生成歷史。',
+  settingsOpenWebFailed: '無法打開 Web 設定',
   settingsHeaderSubtitle: '個人資料、工作區與偏好',
   settingsConnectionAlsoInOverview: '完整設定——與上方概覽捷徑相同目標',
   settingsComingSoonSection: '即將推出',
@@ -3334,6 +3752,33 @@ const zh_tw: TranslationKeys = {
   workspaceManageSourceSet: '管理來源集',
   workspaceSwitchSpaces: '空間',
   workspaceSwitchSourceSets: '來源集',
+  spaceSettingsTitle: '空間設定',
+  spaceSettingsProfile: '基本資料',
+  spaceSettingsLoadFailed: '無法載入空間設定',
+  spaceSettingsSaved: '空間已更新',
+  spaceMembersTitle: '成員',
+  spaceMembersLoadFailed: '無法載入成員',
+  spaceMemberUsernamePlaceholder: '使用者名稱',
+  spaceMemberAdd: '新增成員',
+  spaceMemberAdded: '成員已新增',
+  spaceMemberAddFailed: '無法新增成員',
+  spaceMemberRoleUpdated: '角色已更新',
+  spaceMemberRemove: '移除',
+  spaceMemberRemoveTitle: '移除成員',
+  spaceMemberRemoveDesc: '要將此成員從空間移除嗎？',
+  spaceMemberRemoved: '成員已移除',
+  spaceTransferOwner: '轉移擁有者',
+  spaceTransferOwnerTitle: '轉移擁有權',
+  spaceTransferOwnerDesc: '要將擁有權轉移給此成員嗎？',
+  spaceTransferOwnerDone: '擁有權已轉移',
+  spaceDelete: '刪除空間',
+  spaceDeleteTitle: '刪除空間',
+  spaceDeleteDesc: '這會永久刪除此團隊空間。',
+  spaceDeleted: '空間已刪除',
+  spaceRoleOwner: '擁有者',
+  spaceRoleAdmin: '管理員',
+  spaceRoleEditor: '編輯者',
+  spaceRoleViewer: '檢視者',
 
   msgActionCopy: '複製',
   msgActionEdit: '編輯',
@@ -3822,6 +4267,19 @@ const zh_tw: TranslationKeys = {
     '請確認連結與密碼是否正確；密碼錯誤時顯示可能與連結過期相同。',
   resourcePublicShareDownloadFailed: '無法開啟下載連結。',
   resourcePublicShareSourceSetHint: '若要瀏覽完整來源集與檔案列表，請在瀏覽器使用 LobeHub。',
+  topicPublicShareTitle: '分享的話題',
+  topicPublicShareSubtitle: '唯讀對話',
+  topicPublicShareNotFound: '無法開啟此話題分享。',
+  topicPublicShareNotFoundHint: '連結可能無效、已設為私人或已過期。',
+  topicPublicShareMessagesEmpty: '此分享話題沒有訊息',
+  topicPublicShareMessagesEmptyDesc: '目前沒有可預覽內容。',
+  topicPublicShareFromAgent: '助手',
+  topicPublicShareFromGroup: '群組',
+  topicPublicShareMessageCount: '{count} 則訊息',
+  topicPublicShareFindMore: '發現更多',
+  topicPublicShareTryItYourself: '試用助手',
+  topicPublicShareDisclaimer: '此內容由使用者分享，不代表 Avato 的立場。',
+  topicPublicShareOpenFailed: '無法打開連結',
   resourceGovernanceUsageInternal: '內部',
   resourceGovernanceUsagePublic: '公開',
   resourceGovernanceUsageRestricted: '受限',
@@ -3923,7 +4381,14 @@ const zh_tw: TranslationKeys = {
   tabStore: '商店',
   storeSearch: '搜尋擴充項目...',
   storeExplore: '探索',
+  storeAgents: '智能體',
+  storeAggregatorMcp: 'MCP 聚合',
+  storeAggregatorSkills: 'SkillHub',
+  storeGroupAgents: '智能體群組',
   storeMcp: 'MCP',
+  storeModels: '模型',
+  storePlugins: '插件',
+  storeProviders: '供應商',
   storeSkills: '技能',
   storeInstalled: '已安裝',
   storeEmpty: '未找到擴充項目',
@@ -3933,6 +4398,10 @@ const zh_tw: TranslationKeys = {
   storeBuiltIn: '內建',
   storeFromStore: '商店',
   storeImported: '已匯入',
+  storePreviewOnly: '僅預覽',
+  storePreviewOnlyDesc: '此市場項目可在手機端瀏覽，安裝與工作區操作仍請在 Web 端完成。',
+  storeOpenWebDetail: '打開 Web 詳情',
+  storeOpenWebDetailFailed: '無法打開 Web 詳情',
   storeRemove: '移除',
   storeRemoveConfirm: '移除擴充項目',
   storeRemoveDesc: '要移除此擴充項目嗎？',
@@ -4086,6 +4555,19 @@ const zh_tw: TranslationKeys = {
   statsHeatmapDayTitle: '活動',
   statsHeatmapDayMessage: '日期：{date}\n訊息數：{count}\n強度：{level} / 4',
   statsHeatmapCellA11y: '{date}，強度 {level} / 4',
+  statsUsage: '用量',
+  statsUsageMonth: '{month}',
+  statsUsageSpend: '花費',
+  statsUsageTokens: 'Tokens',
+  statsUsageRequests: '請求',
+  statsUsageByModel: '模型',
+  statsUsageByProvider: '供應商',
+  statsUsageRecentLogs: '近期用量',
+  statsNoUsage: '本月暫無用量',
+  statsShare: '分享統計',
+  statsShareFailed: '無法分享統計。',
+  statsOpenWebStats: '打開 Web 統計',
+  statsOpenWebFailed: '無法打開 Web 統計。',
 
   memoryTitle: '記憶',
   memoryDesc: 'AI 記住你的偏好、身分和經驗',
@@ -4456,6 +4938,81 @@ const zh: TranslationKeys = {
   chatToolStreamingRunning: '执行中…',
   chatToolTapToExpand: '点击展开',
   chatToolTapToCollapse: '点击收起',
+  builtinToolGtdClearTodos: '清除待办',
+  builtinToolGtdCompleteTodos: '完成待办',
+  builtinToolGtdCreatePlan: '创建计划',
+  builtinToolGtdCreateTodos: '创建待办',
+  builtinToolGtdExecTask: '执行任务',
+  builtinToolGtdExecTasks: '执行任务',
+  builtinToolGtdRemoveTodos: '删除待办',
+  builtinToolGtdUpdatePlan: '更新计划',
+  builtinToolGtdUpdateTodos: '更新待办',
+  builtinToolNotebookCreateDocument: '创建文档',
+  builtinToolUserMemoryAddExperienceMemory: '添加经历记忆',
+  builtinToolUserMemoryAddPreferenceMemory: '添加偏好记忆',
+  builtinToolUserMemorySearchUserMemory: '搜索记忆',
+  builtinToolCloudSandboxExecuteCode: '执行代码',
+  builtinToolCalculatorBase: '进制转换',
+  builtinToolCalculatorCalculate: '计算',
+  builtinToolCalculatorDefintegrate: '定积分',
+  builtinToolCalculatorDifferentiate: '求导',
+  builtinToolCalculatorEvaluate: '求值',
+  builtinToolCalculatorExecute: '执行',
+  builtinToolCalculatorIntegrate: '积分',
+  builtinToolCalculatorLimit: '求极限',
+  builtinToolCalculatorSolve: '求解',
+  builtinToolCalculatorSort: '排序',
+  builtinToolWebBrowsingSearch: '网页搜索',
+  builtinToolSourceSetReadSourceFiles: '读取来源文件',
+  builtinToolSourceSetSearchSourceSet: '来源集检索',
+  builtinToolAgentBuilderGetAvailableModels: '获取可用模型',
+  builtinToolAgentBuilderInstallPlugin: '安装插件',
+  builtinToolAgentBuilderSearchMarketTools: '搜索市场工具',
+  builtinToolAgentBuilderUpdateAgentConfig: '更新 Agent 配置',
+  builtinToolAgentBuilderUpdatePrompt: '更新提示词',
+  builtinToolAgentManagementCallAgent: '调用 Agent',
+  builtinToolAgentManagementCreateAgent: '创建 Agent',
+  builtinToolAgentManagementDeleteAgent: '删除 Agent',
+  builtinToolAgentManagementSearchAgent: '搜索 Agent',
+  builtinToolAgentManagementUpdateAgent: '更新 Agent',
+  builtinToolGroupAgentBuilderBatchCreateAgents: '批量创建 Agent',
+  builtinToolGroupAgentBuilderCreateAgent: '创建 Agent',
+  builtinToolGroupAgentBuilderGetAgentInfo: '获取成员信息',
+  builtinToolGroupAgentBuilderGetAvailableModels: '获取可用模型',
+  builtinToolGroupAgentBuilderInstallPlugin: '安装插件',
+  builtinToolGroupAgentBuilderInviteAgent: '邀请成员',
+  builtinToolGroupAgentBuilderRemoveAgent: '移除成员',
+  builtinToolGroupAgentBuilderSearchAgent: '搜索 Agent',
+  builtinToolGroupAgentBuilderSearchMarketTools: '搜索市场工具',
+  builtinToolGroupAgentBuilderUpdateAgentPrompt: '更新 Agent 提示词',
+  builtinToolGroupAgentBuilderUpdateConfig: '更新 Agent 配置',
+  builtinToolGroupAgentBuilderUpdateGroup: '更新群组',
+  builtinToolGroupAgentBuilderUpdateGroupPrompt: '更新群组提示词',
+  builtinToolLocalSystemEditLocalFile: '编辑文件',
+  builtinToolLocalSystemGetCommandOutput: '获取命令输出',
+  builtinToolLocalSystemGlobLocalFiles: 'Glob 搜索文件',
+  builtinToolLocalSystemGrepContent: '内容搜索',
+  builtinToolLocalSystemKillCommand: '终止命令',
+  builtinToolLocalSystemListLocalFiles: '列出文件',
+  builtinToolLocalSystemMoveLocalFiles: '移动文件',
+  builtinToolLocalSystemReadLocalFile: '读取文件',
+  builtinToolLocalSystemRenameLocalFile: '重命名',
+  builtinToolLocalSystemRunCommand: '执行命令',
+  builtinToolLocalSystemSearchLocalFiles: '搜索文件',
+  builtinToolLocalSystemWriteLocalFile: '写入文件',
+  builtinToolGroupManagementBroadcast: '广播',
+  builtinToolGroupManagementExecuteAgentTask: '执行任务',
+  builtinToolGroupManagementExecuteAgentTasks: '执行任务',
+  builtinToolGroupManagementSpeak: '发言',
+  builtinToolGroupManagementVote: '投票',
+  builtinToolSkillStoreImportFromMarket: '从市场导入',
+  builtinToolSkillStoreImportSkill: '导入技能',
+  builtinToolSkillStoreSearchSkill: '搜索技能',
+  builtinToolSkillsExecScript: '执行脚本',
+  builtinToolSkillsExportFile: '导出文件',
+  builtinToolSkillsReadReference: '读取引用',
+  builtinToolSkillsRunSkill: '运行技能',
+  builtinToolSkillsSearchSkill: '搜索技能',
   chatShowMore: '展开更多',
   chatShowLess: '收起',
   chatAskAnything: '问我任何问题...',
@@ -4558,6 +5115,9 @@ const zh: TranslationKeys = {
   groupAddMembers: '添加成员',
   groupCreateDefaultTitle: '新群组会话',
   groupStartConversation: '开始对话',
+  groupOpenWebProfile: '打开 Web 群组工作台',
+  groupOpenWebProfileDesc: '在 Web 管理群组资料、成员助手与高级群组编辑。',
+  groupOpenWebFailed: '无法打开 Web 群组工作台',
   groupCreateSupervisorModel: '主持人模型',
   groupMentionAllMembers: '全体成员',
   groupMentionTitle: '提及',
@@ -4634,6 +5194,12 @@ const zh: TranslationKeys = {
   agentConfigOpenStore: '打开助手商店',
   agentConfigSkills: '技能',
   agentConfigSkillsIds: '技能 ID（逗号分隔）',
+  agentConfigWebManagement: '自动化与渠道',
+  agentConfigCronJobs: '定时任务',
+  agentConfigCronJobsDesc: '打开 Web 创建和管理助手定时任务。',
+  agentConfigChannels: '渠道',
+  agentConfigChannelsDesc: '打开 Web 配置机器人渠道与 Webhook。',
+  agentConfigOpenWebFailed: '无法打开 Web 管理页',
   agentConfigAdvanced: '进阶设置',
   agentConfigNamePlaceholder: '给你的助手起个名字',
   agentConfigDescriptionPlaceholder: '添加一句简短描述',
@@ -4671,7 +5237,19 @@ const zh: TranslationKeys = {
   settingsGroupI18n: '国际化',
   settingsGroupMemory: '记忆',
   settingsGroupData: '数据与语音',
+  settingsGroupAdvanced: '高级',
   settingsGroupAccount: '账户',
+  settingsOpenWebSettings: '打开 Web 设置',
+  settingsOpenWebSettingsDesc: '高级、API Key、安全、代理与账单设置。',
+  settingsOpenWebStudio: '打开 Web 工作室',
+  settingsOpenWebStudioDesc: '在 Web 使用工作流工作室与高级 MCP 编排。',
+  settingsOpenWebMcpStudio: '打开 MCP Studio',
+  settingsOpenWebMcpStudioDesc: '前往 Web MCP 工作流工作室。',
+  settingsOpenWebImage: '打开 Web 图像',
+  settingsOpenWebImageDesc: '使用完整 Web 图像工作区与生成历史。',
+  settingsOpenWebVideo: '打开 Web 视频',
+  settingsOpenWebVideoDesc: '使用完整 Web 视频工作区与生成历史。',
+  settingsOpenWebFailed: '无法打开 Web 设置',
   settingsHeaderSubtitle: '个人资料、工作区与偏好',
   settingsConnectionAlsoInOverview: '完整设置——与上方概览快捷相同入口',
   settingsComingSoonSection: '即将推出',
@@ -4760,6 +5338,33 @@ const zh: TranslationKeys = {
   workspaceManageSourceSet: '管理来源集',
   workspaceSwitchSpaces: '空间',
   workspaceSwitchSourceSets: '来源集',
+  spaceSettingsTitle: '空间设置',
+  spaceSettingsProfile: '基本信息',
+  spaceSettingsLoadFailed: '无法加载空间设置',
+  spaceSettingsSaved: '空间已更新',
+  spaceMembersTitle: '成员',
+  spaceMembersLoadFailed: '无法加载成员',
+  spaceMemberUsernamePlaceholder: '用户名',
+  spaceMemberAdd: '添加成员',
+  spaceMemberAdded: '成员已添加',
+  spaceMemberAddFailed: '无法添加成员',
+  spaceMemberRoleUpdated: '角色已更新',
+  spaceMemberRemove: '移除',
+  spaceMemberRemoveTitle: '移除成员',
+  spaceMemberRemoveDesc: '要将此成员从空间移除吗？',
+  spaceMemberRemoved: '成员已移除',
+  spaceTransferOwner: '转移所有者',
+  spaceTransferOwnerTitle: '转移所有权',
+  spaceTransferOwnerDesc: '要将所有权转移给此成员吗？',
+  spaceTransferOwnerDone: '所有权已转移',
+  spaceDelete: '删除空间',
+  spaceDeleteTitle: '删除空间',
+  spaceDeleteDesc: '这会永久删除此团队空间。',
+  spaceDeleted: '空间已删除',
+  spaceRoleOwner: '所有者',
+  spaceRoleAdmin: '管理员',
+  spaceRoleEditor: '编辑者',
+  spaceRoleViewer: '查看者',
 
   msgActionCopy: '复制',
   msgActionEdit: '编辑',
@@ -5248,6 +5853,19 @@ const zh: TranslationKeys = {
   resourcePublicShareNotFoundHint: '请核对链接与密码；密码错误时提示可能与链接过期相同。',
   resourcePublicShareDownloadFailed: '无法打开下载链接。',
   resourcePublicShareSourceSetHint: '若要查看完整来源集与文件列表，请在浏览器中使用 LobeHub。',
+  topicPublicShareTitle: '分享的话题',
+  topicPublicShareSubtitle: '只读对话',
+  topicPublicShareNotFound: '无法打开此话题分享。',
+  topicPublicShareNotFoundHint: '链接可能无效、已设为私有或已过期。',
+  topicPublicShareMessagesEmpty: '此分享话题没有消息',
+  topicPublicShareMessagesEmptyDesc: '目前没有可预览内容。',
+  topicPublicShareFromAgent: '助手',
+  topicPublicShareFromGroup: '群组',
+  topicPublicShareMessageCount: '{count} 条消息',
+  topicPublicShareFindMore: '发现更多',
+  topicPublicShareTryItYourself: '试用助手',
+  topicPublicShareDisclaimer: '此内容由用户分享，不代表 Avato 的立场。',
+  topicPublicShareOpenFailed: '无法打开链接',
   resourceGovernanceUsageInternal: '内部',
   resourceGovernanceUsagePublic: '公开',
   resourceGovernanceUsageRestricted: '受限',
@@ -5349,7 +5967,14 @@ const zh: TranslationKeys = {
   tabStore: '商店',
   storeSearch: '搜索扩展...',
   storeExplore: '探索',
+  storeAgents: '智能体',
+  storeAggregatorMcp: 'MCP 聚合',
+  storeAggregatorSkills: 'SkillHub',
+  storeGroupAgents: '智能体群组',
   storeMcp: 'MCP',
+  storeModels: '模型',
+  storePlugins: '插件',
+  storeProviders: '服务商',
   storeSkills: '技能',
   storeInstalled: '已安装',
   storeEmpty: '未找到扩展',
@@ -5359,6 +5984,10 @@ const zh: TranslationKeys = {
   storeBuiltIn: '内置',
   storeFromStore: '商店',
   storeImported: '已导入',
+  storePreviewOnly: '仅预览',
+  storePreviewOnlyDesc: '此市场项目可在手机端浏览，安装与工作区操作仍请在 Web 端完成。',
+  storeOpenWebDetail: '打开 Web 详情',
+  storeOpenWebDetailFailed: '无法打开 Web 详情',
   storeRemove: '移除',
   storeRemoveConfirm: '移除扩展',
   storeRemoveDesc: '要移除此扩展吗？',
@@ -5512,6 +6141,19 @@ const zh: TranslationKeys = {
   statsHeatmapDayTitle: '活动',
   statsHeatmapDayMessage: '日期：{date}\n消息数：{count}\n强度：{level} / 4',
   statsHeatmapCellA11y: '{date}，强度 {level} / 4',
+  statsUsage: '用量',
+  statsUsageMonth: '{month}',
+  statsUsageSpend: '花费',
+  statsUsageTokens: 'Tokens',
+  statsUsageRequests: '请求',
+  statsUsageByModel: '模型',
+  statsUsageByProvider: '服务商',
+  statsUsageRecentLogs: '近期用量',
+  statsNoUsage: '本月暂无用量',
+  statsShare: '分享统计',
+  statsShareFailed: '无法分享统计。',
+  statsOpenWebStats: '打开 Web 统计',
+  statsOpenWebFailed: '无法打开 Web 统计。',
 
   memoryTitle: '记忆',
   memoryDesc: 'AI 记住你的偏好、身份和经验',

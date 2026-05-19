@@ -56,8 +56,10 @@ import ProfileEditScreen from '../screens/ProfileEditScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProviderDetailScreen from '../screens/ProviderDetailScreen';
 import PublicResourceShareScreen from '../screens/PublicResourceShareScreen';
+import PublicTopicShareScreen from '../screens/PublicTopicShareScreen';
 import ServerConfigScreen from '../screens/ServerConfigScreen';
 import SpaceMemoryScreen from '../screens/SpaceMemoryScreen';
+import SpaceSettingsScreen from '../screens/SpaceSettingsScreen';
 import StatsScreen from '../screens/StatsScreen';
 import StoreScreen from '../screens/StoreScreen';
 import ThreadDetailScreen from '../screens/ThreadDetailScreen';
@@ -650,12 +652,14 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
       <Stack.Screen component={ModelPickerScreen} name="ModelPicker" />
       <Stack.Screen component={ProfileEditScreen} name="ProfileEdit" />
       <Stack.Screen component={PublicResourceShareScreen} name="PublicResourceShare" />
+      <Stack.Screen component={PublicTopicShareScreen} name="PublicTopicShare" />
       <Stack.Screen component={DataManagementScreen} name="DataManagement" />
       <Stack.Screen component={AppLogsScreen} name="AppLogs" />
       <Stack.Screen component={StatsScreen} name="Stats" />
       <Stack.Screen component={MemoryScreen} name="Memory" />
       <Stack.Screen component={MemoryDetailScreen} name="MemoryDetail" />
       <Stack.Screen component={SpaceMemoryScreen} name="SpaceMemory" />
+      <Stack.Screen component={SpaceSettingsScreen} name="SpaceSettings" />
 
       <Stack.Screen component={AgentListScreen} name="AgentList" />
       <Stack.Screen component={AgentConfigScreen} name="AgentConfig" />

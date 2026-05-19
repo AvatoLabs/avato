@@ -107,6 +107,7 @@ interface UseResourceContentOverlayAssemblyProps {
     onCreateSpace: () => void;
     onOpenSharedWithMe: () => void;
     onOpenSpaceMemory?: () => void;
+    onOpenSpaceSettings: (spaceId: string) => void;
     onOpenTrash: () => void;
     onSelectAllFiles: () => void;
     onSelectSourceSet: ResourceContentOverlaysProps['scopeLauncher']['onSelectSourceSet'];
@@ -298,6 +299,7 @@ export function useResourceContentOverlayAssembly({
       onCreateSpace: scopeLauncher.onCreateSpace,
       onOpenSharedWithMe: scopeLauncher.onOpenSharedWithMe,
       onOpenSpaceMemory: scopeLauncher.onOpenSpaceMemory,
+      onOpenSpaceSettings: scopeLauncher.onOpenSpaceSettings,
       onOpenTrash: scopeLauncher.onOpenTrash,
       onSelectAllFiles: scopeLauncher.onSelectAllFiles,
       onSelectSourceSet: scopeLauncher.onSelectSourceSet,

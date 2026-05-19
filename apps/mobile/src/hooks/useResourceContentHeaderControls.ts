@@ -79,6 +79,13 @@ export function useResourceContentHeaderControls({
       });
   }, [currentSpace, rootNavigation]);
 
+  const openSpaceSettings = useCallback(
+    (spaceId: string) => {
+      rootNavigation.navigate('SpaceSettings', { spaceId });
+    },
+    [rootNavigation],
+  );
+
   const sourceSetModeItems = useMemo(
     () => [
       { icon: FolderOpen, label: t.resourceScopeTree, value: 'tree' as const },
@@ -92,6 +99,7 @@ export function useResourceContentHeaderControls({
     handleMissingSourceSetFolderOpen,
     openCurrentSpaceMemory,
     openScopeSpaceMemory,
+    openSpaceSettings,
     sourceSetModeItems,
   };
 }

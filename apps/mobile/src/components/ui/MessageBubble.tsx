@@ -2417,6 +2417,7 @@ function buildToolDisplayProps(
   tool: Pick<ChatToolPayload, 'apiName' | 'arguments' | 'identifier'>,
   fallbackTitle: string,
   locale: string | undefined,
+  translations: I18nStore['t'] | undefined,
   hasResult: boolean,
   isPending: boolean,
 ) {
@@ -2428,7 +2429,10 @@ function buildToolDisplayProps(
     .filter(Boolean)
     .join('\n');
   const displayTitle =
-    getMobileBuiltinDisplayName(tool.identifier, tool.apiName, locale) ||
+    getMobileBuiltinDisplayName(tool.identifier, tool.apiName, {
+      locale,
+      t: (key) => translations?.[key],
+    }) ||
     title ||
     tool.apiName ||
     tool.identifier ||
@@ -3486,6 +3490,7 @@ const ToolCallItem = memo<{
     disableToolActions = false,
     toolActionHandlers,
   }) => {
+    const { t } = useI18n();
     const navigation = useNavigation<RootStackNavigationProp>();
     const route = useRoute();
     const mergedArgsRef = useRef(tool.arguments || '{}');
@@ -3535,6 +3540,7 @@ const ToolCallItem = memo<{
       tool,
       tool.apiName || tool.identifier || '',
       locale,
+      t,
       hasResult,
       isPending,
     );
@@ -3833,6 +3839,7 @@ const ToolResultBlock = memo<{
   toolActionHandlers?: ToolActionHandlers;
   topicId?: string;
 }>(({ message, sessionId, topicId, disableToolActions = false, toolActionHandlers }) => {
+  const { t } = useI18n();
   const navigation = useNavigation<RootStackNavigationProp>();
   const route = useRoute();
   const locale = useI18n((s) => s.locale);
@@ -3855,6 +3862,7 @@ const ToolResultBlock = memo<{
     toolPayload,
     toolName,
     locale,
+    t,
     hasResult,
     isPending || hasError,
   );
@@ -4409,6 +4417,7 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
     thinking,
   }) => {
     const { t } = useI18n();
+    const toast = useToast();
     const colors = useThemeColors();
     const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
     const [expanded, setExpanded] = useState(thinking ?? false);
@@ -4423,6 +4432,18 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
 
     const hasRenderableReasoning = !!content || !!tempDisplayContent?.length;
     const showContent = (expanded || thinking) && hasRenderableReasoning;
+    const handleOpenLink = useCallback(
+      async (url?: string) => {
+        if (!url) return;
+
+        try {
+          await Linking.openURL(url);
+        } catch {
+          toast.show('error', t.errorNetwork);
+        }
+      },
+      [t.errorNetwork, toast],
+    );
 
     return (
       <View className="mb-2">
@@ -4463,17 +4484,14 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
                 markdownRules={markdownRules}
                 markdownStyles={markdownStyles}
                 parts={tempDisplayContent}
-                onOpenLink={(url) => {
-                  if (!url) return;
-                  Linking.openURL(url).catch(() => undefined);
-                }}
+                onOpenLink={(url) => void handleOpenLink(url)}
               />
             ) : (
               <Markdown
                 rules={markdownRules ?? codeInlineRules}
                 style={markdownStyles}
                 onLinkPress={(url) => {
-                  Linking.openURL(url).catch(() => undefined);
+                  void handleOpenLink(url);
                   return false;
                 }}
               >

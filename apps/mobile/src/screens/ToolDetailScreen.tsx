@@ -48,7 +48,7 @@ export default function ToolDetailScreen({
   const BuiltinRender = getMobileBuiltinRender(identifier, apiName);
   const displayTitle =
     title?.trim() ||
-    getMobileBuiltinDisplayName(identifier, apiName, locale) ||
+    getMobileBuiltinDisplayName(identifier, apiName, { locale, t: (key) => t[key] }) ||
     apiName ||
     identifier ||
     t.toolDetailTitle;

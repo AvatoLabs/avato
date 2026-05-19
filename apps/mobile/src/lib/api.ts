@@ -51,6 +51,7 @@ import type {
   MessageContentPart,
   MobileMemoryEffort,
   MobileSpaceItem,
+  MobileSpaceMemberItem,
   MobileSpaceMemoryAuditBatchBundle,
   MobileSpaceMemoryAuditBundle,
   MobileSpaceMemoryEntryPreview,
@@ -59,16 +60,20 @@ import type {
   MobileSpaceMemorySection,
   MobileSpaceMemorySectionResult,
   MobileSpaceMemorySummary,
+  MobileSpaceRole,
   MobileSSOProvider,
   MobileThreadItem,
   MobileUserState,
   ModelRankItem,
   RecentTopic,
   SessionRankItem,
+  SharedTopicData,
   SourceSetItem,
   Tag,
   Topic,
   TopicRankItem,
+  UsageLog,
+  UsageRecordItem,
   UserProfile,
   UserRegistrationDuration,
 } from '../types';
@@ -655,10 +660,12 @@ const unwrapTrpcPayload = <T>(payload: any) => {
   return (data && typeof data === 'object' && 'json' in data ? data.json : data) as T;
 };
 
+type TrpcNamespace = 'lambda' | 'mobile' | 'tools';
+
 async function requestTrpc<T = any>(params: {
   action: 'mutation' | 'query';
   input?: unknown;
-  namespace?: 'lambda' | 'mobile';
+  namespace?: TrpcNamespace;
   procedure: string;
 }): Promise<T> {
   const base = await getBaseUrl();
@@ -697,7 +704,7 @@ async function requestTrpc<T = any>(params: {
 async function trpcQuery<T = any>(
   procedure: string,
   input?: unknown,
-  options?: { namespace?: 'lambda' | 'mobile' },
+  options?: { namespace?: TrpcNamespace },
 ): Promise<T> {
   return requestTrpc<T>({ action: 'query', input, namespace: options?.namespace, procedure });
 }
@@ -705,12 +712,13 @@ async function trpcQuery<T = any>(
 async function trpcMutate<T = any>(
   procedure: string,
   input?: unknown,
-  options?: { namespace?: 'lambda' | 'mobile' },
+  options?: { namespace?: TrpcNamespace },
 ): Promise<T> {
   return requestTrpc<T>({ action: 'mutation', input, namespace: options?.namespace, procedure });
 }
 
 const LAMBDA_TRPC_OPTIONS = { namespace: 'lambda' } as const;
+const TOOLS_TRPC_OPTIONS = { namespace: 'tools' } as const;
 
 const pickFirstNonEmptyString = (...values: Array<string | null | undefined>) => {
   for (const value of values) {
@@ -1199,6 +1207,17 @@ export const messageApi = {
     trpcMutate('message.removeMessages', { ids }),
   search: (keywords: string) =>
     trpcQuery<MessageSearchResult[]>('message.searchMessages', { keywords }),
+};
+
+export const topicShareApi = {
+  getSharedTopic: (shareId: string) =>
+    trpcQuery<SharedTopicData>('share.getSharedTopic', { shareId }, LAMBDA_TRPC_OPTIONS),
+  listMessages: (shareId: string) =>
+    trpcQuery<any[]>(
+      'message.getMessages',
+      { topicShareId: shareId },
+      LAMBDA_TRPC_OPTIONS,
+    ).then((messages) => (messages ?? []).map((message) => normalizeMessage(message))),
 };
 
 export const threadApi = {
@@ -2251,10 +2270,47 @@ export const sourceSetApi = {
 };
 
 export const spaceApi = {
+  addMemberByUsername: (params: {
+    role: Exclude<MobileSpaceRole, 'owner'>;
+    spaceId: string;
+    username: string;
+  }) =>
+    trpcMutate<MobileSpaceMemberItem>('space.addSpaceMemberByUsername', params, LAMBDA_TRPC_OPTIONS),
   create: (value: { description?: string; name: string }) =>
     trpcMutate<MobileSpaceItem>('space.createTeamSpace', value, LAMBDA_TRPC_OPTIONS),
+  delete: (id: string) => trpcMutate<{ success: boolean }>('space.deleteSpace', { id }, LAMBDA_TRPC_OPTIONS),
   getById: (id: string) => trpcQuery<MobileSpaceItem>('space.getSpace', { id }, LAMBDA_TRPC_OPTIONS),
+  listMembers: (spaceId: string) =>
+    trpcQuery<MobileSpaceMemberItem[]>(
+      'space.listSpaceMembers',
+      { spaceId },
+      LAMBDA_TRPC_OPTIONS,
+    ),
   list: () => trpcQuery<MobileSpaceItem[]>('space.listSpaces', undefined, LAMBDA_TRPC_OPTIONS),
+  removeMember: (spaceId: string, userId: string) =>
+    trpcMutate<{ success: boolean }>(
+      'space.removeSpaceMember',
+      { spaceId, userId },
+      LAMBDA_TRPC_OPTIONS,
+    ),
+  transferOwnership: (spaceId: string, userId: string) =>
+    trpcMutate<{ success: boolean }>(
+      'space.transferSpaceOwnership',
+      { spaceId, userId },
+      LAMBDA_TRPC_OPTIONS,
+    ),
+  update: (id: string, value: { description?: string | null; name?: string }) =>
+    trpcMutate<MobileSpaceItem>('space.updateSpace', { id, value }, LAMBDA_TRPC_OPTIONS),
+  updateMemberRole: (
+    spaceId: string,
+    userId: string,
+    role: Exclude<MobileSpaceRole, 'owner'>,
+  ) =>
+    trpcMutate<{ success: boolean }>(
+      'space.updateSpaceMemberRole',
+      { role, spaceId, userId },
+      LAMBDA_TRPC_OPTIONS,
+    ),
 };
 
 // ── Resource API (unified files + documents with folder support) ─────
@@ -2905,8 +2961,8 @@ export const agentSkillApi = {
     trpcMutate<AgentSkillItem>('agentSkills.importFromGitHub', { branch, gitUrl }),
 
   /** Import agent skill from URL */
-  importFromUrl: (url: string) =>
-    trpcMutate<AgentSkillItem>('agentSkills.importFromUrl', { url }),
+  importFromUrl: (url: string, options?: { identifier?: string; source?: 'market' | 'user' }) =>
+    trpcMutate<AgentSkillItem>('agentSkills.importFromUrl', { ...options, url }),
 
   /** Import agent skill from zip file (file must be uploaded first) */
   importFromZip: (zipFileId: string) =>
@@ -2934,16 +2990,60 @@ export const mcpApi = {
 
 // ── Market Skills API ───────────────────────────────────────────────
 export interface MarketListItem {
-  _source: 'builtin' | 'skill' | 'mcp';
+  _source:
+    | 'agent'
+    | 'aggregator_mcp'
+    | 'aggregator_skill'
+    | 'builtin'
+    | 'group_agent'
+    | 'mcp'
+    | 'model'
+    | 'plugin'
+    | 'provider'
+    | 'skill';
+  aggregatorInstallabilityLevel?: string;
+  aggregatorInstallSchema?: MobileAggregatorMcpInstallSchema;
   author?: string;
   avatar?: string;
   category?: string;
   description?: string;
   identifier: string;
+  importIdentifier?: string;
+  importUrl?: string;
   manifest?: Record<string, any>;
   manifestUrl?: string;
   name?: string;
+  repositoryUrl?: string;
+  sourceUrl?: string;
+  webDetailPath?: `/${string}`;
 }
+
+type CommunityMarketSource = Exclude<
+  MarketListItem['_source'],
+  'aggregator_mcp' | 'aggregator_skill' | 'builtin'
+>;
+
+interface MobileAggregatorMcpInstallConfig {
+  args?: string[];
+  command?: string;
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
+  type: 'http' | 'stdio';
+  url?: string;
+}
+
+interface MobileAggregatorMcpInstallSchema {
+  author?: string;
+  config: MobileAggregatorMcpInstallConfig;
+  description?: string;
+  homepage?: string;
+  icon?: string;
+  identifier: string;
+  name?: string;
+  version?: string;
+}
+
+const AGGREGATOR_INSTALLABLE_LEVELS = new Set(['installable', 'verified']);
 
 export interface MarketCategoryItem {
   category: string;
@@ -3011,6 +3111,204 @@ const resolveMarketTotalCount = (result: {
 
   return result.items?.length ?? 0;
 };
+
+const resolveCommunityMarketItems = (result: any, source: CommunityMarketSource): any[] => {
+  if (Array.isArray(result?.items)) return result.items;
+  if (Array.isArray(result)) return result;
+
+  const sourceItemKeys: Record<CommunityMarketSource, string[]> = {
+    agent: ['agents', 'assistants'],
+    group_agent: ['groups', 'agentGroups', 'groupAgents'],
+    mcp: ['mcps', 'servers'],
+    model: ['models'],
+    plugin: ['plugins'],
+    provider: ['providers'],
+    skill: ['skills'],
+  };
+
+  for (const key of sourceItemKeys[source]) {
+    if (Array.isArray(result?.[key])) return result[key];
+  }
+
+  return [];
+};
+
+const normalizeCommunityMarketItem = (source: CommunityMarketSource, item: any): MarketListItem => {
+  const meta = item?.meta || item?.metadata || {};
+  const owner = item?.owner || item?.user || item?.authorInfo || {};
+  const identifier =
+    item?.identifier ||
+    item?.slug ||
+    item?.id ||
+    item?.name ||
+    item?.displayName ||
+    meta?.title ||
+    '';
+
+  return {
+    ...item,
+    _source: source,
+    author:
+      item?.author ||
+      owner?.name ||
+      owner?.nickname ||
+      owner?.username ||
+      item?.publisher ||
+      item?.providerId,
+    avatar:
+      meta?.avatar ||
+      item?.avatar ||
+      item?.icon ||
+      item?.logo ||
+      item?.image ||
+      item?.profilePictureUrl,
+    category: item?.category ?? meta?.category ?? item?.type ?? item?.providerId,
+    description: meta?.description || item?.description || item?.summary || item?.bio || '',
+    identifier: String(identifier),
+    manifest: item?.manifest,
+    manifestUrl: item?.manifestUrl,
+    name:
+      meta?.title ||
+      item?.displayName ||
+      item?.name ||
+      item?.title ||
+      item?.label ||
+      String(identifier),
+  };
+};
+
+const normalizeCommunityMarketListResult = (
+  result: any,
+  source: CommunityMarketSource,
+  input: { page: number; pageSize: number },
+): CommunityMarketListResult => {
+  const rawItems = resolveCommunityMarketItems(result, source);
+  const pageSize =
+    typeof result?.pageSize === 'number' && result.pageSize > 0 ? result.pageSize : input.pageSize;
+  const totalCount = resolveMarketTotalCount({ ...result, items: rawItems });
+
+  return {
+    currentPage:
+      typeof result?.currentPage === 'number' && result.currentPage > 0
+        ? result.currentPage
+        : input.page,
+    items: rawItems
+      .map((item) => normalizeCommunityMarketItem(source, item))
+      .filter((item) => item.identifier),
+    pageSize,
+    totalCount,
+    totalPages:
+      typeof result?.totalPages === 'number' && result.totalPages > 0
+        ? result.totalPages
+        : Math.max(Math.ceil(totalCount / pageSize), 1),
+  };
+};
+
+const getFirstAggregatorSource = (sources: unknown) =>
+  Array.isArray(sources) && typeof sources[0] === 'string' ? sources[0] : undefined;
+
+const getFirstAggregatorSourceUrl = (sourceLinks: unknown) => {
+  if (!Array.isArray(sourceLinks)) return undefined;
+  const first = sourceLinks.find((item) => typeof item?.url === 'string' && item.url.trim());
+  return first?.url;
+};
+
+const createAggregatorWebDetailPath = (
+  kind: 'mcp' | 'skills',
+  identifier: string,
+): `/${string}` => {
+  const query = `q=${encodeURIComponent(identifier)}`;
+  return kind === 'skills'
+    ? `/community/aggregator?kind=skills&${query}`
+    : `/community/aggregator?${query}`;
+};
+
+const normalizeAggregatorMcpMarketItem = (item: any): MarketListItem => {
+  const source = getFirstAggregatorSource(item?.sources);
+  const identifier = item?.identifier || item?.id || item?.title || '';
+  const sourceUrl =
+    item?.homepage || getFirstAggregatorSourceUrl(item?.sourceLinks) || item?.repositoryUrl;
+
+  return {
+    ...item,
+    _source: 'aggregator_mcp',
+    aggregatorInstallSchema: item?.installability?.installSchema,
+    aggregatorInstallabilityLevel: item?.installability?.level,
+    author: item?.installability?.installSchema?.author || (item?.isOfficial ? 'official' : source),
+    avatar: item?.icon,
+    category: source || (item?.isOfficial ? 'official' : undefined),
+    description: item?.description || '',
+    identifier: String(identifier),
+    name: item?.title || item?.name || String(identifier),
+    repositoryUrl: item?.repositoryUrl,
+    sourceUrl,
+    webDetailPath: createAggregatorWebDetailPath('mcp', String(identifier)),
+  };
+};
+
+const normalizeAggregatorSkillMarketItem = (item: any): MarketListItem => {
+  const source = getFirstAggregatorSource(item?.sources);
+  const identifier = item?.importIdentifier || item?.identifier || item?.slug || item?.id || '';
+  const sourceUrl = item?.homepage || getFirstAggregatorSourceUrl(item?.sourceLinks);
+
+  return {
+    ...item,
+    _source: 'aggregator_skill',
+    aggregatorInstallabilityLevel: item?.installability?.level,
+    author: item?.ownerName || source,
+    category: item?.category || source,
+    description: item?.description || '',
+    identifier: String(identifier),
+    importIdentifier: item?.importIdentifier || String(identifier),
+    importUrl: item?.importUrl,
+    name: item?.title || item?.name || String(identifier),
+    sourceUrl,
+    webDetailPath: createAggregatorWebDetailPath('skills', String(identifier)),
+  };
+};
+
+const normalizeAggregatorMarketListResult = (
+  result: any,
+  source: 'aggregator_mcp' | 'aggregator_skill',
+  input: { page: number; pageSize: number },
+): CommunityMarketListResult => {
+  const rawItems = Array.isArray(result?.items) ? result.items : [];
+  const pageSize =
+    typeof result?.pageSize === 'number' && result.pageSize > 0 ? result.pageSize : input.pageSize;
+  const totalCount = resolveMarketTotalCount({ ...result, items: rawItems });
+  const normalize =
+    source === 'aggregator_mcp'
+      ? normalizeAggregatorMcpMarketItem
+      : normalizeAggregatorSkillMarketItem;
+  const items = rawItems
+    .map((item: any) => normalize(item))
+    .filter((item: MarketListItem) => item.identifier);
+
+  return {
+    currentPage:
+      typeof result?.currentPage === 'number' && result.currentPage > 0
+        ? result.currentPage
+        : input.page,
+    items,
+    pageSize,
+    totalCount,
+    totalPages:
+      typeof result?.totalPages === 'number' && result.totalPages > 0
+        ? result.totalPages
+        : Math.max(Math.ceil(totalCount / pageSize), 1),
+  };
+};
+
+const isAggregatorMcpInstallable = (item: MarketListItem) =>
+  item._source === 'aggregator_mcp' &&
+  Boolean(item.aggregatorInstallSchema?.config?.url) &&
+  item.aggregatorInstallSchema?.config?.type === 'http' &&
+  AGGREGATOR_INSTALLABLE_LEVELS.has(item.aggregatorInstallabilityLevel || '');
+
+const isAggregatorSkillInstallable = (item: MarketListItem) =>
+  item._source === 'aggregator_skill' &&
+  Boolean(item.importUrl) &&
+  AGGREGATOR_INSTALLABLE_LEVELS.has(item.aggregatorInstallabilityLevel || '');
 
 export const marketSkillApi = {
   getMcpList: async (params?: {
@@ -3135,6 +3433,174 @@ export const marketSkillApi = {
     }
   },
 
+  getAgentList: async (params?: {
+    category?: string;
+    page?: number;
+    pageSize?: number;
+    q?: string;
+  }, options?: CommunityMarketRequestOptions): Promise<CommunityMarketListResult> => {
+    const input = {
+      category: params?.category,
+      includeAgentGroup: false,
+      locale: getCommunityMarketLocale(),
+      page: params?.page ?? 1,
+      pageSize: normalizeCommunityMarketPageSize(params?.pageSize),
+      q: params?.q,
+      sort: 'recommended' as const,
+    };
+
+    const result = await requestCommunityMarket({
+      fetcher: () => trpcQuery<any>('market.getAssistantList', input),
+      options,
+      scope: 'market.getAssistantList',
+      values: input,
+    });
+
+    return normalizeCommunityMarketListResult(result, 'agent', input);
+  },
+
+  getGroupAgentList: async (params?: {
+    category?: string;
+    page?: number;
+    pageSize?: number;
+    q?: string;
+  }, options?: CommunityMarketRequestOptions): Promise<CommunityMarketListResult> => {
+    const input = {
+      category: params?.category,
+      locale: getCommunityMarketLocale(),
+      page: params?.page ?? 1,
+      pageSize: normalizeCommunityMarketPageSize(params?.pageSize),
+      q: params?.q,
+      sort: 'recommended' as const,
+    };
+
+    const result = await requestCommunityMarket({
+      fetcher: () => trpcQuery<any>('market.getGroupAgentList', input),
+      options,
+      scope: 'market.getGroupAgentList',
+      values: input,
+    });
+
+    return normalizeCommunityMarketListResult(result, 'group_agent', input);
+  },
+
+  getModelList: async (params?: {
+    category?: string;
+    page?: number;
+    pageSize?: number;
+    q?: string;
+  }, options?: CommunityMarketRequestOptions): Promise<CommunityMarketListResult> => {
+    const input = {
+      category: params?.category,
+      locale: getCommunityMarketLocale(),
+      page: params?.page ?? 1,
+      pageSize: normalizeCommunityMarketPageSize(params?.pageSize),
+      q: params?.q,
+    };
+
+    const result = await requestCommunityMarket({
+      fetcher: () => trpcQuery<any>('market.getModelList', input),
+      options,
+      scope: 'market.getModelList',
+      values: input,
+    });
+
+    return normalizeCommunityMarketListResult(result, 'model', input);
+  },
+
+  getPluginList: async (params?: {
+    category?: string;
+    page?: number;
+    pageSize?: number;
+    q?: string;
+  }, options?: CommunityMarketRequestOptions): Promise<CommunityMarketListResult> => {
+    const input = {
+      category: params?.category,
+      locale: getCommunityMarketLocale(),
+      page: params?.page ?? 1,
+      pageSize: normalizeCommunityMarketPageSize(params?.pageSize),
+      q: params?.q,
+    };
+
+    const result = await requestCommunityMarket({
+      fetcher: () => trpcQuery<any>('market.getPluginList', input),
+      options,
+      scope: 'market.getPluginList',
+      values: input,
+    });
+
+    return normalizeCommunityMarketListResult(result, 'plugin', input);
+  },
+
+  getProviderList: async (params?: {
+    page?: number;
+    pageSize?: number;
+    q?: string;
+  }, options?: CommunityMarketRequestOptions): Promise<CommunityMarketListResult> => {
+    const input = {
+      locale: getCommunityMarketLocale(),
+      page: params?.page ?? 1,
+      pageSize: normalizeCommunityMarketPageSize(params?.pageSize),
+      q: params?.q,
+      sort: 'default' as const,
+    };
+
+    const result = await requestCommunityMarket({
+      fetcher: () => trpcQuery<any>('market.getProviderList', input),
+      options,
+      scope: 'market.getProviderList',
+      values: input,
+    });
+
+    return normalizeCommunityMarketListResult(result, 'provider', input);
+  },
+
+  getAggregatorMcpList: async (params?: {
+    page?: number;
+    pageSize?: number;
+    q?: string;
+  }, options?: CommunityMarketRequestOptions): Promise<CommunityMarketListResult> => {
+    const input = {
+      page: params?.page ?? 1,
+      pageSize: normalizeCommunityMarketPageSize(params?.pageSize),
+      q: params?.q,
+      sort: 'relevance' as const,
+      source: 'all' as const,
+    };
+
+    const result = await requestCommunityMarket({
+      fetcher: () => trpcQuery<any>('aggregator.getRegistryEntries', input),
+      options,
+      scope: 'aggregator.getRegistryEntries',
+      values: input,
+    });
+
+    return normalizeAggregatorMarketListResult(result, 'aggregator_mcp', input);
+  },
+
+  getAggregatorSkillList: async (params?: {
+    page?: number;
+    pageSize?: number;
+    q?: string;
+  }, options?: CommunityMarketRequestOptions): Promise<CommunityMarketListResult> => {
+    const input = {
+      page: params?.page ?? 1,
+      pageSize: normalizeCommunityMarketPageSize(params?.pageSize),
+      q: params?.q,
+      sort: 'relevance' as const,
+      source: 'all' as const,
+    };
+
+    const result = await requestCommunityMarket({
+      fetcher: () => trpcQuery<any>('aggregator.getSkillEntries', input),
+      options,
+      scope: 'aggregator.getSkillEntries',
+      values: input,
+    });
+
+    return normalizeAggregatorMarketListResult(result, 'aggregator_skill', input);
+  },
+
   getList: async (params?: {
     category?: string;
     page?: number;
@@ -3168,6 +3634,49 @@ export const marketSkillApi = {
   },
 
   install: async (item: MarketListItem): Promise<void> => {
+    if (isAggregatorSkillInstallable(item)) {
+      await agentSkillApi.importFromUrl(item.importUrl!, {
+        identifier: item.importIdentifier || item.identifier,
+        source: 'market',
+      });
+      return;
+    }
+
+    if (isAggregatorMcpInstallable(item)) {
+      const installSchema = item.aggregatorInstallSchema!;
+      const headers = normalizeHeaderRecord(installSchema.config.headers);
+      const manifest = await mcpApi.getStreamableMcpServerManifest({
+        ...(headers ? { headers } : {}),
+        identifier: installSchema.identifier || item.identifier,
+        metadata: {
+          avatar: installSchema.icon || item.avatar,
+          description: installSchema.description || item.description,
+        },
+        url: installSchema.config.url!,
+      });
+
+      await trpcMutate('plugin.createOrInstallPlugin', {
+        customParams: {
+          avatar: installSchema.icon || item.avatar,
+          description: installSchema.description || item.description,
+          mcp: {
+            ...(headers ? { headers } : {}),
+            type: 'http' as const,
+            url: installSchema.config.url,
+          },
+        },
+        identifier: installSchema.identifier || item.identifier,
+        manifest: manifest || {},
+        type: 'customPlugin' as const,
+        settings: {},
+      });
+      return;
+    }
+
+    if (item._source === 'aggregator_mcp' || item._source === 'aggregator_skill') {
+      throw new Error('Aggregator item is not installable on mobile');
+    }
+
     if (item._source === 'skill') {
       await trpcMutate('agentSkills.importFromMarket', { identifier: item.identifier });
       return;
@@ -3238,6 +3747,32 @@ export const marketSkillApi = {
   getMcpDetail: (identifier: string) =>
     trpcQuery<any>('market.getMcpDetail', { identifier, locale: getCommunityMarketLocale() }),
 
+  getAgentDetail: (identifier: string) =>
+    trpcQuery<any>('market.getAssistantDetail', { identifier, locale: getCommunityMarketLocale() }),
+
+  getGroupAgentDetail: (identifier: string) =>
+    trpcQuery<any>('market.getGroupAgentDetail', {
+      identifier,
+      locale: getCommunityMarketLocale(),
+    }),
+
+  getModelDetail: (identifier: string) =>
+    trpcQuery<any>('market.getModelDetail', { identifier, locale: getCommunityMarketLocale() }),
+
+  getPluginDetail: (identifier: string) =>
+    trpcQuery<any>('market.getPluginDetail', {
+      identifier,
+      locale: getCommunityMarketLocale(),
+      withManifest: true,
+    }),
+
+  getProviderDetail: (identifier: string) =>
+    trpcQuery<any>('market.getProviderDetail', {
+      identifier,
+      locale: getCommunityMarketLocale(),
+      withReadme: true,
+    }),
+
   getDetail: (identifier: string) =>
     trpcQuery<any>('market.skill.getSkillDetail', {
       identifier,
@@ -3285,15 +3820,98 @@ export const marketSkillApi = {
         .map((item) => normalizeMarketCategoryItem(item))
         .filter((item): item is MarketCategoryItem => Boolean(item)),
     ),
+
+  getAgentCategories: (
+    params?: {
+      q?: string;
+    },
+    options?: CommunityMarketRequestOptions,
+  ) =>
+    requestCommunityMarket({
+      fetcher: () =>
+        trpcQuery<MarketCategoryItem[]>('market.getAssistantCategories', {
+          locale: getCommunityMarketLocale(),
+          q: params?.q,
+        }),
+      options,
+      scope: 'market.getAssistantCategories',
+      values: { locale: getCommunityMarketLocale(), q: params?.q },
+    }).then((items) =>
+      (items ?? [])
+        .map((item) => normalizeMarketCategoryItem(item))
+        .filter((item): item is MarketCategoryItem => Boolean(item)),
+    ),
+
+  getGroupAgentCategories: (
+    params?: {
+      q?: string;
+    },
+    options?: CommunityMarketRequestOptions,
+  ) =>
+    requestCommunityMarket({
+      fetcher: () =>
+        trpcQuery<MarketCategoryItem[]>('market.getGroupAgentCategories', {
+          locale: getCommunityMarketLocale(),
+          q: params?.q,
+        }),
+      options,
+      scope: 'market.getGroupAgentCategories',
+      values: { locale: getCommunityMarketLocale(), q: params?.q },
+    }).then((items) =>
+      (items ?? [])
+        .map((item) => normalizeMarketCategoryItem(item))
+        .filter((item): item is MarketCategoryItem => Boolean(item)),
+    ),
+
+  getModelCategories: (
+    params?: {
+      q?: string;
+    },
+    options?: CommunityMarketRequestOptions,
+  ) =>
+    requestCommunityMarket({
+      fetcher: () =>
+        trpcQuery<MarketCategoryItem[]>('market.getModelCategories', {
+          q: params?.q,
+        }),
+      options,
+      scope: 'market.getModelCategories',
+      values: { q: params?.q },
+    }).then((items) =>
+      (items ?? [])
+        .map((item) => normalizeMarketCategoryItem(item))
+        .filter((item): item is MarketCategoryItem => Boolean(item)),
+    ),
+
+  getPluginCategories: (
+    params?: {
+      q?: string;
+    },
+    options?: CommunityMarketRequestOptions,
+  ) =>
+    requestCommunityMarket({
+      fetcher: () =>
+        trpcQuery<MarketCategoryItem[]>('market.getPluginCategories', {
+          locale: getCommunityMarketLocale(),
+          q: params?.q,
+        }),
+      options,
+      scope: 'market.getPluginCategories',
+      values: { locale: getCommunityMarketLocale(), q: params?.q },
+    }).then((items) =>
+      (items ?? [])
+        .map((item) => normalizeMarketCategoryItem(item))
+        .filter((item): item is MarketCategoryItem => Boolean(item)),
+    ),
 };
 
 export const lobehubSkillApi = {
   getAuthorizeUrl: async (provider: string, options?: { redirectUri?: string; scopes?: string[] }) =>
-    trpcQuery<any>('tools.market.connectGetAuthorizeUrl', {
+    trpcQuery<any>('market.connectGetAuthorizeUrl', {
       provider,
       redirectUri: options?.redirectUri,
       scopes: options?.scopes,
-    }),
+    }, TOOLS_TRPC_OPTIONS),
 
   getConnections: async (): Promise<
     Array<{
@@ -3303,17 +3921,17 @@ export const lobehubSkillApi = {
       tokenExpiresAt?: string;
     }>
   > => {
-    const response = await trpcQuery<any>('tools.market.connectListConnections', {});
+    const response = await trpcQuery<any>('market.connectListConnections', {}, TOOLS_TRPC_OPTIONS);
     return response?.connections || [];
   },
 
   getStatus: async (provider: string) =>
-    trpcQuery<any>('tools.market.connectGetStatus', {
+    trpcQuery<any>('market.connectGetStatus', {
       provider,
-    }),
+    }, TOOLS_TRPC_OPTIONS),
 
   revoke: async (provider: string): Promise<void> => {
-    await trpcMutate('tools.market.connectRevoke', { provider });
+    await trpcMutate('market.connectRevoke', { provider }, TOOLS_TRPC_OPTIONS);
   },
 };
 
@@ -3350,6 +3968,14 @@ export const statsApi = {
   /** Get user registration duration info */
   getRegistrationDuration: () =>
     trpcQuery<UserRegistrationDuration>('user.getUserRegistrationDuration'),
+
+  /** Monthly usage records, aligned with web /settings/stats usage table */
+  findUsageByMonth: (mo?: string) =>
+    trpcQuery<UsageRecordItem[]>('usage.findByMonth', { mo }, LAMBDA_TRPC_OPTIONS),
+
+  /** Monthly usage grouped by day, aligned with web usage cards/trends */
+  findUsageGroupedByDay: (mo?: string) =>
+    trpcQuery<UsageLog[]>('usage.findAndGroupByDay', { mo }, LAMBDA_TRPC_OPTIONS),
 };
 
 // ── Memory API ──────────────────────────────────────────────────────
@@ -3488,7 +4114,7 @@ export const spaceMemoryApi = {
       spaceId,
       summary: draft.summary,
       title: draft.title,
-    }),
+    }, LAMBDA_TRPC_OPTIONS),
   exportAuditBundle: (
     spaceId: string,
     id: string,
@@ -3498,7 +4124,7 @@ export const spaceMemoryApi = {
       id,
       recallFilter,
       spaceId,
-    }),
+    }, LAMBDA_TRPC_OPTIONS),
   exportAuditBundles: (
     spaceId: string,
     ids: string[],
@@ -3508,11 +4134,19 @@ export const spaceMemoryApi = {
       ids,
       recallFilter,
       spaceId,
-    }),
+    }, LAMBDA_TRPC_OPTIONS),
   getEntry: (spaceId: string, id: string) =>
-    trpcQuery<MobileSpaceMemoryEntryResult>('spaceMemory.getEntry', { id, spaceId }),
+    trpcQuery<MobileSpaceMemoryEntryResult>(
+      'spaceMemory.getEntry',
+      { id, spaceId },
+      LAMBDA_TRPC_OPTIONS,
+    ),
   getSummary: (spaceId: string) =>
-    trpcQuery<MobileSpaceMemorySummary>('spaceMemory.getSummary', { spaceId }),
+    trpcQuery<MobileSpaceMemorySummary>(
+      'spaceMemory.getSummary',
+      { spaceId },
+      LAMBDA_TRPC_OPTIONS,
+    ),
   listEntries: (
     spaceId: string,
     section: MobileSpaceMemorySection,
@@ -3522,15 +4156,15 @@ export const spaceMemoryApi = {
       recallFilter,
       section,
       spaceId,
-    }),
+    }, LAMBDA_TRPC_OPTIONS),
   publishEntry: (spaceId: string, id: string) =>
-    trpcMutate('spaceMemory.publishEntry', { id, spaceId }),
+    trpcMutate('spaceMemory.publishEntry', { id, spaceId }, LAMBDA_TRPC_OPTIONS),
   rejectEntry: (spaceId: string, id: string) =>
-    trpcMutate('spaceMemory.rejectEntry', { id, spaceId }),
+    trpcMutate('spaceMemory.rejectEntry', { id, spaceId }, LAMBDA_TRPC_OPTIONS),
   markEntryStale: (spaceId: string, id: string) =>
-    trpcMutate('spaceMemory.markEntriesStale', { ids: [id], spaceId }),
+    trpcMutate('spaceMemory.markEntriesStale', { ids: [id], spaceId }, LAMBDA_TRPC_OPTIONS),
   revalidateEntry: (spaceId: string, id: string) =>
-    trpcMutate('spaceMemory.revalidateEntries', { ids: [id], spaceId }),
+    trpcMutate('spaceMemory.revalidateEntries', { ids: [id], spaceId }, LAMBDA_TRPC_OPTIONS),
   mergeEntry: (
     spaceId: string,
     params: {
@@ -3549,7 +4183,7 @@ export const spaceMemoryApi = {
       merge: params.merge,
       spaceId,
       targetEntryId: params.targetEntryId,
-    }),
+    }, LAMBDA_TRPC_OPTIONS),
 };
 
 // ── Artwork / Image Generation API ─────────────────────────────────

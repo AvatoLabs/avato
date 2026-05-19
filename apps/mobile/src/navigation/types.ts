@@ -126,6 +126,9 @@ export type RootStackParamList = {
     section?: MobileSpaceMemorySection;
     spaceId: string;
   };
+  SpaceSettings: {
+    spaceId: string;
+  };
   MessageDetail: MessageDetailRouteParams & PortalRouteParams;
   ModelPicker: { sessionId?: string } | undefined;
   /** Standalone: no params. From chat/thread: pass source route params. */
@@ -135,6 +138,8 @@ export type RootStackParamList = {
   ProfileEdit: undefined;
   /** Public share link `/share/r/:token` (deep link or in-app). */
   PublicResourceShare: { initialPassword?: string; token: string };
+  /** Public topic share link `/share/t/:shareId` (deep link or in-app). */
+  PublicTopicShare: { shareId: string };
   ProviderDetail: Record<string, unknown> | undefined;
   ServerConfig: { firstLaunch?: boolean } | undefined;
   Stats: undefined;

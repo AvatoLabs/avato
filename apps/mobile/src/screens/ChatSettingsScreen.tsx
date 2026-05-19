@@ -2,12 +2,13 @@
  * ChatSettingsScreen — session-level settings only.
  * Agent management is handled in Agent screens.
  */
-import { ArrowLeft, Check, ChevronRight, Tag } from 'lucide-react-native';
+import { ArrowLeft, Check, ChevronRight, ExternalLink, Tag } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -39,11 +40,13 @@ import {
 } from '../features/ChatSettings';
 import { useAgentConfig } from '../hooks/useAgentConfig';
 import { agentApi, agentGroupApi, type AgentGroupDetail, sessionApi, tagApi } from '../lib/api';
+import { joinWebPath } from '../lib/communityLinks';
 import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { navigateToLogin } from '../lib/navigation';
 import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
+import { getApiUrl } from '../lib/server';
 import { isGroupSessionLike } from '../lib/session';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useChatStore } from '../store/chat';
@@ -521,6 +524,20 @@ export default function ChatSettingsScreen({
     toast,
   ]);
 
+  const handleOpenWebGroupProfile = useCallback(async () => {
+    if (!sessionId) return;
+
+    haptics.light();
+    try {
+      const baseUrl = await getApiUrl();
+      await Linking.openURL(
+        joinWebPath(baseUrl, `/group/${encodeURIComponent(sessionId)}/profile`),
+      );
+    } catch {
+      toast.show('error', t.groupOpenWebFailed);
+    }
+  }, [sessionId, t.groupOpenWebFailed, toast]);
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -577,19 +594,40 @@ export default function ChatSettingsScreen({
 
         {isGroupSession ? (
           <Animated.View entering={FadeInDown.delay(60).duration(300)}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              className="mt-4 flex-row items-center justify-center rounded-xl py-3"
-              style={{ backgroundColor: colors.primary, width: contentWidth }}
-              onPress={() => {
-                haptics.light();
-                navigation.replace('ChatDetail', { sessionId });
-              }}
-            >
-              <Text className="text-[15px] font-semibold" style={{ color: colors.iconOnPrimary }}>
-                {t.groupStartConversation}
+            <View className="mt-4 gap-2" style={{ width: contentWidth }}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                className="flex-row items-center justify-center rounded-xl py-3"
+                style={{ backgroundColor: colors.primary }}
+                onPress={() => {
+                  haptics.light();
+                  navigation.replace('ChatDetail', { sessionId });
+                }}
+              >
+                <Text className="text-[15px] font-semibold" style={{ color: colors.iconOnPrimary }}>
+                  {t.groupStartConversation}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                className="flex-row items-center justify-center rounded-xl py-3"
+                style={{ backgroundColor: colors.fillTertiary }}
+                onPress={() => void handleOpenWebGroupProfile()}
+              >
+                <ExternalLink
+                  color={colors.primary}
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                  style={{ marginRight: 8 }}
+                />
+                <Text className="text-[14px] font-semibold" style={{ color: colors.primary }}>
+                  {t.groupOpenWebProfile}
+                </Text>
+              </TouchableOpacity>
+              <Text className="px-2 text-[12px] leading-5" style={{ color: colors.secondaryText }}>
+                {t.groupOpenWebProfileDesc}
               </Text>
-            </TouchableOpacity>
+            </View>
           </Animated.View>
         ) : null}
 

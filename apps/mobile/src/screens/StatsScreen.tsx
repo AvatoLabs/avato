@@ -10,13 +10,17 @@
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ArrowLeft,
+  BarChart3,
   BookOpen,
   CalendarDays,
   Clock3,
   ClockArrowUp,
   Crown,
+  DollarSign,
+  ExternalLink,
   Flame,
   MessageSquare,
+  Share2,
   Sparkles,
   Trophy,
   Zap,
@@ -26,9 +30,11 @@ import {
   ActivityIndicator,
   Alert,
   Image as RNImage,
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   Text,
   TouchableOpacity,
   useWindowDimensions,
@@ -36,12 +42,14 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { HeaderIconButton, ScreenHeader } from '../components/ui/ScreenHeader';
 import { getProviderIconUrl } from '../constants/cdn';
 import { INBOX_SESSION_ID } from '../constants/session';
 import { statsApi } from '../lib/api';
+import { joinWebPath } from '../lib/communityLinks';
 import { useI18n } from '../lib/i18n';
 import { getResponsiveLayoutMetrics } from '../lib/responsiveLayout';
+import { getApiUrl } from '../lib/server';
 import type { RootStackParamList } from '../navigation/types';
 import { useThemeStore } from '../store/theme';
 import { useThemeColors } from '../theme/colors';
@@ -51,6 +59,8 @@ import type {
   ModelRankItem,
   SessionRankItem,
   TopicRankItem,
+  UsageLog,
+  UsageRecordItem,
   UserRegistrationDuration,
 } from '../types';
 
@@ -75,6 +85,11 @@ function lastMonthEnd(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function currentMonth(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 function percentChange(current: number, prev: number, newSincePrevLabel: string): string | null {
   if (prev === 0 && current === 0) return null;
   if (prev === 0) return newSincePrevLabel;
@@ -86,6 +101,10 @@ function formatDate(iso?: string): string {
   if (!iso) return '--';
   const d = new Date(iso);
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function formatCurrency(n: number): string {
+  return `$${n.toFixed(n >= 1 ? 4 : 6)}`;
 }
 
 function settledNumber(r: PromiseSettledResult<unknown>, fallback = 0): number {
@@ -427,6 +446,177 @@ function RankSection({
   );
 }
 
+type UsageGroupBy = 'model' | 'provider';
+
+function UsageSection({
+  groupBy,
+  logs,
+  loading,
+  month,
+  records,
+  setGroupBy,
+}: {
+  groupBy: UsageGroupBy;
+  logs: UsageLog[];
+  loading: boolean;
+  month: string;
+  records: UsageRecordItem[];
+  setGroupBy: (value: UsageGroupBy) => void;
+}) {
+  const { t } = useI18n();
+  const colors = useThemeColors();
+  const totalSpend = logs.reduce((sum, item) => sum + (item.totalSpend || 0), 0);
+  const totalTokens = logs.reduce((sum, item) => sum + (item.totalTokens || 0), 0);
+  const totalRequests = logs.reduce((sum, item) => sum + (item.totalRequests || 0), 0);
+  const groupedUsage = useMemo(() => {
+    const map = new Map<string, { spend: number; tokens: number; requests: number }>();
+
+    for (const record of records) {
+      const key = groupBy === 'provider' ? record.provider || 'unknown' : record.model || 'unknown';
+      const current = map.get(key) || { requests: 0, spend: 0, tokens: 0 };
+      map.set(key, {
+        requests: current.requests + 1,
+        spend: current.spend + (record.spend || 0),
+        tokens: current.tokens + (record.totalTokens || 0),
+      });
+    }
+
+    return [...map.entries()]
+      .map(([name, value]) => ({ name, ...value }))
+      .sort((a, b) => b.tokens - a.tokens || b.requests - a.requests)
+      .slice(0, 5);
+  }, [groupBy, records]);
+
+  const maxTokens = groupedUsage[0]?.tokens || 1;
+
+  return (
+    <View className="mb-6">
+      <View className="flex-row items-center justify-between mb-3">
+        <View className="flex-row items-center gap-2">
+          <BarChart3 color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
+          <Text className="text-foreground text-[15px] font-semibold tracking-tight">
+            {t.statsUsage}
+          </Text>
+        </View>
+        <Text className="text-[12px] font-medium" style={{ color: colors.secondaryText }}>
+          {t.statsUsageMonth.replace('{month}', month)}
+        </Text>
+      </View>
+
+      <View className="flex-row gap-2 mb-3">
+        <View className="flex-1 rounded-2xl p-3" style={{ backgroundColor: colors.primarySubtle }}>
+          <DollarSign color={colors.primary} size={15} strokeWidth={tokens.icon.strokeWidth} />
+          <Text className="text-foreground text-[17px] font-bold mt-1">
+            {loading ? '--' : formatCurrency(totalSpend)}
+          </Text>
+          <Text className="text-[11px]" style={{ color: colors.secondaryText }}>
+            {t.statsUsageSpend}
+          </Text>
+        </View>
+        <View className="flex-1 rounded-2xl p-3" style={{ backgroundColor: colors.fillTertiary }}>
+          <Text className="text-foreground text-[17px] font-bold">
+            {loading ? '--' : formatNumber(totalTokens)}
+          </Text>
+          <Text className="text-[11px]" style={{ color: colors.secondaryText }}>
+            {t.statsUsageTokens}
+          </Text>
+        </View>
+        <View className="flex-1 rounded-2xl p-3" style={{ backgroundColor: colors.fillTertiary }}>
+          <Text className="text-foreground text-[17px] font-bold">
+            {loading ? '--' : formatNumber(totalRequests)}
+          </Text>
+          <Text className="text-[11px]" style={{ color: colors.secondaryText }}>
+            {t.statsUsageRequests}
+          </Text>
+        </View>
+      </View>
+
+      <View className="flex-row gap-2 mb-3">
+        {(['model', 'provider'] as const).map((value) => {
+          const active = groupBy === value;
+          return (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              activeOpacity={0.72}
+              className="rounded-full px-3 py-1.5"
+              key={value}
+              style={{ backgroundColor: active ? colors.primaryMuted : colors.fillTertiary }}
+              onPress={() => setGroupBy(value)}
+            >
+              <Text
+                className="text-[12px] font-semibold"
+                style={{ color: active ? colors.primary : colors.secondaryText }}
+              >
+                {value === 'model' ? t.statsUsageByModel : t.statsUsageByProvider}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {loading ? (
+        <View className="h-20 items-center justify-center">
+          <ActivityIndicator color={colors.primary} size="small" />
+        </View>
+      ) : groupedUsage.length === 0 ? (
+        <View className="py-8 items-center rounded-2xl bg-foreground/[0.02]">
+          <Text className="text-[13px] font-medium" style={{ color: colors.secondaryText }}>
+            {t.statsNoUsage}
+          </Text>
+        </View>
+      ) : (
+        <View className="rounded-2xl bg-foreground/[0.02] px-3 py-2">
+          {groupedUsage.map((item) => (
+            <View className="py-2" key={item.name}>
+              <View className="flex-row items-center justify-between mb-1">
+                <Text className="text-foreground text-[13px] font-medium flex-1" numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text className="text-[12px] font-semibold" style={{ color: colors.secondaryText }}>
+                  {formatNumber(item.tokens)}
+                </Text>
+              </View>
+              <View className="h-1.5 rounded-full bg-foreground/5 overflow-hidden">
+                <View
+                  className="h-full rounded-full"
+                  style={{
+                    backgroundColor: colors.primary,
+                    width: `${Math.max((item.tokens / maxTokens) * 100, 4)}%`,
+                  }}
+                />
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {!loading && records.length > 0 ? (
+        <View className="mt-3">
+          <Text className="text-[12px] font-semibold mb-2" style={{ color: colors.secondaryText }}>
+            {t.statsUsageRecentLogs}
+          </Text>
+          {records.slice(0, 5).map((record) => (
+            <View className="flex-row items-center py-2" key={record.id}>
+              <View className="flex-1 pr-2">
+                <Text className="text-foreground text-[13px] font-medium" numberOfLines={1}>
+                  {record.model || record.provider || record.type}
+                </Text>
+                <Text className="text-[11px]" style={{ color: colors.tertiaryText }}>
+                  {record.provider} · {formatDate(record.createdAt)}
+                </Text>
+              </View>
+              <Text className="text-[12px] font-semibold" style={{ color: colors.secondaryText }}>
+                {formatNumber(record.totalTokens || 0)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 // ── Main ─────────────────────────────────────────────────────────────
 
 interface StatsData {
@@ -442,6 +632,8 @@ interface StatsData {
   sessions: number;
   topicRank: TopicRankItem[];
   topics: number;
+  usageLogs: UsageLog[];
+  usageRecords: UsageRecordItem[];
   words: number;
 }
 
@@ -456,6 +648,7 @@ export default function StatsScreen({ navigation }: { navigation: StatsScreenNav
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [usageGroupBy, setUsageGroupBy] = useState<UsageGroupBy>('model');
   const [data, setData] = useState<StatsData>({
     messages: 0,
     prevMessages: 0,
@@ -470,9 +663,12 @@ export default function StatsScreen({ navigation }: { navigation: StatsScreenNav
     modelRank: [],
     sessionRank: [],
     topicRank: [],
+    usageLogs: [],
+    usageRecords: [],
   });
 
   const prevMonthEnd = lastMonthEnd();
+  const usageMonth = currentMonth();
 
   const fetchAll = useCallback(async (): Promise<boolean> => {
     const settled = await Promise.allSettled([
@@ -489,6 +685,8 @@ export default function StatsScreen({ navigation }: { navigation: StatsScreenNav
       statsApi.rankModels(),
       statsApi.rankSessions(),
       statsApi.rankTopics(),
+      statsApi.findUsageGroupedByDay(usageMonth),
+      statsApi.findUsageByMonth(usageMonth),
     ]);
 
     if (settled.every((s) => s.status === 'rejected')) {
@@ -509,9 +707,11 @@ export default function StatsScreen({ navigation }: { navigation: StatsScreenNav
       modelRank: settledArray<ModelRankItem>(settled[10]),
       sessionRank: settledArray<SessionRankItem>(settled[11]),
       topicRank: settledArray<TopicRankItem>(settled[12]),
+      usageLogs: settledArray<UsageLog>(settled[13]),
+      usageRecords: settledArray<UsageRecordItem>(settled[14]),
     });
     return true;
-  }, [prevMonthEnd]);
+  }, [prevMonthEnd, usageMonth]);
 
   useEffect(() => {
     void (async () => {
@@ -528,6 +728,41 @@ export default function StatsScreen({ navigation }: { navigation: StatsScreenNav
     setRefreshing(false);
   }, [fetchAll]);
 
+  const shareMessage = useMemo(() => {
+    const totalSpend = data.usageLogs.reduce((sum, item) => sum + (item.totalSpend || 0), 0);
+    const totalTokens = data.usageRecords.reduce((sum, item) => sum + (item.totalTokens || 0), 0);
+    const totalRequests = data.usageLogs.reduce((sum, item) => sum + (item.totalRequests || 0), 0);
+
+    return [
+      `${t.statsTitle} · Avato`,
+      `${t.statsTotalSessions}: ${formatNumber(data.sessions)}`,
+      `${t.statsTotalTopics}: ${formatNumber(data.topics)}`,
+      `${t.statsTotalMessages}: ${formatNumber(data.messages)}`,
+      `${t.statsTotalWords}: ${formatNumber(data.words)}`,
+      `${t.statsUsageMonth.replace('{month}', usageMonth)}`,
+      `${t.statsUsageSpend}: ${formatCurrency(totalSpend)}`,
+      `${t.statsUsageTokens}: ${formatNumber(totalTokens)}`,
+      `${t.statsUsageRequests}: ${formatNumber(totalRequests)}`,
+    ].join('\n');
+  }, [
+    data.messages,
+    data.sessions,
+    data.topics,
+    data.usageLogs,
+    data.usageRecords,
+    data.words,
+    t.statsTitle,
+    t.statsTotalMessages,
+    t.statsTotalSessions,
+    t.statsTotalTopics,
+    t.statsTotalWords,
+    t.statsUsageMonth,
+    t.statsUsageRequests,
+    t.statsUsageSpend,
+    t.statsUsageTokens,
+    usageMonth,
+  ]);
+
   const handleRetry = useCallback(async () => {
     setLoadError(false);
     setLoading(true);
@@ -535,6 +770,26 @@ export default function StatsScreen({ navigation }: { navigation: StatsScreenNav
     setLoading(false);
     setLoadError(!ok);
   }, [fetchAll]);
+
+  const handleShare = useCallback(async () => {
+    try {
+      await Share.share({
+        message: shareMessage,
+        title: t.statsTitle,
+      });
+    } catch {
+      Alert.alert(t.statsShareFailed);
+    }
+  }, [shareMessage, t.statsShareFailed, t.statsTitle]);
+
+  const handleOpenWebStats = useCallback(async () => {
+    try {
+      const baseUrl = await getApiUrl();
+      await Linking.openURL(joinWebPath(baseUrl, '/settings/stats'));
+    } catch {
+      Alert.alert(t.statsOpenWebFailed);
+    }
+  }, [t.statsOpenWebFailed]);
 
   const modelRankSectionData = useMemo(
     () => data.modelRank.map((m) => ({ count: m.count, name: m.id })),
@@ -586,6 +841,24 @@ export default function StatsScreen({ navigation }: { navigation: StatsScreenNav
         title={t.statsTitle}
         leftElement={
           <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+        }
+        rightActions={
+          <View className="flex-row items-center gap-2">
+            <HeaderIconButton accessibilityLabel={t.statsOpenWebStats} onPress={handleOpenWebStats}>
+              <ExternalLink
+                color={colors.primary}
+                size={18}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            </HeaderIconButton>
+            <HeaderIconButton
+              accessibilityLabel={t.statsShare}
+              disabled={loading || loadError}
+              onPress={handleShare}
+            >
+              <Share2 color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+            </HeaderIconButton>
+          </View>
         }
         onPressLeft={() => navigation.goBack()}
       />
@@ -763,6 +1036,20 @@ export default function StatsScreen({ navigation }: { navigation: StatsScreenNav
               onRowPress={handleTopicRankPress}
             />
           </View>
+        </Animated.View>
+
+        <Animated.View
+          entering={FadeInDown.delay(150).duration(300)}
+          style={{ width: contentWidth }}
+        >
+          <UsageSection
+            groupBy={usageGroupBy}
+            loading={loading}
+            logs={data.usageLogs}
+            month={usageMonth}
+            records={data.usageRecords}
+            setGroupBy={setUsageGroupBy}
+          />
         </Animated.View>
       </ScrollView>
     </View>

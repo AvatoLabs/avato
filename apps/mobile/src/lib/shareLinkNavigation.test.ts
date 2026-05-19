@@ -7,11 +7,13 @@ import {
   navigateToThreadDetail,
   navigateToThreadList,
   navigateToToolDetail,
+  navigationRef,
 } from './navigation';
 import {
   handleIncomingShareUrl,
   parseIncomingNavigationUrl,
   parseResourceShareUrl,
+  parseTopicShareUrl,
 } from './shareLinkNavigation';
 
 vi.mock('./navigation', () => ({
@@ -33,6 +35,21 @@ describe('shareLinkNavigation', () => {
     expect(parseResourceShareUrl('https://example.com/share/r/token-1?password=abc')).toEqual({
       initialPassword: 'abc',
       token: 'token-1',
+    });
+  });
+
+  it('parses public topic share urls', () => {
+    expect(parseTopicShareUrl('https://example.com/share/t/topic-share-1')).toEqual({
+      shareId: 'topic-share-1',
+    });
+  });
+
+  it('parses public topic share urls as navigation targets', () => {
+    expect(parseIncomingNavigationUrl('https://example.com/share/t/topic-share-1')).toEqual({
+      params: {
+        shareId: 'topic-share-1',
+      },
+      route: 'PublicTopicShare',
     });
   });
 
@@ -247,6 +264,14 @@ describe('shareLinkNavigation', () => {
     expect(navigateToThreadList).toHaveBeenCalledWith({
       sessionId: 'session-1',
       topicId: 'topic-2',
+    });
+  });
+
+  it('dispatches public topic share deep links to the in-app preview', () => {
+    handleIncomingShareUrl('https://example.com/share/t/topic-share-1');
+
+    expect(navigationRef.navigate).toHaveBeenCalledWith('PublicTopicShare', {
+      shareId: 'topic-share-1',
     });
   });
 });

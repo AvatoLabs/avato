@@ -17,6 +17,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Clapperboard,
   Cloud,
   Database,
   FileText,
@@ -26,7 +27,9 @@ import {
   Mic,
   Monitor,
   Moon,
+  Palette,
   Server,
+  Settings2,
   Sun,
   Volume2,
 } from 'lucide-react-native';
@@ -34,6 +37,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -55,6 +59,7 @@ import { APP_NAME, APP_VERSION } from '../lib/appInfo';
 import { clearTransientAppState } from '../lib/appState';
 import { signOutFromBrowser } from '../lib/auth';
 import { useMainTabScrollableContentPaddingBottom } from '../lib/bottomChrome';
+import { joinWebPath } from '../lib/communityLinks';
 import { haptics } from '../lib/haptics';
 import { LOCALE_DISPLAY_NAMES, useI18n } from '../lib/i18n';
 import { getAppLoggingEnabled, setAppLoggingEnabled } from '../lib/logger';
@@ -312,6 +317,66 @@ export default function ProfileScreen({ navigation }: any) {
     haptics.light();
     navigation?.navigate?.(name);
   };
+
+  const handleOpenWebPath = useCallback(
+    async (path: `/${string}`) => {
+      haptics.light();
+      try {
+        const baseUrl = await getApiUrl();
+        await Linking.openURL(joinWebPath(baseUrl, path));
+      } catch {
+        toast.show('error', t.settingsOpenWebFailed);
+      }
+    },
+    [t.settingsOpenWebFailed, toast],
+  );
+
+  const advancedWebEntries = useMemo(
+    () => [
+      {
+        description: t.settingsOpenWebSettingsDesc,
+        icon: Settings2,
+        label: t.settingsOpenWebSettings,
+        path: '/settings' as const,
+      },
+      {
+        description: t.settingsOpenWebStudioDesc,
+        icon: BrainCircuit,
+        label: t.settingsOpenWebStudio,
+        path: '/studio' as const,
+      },
+      {
+        description: t.settingsOpenWebMcpStudioDesc,
+        icon: Bot,
+        label: t.settingsOpenWebMcpStudio,
+        path: '/settings/mcp-studio' as const,
+      },
+      {
+        description: t.settingsOpenWebImageDesc,
+        icon: Palette,
+        label: t.settingsOpenWebImage,
+        path: '/image' as const,
+      },
+      {
+        description: t.settingsOpenWebVideoDesc,
+        icon: Clapperboard,
+        label: t.settingsOpenWebVideo,
+        path: '/video' as const,
+      },
+    ],
+    [
+      t.settingsOpenWebImage,
+      t.settingsOpenWebImageDesc,
+      t.settingsOpenWebMcpStudio,
+      t.settingsOpenWebMcpStudioDesc,
+      t.settingsOpenWebSettings,
+      t.settingsOpenWebSettingsDesc,
+      t.settingsOpenWebStudio,
+      t.settingsOpenWebStudioDesc,
+      t.settingsOpenWebVideo,
+      t.settingsOpenWebVideoDesc,
+    ],
+  );
 
   const handleSignOut = () => {
     Alert.alert(t.meSignOutConfirm, t.meSignOutDesc, [
@@ -768,6 +833,50 @@ export default function ProfileScreen({ navigation }: any) {
                 />
               </TouchableOpacity>
             </View>
+          </View>
+        </SettingsSection>
+
+        <SettingsSection delay={108} title={t.settingsGroupAdvanced}>
+          <View className="mb-4 overflow-hidden rounded-xl bg-foreground/[0.03]">
+            {advancedWebEntries.map((entry, index) => {
+              const Icon = entry.icon;
+
+              return (
+                <TouchableOpacity
+                  activeOpacity={0.6}
+                  className="flex-row items-center px-5 py-3.5"
+                  key={entry.path}
+                  onPress={() => void handleOpenWebPath(entry.path)}
+                >
+                  <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
+                    <Icon color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                  </View>
+                  <View
+                    className="flex-1"
+                    style={
+                      index === advancedWebEntries.length - 1
+                        ? undefined
+                        : { borderBottomColor: colors.borderSubtle, borderBottomWidth: 1 }
+                    }
+                  >
+                    <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                      {entry.label}
+                    </Text>
+                    <Text
+                      className="text-[12px] font-medium mt-0.5 mb-3.5"
+                      style={{ color: colors.secondaryText }}
+                    >
+                      {entry.description}
+                    </Text>
+                  </View>
+                  <ChevronRight
+                    color={colors.primary}
+                    size={18}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </SettingsSection>
 

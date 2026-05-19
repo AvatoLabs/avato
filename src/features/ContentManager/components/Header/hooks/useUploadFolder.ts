@@ -1,4 +1,3 @@
-import { type TFunction } from 'i18next';
 import { type ChangeEvent } from 'react';
 import { useCallback } from 'react';
 
@@ -15,7 +14,7 @@ interface UseUploadFolderOptions {
   currentFolderId?: string | null;
   sourceSetId?: string | null;
   spaceId?: string;
-  t: TFunction;
+  t: (key: any, options?: any) => string;
   uploadFolderWithStructure: FileManageAction['uploadFolderWithStructure'];
 }
 
@@ -31,6 +30,7 @@ const useUploadFolder = ({
       let files = Array.from(event.target.files || []);
       if (files.length === 0) return;
 
+      const translateText = (key: string, options?: Record<string, unknown>) => t(key, options);
       const targetFolderId = currentFolderId ?? undefined;
       const targetSourceSetId = sourceSetId ?? undefined;
       const upload = async (fileList: File[]) =>
@@ -49,7 +49,7 @@ const useUploadFolder = ({
       if (builtInBlockedCount > 0) {
         const { message } = await import('antd');
         message.info(
-          t('header.actions.builtInBlockList.filtered', {
+          translateText('header.actions.builtInBlockList.filtered', {
             ignored: builtInBlockedCount,
             total: originalCount,
           }),
@@ -66,11 +66,11 @@ const useUploadFolder = ({
           const { Modal } = await import('antd');
 
           Modal.confirm({
-            cancelText: t('header.actions.gitignore.cancel'),
-            content: t('header.actions.gitignore.content', {
+            cancelText: translateText('header.actions.gitignore.cancel'),
+            content: translateText('header.actions.gitignore.content', {
               count: gitignoreOriginalCount,
             }),
-            okText: t('header.actions.gitignore.apply'),
+            okText: translateText('header.actions.gitignore.apply'),
             onCancel: () => {
               startUpload(files);
             },
@@ -81,7 +81,7 @@ const useUploadFolder = ({
               if (ignoredCount > 0) {
                 const { message } = await import('antd');
                 message.info(
-                  t('header.actions.gitignore.filtered', {
+                  translateText('header.actions.gitignore.filtered', {
                     ignored: ignoredCount,
                     total: gitignoreOriginalCount,
                   }),
@@ -90,7 +90,7 @@ const useUploadFolder = ({
 
               startUpload(filteredFiles);
             },
-            title: t('header.actions.gitignore.title'),
+            title: translateText('header.actions.gitignore.title'),
           });
         } catch (error) {
           console.error('Failed to read .gitignore:', error);

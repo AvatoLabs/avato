@@ -19,7 +19,7 @@ describe('ssrfSafeFetch', () => {
     delete process.env.SSRF_ALLOW_IP_ADDRESS_LIST;
     delete process.env.SSRF_ALLOW_PRIVATE_IP_ADDRESS;
     global.fetch = mockFetch;
-    mockLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+    mockLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as any);
     mockFetch.mockResolvedValue(new Response('ok', { status: 200, statusText: 'OK' }));
   });
 
@@ -54,7 +54,7 @@ describe('ssrfSafeFetch', () => {
   });
 
   it('should block private DNS results by default', async () => {
-    mockLookup.mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
+    mockLookup.mockResolvedValue([{ address: '127.0.0.1', family: 4 }] as any);
 
     await expect(ssrfSafeFetch('https://example.com/api')).rejects.toThrow(
       /SSRF-safe fetch failed/,
@@ -65,7 +65,7 @@ describe('ssrfSafeFetch', () => {
   });
 
   it('should append documentation link for SSRF-blocked errors', async () => {
-    mockLookup.mockResolvedValue([{ address: '10.0.0.1', family: 4 }]);
+    mockLookup.mockResolvedValue([{ address: '10.0.0.1', family: 4 }] as any);
 
     await expect(ssrfSafeFetch('https://example.com/api')).rejects.toThrow(
       /ssrf-allow-private-ip-address/,
@@ -74,7 +74,7 @@ describe('ssrfSafeFetch', () => {
 
   it('should allow private IPs with env override', async () => {
     process.env.SSRF_ALLOW_PRIVATE_IP_ADDRESS = '1';
-    mockLookup.mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
+    mockLookup.mockResolvedValue([{ address: '127.0.0.1', family: 4 }] as any);
 
     const response = await ssrfSafeFetch('https://example.com/api');
 
@@ -84,7 +84,7 @@ describe('ssrfSafeFetch', () => {
 
   it('should allow specific private IPs with allow list', async () => {
     process.env.SSRF_ALLOW_IP_ADDRESS_LIST = '127.0.0.1';
-    mockLookup.mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
+    mockLookup.mockResolvedValue([{ address: '127.0.0.1', family: 4 }] as any);
 
     const response = await ssrfSafeFetch('https://example.com/api');
 

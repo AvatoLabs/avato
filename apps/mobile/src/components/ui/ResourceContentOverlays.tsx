@@ -90,6 +90,7 @@ export interface ResourceContentOverlaysProps {
     onCreateSpace: () => void;
     onOpenSharedWithMe: () => void;
     onOpenSpaceMemory?: () => void;
+    onOpenSpaceSettings: (spaceId: string) => void;
     onOpenTrash: () => void;
     onSelectAllFiles: () => void;
     onSelectSourceSet: (
@@ -309,6 +310,10 @@ export default function ResourceContentOverlays({
               }
             : undefined
         }
+        onOpenSpaceSettings={(spaceId) => {
+          scopeLauncher.onClose();
+          scopeLauncher.onOpenSpaceSettings(spaceId);
+        }}
         onOpenTrash={() => {
           scopeLauncher.onClose();
           scopeLauncher.onOpenTrash();
